@@ -37,12 +37,14 @@ struct FilterRules {
     @Published private(set) var updating = false
     @Published var status = "قواعد محلية جاهزة"
     private var allowed: Set<String> = []
+    private var nativeRules: [[String: Any]] = []
     private var compiled: [UUID: WKContentRuleList] = [:]
     private let updatesURL: URL
     init(root: URL = BrowserDisk.applicationRoot) {
         updatesURL = root.appendingPathComponent("Filters/easylist.txt")
         let bundled = Bundle.main.url(forResource: "block-domains", withExtension: "txt").flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? "doubleclick.net\ngooglesyndication.com\npopads.net\n"
         domains = FilterRules.parse(bundled).domains
+        if let path = Bundle.main.url(forResource: "safari-rules", withExtension: "json"), let bytes = try? Data(contentsOf: path), let rules = try? JSONSerialization.jsonObject(with: bytes) as? [[String: Any]] { nativeRules = rules; status = "\(rules.count) قاعدة WebKit من EasyList وEasyPrivacy" }
         if let update = try? String(contentsOf: updatesURL, encoding: .utf8) { merge(update) }
     }
     private func merge(_ text: String) {
@@ -72,6 +74,10 @@ struct FilterRules {
             if !exceptions.isEmpty { trigger["unless-top-url"] = exceptions.map(FilterRules.regex(for:)) }
             rules.append(["trigger": trigger, "action": ["type": "css-display-none", "selector": ".adsbygoogle,[id^='google_ads_'],[data-ad-slot],iframe[src*='doubleclick.net']"]])
         }
+        let converted = settings.cosmeticFiltering ? nativeRules : nativeRules.filter { ($0["action"] as? [String: Any])?["type"] as? String != "css-display-none" }
+        rules = converted + rules
+        // Applied after every blocking rule so compatibility overrides all lists.
+        for host in exceptions { rules.append(["trigger": ["url-filter": ".*", "if-top-url": [FilterRules.regex(for: host)]], "action": ["type": "ignore-previous-rules"]]) }
         guard let json = String(data: try JSONSerialization.data(withJSONObject: rules), encoding: .utf8) else { return nil }
         let value: WKContentRuleList = try await withCheckedThrowingContinuation { continuation in
             WKContentRuleListStore.default().compileContentRuleList(forIdentifier: "zeus-v2-" + profile.id.uuidString, encodedContentRuleList: json) { list, error in

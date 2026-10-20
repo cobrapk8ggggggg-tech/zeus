@@ -26,6 +26,8 @@ jobs:
           python3 .zeus-ci/project.py
           xcodegen generate --spec zeus-project.json
           mkdir -p results
+      - name: Convert EasyList and EasyPrivacy to native WebKit rules
+        run: python3 .zeus-ci/filters.py
       - name: Build unsigned iPhone and iPad application
         run: |
           set -o pipefail
@@ -84,5 +86,17 @@ jobs:
         with:
           name: zeus-next-build-and-tests
           path: results
+          retention-days: 14
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zeus-review
+          path: |
+            results/ZEUS-2.0-unsigned.ipa
+            results/screenshots
+            results/filter-metadata.json
+            ZEUSNext/Resources/safari-rules.json
+            ZEUSNext/Resources/FILTER-NOTICES.txt
           retention-days: 14
           if-no-files-found: warn

@@ -30,9 +30,15 @@ struct ProfilesSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    ForEach(store.profiles.filter { $0.account?.enabled != false || model.profile.isAdmin && !model.requiresUnlock }) { profile in accountRow(profile) }
-                } header: { Text(model.requiresUnlock ? "اختر حسابًا لتسجيل الدخول" : "الحسابات") } footer: { Text("لكل حساب إعداداته وملفاته وجلسات مواقعه. كلمة مرور الحساب تمنع دخوله حتى من الحساب الرئيسي.") }
+                Section("الحساب الرئيسي") {
+                    ForEach(store.profiles.filter { $0.isAdmin }) { profile in accountRow(profile) }
+                }
+                Section("الحسابات") {
+                    ForEach(store.profiles.filter { $0.role == .standard && $0.account?.enabled != false }) { profile in accountRow(profile) }
+                }
+                if store.profiles.contains(where: { [.guest, .kiosk].contains($0.role) && $0.account?.enabled == true }) {
+                    Section("ضيف وكشك") { ForEach(store.profiles.filter { [.guest, .kiosk].contains($0.role) && $0.account?.enabled == true }) { profile in accountRow(profile) } }
+                }
                 if model.profile.isAdmin && !model.requiresUnlock {
                     Section("إدارة الحسابات") {
                         Button("إضافة حساب", systemImage: "person.badge.plus") { creating = true }.accessibilityIdentifier("addProfileButton")
@@ -59,7 +65,7 @@ struct ProfilesSheet: View {
         HStack(spacing: 14) {
             Button { if AccountVault.exists(profile.id) { password = ""; login = profile } else { attempt(profile, password: "") } } label: {
                 HStack(spacing: 14) {
-                    AccountAvatar(profile: profile, store: store)
+                    AccountAvatar(profile: profile, store: store, size: 70)
                     VStack(alignment: .leading, spacing: 5) { Text(profile.name).font(.headline); Text(profile.role.title).font(.caption).foregroundStyle(.secondary) }
                     Spacer()
                     if AccountVault.exists(profile.id) || profile.locked { Image(systemName: "lock") }
@@ -69,7 +75,7 @@ struct ProfilesSheet: View {
             if !model.requiresUnlock && (model.profile.id == profile.id || model.profile.isAdmin && !AccountVault.exists(profile.id)) {
                 Button { editing = profile } label: { Image(systemName: "info.circle").frame(width: 40, height: 44) }.buttonStyle(.borderless).accessibilityLabel("إعدادات " + profile.name)
             }
-        }.padding(.vertical, 10).listRowBackground(Color.black)
+        }.frame(minHeight: 88).listRowBackground(Color.black).listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 12))
     }
     private func attempt(_ target: BrowserProfile, password: String) {
         busy = true; failure = nil

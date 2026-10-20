@@ -3,3 +3,6 @@ ZEUSNext.xcodeproj/
 .zeus-ci/Generated-Info.plist
 .zeus-ci/__pycache__/
 results/
+ZEUSNext/Resources/safari-rules.json
+ZEUSNext/Resources/filter-metadata.json
+ZEUSNext/Resources/FILTER-NOTICES.txt
