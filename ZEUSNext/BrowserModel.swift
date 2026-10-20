@@ -14,8 +14,9 @@ import LocalAuthentication
     var error: String?
     var snapshot: UIImage?
     var lastUsed = Date()
-    init(saved: SavedTab, profileID: UUID) { id = saved.id; title = saved.title; url = saved.url; self.profileID = profileID }
-    var saved: SavedTab { SavedTab(id: id, title: title, url: url) }
+    var pinned = false
+    init(saved: SavedTab, profileID: UUID) { id = saved.id; title = saved.title; url = saved.url; self.profileID = profileID; pinned = saved.pinned ?? false }
+    var saved: SavedTab { SavedTab(id: id, title: title, url: url, pinned: pinned) }
     var isHome: Bool { url == "zeus://home" }
     func dispose() {
         webView?.stopLoading()
@@ -55,6 +56,10 @@ struct WebDialog: Identifiable {
     @Published var address = ""
     @Published var blockedNavigations = 0
     @Published var chromeHidden = false
+    @Published var twinTabID: UUID?
+    @Published var twinVertical = false
+    @Published var twinFocused = false
+    @Published var twinFraction: CGFloat = 0.5
     private var leftAt: Date?
     init(profiles: ProfileStore? = nil, useBackgroundDownloads: Bool = true) {
         let store = profiles ?? ProfileStore()
@@ -67,7 +72,9 @@ struct WebDialog: Identifiable {
 
     }
     var profile: BrowserProfile { profiles.active }
-    var current: BrowserTab? { tabs.first { $0.id == selectedTabID } }
+    var primary: BrowserTab? { tabs.first { $0.id == selectedTabID } }
+    var secondary: BrowserTab? { tabs.first { $0.id == twinTabID } }
+    var current: BrowserTab? { twinFocused ? secondary ?? primary : primary }
     var webView: WKWebView? { current?.webView }
     var currentHost: String { URL(string: current?.url ?? "")?.host ?? "" }
     var siteCompatible: Bool { data.settings.siteExceptions.contains { BrowserURL.hostMatches(currentHost, domain: $0) } }
@@ -78,7 +85,7 @@ struct WebDialog: Identifiable {
     }
     func persist() {
         guard !requiresUnlock else { return }
-        data.tabs = tabs.map(\.saved); data.selectedTabID = selectedTabID
+        data.tabs = tabs.map(\.saved); data.selectedTabID = current?.id
         profiles.save(data, for: profile)
     }
     func changed() { objectWillChange.send() }
@@ -151,24 +158,25 @@ struct WebDialog: Identifiable {
         if activate { snapshotCurrent() }
         let tab = BrowserTab(saved: SavedTab(), profileID: profile.id)
         if data.settings.advanced?.openTabsNextToActive == true, let index = tabs.firstIndex(where: { $0.id == selectedTabID }) { tabs.insert(tab, at: index + 1) } else { tabs.append(tab) }
-        if activate { selectedTabID = tab.id; address = "" }
+        if activate { if twinFocused && twinTabID != nil { twinTabID = tab.id } else { selectedTabID = tab.id }; address = "" }
         if let url { tab.url = url.absoluteString; tab.title = url.host ?? "صفحة جديدة"; if activate { address = tab.url }; Task { if let view = await prepare(tab) { view.load(URLRequest(url: url)) } } }
         persist()
         return tab
     }
     func selectTab(_ tab: BrowserTab) {
         guard tabs.contains(where: { $0.id == tab.id }) else { return }
-        snapshotCurrent(); selectedTabID = tab.id; tab.lastUsed = Date(); address = tab.isHome ? "" : tab.url; persist()
+        snapshotCurrent(); if twinFocused && twinTabID != nil && tab.id != selectedTabID { twinTabID = tab.id } else if tab.id == twinTabID { twinFocused = true } else { selectedTabID = tab.id }; tab.lastUsed = Date(); address = tab.isHome ? "" : tab.url; persist()
         Task { await ensureCurrentLoaded() }
     }
     func closeTab(_ tab: BrowserTab) {
+        if twinTabID != nil && (tab.id == twinTabID || tab.id == selectedTabID) { twinTabID = nil; twinFocused = false }
         let previousIndex = tabs.firstIndex { $0.id == tab.id } ?? 0
         tab.dispose(); tabs.removeAll { $0.id == tab.id }
         if tabs.isEmpty { _ = newTab() }
         else if selectedTabID == tab.id { selectTab(tabs[min(max(0, previousIndex - (data.settings.advanced?.selectLeftAfterClosing == true ? 1 : 0)), tabs.count - 1)]) }
         persist()
     }
-    func closeAllTabs() { for tab in tabs { tab.dispose() }; tabs.removeAll(); _ = newTab() }
+    func closeAllTabs() { twinTabID = nil; twinFocused = false; for tab in tabs { tab.dispose() }; tabs.removeAll(); _ = newTab() }
     func home() { current?.dispose(); current?.url = "zeus://home"; current?.title = "بداية جديدة"; address = ""; changed(); persist() }
     func reload() { current?.error = nil; if let view = webView { view.reload() } else { Task { await ensureCurrentLoaded() } } }
     func snapshotCurrent() {
@@ -191,7 +199,7 @@ struct WebDialog: Identifiable {
         guard !switching, target.account?.enabled != false, target.id != profile.id || requiresUnlock else { return }; switching = true; defer { switching = false }
         if AccountVault.exists(target.id), !(await AccountVault.verify(password, id: target.id)) { notify(AccountError.password.localizedDescription); return }
         if target.locked, !(await authenticate(reason: "فتح مساحة \(target.name)")) { return }
-        let previous = profile; if !requiresUnlock { persist() }
+        let previous = profile; twinTabID = nil; twinFocused = false; if !requiresUnlock { persist() }
         for tab in tabs { tab.dispose() }; console.removeAll(); pendingPopup = nil
         dialog?.complete(nil); dialog = nil; article = nil; gallery = nil; share = nil
         if previous.isPrivate { shield.erase(previous.id); downloads.removeAll(profileID: previous.id); await profiles.clearEphemeral(previous) }
@@ -260,6 +268,18 @@ struct WebDialog: Identifiable {
         let store = profiles.websiteDataStore(for: owner)
         Task { await store.removeData(ofTypes: types, modifiedSince: .distantPast) }
     }
+    func toggleTwin(vertical: Bool) {
+        if twinTabID != nil && twinVertical == vertical { twinTabID = nil; twinFocused = false; return }
+        twinVertical = vertical
+        if twinTabID == nil {
+            let other = tabs.first { $0.id != selectedTabID } ?? newTab(foreground: false)
+            twinTabID = other?.id
+            if let other, !other.isHome { Task { if let view = await prepare(other), view.url == nil, let url = URL(string: other.url) { view.load(URLRequest(url: url)) } } }
+        }
+        twinFocused = false
+    }
+    func focusPane(_ tab: BrowserTab) { twinFocused = tab.id == twinTabID; address = tab.isHome ? "" : tab.url; changed() }
+    func pinCurrent() { current?.pinned.toggle(); tabs.sort { $0.pinned && !$1.pinned }; changed(); persist() }
     func permits(_ url: URL) -> Bool {
         let domains = profile.account?.allowedDomains ?? []
         return domains.isEmpty || domains.contains { BrowserURL.hostMatches(url.host ?? "", domain: $0) }
@@ -271,6 +291,7 @@ struct WebDialog: Identifiable {
     func logout() {
         if !requiresUnlock { persist() }
         cleanOnExit(profile)
+        twinTabID = nil; twinFocused = false
         for tab in tabs { tab.dispose() }; tabs.removeAll(); data = ProfileData(); console.removeAll(); article = nil; gallery = nil; share = nil; pendingPopup = nil; address = ""; requiresUnlock = true
         if profile.isPrivate { shield.erase(profile.id); let owner = profile; downloads.removeAll(profileID: owner.id); Task { await profiles.clearEphemeral(owner) } }
     }

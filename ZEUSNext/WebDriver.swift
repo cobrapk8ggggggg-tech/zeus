@@ -8,7 +8,7 @@ import UIKit
     private var scrollAnchor: CGFloat = 0
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) { scrollAnchor = scrollView.contentOffset.y }
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        guard scrollView.isDragging || scrollView.isDecelerating, let model, model.data.settings.advanced?.hideChromeOnScroll != false, tab?.id == model.selectedTabID else { return }
+        guard scrollView.isDragging || scrollView.isDecelerating, let model, model.data.settings.advanced?.hideChromeOnScroll != false, tab?.id == model.current?.id else { return }
         let y = scrollView.contentOffset.y
         guard y >= -scrollView.adjustedContentInset.top, y <= max(0, scrollView.contentSize.height - scrollView.bounds.height) else { return }
         let delta = y - scrollAnchor

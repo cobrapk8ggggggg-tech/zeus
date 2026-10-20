@@ -4,7 +4,7 @@ final class BrowserJourneyTests: XCTestCase {
     func testOriginalHomeAndFullScreenAccountSettings() throws {
         let app = XCUIApplication(); app.launchArguments = ["--uitesting"]; app.launch()
         XCTAssertTrue(app.textFields["homeSearchField"].waitForExistence(timeout: 15)); capture("01-original-home")
-        openToolbar(app); app.buttons["profilesButton"].tap()
+        openToolbar(app); app.buttons["toolsButton"].tap(); app.buttons["profilesButton"].tap()
         XCTAssertTrue(app.buttons["addProfileButton"].waitForExistence(timeout: 5)); capture("02-fullscreen-accounts")
         app.buttons["addProfileButton"].tap()
         let name = app.textFields["profileNameField"]; XCTAssertTrue(name.waitForExistence(timeout: 5)); name.tap(); name.typeText("Work")
@@ -14,7 +14,7 @@ final class BrowserJourneyTests: XCTestCase {
     func testAllChromeLayoutsKeepOriginalHomepage() throws {
         let app = XCUIApplication(); app.launchArguments = ["--uitesting"]; app.launch()
         openToolbar(app)
-        app.buttons["settingsButton"].tap()
+        app.buttons["toolsButton"].tap(); app.buttons["settingsButton"].tap()
         app.buttons["واجهة المستخدم والأشرطة"].tap()
         for layout in ["dualBars", "icab", "original"] {
             XCTAssertTrue(app.buttons["layout-" + layout].waitForExistence(timeout: 5)); app.buttons["layout-" + layout].tap(); capture("layout-choice-" + layout)

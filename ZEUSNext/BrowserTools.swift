@@ -91,3 +91,14 @@ extension BrowserModel {
     }
 
 }
+
+extension BrowserModel {
+    func saveWebArchive() {
+        guard profile.account?.allowDownloads != false, let view = webView else { return }; let owner = profile
+        view.createWebArchiveData { [weak self] result in
+            guard let self else { return }
+            do { let bytes = try result.get(); let path = FileManager.default.temporaryDirectory.appendingPathComponent("ZEUS-" + UUID().uuidString + ".webarchive"); try bytes.write(to: path, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication]); Task { await self.downloads.importFile(path, profile: owner); try? FileManager.default.removeItem(at: path) } }
+            catch { self.notify(error.localizedDescription) }
+        }
+    }
+}

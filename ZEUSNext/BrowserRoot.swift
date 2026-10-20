@@ -3,15 +3,17 @@ import WebKit
 
 enum BrowserPanel: String, Identifiable { case tabs, profiles, downloads, settings, library, history, tools, scripts, console; var id: String { rawValue } }
 enum BrowserAction: String, CaseIterable, Identifiable {
-    case back, forward, reload, home, newTab, tabs, library, history, reader, gallery, downloads, profiles, scripts, console, shield, share, settings, tools
+    case back, forward, reload, home, newTab, tabs, library, history, reader, gallery, downloads, profiles, scripts, console, shield, share, settings, tools, bookmark, pinTab, twinHorizontal, twinVertical, savePage, printPage, darkPage, fullScreen
     var id: String { rawValue }
     var symbol: String {
         switch self {
+        case .bookmark: return "bookmark.badge.plus"; case .pinTab: return "pin"; case .twinHorizontal: return "rectangle.split.2x1"; case .twinVertical: return "rectangle.split.1x2"; case .savePage: return "doc"; case .printPage: return "printer"; case .darkPage: return "moon"; case .fullScreen: return "arrow.up.left.and.arrow.down.right"
         case .back: return "chevron.backward"; case .forward: return "chevron.forward"; case .reload: return "arrow.clockwise"; case .home: return "house.fill"; case .newTab: return "plus"; case .tabs: return "square.on.square"; case .library: return "globe"; case .history: return "clock.arrow.circlepath"; case .reader: return "doc.plaintext"; case .gallery: return "photo.on.rectangle"; case .downloads: return "arrow.down.circle"; case .profiles: return "person.crop.circle"; case .scripts: return "curlybraces"; case .console: return "terminal"; case .shield: return "shield"; case .share: return "square.and.arrow.up"; case .settings: return "gearshape"; case .tools: return "ellipsis.circle"
         }
     }
     var title: String {
         switch self {
+        case .bookmark: return "إضافة للمفضلة"; case .pinTab: return "تثبيت التبويب"; case .twinHorizontal: return "متصفح مزدوج أفقي"; case .twinVertical: return "متصفح مزدوج عمودي"; case .savePage: return "حفظ الصفحة"; case .printPage: return "طباعة"; case .darkPage: return "تعتيم الصفحة"; case .fullScreen: return "إخفاء الأشرطة"
         case .back: return "رجوع"; case .forward: return "تقدم"; case .reload: return "تحديث"; case .home: return "الرئيسية"; case .newTab: return "تبويب جديد"; case .tabs: return "التبويبات"; case .library: return "المواقع"; case .history: return "السجل"; case .reader: return "القارئ"; case .gallery: return "معرض الصور"; case .downloads: return "التنزيلات"; case .profiles: return "البروفايلات"; case .scripts: return "السكربتات"; case .console: return "أدوات المطور"; case .shield: return "حماية الموقع"; case .share: return "مشاركة"; case .settings: return "الإعدادات"; case .tools: return "أدوات الصفحة"
         }
     }
@@ -72,11 +74,8 @@ struct BrowserRoot: View {
         .task { draft = model.address; await model.ensureCurrentLoaded() }
     }
     @ViewBuilder private var browserContent: some View {
-        if model.current?.isHome != false { OriginalHome(model: model) }
-        else if let error = model.current?.error {
-            VStack(spacing: 20) { Image(systemName: "network.slash").font(.largeTitle); Text(error).multilineTextAlignment(.center); Button("إعادة المحاولة") { model.reload() }; Button("توافق الموقع") { model.toggleCompatibility() } }.padding(25)
-        } else if let view = model.webView { WebSurface(webView: view).accessibilityIdentifier("webContent") }
-        else { ProgressView() }
+        if model.secondary != nil { TwinBrowserSurface(model: model) }
+        else { BrowserPane(model: model, tab: model.current) }
     }
     private var addressBar: some View {
         HStack(spacing: 8) {
@@ -96,7 +95,7 @@ struct BrowserRoot: View {
                     HStack(spacing: 0) {
                         actionButton(.home)
                         ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 18) { ForEach(model.data.bookmarks) { bookmark in Button(bookmark.title) { model.open(bookmark.url) }.font(.subheadline).lineLimit(1) } } }
-                        ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 0) { ForEach([BrowserAction.reader, .scripts, .downloads, .gallery, .settings, .tools]) { actionButton($0) } } }.frame(maxWidth: sizeClass == .regular ? 270 : 140)
+                        ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 0) { ForEach([BrowserAction.reader, .scripts, .downloads, .fullScreen, .twinHorizontal, .darkPage, .settings, .tools]) { actionButton($0) } } }.frame(maxWidth: sizeClass == .regular ? 270 : 140)
                     }
                 }
                 if model.data.settings.advanced?.showTabsBar != false {
@@ -125,7 +124,7 @@ struct BrowserRoot: View {
             if toolbarVisible {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 9) {
-                        ForEach(BrowserAction.allCases) { item in actionButton(item); if [.home, .gallery, .profiles].contains(item) { Divider().frame(width: 30).overlay(.white.opacity(0.3)) } }
+                        ForEach([BrowserAction.back, .forward, .reload, .home, .newTab, .library, .history, .reader, .gallery, .console, .scripts, .darkPage, .tools]) { item in actionButton(item); if [.home, .gallery, .profiles].contains(item) { Divider().frame(width: 30).overlay(.white.opacity(0.3)) } }
                     }.padding(.vertical, 14).padding(.horizontal, 8)
                 }.frame(width: 64).frame(maxHeight: 680).glassSurface(20)
                     .transition(.move(edge: .trailing)).padding(.vertical, 24)
@@ -173,7 +172,7 @@ struct BrowserRoot: View {
     @ViewBuilder private func actionButton(_ action: BrowserAction) -> some View {
         if action == .tools {
             Menu {
-                ForEach(BrowserAction.allCases.filter { $0 != .tools }) { item in Button(item.title, systemImage: item.symbol) { perform(item) } }
+                ForEach(BrowserAction.allCases.filter { $0 != .tools }) { item in Button(item.title, systemImage: item.symbol) { perform(item) }.accessibilityIdentifier(item.identifier) }
                 Button("أدوات الصفحة وحفظها", systemImage: "slider.horizontal.3") { panel = .tools }
             } label: { Image(systemName: action.symbol).font(.system(size: 19)).frame(width: 44, height: 40) }.accessibilityIdentifier(action.identifier).accessibilityLabel(action.title)
         } else { Button { perform(action) } label: { Group { if action == .profiles && showCurrentUserAvatar { AccountAvatar(profile: model.profile, store: model.profiles, size: 28) } else { Image(systemName: action.symbol).font(.system(size: 19)) } }.frame(width: 44, height: 40).overlay(alignment: .topTrailing) { if action == .tabs { Text("\(model.tabs.count)").font(.system(size: 9)).padding(2).background(.black, in: Circle()) } } }
@@ -190,6 +189,11 @@ struct BrowserRoot: View {
         case .reader: model.readerMode(); case .gallery: model.galleryMode()
         case .downloads: panel = .downloads; case .profiles: panel = .profiles; case .scripts: panel = .scripts; case .console: panel = .console
         case .shield: model.toggleCompatibility(); case .settings: panel = .settings; case .tools: panel = .tools
+        case .bookmark: model.bookmarkCurrent(); case .pinTab: model.pinCurrent()
+        case .twinHorizontal: model.toggleTwin(vertical: false); case .twinVertical: model.toggleTwin(vertical: true)
+        case .savePage: model.saveWebArchive(); case .printPage: model.printPage()
+        case .darkPage: var options = model.data.settings.advanced ?? AdvancedSettings(); options.forceDarkWebPages.toggle(); model.data.settings.advanced = options; model.applySettings()
+        case .fullScreen: model.chromeHidden.toggle()
         case .share: if let url = model.webView?.url { model.share = ShareItem(url: url) }
         }
     }

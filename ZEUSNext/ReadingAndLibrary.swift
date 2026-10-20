@@ -203,7 +203,7 @@ struct ProfileThumbnail: View {
                 if fit { Image(uiImage: image).resizable().scaledToFit() }
                 else { Image(uiImage: image).resizable().scaledToFill() }
             } else { ZStack { Color.white.opacity(0.04); if failed { Image(systemName: "photo").font(.largeTitle) } else { ProgressView() } }.frame(minHeight: fit ? 220 : 0) }
-        }.task(id: address) { await load() }
+        }.task(id: address) { failed = false; await load() }.onDisappear { image = nil }
     }
     private func load() async {
         guard let url = URL(string: address) else { failed = true; return }
@@ -228,7 +228,13 @@ struct ProfileThumbnail: View {
         } catch { failed = true }
     }
     private func thumbnail(data: Data) -> UIImage? {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil), let output = CGImageSourceCreateThumbnailAtIndex(source, 0, [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceThumbnailMaxPixelSize: fit ? 1600 : 450, kCGImageSourceCreateThumbnailWithTransform: true] as CFDictionary) else { return nil }
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        let width = (properties?[kCGImagePropertyPixelWidth] as? NSNumber)?.doubleValue ?? 1
+        let height = (properties?[kCGImagePropertyPixelHeight] as? NSNumber)?.doubleValue ?? 1
+        let scale = min(1, 1100 / max(1, width), sqrt(8_000_000 / max(1, width * height)))
+        let maximum = fit ? min(12_000, max(width, height) * scale) : 450
+        guard let output = CGImageSourceCreateThumbnailAtIndex(source, 0, [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceThumbnailMaxPixelSize: maximum, kCGImageSourceCreateThumbnailWithTransform: true] as CFDictionary) else { return nil }
         return UIImage(cgImage: output)
     }
 }

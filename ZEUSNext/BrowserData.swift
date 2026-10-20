@@ -72,6 +72,7 @@ struct SavedTab: Codable, Identifiable {
     var id = UUID()
     var title = "بداية جديدة"
     var url = "zeus://home"
+    var pinned: Bool?
 }
 
 struct ProfileData: Codable {
