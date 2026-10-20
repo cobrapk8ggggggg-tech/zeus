@@ -125,6 +125,10 @@ enum DownloadFiles {
         }
     }
     func start(url: URL, profile: BrowserProfile, referrer: URL? = nil, webView: WKWebView? = nil) async {
+        guard profile.account?.allowDownloads != false else { message = "التنزيلات غير مسموحة لهذا الحساب."; return }
+        if ["blob", "data"].contains(url.scheme ?? ""), let webView, webView.configuration.websiteDataStore === store.websiteDataStore(for: profile) {
+            webView.startDownload(using: URLRequest(url: url)) { [weak self] download in self?.attach(download, profile: profile) }; return
+        }
         guard BrowserURL.isWeb(url) else { message = "افتح الرابط داخل الصفحة لتنزيل ملفات blob أو data."; return }
         let item = BrowserDownload(profileID: profile.id, source: url.absoluteString, filename: DownloadFiles.safeName(url.lastPathComponent), engine: .backgroundSession)
         records.insert(item, at: 0)
@@ -160,7 +164,7 @@ enum DownloadFiles {
         let id: UUID
         if let existingID { id = existingID; change(id) { $0.state = .running; $0.error = nil } }
         else {
-            let source = download.originalRequest.url?.absoluteString ?? ""
+            let source = download.originalRequest?.url?.absoluteString ?? ""
             let item = BrowserDownload(profileID: profile.id, source: source, filename: "download", state: .running, engine: .webKit)
             records.insert(item, at: 0); id = item.id
         }
@@ -225,6 +229,7 @@ enum DownloadFiles {
         catch { message = "تعذرت إعادة التسمية: \(error.localizedDescription)" }
     }
     func importFile(_ url: URL, profile: BrowserProfile) async {
+        guard profile.account?.allowDownloads != false else { message = "الملفات غير مسموحة لهذا الحساب."; return }
         let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }
         do {
             let folder = store.downloads(for: profile); try BrowserDisk.ensure(folder)

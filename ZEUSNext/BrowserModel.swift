@@ -54,11 +54,13 @@ struct WebDialog: Identifiable {
     @Published var switching = false
     @Published var address = ""
     @Published var blockedNavigations = 0
+    @Published var chromeHidden = false
+    private var leftAt: Date?
     init(profiles: ProfileStore? = nil, useBackgroundDownloads: Bool = true) {
         let store = profiles ?? ProfileStore()
         self.profiles = store; downloads = DownloadService(store: store, useBackground: useBackgroundDownloads)
         shield = ShieldEngine(root: store.root); data = store.load(store.active)
-        restoreTabs(); requiresUnlock = store.active.locked
+        restoreTabs(); requiresUnlock = store.active.locked || AccountVault.exists(store.activeID)
     }
     var profile: BrowserProfile { profiles.active }
     var current: BrowserTab? { tabs.first { $0.id == selectedTabID } }
@@ -71,6 +73,7 @@ struct WebDialog: Identifiable {
         address = current?.isHome == false ? current?.url ?? "" : ""
     }
     func persist() {
+        guard !requiresUnlock else { return }
         data.tabs = tabs.map(\.saved); data.selectedTabID = selectedTabID
         profiles.save(data, for: profile)
     }
@@ -90,7 +93,7 @@ struct WebDialog: Identifiable {
         do { if let list = try await shield.list(profile: owner, settings: settings) { controller.add(list) } }
         catch { notify("تعذر تحميل قواعد الحجب: \(error.localizedDescription)") }
         guard owner.id == profile.id, tabs.contains(where: { $0.id == tab.id }) else { return nil }
-        for script in data.scripts where script.isActive {
+        for script in data.scripts where script.isActive && owner.account?.allowScripts != false {
             let domain = script.domain.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             guard domain == "*" || FilterRules.validDomain(domain) else { continue }
             let encoded = (try? JSONEncoder().encode(domain)).flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
@@ -99,12 +102,13 @@ struct WebDialog: Identifiable {
         }
         let view = WKWebView(frame: .zero, configuration: config)
         view.allowsBackForwardNavigationGestures = true; view.allowsLinkPreview = true
-        view.isFindInteractionEnabled = true; view.isInspectable = settings.developerTools
+        view.isFindInteractionEnabled = true; view.isInspectable = settings.developerTools && owner.account?.allowDeveloperTools != false
         view.pageZoom = settings.textScale
         view.scrollView.contentInsetAdjustmentBehavior = .never
         let driver = WebDriver(model: self, tab: tab)
         view.navigationDelegate = driver; view.uiDelegate = driver
-        if settings.developerTools {
+        view.scrollView.delegate = driver
+        if settings.developerTools && owner.account?.allowDeveloperTools != false {
             controller.add(driver, name: "zeusConsole")
             controller.addUserScript(WKUserScript(source: BrowserTools.consoleScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
@@ -125,6 +129,7 @@ struct WebDialog: Identifiable {
         guard let tab = current, let url = request.url else { return }
         if url.scheme == "zeus" { home(); return }
         guard BrowserURL.isWeb(url) else { notify("هذا النوع من الروابط يُفتح من قائمة التطبيقات الخارجية."); return }
+        guard permits(url) else { notify("هذا النطاق خارج المواقع المسموح بها لهذا الحساب."); return }
         tab.url = url.absoluteString; tab.error = nil; address = tab.url; tab.lastUsed = Date(); changed(); persist()
         Task { if let view = await prepare(tab), profile.id == tab.profileID { view.load(request) } }
     }
@@ -162,17 +167,20 @@ struct WebDialog: Identifiable {
         data.history = Array(data.history.prefix(1000)); persist()
     }
     func bookmarkCurrent() {
+        guard profile.role != .guest, profile.role != .kiosk else { notify("هذا الحساب لا يحفظ مفضلة جديدة."); return }
         guard let tab = current, !tab.isHome else { return }
         if !data.bookmarks.contains(where: { $0.url == tab.url }) { data.bookmarks.insert(Bookmark(title: tab.title, url: tab.url), at: 0); persist(); notify("حُفظت الصفحة في هذه المساحة.") }
     }
-    func switchProfile(to target: BrowserProfile) async {
-        guard !switching, target.id != profile.id else { return }; switching = true; defer { switching = false }
+    func switchProfile(to target: BrowserProfile, password: String = "") async {
+        guard !switching, target.account?.enabled != false, target.id != profile.id || requiresUnlock else { return }; switching = true; defer { switching = false }
+        if AccountVault.exists(target.id), !(await AccountVault.verify(password, id: target.id)) { notify(AccountError.password.localizedDescription); return }
         if target.locked, !(await authenticate(reason: "فتح مساحة \(target.name)")) { return }
-        let previous = profile; persist()
+        let previous = profile; if !requiresUnlock { persist() }
         for tab in tabs { tab.dispose() }; console.removeAll(); pendingPopup = nil
         dialog?.complete(nil); dialog = nil; article = nil; gallery = nil; share = nil
         if previous.isPrivate { downloads.removeAll(profileID: previous.id); await profiles.clearEphemeral(previous) }
-        profiles.select(target.id); data = profiles.load(target); blockedNavigations = 0; requiresUnlock = false; restoreTabs()
+        profiles.select(target.id); data = profiles.load(target); blockedNavigations = 0; requiresUnlock = false; chromeHidden = false; restoreTabs()
+        if target.role == .kiosk, let home = target.account?.homePage, home != "zeus://home" { open(home) }
         await ensureCurrentLoaded()
     }
     func authenticate(reason: String) async -> Bool {
@@ -187,6 +195,7 @@ struct WebDialog: Identifiable {
         var changed = profile; changed.locked = locked; profiles.update(changed)
     }
     func backgrounded() {
+        leftAt = Date()
         persist(); if profile.locked { requiresUnlock = true }
         if profile.isPrivate {
             for tab in tabs { tab.dispose() }; downloads.removeAll(profileID: profile.id)
@@ -216,9 +225,23 @@ struct WebDialog: Identifiable {
         await ensureCurrentLoaded(); notify(cacheOnly ? "مُسحت الملفات المؤقتة لهذه المساحة." : "مُسحت بيانات المواقع والجلسات لهذه المساحة.")
     }
     func deleteProfile(_ target: BrowserProfile) async {
+        guard profile.isAdmin, !target.isAdmin else { notify("الحذف للحساب الرئيسي فقط، ولا يمكن حذف الحساب الرئيسي."); return }
         guard profiles.profiles.count > 1 else { notify("أبقِ مساحة واحدة على الأقل."); return }
         if target.id == profile.id, let other = profiles.profiles.first(where: { $0.id != target.id }) { await switchProfile(to: other); if profile.id == target.id { return } }
         downloads.removeAll(profileID: target.id)
         do { try await profiles.delete(target) } catch { notify(error.localizedDescription) }
+    }
+    func permits(_ url: URL) -> Bool {
+        let domains = profile.account?.allowedDomains ?? []
+        return domains.isEmpty || domains.contains { BrowserURL.hostMatches(url.host ?? "", domain: $0) }
+    }
+    func becameActive() {
+        if let leftAt, let timeout = profile.account?.logoutAfter, timeout >= 0, Date().timeIntervalSince(leftAt) >= timeout { logout() }
+        leftAt = nil
+    }
+    func logout() {
+        if !requiresUnlock { persist() }
+        for tab in tabs { tab.dispose() }; tabs.removeAll(); data = ProfileData(); console.removeAll(); article = nil; gallery = nil; share = nil; pendingPopup = nil; address = ""; requiresUnlock = true
+        if profile.isPrivate { let owner = profile; downloads.removeAll(profileID: owner.id); Task { await profiles.clearEphemeral(owner) } }
     }
 }

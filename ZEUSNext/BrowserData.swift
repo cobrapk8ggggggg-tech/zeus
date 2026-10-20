@@ -24,15 +24,11 @@ struct BrowserProfile: Codable, Identifiable, Equatable {
     var kind: ProfileKind = .standard
     var locked = false
     var isPrivate: Bool { kind == .ephemeral }
-    var color: Color {
-        switch accent {
-        case "violet": return .purple
-        case "rose": return .pink
-        case "amber": return .orange
-        case "mint": return .mint
-        default: return .cyan
-        }
-    }
+    var account: AccountOptions?
+    var role: AccountRole { account?.role ?? .standard }
+    var isAdmin: Bool { role == .administrator }
+    var color: Color { .white }
+
 }
 
 struct Bookmark: Codable, Identifiable, Equatable {
@@ -66,6 +62,8 @@ struct BrowserSettings: Codable {
     var siteExceptions: [String] = []
     var popupExceptions: [String] = []
     var developerTools = false
+    var chromeLayout: ChromeLayout?
+    var reading: ReadingPreferences?
 }
 
 struct SavedTab: Codable, Identifiable {
@@ -81,6 +79,7 @@ struct ProfileData: Codable {
     var tabs: [SavedTab] = [SavedTab()]
     var selectedTabID: UUID?
     var settings = BrowserSettings()
+    var searches: [String]?
 }
 
 enum BrowserURL {
@@ -151,9 +150,11 @@ enum BrowserDisk {
         self.root = root; self.downloadsRoot = downloadsRoot
         if let index = BrowserDisk.read(Index.self, from: root.appendingPathComponent("profiles.json")), !index.profiles.isEmpty {
             profiles = index.profiles
+            if !profiles.contains(where: { $0.isAdmin }) { profiles[0].account = AccountOptions(role: .administrator) }
             activeID = index.profiles.contains(where: { $0.id == index.activeID }) ? index.activeID : index.profiles[0].id
         } else {
-            let initial = BrowserProfile(name: "المساحة الشخصية")
+            var initial = BrowserProfile(name: "الرئيسي")
+            initial.account = AccountOptions(role: .administrator)
             profiles = [initial]; activeID = initial.id
             persistIndex()
             migrateLegacy(into: initial)
@@ -176,7 +177,7 @@ enum BrowserDisk {
         return store
     }
     func load(_ profile: BrowserProfile) -> ProfileData {
-        guard !profile.isPrivate else { return ProfileData() }
+        guard !profile.isPrivate else { return guestTemplate(profile) }
         return BrowserDisk.read(ProfileData.self, from: folder(for: profile).appendingPathComponent("browser.json")) ?? ProfileData()
     }
     func save(_ data: ProfileData, for profile: BrowserProfile) {
@@ -185,6 +186,7 @@ enum BrowserDisk {
         catch { errorMessage = "تعذر حفظ بيانات المساحة: \(error.localizedDescription)" }
     }
     @discardableResult func add(name: String, accent: String, isPrivate: Bool) -> BrowserProfile {
+        guard active.isAdmin else { errorMessage = AccountError.permission.localizedDescription; return active }
         let name = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(48))
         let profile = BrowserProfile(name: name.isEmpty ? "مساحة جديدة" : name, symbol: isPrivate ? "theatermasks.fill" : "person.crop.circle.fill", accent: accent, kind: isPrivate ? .ephemeral : .standard)
         profiles.append(profile); persistIndex(); return profile
@@ -202,7 +204,7 @@ enum BrowserDisk {
         try? FileManager.default.removeItem(at: folder(for: profile))
     }
     func delete(_ profile: BrowserProfile) async throws {
-        guard profiles.count > 1 else { return }
+        guard active.isAdmin, !profile.isAdmin, profiles.count > 1 else { throw AccountError.permission }
         let store = websiteDataStore(for: profile)
         await store.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
         stores.removeValue(forKey: profile.id)
@@ -214,9 +216,26 @@ enum BrowserDisk {
             }
         }
         for path in [folder(for: profile), downloads(for: profile)] where FileManager.default.fileExists(atPath: path.path) { try FileManager.default.removeItem(at: path) }
+        AccountVault.remove(profile.id)
         profiles.removeAll { $0.id == profile.id }
         if activeID == profile.id { activeID = profiles[0].id }
         persistIndex()
+    }
+    func resetAll() async throws {
+        guard active.isAdmin else { throw AccountError.permission }
+        let old = profiles
+        for profile in old {
+            await websiteDataStore(for: profile).removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
+            if !profile.isPrivate {
+                try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in WKWebsiteDataStore.remove(forIdentifier: profile.id) { if let error = $0 { c.resume(throwing: error) } else { c.resume() } } }
+            }
+            AccountVault.remove(profile.id)
+            for path in [folder(for: profile), downloads(for: profile), configurationFolder(profile)] where FileManager.default.fileExists(atPath: path.path) { try FileManager.default.removeItem(at: path) }
+        }
+        stores.removeAll()
+        var initial = BrowserProfile(name: "الرئيسي"); initial.account = AccountOptions(role: .administrator)
+        profiles = [initial]; activeID = initial.id; persistIndex()
+        let filters = root.appendingPathComponent("Filters"); if FileManager.default.fileExists(atPath: filters.path) { try FileManager.default.removeItem(at: filters) }
     }
     private func persistIndex() {
         do { try BrowserDisk.write(Index(profiles: profiles, activeID: activeID), to: root.appendingPathComponent("profiles.json")) }
@@ -225,7 +244,12 @@ enum BrowserDisk {
     private func migrateLegacy(into profile: BrowserProfile) {
         var data = ProfileData()
         let defaults = UserDefaults.standard
-        if let raw = defaults.data(forKey: "saved_websites"), let sites = try? JSONDecoder().decode([Bookmark].self, from: raw) { data.bookmarks = sites }
+        struct LegacyWebsite: Decodable { var id: UUID; var name: String; var url: String; var dateAdded: Date }
+        if let raw = defaults.data(forKey: "saved_websites"), let sites = try? JSONDecoder().decode([LegacyWebsite].self, from: raw) { data.bookmarks = sites.map { Bookmark(id: $0.id, title: $0.name, url: $0.url, created: $0.dateAdded) } }
+        if let raw = defaults.data(forKey: "browser_history_data"), let visits = try? JSONDecoder().decode([Visit].self, from: raw) { data.history = visits }
+        if let raw = defaults.data(forKey: "browser_saved_tabs_list"), let tabs = try? JSONDecoder().decode([SavedTab].self, from: raw), !tabs.isEmpty { data.tabs = tabs; data.selectedTabID = defaults.string(forKey: "browser_last_active_tab_id").flatMap(UUID.init(uuidString:)) }
+        data.searches = defaults.stringArray(forKey: "user_search_history_list")
+        var reading = ReadingPreferences(); if defaults.object(forKey: "reader_fontSize") != nil { reading.fontSize = defaults.double(forKey: "reader_fontSize") }; if defaults.object(forKey: "reader_textOpacity") != nil { reading.textOpacity = defaults.double(forKey: "reader_textOpacity") }; reading.blockedWords = (defaults.string(forKey: "reader_blacklist") ?? "").split(separator: ",").map(String.init); if defaults.object(forKey: "gallery_image_scale") != nil { reading.imageScale = defaults.double(forKey: "gallery_image_scale") }; if defaults.object(forKey: "gallery_scroll_distance") != nil { reading.scrollDistance = defaults.double(forKey: "gallery_scroll_distance") }; data.settings.reading = reading
         if let raw = defaults.data(forKey: "user_custom_scripts"), let scripts = try? JSONDecoder().decode([BrowserScript].self, from: raw) { data.scripts = scripts }
         if let engine = defaults.string(forKey: "user_preferred_search_engine"), let value = SearchProvider(rawValue: engine) { data.settings.searchProvider = value }
         save(data, for: profile)

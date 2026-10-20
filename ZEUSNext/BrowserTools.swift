@@ -6,12 +6,15 @@ enum BrowserTools {
     static let consoleScript = """
     (()=>{for(const kind of ['log','warn','error','info']){const original=console[kind];console[kind]=function(...args){try{window.webkit.messageHandlers.zeusConsole.postMessage({type:kind,message:args.map(a=>{try{return typeof a==='string'?a:JSON.stringify(a)}catch{return String(a)}}).join(' ').slice(0,4000)})}catch{};original.apply(console,args)}}})();
     """
+    // The original ZEUS selection order, short paragraphs and DIV handling are preserved.
     static let reader = """
-    (()=>{const root=document.querySelector('article,main,[role=main],.entry-content,.chapter-content')||document.body;const seen=new Set();const paragraphs=[];let size=0;for(const el of root.querySelectorAll('h1,h2,h3,p,li')){const s=getComputedStyle(el);const t=(el.innerText||'').replace(/\\s+/g,' ').trim();if(t.length<3||seen.has(t)||s.display==='none'||s.visibility==='hidden')continue;if(paragraphs.length>=500||size+t.length>180000)break;paragraphs.push(t);seen.add(t);size+=t.length}return {title:document.title||'القارئ',paragraphs}})();
+    (()=>{const selectors=['article','main','.post-content','.entry-content','#article-body','.chapter-content'];let root=null;for(const selector of selectors){const el=document.querySelector(selector);if(el&&(el.innerText||'').length>100){root=el;break}}root=root||document.body;const seen=new Set(),paragraphs=[];let size=0;for(const el of root.querySelectorAll('p,h2,h3,div')){const style=getComputedStyle(el);if(style.display==='none'||style.visibility==='hidden'||style.opacity==='0'||el.offsetHeight===0)continue;if(el.tagName==='DIV'&&el.querySelector('p'))continue;const text=(el.innerText||'').replace(/\\s+/g,' ').trim();if(text.length>=2&&!seen.has(text)){if(size+text.length>500000||paragraphs.length>=3000)break;paragraphs.push(text);seen.add(text);size+=text.length}}return {title:(document.querySelector('h1')?.innerText||document.title||'القارئ').trim(),paragraphs}})();
     """
+    // Restore CSS backgrounds and add lazy image sources. Preserve document order for webtoons.
     static let gallery = """
-    (()=>{const urls=new Set();for(const img of document.images){const src=img.currentSrc||img.src;if(src&&img.naturalWidth>=160&&img.naturalHeight>=160&&/^https?:/.test(src))urls.add(src);if(urls.size>=150)break}return Array.from(urls)})();
+    (()=>{const found=new Set();const add=raw=>{try{if(!raw||found.size>=1000)return;const u=new URL(raw,document.baseURI);if(['http:','https:','data:','blob:'].includes(u.protocol))found.add(u.href)}catch{}};for(const img of document.querySelectorAll('img')){const lazy=img.getAttribute('data-src')||img.getAttribute('data-lazy-src')||img.getAttribute('data-original');if(img.naturalWidth>150&&img.naturalHeight>150){add(img.currentSrc||img.src)}if(lazy)add(lazy);if(!img.complete&&(img.width>150||img.height>150))add(img.currentSrc||img.src)}let count=0;for(const el of document.querySelectorAll('*')){if(++count>30000||found.size>=1000)break;const bg=getComputedStyle(el).backgroundImage;if(bg&&bg!=='none'){const re=/url\\(\\s*(['"]?)(.*?)\\1\\s*\\)/g;let m;while((m=re.exec(bg)))add(m[2])}}return Array.from(found)})();
     """
+
 }
 
 extension BrowserModel {

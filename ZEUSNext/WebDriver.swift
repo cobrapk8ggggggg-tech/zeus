@@ -1,10 +1,20 @@
 import WebKit
 import UIKit
 
-@MainActor final class WebDriver: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
+@MainActor final class WebDriver: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, UIScrollViewDelegate {
     weak var model: BrowserModel?
     weak var tab: BrowserTab?
     var observations: [NSKeyValueObservation] = []
+    private var scrollAnchor: CGFloat = 0
+    func scrollViewWillBeginDragging(_ scrollView: UIScrollView) { scrollAnchor = scrollView.contentOffset.y }
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        guard scrollView.isDragging || scrollView.isDecelerating, let model, tab?.id == model.selectedTabID else { return }
+        let y = scrollView.contentOffset.y
+        guard y >= -scrollView.adjustedContentInset.top, y <= max(0, scrollView.contentSize.height - scrollView.bounds.height) else { return }
+        let delta = y - scrollAnchor
+        if y < 20 { model.chromeHidden = false; scrollAnchor = y }
+        else if abs(delta) > 18 { model.chromeHidden = delta > 0; scrollAnchor = y }
+    }
     init(model: BrowserModel, tab: BrowserTab) { self.model = model; self.tab = tab }
     func observe(_ view: WKWebView) {
         observations.append(view.observe(\.estimatedProgress, options: [.new]) { [weak self] view, _ in
@@ -25,6 +35,8 @@ import UIKit
         }
         guard ["http", "https", "about", "blob", "data"].contains(scheme) else { decisionHandler(.cancel); model.notify("تعذر فتح مخطط الرابط داخل المتصفح."); return }
         let host = url.host ?? ""
+        if BrowserURL.isWeb(url), !model.permits(url) { decisionHandler(.cancel); return }
+        if navigationAction.shouldPerformDownload, model.profile.account?.allowDownloads == false { decisionHandler(.cancel); model.notify("التنزيلات غير مسموحة لهذا الحساب."); return }
         if model.data.settings.shieldsEnabled && !model.siteCompatible && model.shield.blocks(host) {
             model.blockedNavigations += 1; model.changed(); decisionHandler(.cancel); return
         }

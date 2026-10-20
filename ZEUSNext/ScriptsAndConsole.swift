@@ -16,12 +16,12 @@ struct ScriptsSheet: View {
                     }.contextMenu { Button("تعديل", systemImage: "pencil") { editing = script }; Button("حذف", systemImage: "trash", role: .destructive) { model.data.scripts.removeAll { $0.id == script.id }; model.applySettings() } }
                 }
                 if model.data.scripts.isEmpty { ContentUnavailableView("أدواتك بطريقتك", systemImage: "curlybraces", description: Text("أضف سكربتًا خاصًا لتحسين صفحة أو تسهيل عمل متكرر.")) }
-            }.scrollContentBackground(.hidden).background { OrbitBackground(tint: .purple) }.navigationTitle("السكربتات")
+            }.scrollContentBackground(.hidden).background { OrbitBackground(tint: .white) }.navigationTitle("السكربتات")
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) { Button("تم") { dismiss() } }
                     ToolbarItem(placement: .topBarLeading) { Button { editing = BrowserScript(name: "سكربت جديد", domain: "example.com", code: "// اكتب الكود هنا\n") } label: { Image(systemName: "plus") } }
                 }
-                .sheet(item: $editing) { script in ScriptEditor(script: script) { changed in if let index = model.data.scripts.firstIndex(where: { $0.id == changed.id }) { model.data.scripts[index] = changed } else { model.data.scripts.append(changed) }; model.applySettings() } }
+                .fullScreenCover(item: $editing) { script in ScriptEditor(script: script) { changed in if let index = model.data.scripts.firstIndex(where: { $0.id == changed.id }) { model.data.scripts[index] = changed } else { model.data.scripts.append(changed) }; model.applySettings() } }
         }
     }
 }
@@ -58,7 +58,7 @@ struct ConsoleSheet: View {
                 } else {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 12) {
-                            ForEach(model.console) { entry in Text(entry.text).font(.system(.caption, design: .monospaced)).foregroundStyle(entry.kind == "error" ? .red : entry.kind == "warn" ? .orange : .white.opacity(0.85)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).padding(10).background(.white.opacity(0.03), in: RoundedRectangle(cornerRadius: 10)) }
+                            ForEach(model.console) { entry in Text(entry.text).font(.system(.caption, design: .monospaced)).foregroundStyle(entry.kind == "error" ? .white : entry.kind == "warn" ? .white : .white.opacity(0.85)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).padding(10).background(.white.opacity(0.03), in: RoundedRectangle(cornerRadius: 10)) }
                         }.padding(15)
                     }.environment(\.layoutDirection, .leftToRight)
                     HStack {
@@ -66,7 +66,7 @@ struct ConsoleSheet: View {
                         Button { execute() } label: { Image(systemName: "arrow.up.circle.fill").font(.title2) }
                     }.environment(\.layoutDirection, .leftToRight).padding(17).glassSurface(22).padding(12)
                 }
-            }.background { OrbitBackground(tint: .mint) }.navigationTitle("الكونسول")
+            }.background { OrbitBackground(tint: .white) }.navigationTitle("الكونسول")
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("تم") { dismiss() } }; ToolbarItem(placement: .topBarLeading) { Button("مسح") { model.console.removeAll() } } }
         }
     }

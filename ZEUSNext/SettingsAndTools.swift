@@ -22,9 +22,7 @@ struct SettingsSheet: View {
                         VStack(alignment: .leading, spacing: 5) { Text(model.profile.name).font(.headline); Text(model.profile.isPrivate ? "جلسة خاصة مؤقتة" : "مساحة مستقلة على هذا الجهاز").font(.caption).foregroundStyle(.secondary) }
                     }.padding(.vertical, 10)
                     TextField("اسم المساحة", text: $editedName).onSubmit { var profile = model.profile; if !editedName.trimmingCharacters(in: .whitespaces).isEmpty { profile.name = String(editedName.prefix(48)); model.profiles.update(profile) } }
-                    Picker("لون المساحة", selection: Binding(get: { model.profile.accent }, set: { var profile = model.profile; profile.accent = $0; model.profiles.update(profile) })) {
-                        Text("سماوي").tag("cyan"); Text("بنفسجي").tag("violet"); Text("وردي").tag("rose"); Text("عنبر").tag("amber"); Text("نعناعي").tag("mint")
-                    }
+                    NavigationLink("واجهة المستخدم والأشرطة") { AppearanceSettings(model: model) }
                     Button { Task { await model.setProfileLock(!model.profile.locked) } } label: { HStack { Label("قفل الجهاز والبصمة", systemImage: "faceid"); Spacer(); Text(model.profile.locked ? "مفعّل" : "غير مفعّل").foregroundStyle(.secondary) } }
                 }
                 Section("التصفح") {
@@ -66,7 +64,7 @@ struct SettingsSheet: View {
             Button("مسح الملفات المؤقتة", systemImage: "sparkles") { action = "cache" }.accessibilityIdentifier("clearCacheButton")
             Button("مسح كوكيز وبيانات المواقع", systemImage: "globe.badge.chevron.backward") { action = "web" }
             Button("مسح سجل التصفح", systemImage: "clock.arrow.circlepath") { action = "history" }
-            Button("حذف تنزيلات هذه المساحة", systemImage: "trash") { action = "downloads" }.foregroundStyle(.orange)
+            Button("حذف تنزيلات هذه المساحة", systemImage: "trash") { action = "downloads" }.foregroundStyle(.white)
             Button("إعادة ضبط التطبيق وكل مساحاته", systemImage: "arrow.counterclockwise", role: .destructive) { action = "reset" }.accessibilityIdentifier("resetAppButton")
         } header: { Text("التخزين والبيانات") } footer: { Text("المسح العادي يخص المساحة الحالية فقط. حذف بيانات المواقع يسجّل خروجك منها. ملفات WebKit لا تتيح قياس حجم دقيق لكل موقع؛ الحجم المعروض للملفات المحفوظة والتنزيلات.") }
     }
@@ -139,8 +137,8 @@ struct ToolsSheet: View {
                 }
             }.scrollContentBackground(.hidden).background { OrbitBackground(tint: model.profile.color) }.navigationTitle("صندوق الأدوات").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("تم") { dismiss() } } }
-                .sheet(isPresented: $scripts) { ScriptsSheet(model: model) }
-                .sheet(isPresented: $console) { ConsoleSheet(model: model) }
+                .fullScreenCover(isPresented: $scripts) { ScriptsSheet(model: model) }
+                .fullScreenCover(isPresented: $console) { ConsoleSheet(model: model) }
                 .sheet(item: $systemURL) { SystemBrowser(url: $0.url).ignoresSafeArea() }
         }
     }
@@ -153,13 +151,13 @@ struct ToolsSheet: View {
 
 extension BrowserModel {
     func resetApplication() async {
-        let old = profiles.profiles
-        let fresh = profiles.add(name: "المساحة الشخصية", accent: "cyan", isPrivate: false)
-        await switchProfile(to: fresh)
-        for item in old { downloads.removeAll(profileID: item.id); do { try await profiles.delete(item) } catch { notify("بقيت بعض البيانات: \(error.localizedDescription)"); return } }
+        guard profile.isAdmin else { notify(AccountError.permission.localizedDescription); return }
+        for tab in tabs { tab.dispose() }
+        for item in profiles.profiles { downloads.removeAll(profileID: item.id) }
+        do { try await profiles.resetAll() } catch { notify(error.localizedDescription); return }
         await WKWebsiteDataStore.default().removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
         for cookie in HTTPCookieStorage.shared.cookies ?? [] { HTTPCookieStorage.shared.deleteCookie(cookie) }
         if let identifier = Bundle.main.bundleIdentifier { UserDefaults.standard.removePersistentDomain(forName: identifier) }
-        data = ProfileData(); closeAllTabs(); persist(); notify("أُنشئت مساحة نظيفة وحُذفت بيانات المساحات السابقة.")
+        requiresUnlock = false; data = ProfileData(); closeAllTabs(); persist(); notify("مُسحت بيانات التطبيق وأُنشئ حساب رئيسي جديد.")
     }
 }

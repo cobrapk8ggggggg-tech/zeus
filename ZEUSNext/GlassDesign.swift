@@ -18,14 +18,9 @@ struct GlassSurface: ViewModifier {
 extension View { func glassSurface(_ radius: CGFloat = 24) -> some View { modifier(GlassSurface(radius: radius)) } }
 
 struct OrbitBackground: View {
-    var tint: Color = .cyan
-    var body: some View {
-        ZStack {
-            Color(red: 0.025, green: 0.04, blue: 0.075)
-            RadialGradient(colors: [tint.opacity(0.2), .clear], center: .topTrailing, startRadius: 10, endRadius: 490)
-            RadialGradient(colors: [Color.purple.opacity(0.15), .clear], center: .bottomLeading, startRadius: 30, endRadius: 480)
-        }.ignoresSafeArea()
-    }
+    var tint: Color = .white
+    var body: some View { Color.black.ignoresSafeArea() }
+
 }
 
 struct ToolButton: View {
@@ -35,7 +30,7 @@ struct ToolButton: View {
     var disabled = false
     var action: () -> Void
     var body: some View {
-        Button(action: action) { Image(systemName: symbol).font(.system(size: 19, weight: .medium)).foregroundStyle(selected ? Color.cyan : Color.white.opacity(0.85)).frame(minWidth: 44, minHeight: 44).contentShape(Rectangle()) }
+        Button(action: action) { Image(systemName: symbol).font(.system(size: 19, weight: .medium)).foregroundStyle(selected ? Color.white : Color.white.opacity(0.85)).frame(minWidth: 44, minHeight: 44).contentShape(Rectangle()) }
             .buttonStyle(.plain).disabled(disabled).opacity(disabled ? 0.3 : 1).accessibilityLabel(label)
     }
 }
