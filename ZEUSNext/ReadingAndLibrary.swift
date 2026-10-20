@@ -71,7 +71,7 @@ struct ReaderSheet: View {
                 }.padding(.horizontal, 12).background(.black).transition(.move(edge: .top).combined(with: .opacity))
             }
             rightReveal.environment(\.layoutDirection, .leftToRight)
-        }.foregroundStyle(.white).tint(.white).statusBarHidden()
+        }.foregroundStyle(.white).tint(.white).statusBarHidden().environment(\.layoutDirection, .leftToRight)
             .fullScreenCover(isPresented: $settings) {
                 NavigationStack { Form {
                     Section("النص") { Text("حجم الخط \(Int(prefs.fontSize))"); Slider(value: preference(\.fontSize), in: 14...40, step: 1); Text("شفافية النص"); Slider(value: preference(\.textOpacity), in: 0.1...1) }
@@ -119,7 +119,7 @@ struct GallerySheet: View {
                 if selecting { HStack { Text(saving ? photoProgress : "\(selection.count) صورة"); Spacer(); Menu("حفظ المحدد", systemImage: "arrow.down.circle") { Button("حفظ في ألبوم الصور") { saveToPhotos() }; Button("تنزيل إلى ملفات المتصفح") { downloadSelection() } }.disabled(selection.isEmpty || saving) }.padding(16).background(.black) }
             }
             if let index = selectedIndex { imageReader(start: index).transition(.move(edge: .bottom)) }
-        }.foregroundStyle(.white).tint(.white).statusBarHidden(selectedIndex != nil)
+        }.foregroundStyle(.white).tint(.white).statusBarHidden(selectedIndex != nil).environment(\.layoutDirection, .leftToRight)
             .alert("حفظ الصور", isPresented: Binding(get: { photoMessage != nil }, set: { if !$0 { photoMessage = nil } })) { Button("حسنًا") { photoMessage = nil } } message: { Text(photoMessage ?? "") }
             .fullScreenCover(isPresented: $settings) {
                 NavigationStack { Form {
@@ -183,7 +183,11 @@ struct GallerySheet: View {
             saving = false; selection.removeAll(); selecting = false; photoMessage = "حُفظت \(count) من \(addresses.count) صورة في الألبوم."
         }
     }
-    private func downloadSelection() { let urls = gallery.images.filter { selection.contains($0) }; selection.removeAll(); selecting = false; Task { for item in urls { if let url = URL(string: item) { await model.downloads.start(url: url, profile: model.profile, referrer: model.webView?.url, webView: model.webView) } } } }
+    private func downloadSelection() {
+        let urls = gallery.images.filter { selection.contains($0) }, owner = model.profile, source = model.webView, referrer = model.webView?.url
+        selection.removeAll(); selecting = false
+        Task { for item in urls { if owner.isPrivate && model.profile.id != owner.id { break }; if let url = URL(string: item) { await model.downloads.start(url: url, profile: owner, referrer: referrer, webView: source) } } }
+    }
     private func preference(_ key: WritableKeyPath<ReadingPreferences, Double>) -> Binding<Double> { Binding(get: { prefs[keyPath: key] }, set: { var value = prefs; value[keyPath: key] = $0; model.data.settings.reading = value; model.persist() }) }
 }
 

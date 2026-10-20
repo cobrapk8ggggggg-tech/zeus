@@ -45,7 +45,8 @@ enum DownloadFiles {
         return HTTPCookie.requestHeaderFields(with: cookies.filter { cookie in
             let domain = cookie.domain.lowercased()
             let hostAllowed = domain.hasPrefix(".") ? BrowserURL.hostMatches(host, domain: domain) : host == domain
-            let path = url.path.isEmpty ? "/" : url.path
+            let rawPath = URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedPath ?? url.path
+            let path = rawPath.isEmpty ? "/" : rawPath
             let cookiePath = cookie.path
             let pathAllowed = path == cookiePath || (path.hasPrefix(cookiePath) && (cookiePath.hasSuffix("/") || path.dropFirst(cookiePath.count).hasPrefix("/")))
             return hostAllowed && pathAllowed && (!cookie.isSecure || url.scheme == "https") && (cookie.expiresDate == nil || cookie.expiresDate! > Date())
@@ -166,6 +167,7 @@ enum DownloadFiles {
         }
     }
     func start(url: URL, profile: BrowserProfile, referrer: URL? = nil, webView: WKWebView? = nil) async {
+        guard !profile.isPrivate || store.activeID == profile.id else { return }
         guard profile.account?.allowDownloads != false else { message = "التنزيلات غير مسموحة لهذا الحساب."; return }
         if BrowserURL.isWeb(url) && options(profile.id).confirmDownloads && !(await confirmation(DownloadFiles.safeName(url.lastPathComponent))) { return }
         if ["blob", "data"].contains(url.scheme ?? ""), let webView, webView.configuration.websiteDataStore === store.websiteDataStore(for: profile) {
@@ -181,11 +183,14 @@ enum DownloadFiles {
         let cookies: [HTTPCookie] = await withCheckedContinuation { continuation in
             store.websiteDataStore(for: profile).httpCookieStore.getAllCookies { continuation.resume(returning: $0) }
         }
-        guard records.contains(where: { $0.id == item.id }) else { return }
+        guard records.contains(where: { $0.id == item.id }), !profile.isPrivate || store.activeID == profile.id else { return }
         var request = URLRequest(url: url)
         // Authenticated requests stay inside the owning WebKit store. Do not
         // put Cookie headers into a cross-origin background redirect chain.
-        if !DownloadFiles.cookieHeaders(cookies, for: url).isEmpty {
+        if cookies.contains(where: { cookie in
+            let domain = cookie.domain.lowercased(), host = url.host?.lowercased() ?? ""
+            return (cookie.expiresDate == nil || cookie.expiresDate! > Date()) && (domain.hasPrefix(".") ? BrowserURL.hostMatches(host, domain: domain) : host == domain)
+        }) {
             guard permittedNetwork(profile.id) else { change(item.id) { $0.state = .paused; $0.error = "اتصل بشبكة Wi-Fi ثم استأنف التنزيل." }; save(); return }
             guard let webView, webView.configuration.websiteDataStore === store.websiteDataStore(for: profile) else {
                 failed(item.id, error: NSError(domain: "Download", code: 1, userInfo: [NSLocalizedDescriptionKey: "افتح الموقع في هذه المساحة ثم نزّل الرابط للحفاظ على جلسة الدخول."]))
@@ -205,6 +210,7 @@ enum DownloadFiles {
         pump()
     }
     func attach(_ download: WKDownload, profile: BrowserProfile, existingID: UUID? = nil) {
+        guard !profile.isPrivate || store.activeID == profile.id else { download.cancel { _ in }; return }
         guard profile.account?.allowDownloads != false else { download.cancel { _ in }; message = "التنزيلات غير مسموحة لهذا الحساب."; return }
         let id: UUID
         if let existingID { id = existingID; change(id) { $0.state = .queued; $0.error = nil } }
@@ -279,6 +285,7 @@ enum DownloadFiles {
         catch { message = "تعذرت إعادة التسمية: \(error.localizedDescription)" }
     }
     func importFile(_ url: URL, profile: BrowserProfile) async {
+        guard !profile.isPrivate || store.activeID == profile.id else { return }
         guard profile.account?.allowDownloads != false else { message = "الملفات غير مسموحة لهذا الحساب."; return }
         let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }
         do {
@@ -289,7 +296,7 @@ enum DownloadFiles {
                 try FileManager.default.copyItem(at: url, to: target)
                 return Int64((try? target.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
             }.value
-            guard store.profile(profile.id) != nil else { try? FileManager.default.removeItem(at: target); return }
+            guard store.profile(profile.id) != nil, !profile.isPrivate || store.activeID == profile.id else { try? FileManager.default.removeItem(at: target); return }
             var item = BrowserDownload(profileID: profile.id, source: "", filename: target.lastPathComponent, state: .completed, engine: .backgroundSession)
             item.received = size; item.expected = item.received
             records.insert(item, at: 0); preferencesDidChange(profile); save()

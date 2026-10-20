@@ -56,6 +56,9 @@ struct ToolsSheet: View {
 extension BrowserModel {
     func resetApplication() async {
         guard profile.isAdmin else { notify(AccountError.permission.localizedDescription); return }
+        FaviconMemory.purge()
+        _ = try? await BrowserDisk.clearLegacyImageCache()
+        URLCache.shared.removeAllCachedResponses()
         for tab in tabs { tab.dispose() }
         for item in profiles.profiles { shield.erase(item.id); downloads.removeAll(profileID: item.id) }
         do { try await profiles.resetAll() } catch { notify(error.localizedDescription); return }

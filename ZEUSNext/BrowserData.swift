@@ -5,6 +5,7 @@ import WebKit
 enum SearchProvider: String, Codable, CaseIterable, Identifiable {
     case google = "Google", duckDuckGo = "DuckDuckGo", bing = "Bing"
     var id: String { rawValue }
+    var symbol: String { switch self { case .google: return "globe"; case .duckDuckGo: return "target"; case .bing: return "magnifyingglass.circle" } }
     var baseURL: String {
         switch self {
         case .google: return "https://www.google.com/search"
@@ -24,6 +25,8 @@ struct BrowserProfile: Codable, Identifiable, Equatable {
     var kind: ProfileKind = .standard
     var locked = false
     var isPrivate: Bool { kind == .ephemeral }
+    var passwordProtected: Bool?
+    var requiresPassword: Bool { passwordProtected == true || AccountVault.exists(id) }
     var legacyWebsiteStore: Bool?
     var account: AccountOptions?
     var role: AccountRole { account?.role ?? .standard }
@@ -140,6 +143,15 @@ enum BrowserDisk {
         guard let data = try? Data(contentsOf: url) else { return nil }
         return try? JSONDecoder().decode(type, from: data)
     }
+    static func clearLegacyImageCache() async throws -> Int64 {
+        try await Task.detached {
+            guard let root = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else { return Int64(0) }
+            let children = try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)
+            var reclaimed: Int64 = 0
+            for child in children where child.lastPathComponent.hasPrefix("com.onevcat.Kingfisher.ImageCache") { reclaimed += size(at: child); try FileManager.default.removeItem(at: child) }
+            return reclaimed
+        }.value
+    }
     static func size(at url: URL) -> Int64 {
         guard let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey]) else { return 0 }
         return enumerator.reduce(Int64(0)) { total, item in
@@ -177,6 +189,7 @@ enum BrowserDisk {
             migrateLegacy(into: initial)
         }
         ensureSpecialAccounts()
+        for profile in profiles where profile.isPrivate { try? FileManager.default.removeItem(at: folder(for: profile)) }
     }
     private func ensureSpecialAccounts() {
         for role in [AccountRole.guest, .kiosk] where !profiles.contains(where: { $0.role == role }) {

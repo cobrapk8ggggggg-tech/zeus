@@ -23,15 +23,17 @@ enum BrowserTools {
 extension BrowserModel {
     func readerMode() {
         guard let view = webView else { return }
+        let owner = profile.id, tabID = current?.id
         view.evaluateJavaScript(BrowserTools.reader) { [weak self] result, error in
-            guard let self else { return }
+            guard let self, self.profile.id == owner, self.current?.id == tabID else { return }
             guard let value = result as? [String: Any], let paragraphs = value["paragraphs"] as? [String], !paragraphs.isEmpty else { self.notify(error?.localizedDescription ?? "لم يُعثر على نص مناسب لوضع القراءة."); return }
             self.article = ReaderArticle(title: value["title"] as? String ?? "القارئ", paragraphs: paragraphs)
         }
     }
     func galleryMode() {
+        let owner = profile.id, tabID = current?.id
         webView?.evaluateJavaScript(BrowserTools.gallery) { [weak self] value, error in
-            guard let self else { return }
+            guard let self, self.profile.id == owner, self.current?.id == tabID else { return }
             if let urls = value as? [String], !urls.isEmpty { self.gallery = GalleryArticle(images: urls) }
             else { self.notify(error?.localizedDescription ?? "لا توجد صور كبيرة جاهزة في الصفحة.") }
         }

@@ -9,7 +9,7 @@ struct SavedForm: Codable, Identifiable {
     var fieldCount: Int
 }
 struct SavedFormField: Codable { var selector: String; var type: String; var value: String; var checked: Bool; var index: Int? }
-struct FormDraft: Identifiable { let id = UUID(); var origin: String; var title: String; var fields: [SavedFormField] }
+struct FormDraft: Identifiable { let id = UUID(); var profileID: UUID; var origin: String; var title: String; var fields: [SavedFormField] }
 enum FormVault {
     private static func query(profileID: UUID, id: UUID? = nil) -> [String: Any] {
         var q: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "tools.zeus.forms." + profileID.uuidString]
@@ -31,12 +31,13 @@ enum FormVault {
 extension BrowserModel {
     func extractForm() {
         guard profile.role != .kiosk, let view = webView, let url = view.url, let origin = Self.origin(url) else { return }
+        let owner = profile.id, tabID = current?.id
         let script = #"""
         (()=>Array.from(document.querySelectorAll('input,textarea,select')).filter(e=>!['hidden','file','submit','button','reset'].includes(e.type)&&e.getClientRects().length).slice(0,200).map(e=>{let selector;if(e.id)selector='#'+CSS.escape(e.id);else if(e.name)selector=e.tagName.toLowerCase()+'[name='+CSS.escape(e.name)+']';else{let cur=e,parts=[];while(cur&&cur.parentElement){parts.unshift(cur.tagName.toLowerCase()+':nth-child('+(Array.from(cur.parentElement.children).indexOf(cur)+1)+')');cur=cur.parentElement}selector='html>'+parts.join('>')}return {selector,index:Array.from(document.querySelectorAll(selector)).indexOf(e),type:e.type||e.tagName.toLowerCase(),value:String(e.value||'').slice(0,10000),checked:!!e.checked}}))();
         """#
         view.evaluateJavaScript(script) { [weak self] value, error in
-            guard let self else { return }
-            do { let data = try JSONSerialization.data(withJSONObject: value ?? []); let fields = try JSONDecoder().decode([SavedFormField].self, from: data); guard !fields.isEmpty else { self.notify("لا توجد حقول نموذج قابلة للحفظ في الصفحة الرئيسية."); return }; self.formDraft = FormDraft(origin: origin, title: self.current?.title ?? "نموذج", fields: fields) }
+            guard let self, self.profile.id == owner, self.current?.id == tabID else { return }
+            do { let data = try JSONSerialization.data(withJSONObject: value ?? []); let fields = try JSONDecoder().decode([SavedFormField].self, from: data); guard !fields.isEmpty else { self.notify("لا توجد حقول نموذج قابلة للحفظ في الصفحة الرئيسية."); return }; self.formDraft = FormDraft(profileID: owner, origin: origin, title: self.current?.title ?? "نموذج", fields: fields) }
             catch { self.notify(error.localizedDescription) }
         }
     }
@@ -45,6 +46,7 @@ extension BrowserModel {
         parts.path = ""; parts.query = nil; parts.fragment = nil; parts.user = nil; parts.password = nil; return parts.url?.absoluteString
     }
     func storeForm(_ draft: FormDraft, includePasswords: Bool) throws {
+        guard !requiresUnlock, profile.id == draft.profileID else { throw AccountError.permission }
         let fields = draft.fields.filter { includePasswords || $0.type != "password" }
         let item = SavedForm(title: draft.title, origin: draft.origin, fieldCount: fields.count)
         if profile.isPrivate { temporaryFormValues[item.id] = fields } else { try FormVault.save(fields, profileID: profile.id, id: item.id) }

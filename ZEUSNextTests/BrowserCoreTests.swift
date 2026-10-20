@@ -35,6 +35,7 @@ final class BrowserCoreTests: XCTestCase {
         XCTAssertNil(DownloadFiles.cookieHeaders([cookie], for: URL(string: "https://notexample.com/private")!)["Cookie"])
         XCTAssertNil(DownloadFiles.cookieHeaders([cookie], for: URL(string: "http://example.com/private")!)["Cookie"])
         XCTAssertNil(DownloadFiles.cookieHeaders([cookie], for: URL(string: "https://example.com/private-extra")!)["Cookie"])
+        XCTAssertNil(DownloadFiles.cookieHeaders([cookie], for: URL(string: "https://example.com/private%2Ffile")!)["Cookie"])
         XCTAssertNotNil(DownloadFiles.cookieHeaders([cookie], for: URL(string: "https://example.com/private/file")!)["Cookie"])
     }
     @MainActor func testProfileFilesAndWebKitStoresAreIndependent() async throws {

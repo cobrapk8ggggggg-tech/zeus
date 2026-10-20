@@ -162,20 +162,22 @@ struct StorageSettingsPage: View {
     @ObservedObject var context: ProfileSettingsContext
     @State private var bytes: Int64 = 0
     @State private var sites = 0
+    @State private var freeBytes: Int64 = 0
     @State private var action: String?
     @State private var busy = false
     @State private var result: String?
     var body: some View {
         Form {
-            Section("البيانات") { LabeledContent("ملفات الحساب", value: byteText(bytes)); LabeledContent("مواقع خزّنت بيانات", value: "\(sites)"); Button("مسح الملفات المؤقتة") { action = "cache" }.accessibilityIdentifier("clearCacheButton"); Button("مسح الكوكيز وبيانات المواقع") { action = "web" }; Button("مسح سجل التصفح") { action = "history" }; Button("مسح سجل البحث") { action = "search" }; Button("حذف التنزيلات") { action = "downloads" } }
+            Section("البيانات") { LabeledContent("ملفات الحساب", value: byteText(bytes)); LabeledContent("مواقع خزّنت بيانات", value: "\(sites)"); LabeledContent("المساحة المتاحة بالجهاز", value: byteText(freeBytes)); Button("مسح الملفات المؤقتة") { action = "cache" }.accessibilityIdentifier("clearCacheButton"); Button("مسح الكوكيز وبيانات المواقع") { action = "web" }; Button("مسح سجل التصفح") { action = "history" }; Button("مسح سجل البحث") { action = "search" }; Button("حذف التنزيلات") { action = "downloads" } }
             if context.isActive { Section { NavigationLink("المفضلة والسجل") { LibrarySheet(model: context.model) }; NavigationLink("السكربتات") { ScriptsSheet(model: context.model) } } }
-            if context.model.profile.isAdmin { Section { Button("إعادة ضبط التطبيق وكل الحسابات") { action = "reset" } } }
+            if context.model.profile.isAdmin { Section { Button("مسح كاش الصور من إصدار ZEUS القديم") { action = "legacy" }; Button("إعادة ضبط التطبيق وكل الحسابات") { action = "reset" } } }
             if let result { Text(result).font(.footnote) }
         }.settingsPage("البيانات الشخصية").disabled(busy).task { await refresh() }
             .confirmationDialog("تأكيد حذف البيانات المحددة؟ حذف بيانات المواقع يسجل خروجك منها. لا يمكن التراجع عن حذف الملفات.", isPresented: Binding(get: { action != nil }, set: { if !$0 { action = nil } }), titleVisibility: .visible) { Button("مسح") { let selected = action; action = nil; Task { await perform(selected) } } }
     }
     private func refresh() async {
         let folder = context.model.profiles.folder(for: context.profile), downloads = context.model.profiles.downloads(for: context.profile)
+        freeBytes = ((try? FileManager.default.attributesOfFileSystem(forPath: NSHomeDirectory())[.systemFreeSize]) as? NSNumber)?.int64Value ?? 0
         bytes = await Task.detached { BrowserDisk.size(at: folder) + BrowserDisk.size(at: downloads) }.value
         let records: [WKWebsiteDataRecord] = await withCheckedContinuation { c in context.model.profiles.websiteDataStore(for: context.profile).fetchDataRecords(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes()) { c.resume(returning: $0) } }; sites = records.count
     }
@@ -187,6 +189,7 @@ struct StorageSettingsPage: View {
         case "cache", "web": let types: Set<String> = selected == "cache" ? [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache, WKWebsiteDataTypeFetchCache] : WKWebsiteDataStore.allWebsiteDataTypes(); if context.isActive { for tab in model.tabs { tab.dispose() } }; await model.profiles.websiteDataStore(for: context.profile).removeData(ofTypes: types, modifiedSince: .distantPast); if context.isActive { await model.ensureCurrentLoaded() }
         case "history", "search": if context.isActive { if selected == "history" { model.data.history = [] } else { model.data.searches = [] }; model.persist() } else { var data = model.profiles.load(context.profile); if selected == "history" { data.history = [] } else { data.searches = [] }; model.profiles.save(data, for: context.profile) }
         case "downloads": model.downloads.removeAll(profileID: context.profileID)
+        case "legacy": do { let removed = try await BrowserDisk.clearLegacyImageCache(); FaviconMemory.purge(); result = "مُسح كاش الصور القديم: " + byteText(removed) } catch { result = error.localizedDescription }; await refresh(); return
         case "reset": await model.resetApplication()
         default: break
         }

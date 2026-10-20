@@ -68,7 +68,8 @@ struct WebDialog: Identifiable {
         let store = profiles ?? ProfileStore()
         self.profiles = store; downloads = DownloadService(store: store, useBackground: useBackgroundDownloads)
         shield = ShieldEngine(root: store.root); data = store.load(store.active)
-        restoreTabs(); requiresUnlock = store.active.locked || AccountVault.exists(store.activeID)
+        for profile in store.profiles where profile.isPrivate { shield.erase(profile.id) }
+        restoreTabs(); requiresUnlock = store.active.locked || store.active.requiresPassword
         if data.settings.advanced?.launchBehavior == .home && !requiresUnlock { home() }
         downloads.settingsForProfile = { [weak self] id in guard let self else { return BrowserSettings() }; return self.profile.id == id ? self.data.settings : self.profiles.profile(id).map { self.profiles.load($0).settings } ?? BrowserSettings() }
         downloads.askDownload = { [weak self] filename, answer in guard let self, self.dialog == nil else { answer(false); return }; self.dialog = WebDialog(kind: .confirm, text: "تنزيل الملف \(filename)؟") { answer($0 != nil) } }
@@ -200,7 +201,7 @@ struct WebDialog: Identifiable {
     }
     func switchProfile(to target: BrowserProfile, password: String = "") async {
         guard !switching, target.account?.enabled != false, target.id != profile.id || requiresUnlock else { return }; switching = true; defer { switching = false }
-        if AccountVault.exists(target.id), !(await AccountVault.verify(password, id: target.id)) { notify(AccountError.password.localizedDescription); return }
+        if target.requiresPassword, !(await AccountVault.verify(password, id: target.id)) { notify(AccountError.password.localizedDescription); return }
         if target.locked, !(await authenticate(reason: "فتح مساحة \(target.name)")) { return }
         transitionEpoch = UUID()
         let previous = profile; twinTabID = nil; twinFocused = false; if !requiresUnlock { persist() }
@@ -209,7 +210,7 @@ struct WebDialog: Identifiable {
         if previous.isPrivate { shield.erase(previous.id); downloads.removeAll(profileID: previous.id); await profiles.clearEphemeral(previous) }
         profiles.select(target.id); data = profiles.load(target); blockedNavigations = 0; requiresUnlock = false; chromeHidden = false; restoreTabs()
         if let home = target.account?.homePage, home != "zeus://home", tabs.count == 1, current?.isHome == true { open(home) }
-        await ensureCurrentLoaded()
+        Task { await ensureCurrentLoaded() }
     }
     func authenticate(reason: String) async -> Bool {
         let context = LAContext(); var error: NSError?
@@ -228,10 +229,11 @@ struct WebDialog: Identifiable {
         cleanOnExit(profile)
         persist(); if profile.locked { requiresUnlock = true }
         if profile.isPrivate {
+            shield.erase(profile.id)
             temporaryFormValues.removeAll(); formDraft = nil
             for tab in tabs { tab.dispose() }; downloads.removeAll(profileID: profile.id)
             let owner = profile; transitionEpoch = UUID(); let epoch = transitionEpoch; requiresUnlock = true
-            Task { await profiles.clearEphemeral(owner); guard profile.id == owner.id, transitionEpoch == epoch else { return }; data = profiles.load(owner); restoreTabs(); requiresUnlock = owner.locked || AccountVault.exists(owner.id) }
+            Task { await profiles.clearEphemeral(owner); guard profile.id == owner.id, transitionEpoch == epoch else { return }; data = profiles.load(owner); restoreTabs(); requiresUnlock = owner.locked || owner.requiresPassword }
         }
     }
     func applySettings(reload: Bool = true) {
@@ -250,6 +252,7 @@ struct WebDialog: Identifiable {
         if let tab = newTab(), let url = request.url { tab.url = url.absoluteString; open(request) }
     }
     func clearWebsiteData(cacheOnly: Bool) async {
+        FaviconMemory.purge()
         for tab in tabs { tab.dispose() }
         let types: Set<String> = cacheOnly ? [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache, WKWebsiteDataTypeFetchCache] : WKWebsiteDataStore.allWebsiteDataTypes()
         await profiles.websiteDataStore(for: profile).removeData(ofTypes: types, modifiedSince: .distantPast)
@@ -259,7 +262,7 @@ struct WebDialog: Identifiable {
         guard profile.isAdmin, !target.isAdmin else { notify("الحذف للحساب الرئيسي فقط، ولا يمكن حذف الحساب الرئيسي."); return }
         guard profiles.profiles.count > 1 else { notify("أبقِ مساحة واحدة على الأقل."); return }
         if target.id == profile.id, let other = profiles.profiles.first(where: { $0.id != target.id }) { await switchProfile(to: other); if profile.id == target.id { return } }
-        downloads.removeAll(profileID: target.id)
+        downloads.removeAll(profileID: target.id); shield.erase(target.id)
         do { try await profiles.delete(target) } catch { notify(error.localizedDescription) }
     }
     private func cleanOnExit(_ owner: BrowserProfile) {

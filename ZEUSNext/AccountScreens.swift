@@ -19,6 +19,7 @@ struct ProfilesSheet: View {
     @ObservedObject private var store: ProfileStore
     @Environment(\.dismiss) private var dismiss
     @State private var creating = false
+    @State private var createdAccount: BrowserProfile?
     @State private var name = ""
     @State private var selectedRole: AccountRole = .standard
     @State private var editing: BrowserProfile?
@@ -52,7 +53,7 @@ struct ProfilesSheet: View {
                 if let failure { Section { Text(failure).font(.footnote) } }
             }.scrollContentBackground(.hidden).background(.black).navigationTitle("الحسابات").navigationBarTitleDisplayMode(.inline)
                 .toolbar { if !model.requiresUnlock { ToolbarItem(placement: .topBarTrailing) { Button("تم") { dismiss() } } } }
-                .fullScreenCover(isPresented: $creating) { createAccount }
+                .fullScreenCover(isPresented: $creating, onDismiss: { if let createdAccount { editing = createdAccount; self.createdAccount = nil } }) { createAccount }
                 .fullScreenCover(item: $editing) { SettingsSheet(model: model, profile: $0) }
                 .alert("تسجيل الدخول إلى \(login?.name ?? "")", isPresented: Binding(get: { login != nil }, set: { if !$0 { login = nil } })) {
                     SecureField("كلمة المرور", text: $password)
@@ -65,16 +66,16 @@ struct ProfilesSheet: View {
     }
     private func accountRow(_ profile: BrowserProfile) -> some View {
         HStack(spacing: 14) {
-            Button { if AccountVault.exists(profile.id) { password = ""; login = profile } else { attempt(profile, password: "") } } label: {
+            Button { if profile.requiresPassword { password = ""; login = profile } else { attempt(profile, password: "") } } label: {
                 HStack(spacing: 14) {
                     AccountAvatar(profile: profile, store: store, size: 70)
                     VStack(alignment: .leading, spacing: 5) { Text(profile.name).font(.headline); Text(profile.role.title).font(.caption).foregroundStyle(.secondary) }
                     Spacer()
-                    if AccountVault.exists(profile.id) || profile.locked { Image(systemName: "lock") }
+                    if profile.requiresPassword || profile.locked { Image(systemName: "lock") }
                     if !model.requiresUnlock && model.profile.id == profile.id { Image(systemName: "checkmark") }
                 }.contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityIdentifier("profile-" + profile.name)
-            if !model.requiresUnlock && (model.profile.id == profile.id || model.profile.isAdmin && !AccountVault.exists(profile.id)) {
+            if !model.requiresUnlock && (model.profile.id == profile.id || model.profile.isAdmin && !profile.requiresPassword) {
                 Button { editing = profile } label: { Image(systemName: "info.circle").frame(width: 40, height: 44) }.buttonStyle(.borderless).accessibilityLabel("إعدادات " + profile.name)
             }
         }.frame(minHeight: 88).listRowBackground(Color.black).listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 12))
@@ -104,7 +105,7 @@ struct ProfilesSheet: View {
             Form { Section("الحساب الجديد") { TextField("اسم الحساب", text: $name).accessibilityIdentifier("profileNameField") } }.scrollContentBackground(.hidden).background(.black).navigationTitle("إضافة حساب")
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { creating = false } }
-                    ToolbarItem(placement: .confirmationAction) { Button("إنشاء") { var target = store.add(name: name, accent: "white", isPrivate: false); target.account = AccountOptions(); store.update(target); name = ""; creating = false; editing = target }.accessibilityIdentifier("createProfileButton") }
+                    ToolbarItem(placement: .confirmationAction) { Button("إنشاء") { var target = store.add(name: name, accent: "white", isPrivate: false); target.account = AccountOptions(); store.update(target); name = ""; createdAccount = target; creating = false }.accessibilityIdentifier("createProfileButton") }
                 }
         }.tint(.white).preferredColorScheme(.dark)
     }
@@ -144,7 +145,7 @@ struct AccountSettingsView: View {
 
                     if profile.role != .guest { Button("كلمة مرور الحساب", systemImage: "key") { passwordScreen = true } }
                     Picker("تسجيل الخروج بعد مغادرة التطبيق", selection: option(\.logoutAfter)) { Text("أبدًا").tag(Double(-1)); Text("فورًا").tag(Double(0)); Text("دقيقة").tag(Double(60)); Text("5 دقائق").tag(Double(300)); Text("10 دقائق").tag(Double(600)); Text("30 دقيقة").tag(Double(1800)) }
-                    if model.profile.id == profile.id { Button(profile.locked ? "إلغاء قفل الجهاز والبصمة" : "حماية إضافية برمز الجهاز والبصمة") { Task { await model.setProfileLock(!profile.locked); profile = model.profile } } }
+                    if model.profile.id == profile.id && (profile.isAdmin || profile.locked) { Button(profile.locked ? "إلغاء قفل الجهاز والبصمة" : "حماية إضافية برمز الجهاز والبصمة") { Task { await model.setProfileLock(!profile.locked); profile = model.profile } } }
                 }
                 .disabled(profile.role == .guest && !canAdminister)
                 if model.profile.id == profile.id { Button("تسجيل الخروج الآن") { model.logout(); dismiss() } }
@@ -156,7 +157,7 @@ struct AccountSettingsView: View {
                     Section("حسابات المستخدمين") {
                         Button("إدارة الحسابات وإضافة حساب") { accountsManager = true }
                         ForEach(model.profiles.profiles.filter { $0.role == .standard }) { account in
-                            if AccountVault.exists(account.id) { Label(account.name + " — سجّل الدخول لتغيير إعداداته", systemImage: "lock") }
+                            if account.requiresPassword { Label(account.name + " — سجّل الدخول لتغيير إعداداته", systemImage: "lock") }
                             else { Button(account.name) { editingAccount = account } }
                         }
                     }
@@ -182,7 +183,7 @@ struct AccountSettingsView: View {
                 .fullScreenCover(isPresented: $avatars) {
                     NavigationStack { ScrollView { LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 24) { ForEach(["person.crop.circle.fill", "person.fill", "house.fill", "briefcase.fill", "book.fill", "star.fill", "moon.fill", "sun.max.fill", "globe", "bolt.fill", "leaf.fill", "heart.fill", "pawprint.fill", "paperplane.fill", "gamecontroller.fill", "desktopcomputer"], id: \.self) { symbol in Button { profile.symbol = symbol; profile.account = options; profile.account?.avatarFilename = nil; avatars = false } label: { Image(systemName: symbol).font(.system(size: 36)).frame(width: 70, height: 70).glassSurface(12) } } }.padding() }.background(.black).navigationTitle("الصور الرمزية").toolbar { Button("تم") { avatars = false } } }.tint(.white).preferredColorScheme(.dark)
                 }
-                .fullScreenCover(isPresented: $passwordScreen) { AccountPasswordView(profile: profile) }
+                .fullScreenCover(isPresented: $passwordScreen) { AccountPasswordView(profile: profile) { protected in profile.passwordProtected = protected; model.profiles.update(profile) } }
                 .confirmationDialog("حذف الحساب وكل ملفاته؟", isPresented: $deleting) { Button("حذف نهائي") { Task { await model.deleteProfile(profile); dismiss() } } }
     }
     private func option<T>(_ key: WritableKeyPath<AccountOptions, T>) -> Binding<T> {
@@ -199,6 +200,7 @@ struct AccountSettingsView: View {
 
 struct AccountPasswordView: View {
     let profile: BrowserProfile
+    var saved: (Bool) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var current = ""
     @State private var password = ""
@@ -208,11 +210,11 @@ struct AccountPasswordView: View {
     var body: some View {
         NavigationStack {
             Form {
-                if AccountVault.exists(profile.id) { SecureField("كلمة المرور الحالية", text: $current) }
+                if profile.requiresPassword { SecureField("كلمة المرور الحالية", text: $current) }
                 SecureField("كلمة المرور الجديدة", text: $password); SecureField("تأكيد كلمة المرور", text: $confirmation)
                 Text("اترك كلمة المرور الجديدة فارغة لإزالة الحماية بعد إدخال الحالية. الحساب الرئيسي لا يتجاوز كلمة مرور حسابك.").font(.footnote)
                 if let issue { Text(issue) }
-                Button("حفظ") { busy = true; Task { defer { busy = false }; guard password == confirmation else { issue = "كلمتا المرور غير متطابقتين."; return }; if AccountVault.exists(profile.id), !(await AccountVault.verify(current, id: profile.id)) { issue = "كلمة المرور الحالية غير صحيحة."; return }; do { try await AccountVault.set(password, id: profile.id); dismiss() } catch { issue = error.localizedDescription } } }.disabled(busy)
+                Button("حفظ") { busy = true; Task { defer { busy = false }; guard password == confirmation else { issue = "كلمتا المرور غير متطابقتين."; return }; if profile.requiresPassword, !(await AccountVault.verify(current, id: profile.id)) { issue = "كلمة المرور الحالية غير صحيحة."; return }; do { try await AccountVault.set(password, id: profile.id); saved(!password.isEmpty); dismiss() } catch { issue = error.localizedDescription } } }.disabled(busy)
             }.scrollContentBackground(.hidden).background(.black).navigationTitle("كلمة مرور الحساب").toolbar { Button("إلغاء") { dismiss() } }
         }.tint(.white).preferredColorScheme(.dark)
     }

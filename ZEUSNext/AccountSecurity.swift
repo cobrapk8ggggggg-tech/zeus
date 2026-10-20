@@ -50,7 +50,7 @@ enum AccountVault {
         return Data(output)
     }
     static func verify(_ password: String, id: UUID) async -> Bool {
-        guard let credential = read(id) else { return password.isEmpty }
+        guard let credential = read(id) else { return false }
         guard credential.salt.count == 32, credential.digest.count == 32 else { return false }
         return await Task.detached(priority: .userInitiated) {
             let actual = derive(password, salt: credential.salt)
