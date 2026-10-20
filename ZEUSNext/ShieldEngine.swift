@@ -50,7 +50,7 @@ struct FilterRules {
     private func merge(_ text: String) {
         let parsed = FilterRules.parse(text)
         domains.formUnion(parsed.domains); allowed.formUnion(parsed.allowed)
-        status = "\(domains.count) نطاق · \(parsed.unsupported) قاعدة متقدمة غير مدعومة"
+        status = "\(nativeRules.count) قاعدة WebKit · \(domains.count) نطاق إضافي؛ تحديث النطاقات لا يغيّر لقطة القواعد المرفقة"
         compiled.removeAll()
     }
     func blocks(_ host: String) -> Bool {

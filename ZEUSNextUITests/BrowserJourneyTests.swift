@@ -23,6 +23,22 @@ final class BrowserJourneyTests: XCTestCase {
             XCTAssertTrue(app.textFields["homeSearchField"].waitForExistence(timeout: 8)); capture("chrome-" + layout)
         }
     }
+    func testAccountNetworkAndToolsMatchReferenceStructure() throws {
+        for category in ["account", "network", "tools"] {
+            let app = launch()
+            XCTAssertTrue(app.textFields["homeSearchField"].waitForExistence(timeout: 15))
+            openToolbar(app); app.buttons["toolsButton"].tap(); app.buttons["settingsButton"].tap()
+            let item = app.buttons["category-" + category].firstMatch
+            XCTAssertTrue(item.waitForExistence(timeout: 8)); for _ in 0..<3 { if item.isHittable { break }; app.swipeUp() }; item.tap()
+            switch category {
+            case "account": XCTAssertTrue(app.buttons["صور رمزية"].waitForExistence(timeout: 8))
+            case "network": XCTAssertTrue(app.switches["التنزيل عبر Wi-Fi فقط"].waitForExistence(timeout: 8))
+            default: XCTAssertTrue(app.buttons["تصدير واستيراد عبر الملفات والتطبيقات"].waitForExistence(timeout: 8))
+            }
+            capture("reference-settings-" + category)
+            app.terminate()
+        }
+    }
     func testOriginalReaderAndGalleryWithBackgroundAndLazyImages() throws {
         let app = launch()
         let search = app.textFields["homeSearchField"]; XCTAssertTrue(search.waitForExistence(timeout: 15)); search.tap(); search.typeText("http://127.0.0.1:8765/\n")

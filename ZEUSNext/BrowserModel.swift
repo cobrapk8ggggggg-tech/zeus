@@ -218,7 +218,6 @@ struct WebDialog: Identifiable {
         do { return try await context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) }
         catch { return false }
     }
-    func unlock() async { if await authenticate(reason: "فتح مساحة \(profile.name)") { requiresUnlock = false; await ensureCurrentLoaded() } }
     func setProfileLock(_ locked: Bool) async {
         guard await authenticate(reason: locked ? "حماية هذه المساحة" : "إلغاء حماية المساحة") else { return }
         var changed = profile; changed.locked = locked; profiles.update(changed)

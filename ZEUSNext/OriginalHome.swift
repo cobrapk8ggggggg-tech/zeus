@@ -22,7 +22,7 @@ struct OriginalHome: View {
                     Button { query = "" } label: { Image(systemName: "xmark.circle.fill").opacity(query.isEmpty ? 0 : 0.5) }
                     TextField("البحث أو إدخال عنوان URL", text: $query).textInputAutocapitalization(.never).autocorrectionDisabled().multilineTextAlignment(.trailing).submitLabel(.search).focused($focused).accessibilityIdentifier("homeSearchField").onSubmit { focused = false; showHistory = false; model.open(query) }
                     Image(systemName: model.data.settings.searchProvider.symbol).font(.system(size: 18))
-                }.padding(.horizontal, 15).frame(height: 55).background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 28)).overlay(RoundedRectangle(cornerRadius: 28).stroke(.white.opacity(0.1), lineWidth: 1))
+                }.padding(.horizontal, 15).frame(height: 55).background(Color(white: 30.0 / 255.0), in: RoundedRectangle(cornerRadius: 28)).overlay(RoundedRectangle(cornerRadius: 28).stroke(.white.opacity(0.1), lineWidth: 1))
                 if showHistory && !(model.data.searches ?? []).isEmpty {
                     VStack(spacing: 0) {
                         ForEach(Array((model.data.searches ?? []).prefix(5)), id: \.self) { suggestion in
@@ -33,7 +33,7 @@ struct OriginalHome: View {
                                 Image(systemName: "clock.arrow.2.circlepath").font(.system(size: 14))
                             }.padding(.horizontal, 18).padding(.vertical, 14)
                         }
-                    }.background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 20)).padding(.horizontal, 8).padding(.top, 10)
+                    }.background(Color(white: 26.0 / 255.0), in: RoundedRectangle(cornerRadius: 20)).padding(.horizontal, 8).padding(.top, 10)
                 }
             }.padding(.horizontal, 20).environment(\.layoutDirection, .leftToRight)
             ScrollView(showsIndicators: false) {

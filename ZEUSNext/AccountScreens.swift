@@ -52,7 +52,10 @@ struct ProfilesSheet: View {
                 }
                 if let failure { Section { Text(failure).font(.footnote) } }
             }.scrollContentBackground(.hidden).background(.black).navigationTitle("الحسابات").navigationBarTitleDisplayMode(.inline)
-                .toolbar { if !model.requiresUnlock { ToolbarItem(placement: .topBarTrailing) { Button("تم") { dismiss() } } } }
+                .toolbar {
+                    if !model.requiresUnlock { ToolbarItem(placement: .topBarTrailing) { Button("تم") { dismiss() } } }
+                    if model.profile.isAdmin && !model.requiresUnlock { ToolbarItem(placement: .topBarLeading) { EditButton() } }
+                }
                 .fullScreenCover(isPresented: $creating, onDismiss: { if let createdAccount { editing = createdAccount; self.createdAccount = nil } }) { createAccount }
                 .fullScreenCover(item: $editing) { SettingsSheet(model: model, profile: $0) }
                 .alert("تسجيل الدخول إلى \(login?.name ?? "")", isPresented: Binding(get: { login != nil }, set: { if !$0 { login = nil } })) {

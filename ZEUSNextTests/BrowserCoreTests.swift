@@ -67,8 +67,9 @@ final class BrowserCoreTests: XCTestCase {
         let store = ProfileStore(root: root, downloadsRoot: root.appendingPathComponent("Downloads"))
         let service = DownloadService(store: store, useBackground: false)
         let done = expectation(description: "redirected download saved")
+        var fired = false
         var subscription: AnyCancellable?
-        subscription = service.$records.sink { if $0.contains(where: { $0.state == .completed }) { done.fulfill() } }
+        subscription = service.$records.sink { if !fired && $0.contains(where: { $0.state == .completed }) { fired = true; done.fulfill() } }
         await service.start(url: URL(string: "http://127.0.0.1:8765/redirect")!, profile: store.active)
         await fulfillment(of: [done], timeout: 35); subscription?.cancel()
         let item = try XCTUnwrap(service.records.first); let file = try XCTUnwrap(service.fileURL(item))
@@ -114,14 +115,15 @@ final class BrowserCoreTests: XCTestCase {
         let loaderA = WebKitFixtureLoader(), loaderB = WebKitFixtureLoader()
         let configA = WKWebViewConfiguration(); configA.websiteDataStore = store.websiteDataStore(for: a)
         let configB = WKWebViewConfiguration(); configB.websiteDataStore = store.websiteDataStore(for: b)
-        let viewA = WKWebView(frame: .zero, configuration: configA), viewB = WKWebView(frame: .zero, configuration: configB)
+        let viewA = WKWebView(frame: .zero, configuration: configA)
+        var viewB: WKWebView? = WKWebView(frame: .zero, configuration: configB)
         await loaderA.loadURL(URL(string: "http://127.0.0.1:8765/")!, view: viewA)
-        await loaderB.loadURL(URL(string: "http://127.0.0.1:8765/")!, view: viewB)
+        await loaderB.loadURL(URL(string: "http://127.0.0.1:8765/")!, view: try XCTUnwrap(viewB))
         _ = try await viewA.evaluateJavaScript("localStorage.setItem('zeus-profile-test','A')")
         let stored = try await viewA.evaluateJavaScript("localStorage.getItem('zeus-profile-test')") as? String; XCTAssertEqual(stored, "A")
-        let other = try await viewB.evaluateJavaScript("localStorage.getItem('zeus-profile-test')")
+        let other = try await viewB?.evaluateJavaScript("localStorage.getItem('zeus-profile-test')")
         XCTAssertTrue(other is NSNull)
-        viewA.navigationDelegate = nil; viewB.navigationDelegate = nil
+        viewA.navigationDelegate = nil; viewB?.navigationDelegate = nil; viewB?.stopLoading(); viewB = nil
         try await store.delete(b)
         await store.websiteDataStore(for: a).removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
         try? FileManager.default.removeItem(at: root)
@@ -168,10 +170,21 @@ final class BrowserCoreTests: XCTestCase {
 
 @MainActor private final class WebKitFixtureLoader: NSObject, WKNavigationDelegate {
     private var continuation: CheckedContinuation<Void, Never>?
-    func load(_ html: String, view: WKWebView) async { await withCheckedContinuation { c in continuation = c; view.navigationDelegate = self; view.loadHTMLString(html, baseURL: URL(string: "https://example.com")) } }
-    func loadURL(_ url: URL, view: WKWebView) async { await withCheckedContinuation { c in continuation = c; view.navigationDelegate = self; view.load(URLRequest(url: url)) } }
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { continuation?.resume(); continuation = nil }
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { continuation?.resume(); continuation = nil }
+    private var watchdog: DispatchWorkItem?
+    private func begin(_ value: CheckedContinuation<Void, Never>, view: WKWebView) {
+        continuation = value; view.navigationDelegate = self
+        let timeout = DispatchWorkItem { [weak self, weak view] in
+            guard let self, self.continuation != nil else { return }
+            view?.stopLoading(); XCTFail("WebKit fixture did not load within 30 seconds"); self.finish()
+        }
+        watchdog = timeout; DispatchQueue.main.asyncAfter(deadline: .now() + 30, execute: timeout)
+    }
+    private func finish() { watchdog?.cancel(); watchdog = nil; let pending = continuation; continuation = nil; pending?.resume() }
+    func load(_ html: String, view: WKWebView) async { await withCheckedContinuation { c in begin(c, view: view); view.loadHTMLString(html, baseURL: URL(string: "https://example.com")) } }
+    func loadURL(_ url: URL, view: WKWebView) async { await withCheckedContinuation { c in begin(c, view: view); view.load(URLRequest(url: url)) } }
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { finish() }
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { XCTFail(error.localizedDescription); finish() }
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { XCTFail(error.localizedDescription); finish() }
 }
 
 final class TransferAndPreferenceTests: XCTestCase {

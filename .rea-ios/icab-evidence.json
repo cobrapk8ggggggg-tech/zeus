@@ -1,0 +1,677 @@
+{
+  "notice": "Targeted Ghidra evidence, not original Swift/Objective-C source. Not a whole-application reconstruction. The supplied IPA has additional dylib load commands and is not assumed identical to an official distribution.",
+  "binary_sha256": "fa388346982ff8d9fa9a717b8a992abc832b1dd3dceb2350965778ffd79fbfc2",
+  "protocol": "2025-11-25",
+  "rea_version": "6.7.0",
+  "ghidra_version": "12.1.4",
+  "disabled_analyzers": [
+    "Objective-C Message Analyzer",
+    "Stack",
+    "Decompiler Switch Analysis"
+  ],
+  "records": [
+    {
+      "evidence_id": "ev_e0ac9df25024517bf36b21df4088e70f1b60037cfb72b06c9a3561d5b35cf278",
+      "procedure": {
+        "address": "0x100043c5c",
+        "name": "ACUser::loginWithPassword:",
+        "classification": {
+          "external": false,
+          "thunk": false,
+          "thunk_target": null,
+          "provenance": "ghidra-function-manager"
+        },
+        "body": {
+          "available": true,
+          "provenance": "ghidra-function-body-address-set",
+          "ranges": [
+            {
+              "start": "0x100043c5c",
+              "end": "0x100043cc7"
+            }
+          ],
+          "total_bytes": 108,
+          "span_bytes": 108,
+          "non_contiguous": false,
+          "contains_entry": true
+        },
+        "signature": "bool __cdecl loginWithPassword:(ID param_1, SEL param_2, ID param_3)",
+        "locals": []
+      },
+      "referenced_strings": [
+        {
+          "address": "0x1001cff0c",
+          "value": "isEqualToString:",
+          "source_address": "0x100043c98"
+        },
+        {
+          "address": "0x1001d9296",
+          "value": "password",
+          "source_address": "0x100043c74"
+        },
+        {
+          "address": "0x1001dbafa",
+          "value": "userLoggedIn",
+          "source_address": "0x100043cac"
+        }
+      ],
+      "raw_result_sha256": "f531b4a3062e780133dcb4cbb0612d84951d2116343b0ccbce7101917f761aa7"
+    },
+    {
+      "evidence_id": "ev_1dadb8ad5f56b6dcb27b99c8e42245f663e387a3fd759b6910e409501de3e1c1",
+      "procedure": {
+        "address": "0x10004293c",
+        "name": "ACUser::willBecomeInactiveBecauseAutoLogout:",
+        "classification": {
+          "external": false,
+          "thunk": false,
+          "thunk_target": null,
+          "provenance": "ghidra-function-manager"
+        },
+        "body": {
+          "available": true,
+          "provenance": "ghidra-function-body-address-set",
+          "ranges": [
+            {
+              "start": "0x10004293c",
+              "end": "0x100042d43"
+            }
+          ],
+          "total_bytes": 1032,
+          "span_bytes": 1032,
+          "non_contiguous": false,
+          "contains_entry": true
+        },
+        "signature": "void __cdecl willBecomeInactiveBecauseAutoLogout:(ID param_1, SEL param_2, bool param_3)",
+        "locals": []
+      },
+      "referenced_strings": [
+        {
+          "address": "0x1001cfd31",
+          "value": "settings",
+          "source_address": "0x1000429e8"
+        },
+        {
+          "address": "0x1001cfd31",
+          "value": "settings",
+          "source_address": "0x100042a04"
+        },
+        {
+          "address": "0x1001cfd31",
+          "value": "settings",
+          "source_address": "0x100042a34"
+        },
+        {
+          "address": "0x1001cfd31",
+          "value": "settings",
+          "source_address": "0x100042a50"
+        },
+        {
+          "address": "0x1001cfd31",
+          "value": "settings",
+          "source_address": "0x100042a68"
+        },
+        {
+          "address": "0x1001cfd3a",
+          "value": "privateMode",
+          "source_address": "0x1000429f4"
+        },
+        {
+          "address": "0x1001d042c",
+          "value": "defaultCenter",
+          "source_address": "0x100042960"
+        },
+        {
+          "address": "0x1001d0721",
+          "value": "bookmarks",
+          "source_address": "0x100042b0c"
+        },
+        {
+          "address": "0x1001d0873",
+          "value": "session",
+          "source_address": "0x1000429a0"
+        },
+        {
+          "address": "0x1001d0888",
+          "value": "session2",
+          "source_address": "0x1000429c8"
+        },
+        {
+          "address": "0x1001d0cb1",
+          "value": "searchEngines",
+          "source_address": "0x100042b3c"
+        },
+        {
+          "address": "0x1001d0dd0",
+          "value": "quickstarter",
+          "source_address": "0x100042b24"
+        },
+        {
+          "address": "0x1001d0ddd",
+          "value": "filterManager",
+          "source_address": "0x100042b54"
+        },
+        {
+          "address": "0x1001d0deb",
+          "value": "cookieFilters",
+          "source_address": "0x100042b6c"
+        },
+        {
+          "address": "0x1001d0e05",
+          "value": "downloadManager",
+          "source_address": "0x100042bbc"
+        },
+        {
+          "address": "0x1001d1299",
+          "value": "length",
+          "source_address": "0x100042cec"
+        },
+        {
+          "address": "0x1001d12ac",
+          "value": "deactivate",
+          "source_address": "0x1000429b4"
+        },
+        {
+          "address": "0x1001d12ac",
+          "value": "deactivate",
+          "source_address": "0x1000429d4"
+        },
+        {
+          "address": "0x1001d12ac",
+          "value": "deactivate",
+          "source_address": "0x100042a70"
+        },
+        {
+          "address": "0x1001d12ac",
+          "value": "deactivate",
+          "source_address": "0x100042a88"
+        },
+        {
+          "address": "0x1001d12ac",
+          "value": "deactivate",
+          "source_address": "0x100042aa0"
+        },
+        {
+          "address": "0x1001d12ac",
+          "value": "deactivate",
+          "source_address": "0x100042ab8"
+        },
+        {
+          "address": "0x1001d12ac",
+          "value": "deactivate",
+          "source_address": "0x100042ad0"
+        },
+        {
+          "address": "0x1001d12ac",
+          "value": "deactivate",
+          "source_address": "0x100042ae8"
+        },
+        {
+          "address": "0x1001d12ac",
+          "value": "deactivate",
+          "source_address": "0x100042b00"
+        },
+        {
+          "address": "0x1001d12ac",
+          "value": "deactivate",
+          "source_address": "0x100042b18"
+        },
+        {
+          "address": "0x1001d12ac",
+          "value": "deactivate",
+          "source_address": "0x100042b30"
+        },
+        {
+          "address": "0x1001d12ac",
+          "value": "deactivate",
+          "source_address": "0x100042b48"
+        },
+        {
+          "address": "0x1001d12ac",
+          "value": "deactivate",
+          "source_address": "0x100042b60"
+        },
+        {
+          "address": "0x1001d12ac",
+          "value": "deactivate",
+          "source_address": "0x100042b78"
+        },
+        {
+          "address": "0x1001d12ac",
+          "value": "deactivate",
+          "source_address": "0x100042b90"
+        },
+        {
+          "address": "0x1001d12ac",
+          "value": "deactivate",
+          "source_address": "0x100042ba8"
+        },
+        {
+          "address": "0x1001d12ac",
+          "value": "deactivate",
+          "source_address": "0x100042bc8"
+        },
+        {
+          "address": "0x1001d12ac",
+          "value": "deactivate",
+          "source_address": "0x100042be8"
+        },
+        {
+          "address": "0x1001d12ac",
+          "value": "deactivate",
+          "source_address": "0x100042c08"
+        },
+        {
+          "address": "0x1001d12ac",
+          "value": "deactivate",
+          "source_address": "0x100042c28"
+        },
+        {
+          "address": "0x1001d12ac",
+          "value": "deactivate",
+          "source_address": "0x100042c48"
+        },
+        {
+          "address": "0x1001d12ac",
+          "value": "deactivate",
+          "source_address": "0x100042c68"
+        },
+        {
+          "address": "0x1001d12ac",
+          "value": "deactivate",
+          "source_address": "0x100042c88"
+        },
+        {
+          "address": "0x1001d12ac",
+          "value": "deactivate",
+          "source_address": "0x100042ca8"
+        },
+        {
+          "address": "0x1001d12ac",
+          "value": "deactivate",
+          "source_address": "0x100042d20"
+        },
+        {
+          "address": "0x1001d12b7",
+          "value": "sharedApplication",
+          "source_address": "0x100042984"
+        },
+        {
+          "address": "0x1001d2f84",
+          "value": "timeIntervalSinceReferenceDate",
+          "source_address": "0x100042cc0"
+        },
+        {
+          "address": "0x1001d3706",
+          "value": "removeObserver:",
+          "source_address": "0x10004296c"
+        },
+        {
+          "address": "0x1001d3886",
+          "value": "instapaper",
+          "source_address": "0x100042c3c"
+        },
+        {
+          "address": "0x1001d38ee",
+          "value": "pocket",
+          "source_address": "0x100042c5c"
+        },
+        {
+          "address": "0x1001d7c0c",
+          "value": "save",
+          "source_address": "0x100042d2c"
+        },
+        {
+          "address": "0x1001d8474",
+          "value": "history",
+          "source_address": "0x100042af4"
+        },
+        {
+          "address": "0x1001d90cf",
+          "value": "savedForms",
+          "source_address": "0x100042b84"
+        },
+        {
+          "address": "0x1001d9254",
+          "value": "webDav",
+          "source_address": "0x100042bfc"
+        },
+        {
+          "address": "0x1001d9296",
+          "value": "password",
+          "source_address": "0x100042cdc"
+        },
+        {
+          "address": "0x1001d9741",
+          "value": "firefoxSync",
+          "source_address": "0x100042bdc"
+        },
+        {
+          "address": "0x1001d9f2c",
+          "value": "dropbox",
+          "source_address": "0x100042c1c"
+        },
+        {
+          "address": "0x1001db920",
+          "value": "setIdleTimerDisabled:",
+          "source_address": "0x100042990"
+        },
+        {
+          "address": "0x1001db936",
+          "value": "privateModeIdleTimeout",
+          "source_address": "0x100042a10"
+        },
+        {
+          "address": "0x1001db94d",
+          "value": "deleteAllPrivateData",
+          "source_address": "0x100042a24"
+        },
+        {
+          "address": "0x1001db962",
+          "value": "cacheSize",
+          "source_address": "0x100042a40"
+        },
+        {
+          "address": "0x1001db96c",
+          "value": "clearCache",
+          "source_address": "0x100042a5c"
+        },
+        {
+          "address": "0x1001db977",
+          "value": "cookieManager",
+          "source_address": "0x100042a7c"
+        },
+        {
+          "address": "0x1001db985",
+          "value": "webStorageManager",
+          "source_address": "0x100042a94"
+        },
+        {
+          "address": "0x1001db997",
+          "value": "webCache",
+          "source_address": "0x100042aac"
+        },
+        {
+          "address": "0x1001db9a0",
+          "value": "tabsHistory",
+          "source_address": "0x100042ac4"
+        },
+        {
+          "address": "0x1001db9ac",
+          "value": "searchHistory",
+          "source_address": "0x100042adc"
+        },
+        {
+          "address": "0x1001db9ba",
+          "value": "authManager",
+          "source_address": "0x100042b9c"
+        },
+        {
+          "address": "0x1001db9c6",
+          "value": "iCloudManager",
+          "source_address": "0x100042c7c"
+        },
+        {
+          "address": "0x1001db9d4",
+          "value": "fontSizeManager",
+          "source_address": "0x100042c9c"
+        },
+        {
+          "address": "0x1001db9e4",
+          "value": "setDeactivationTime:",
+          "source_address": "0x100042ccc"
+        },
+        {
+          "address": "0x1001db9f9",
+          "value": "setMustLogin:",
+          "source_address": "0x100042d00"
+        },
+        {
+          "address": "0x1001dba07",
+          "value": "sharedDatabase",
+          "source_address": "0x100042d18"
+        }
+      ],
+      "raw_result_sha256": "ee12bb698339f54385102b706f01339b81b3609b7f9dcc5f4f5c66b274b7fb7e"
+    },
+    {
+      "evidence_id": "ev_3a0035ced74ae18a17d243b7e52a5f70997de72caac75b9d9284e2349c435bcb",
+      "procedure": {
+        "address": "0x10004212c",
+        "name": "ACUser::downloadsPathForUserID:",
+        "classification": {
+          "external": false,
+          "thunk": false,
+          "thunk_target": null,
+          "provenance": "ghidra-function-manager"
+        },
+        "body": {
+          "available": true,
+          "provenance": "ghidra-function-body-address-set",
+          "ranges": [
+            {
+              "start": "0x10004212c",
+              "end": "0x1000421b7"
+            }
+          ],
+          "total_bytes": 140,
+          "span_bytes": 140,
+          "non_contiguous": false,
+          "contains_entry": true
+        },
+        "signature": "ID __cdecl downloadsPathForUserID:(ID param_1, SEL param_2, ID param_3)",
+        "locals": []
+      },
+      "referenced_strings": [
+        {
+          "address": "0x1001d0e15",
+          "value": "defaultManager",
+          "source_address": "0x100042168"
+        },
+        {
+          "address": "0x1001d0f36",
+          "value": "stringByAppendingPathComponent:",
+          "source_address": "0x100042148"
+        },
+        {
+          "address": "0x1001d92f6",
+          "value": "fileExistsAtPath:",
+          "source_address": "0x100042178"
+        },
+        {
+          "address": "0x1001da2c9",
+          "value": "createDirectoryAtPath:withIntermediateDirectories:attributes:error:",
+          "source_address": "0x10004218c"
+        },
+        {
+          "address": "0x1001db803",
+          "value": "pathForUserID:",
+          "source_address": "0x10004213c"
+        }
+      ],
+      "raw_result_sha256": "cd9a870a8fc17bde6f484c0e1356bb21d76b3eaafb20d38375619e8cd1ebd07c"
+    },
+    {
+      "evidence_id": "ev_49de895300062e61e487cb3f4109c83660a21d6c99041ec02d767f5302f51711",
+      "procedure": {
+        "address": "0x1001ba578",
+        "name": "ACDownloadManager::suspendedDownloadsDatabasePathForUserID:",
+        "classification": {
+          "external": false,
+          "thunk": false,
+          "thunk_target": null,
+          "provenance": "ghidra-function-manager"
+        },
+        "body": {
+          "available": true,
+          "provenance": "ghidra-function-body-address-set",
+          "ranges": [
+            {
+              "start": "0x1001ba578",
+              "end": "0x1001ba617"
+            }
+          ],
+          "total_bytes": 160,
+          "span_bytes": 160,
+          "non_contiguous": false,
+          "contains_entry": true
+        },
+        "signature": "ID __cdecl suspendedDownloadsDatabasePathForUserID:(ID param_1, SEL param_2, ID param_3)",
+        "locals": []
+      },
+      "referenced_strings": [
+        {
+          "address": "0x1001d0e15",
+          "value": "defaultManager",
+          "source_address": "0x1001ba5b0"
+        },
+        {
+          "address": "0x1001d0e15",
+          "value": "defaultManager",
+          "source_address": "0x1001ba5d0"
+        },
+        {
+          "address": "0x1001d0f36",
+          "value": "stringByAppendingPathComponent:",
+          "source_address": "0x1001ba5f8"
+        },
+        {
+          "address": "0x1001d92f6",
+          "value": "fileExistsAtPath:",
+          "source_address": "0x1001ba5bc"
+        },
+        {
+          "address": "0x1001da2c9",
+          "value": "createDirectoryAtPath:withIntermediateDirectories:attributes:error:",
+          "source_address": "0x1001ba5dc"
+        },
+        {
+          "address": "0x1001db803",
+          "value": "pathForUserID:",
+          "source_address": "0x1001ba594"
+        }
+      ],
+      "raw_result_sha256": "94aab4931c96819967df6479617422ad6269be1cdb5d1b659fffed861c7397b2"
+    },
+    {
+      "evidence_id": "ev_0a3497ae7f65630a34ed7d5d3845d4e7f950592dd9c355d57282620592f66fb5",
+      "procedure": {
+        "address": "0x1001c30a8",
+        "name": "ACDownloadManager::download:decideDestinationUsingResponse:suggestedFilename:completionHandler:",
+        "classification": {
+          "external": false,
+          "thunk": false,
+          "thunk_target": null,
+          "provenance": "ghidra-function-manager"
+        },
+        "body": {
+          "available": true,
+          "provenance": "ghidra-function-body-address-set",
+          "ranges": [
+            {
+              "start": "0x1001c30a8",
+              "end": "0x1001c31a3"
+            }
+          ],
+          "total_bytes": 252,
+          "span_bytes": 252,
+          "non_contiguous": false,
+          "contains_entry": true
+        },
+        "signature": "void __cdecl download:decideDestinationUsingResponse:suggestedFilename:completionHandler:(ID param_1, SEL param_2, ID param_3, ID param_4, ID param_5, ID param_6, undefined4 param_7)",
+        "locals": []
+      },
+      "referenced_strings": [
+        {
+          "address": "0x1001d0f15",
+          "value": "downloadFolder",
+          "source_address": "0x1001c3108"
+        },
+        {
+          "address": "0x1001d0f15",
+          "value": "downloadFolder",
+          "source_address": "0x1001c3150"
+        },
+        {
+          "address": "0x1001d0f36",
+          "value": "stringByAppendingPathComponent:",
+          "source_address": "0x1001c315c"
+        },
+        {
+          "address": "0x1001d0f56",
+          "value": "fileURLWithPath:",
+          "source_address": "0x1001c3178"
+        },
+        {
+          "address": "0x1001ddc0e",
+          "value": "uniqueNameForFileName:inFolder:",
+          "source_address": "0x1001c3118"
+        },
+        {
+          "address": "0x1001fdf61",
+          "value": "setProposedFileName:",
+          "source_address": "0x1001c3140"
+        },
+        {
+          "address": "0x1001fdf76",
+          "value": "setResponse:",
+          "source_address": "0x1001c30e8"
+        },
+        {
+          "address": "0x1001fefa7",
+          "value": "downloadForDownload:",
+          "source_address": "0x1001c30dc"
+        },
+        {
+          "address": "0x1001fefa7",
+          "value": "downloadForDownload:",
+          "source_address": "0x1001c3130"
+        }
+      ],
+      "raw_result_sha256": "4e35935353688c8183d8d8e758e59d16e97bf2c4c6f60137ee9a25d056ffe4cb"
+    },
+    {
+      "evidence_id": "ev_a28640b94e0fc520a9e371b5e78ac168e3a8d1d38889265baf567108f84f1dc6",
+      "procedure": {
+        "address": "0x1001bfd14",
+        "name": "ACDownloadManager::startDownloadWithRequest:fileName:referrer:",
+        "classification": {
+          "external": false,
+          "thunk": false,
+          "thunk_target": null,
+          "provenance": "ghidra-function-manager"
+        },
+        "body": {
+          "available": true,
+          "provenance": "ghidra-function-body-address-set",
+          "ranges": [
+            {
+              "start": "0x1001bfd14",
+              "end": "0x1001bfd6b"
+            }
+          ],
+          "total_bytes": 88,
+          "span_bytes": 88,
+          "non_contiguous": false,
+          "contains_entry": true
+        },
+        "signature": "void __cdecl startDownloadWithRequest:fileName:referrer:(ID param_1, SEL param_2, ID param_3, ID param_4, ID param_5)",
+        "locals": []
+      },
+      "referenced_strings": [
+        {
+          "address": "0x1001d7011",
+          "value": "rootFolder",
+          "source_address": "0x1001bfd38"
+        },
+        {
+          "address": "0x1001fee82",
+          "value": "startDownloadWithRequest:fileName:referrer:inFolder:",
+          "source_address": "0x1001bfd48"
+        }
+      ],
+      "raw_result_sha256": "90048804012f1c94d174ff928da3c905af2da5519175be9d42dd3309e3180e8f"
+    }
+  ],
+  "login_pseudocode_excerpt": "\n/* Function Stack Size: 0x18 bytes */\n\nbool ACUser::loginWithPassword_(ID param_1,SEL param_2,ID param_3)\n\n{\n  cfstringStruct *pcVar1;\n  cfstringStruct *pcVar2;\n  bool bVar3;\n  cfstringStruct *pcVar4;\n  \n  pcVar4 = (cfstringStruct *)_objc_msgSend(param_1,\"password\");\n  pcVar1 = &cf___;\n  pcVar2 = pcVar1;\n  if (pcVar4 != (cfstringStruct *)0x0) {\n    pcVar2 = pcVar4;\n  }\n  if (param_3 != 0) {\n    pcVar1 = (cfstringStruct *)param_3;\n  }\n  bVar3 = _objc_msgSend(pcVar2,\"isEqualToString:\",pcVar1);\n  if (bVar3 != 0) {\n    _objc_msgSend(param_1,\"userLoggedIn\");\n  }\n  return bVar3;\n}\n\n"
+}

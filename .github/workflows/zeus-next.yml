@@ -85,6 +85,7 @@ jobs:
           xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -configuration Debug \
             -destination "platform=iOS Simulator,id=$device_id" \
             -parallel-testing-enabled NO -maximum-concurrent-test-simulator-destinations 1 \
+            -test-timeouts-enabled YES -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 180 \
             -derivedDataPath "$RUNNER_TEMP/ZEUSSimulator" \
             -resultBundlePath "$GITHUB_WORKSPACE/results/tests.xcresult" \
             test CODE_SIGNING_ALLOWED=NO 2>&1 | tee results/test.log
@@ -105,6 +106,7 @@ jobs:
           xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -configuration Debug \
             -destination "platform=iOS Simulator,id=$ipad_id" \
             -only-testing:ZEUSNextUITests -parallel-testing-enabled NO \
+            -test-timeouts-enabled YES -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 180 \
             -derivedDataPath "$RUNNER_TEMP/ZEUSSimulator" \
             -resultBundlePath "$GITHUB_WORKSPACE/results/ipad-tests.xcresult" \
             test CODE_SIGNING_ALLOWED=NO 2>&1 | tee results/ipad-test.log
