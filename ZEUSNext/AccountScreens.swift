@@ -121,7 +121,7 @@ struct AccountSettingsView: View {
                     PhotosPicker(selection: $photo, matching: .images) { Label("اختيار صورة من الألبوم", systemImage: "photo") }
                     if UIImagePickerController.isSourceTypeAvailable(.camera) { Button("التقاط صورة", systemImage: "camera") { camera = true } }
                     Picker("الصورة الرمزية", selection: $profile.symbol) { ForEach(["person.crop.circle.fill", "person.fill", "house.fill", "briefcase.fill", "book.fill", "star.fill"], id: \.self) { Image(systemName: $0).tag($0) } }
-                    if options.avatarFilename != nil { Button("إزالة الصورة") { profile.account?.avatarFilename = nil; if let file = model.profiles.avatarURL(profile) { try? FileManager.default.removeItem(at: file) } } }
+                    if options.avatarFilename != nil { Button("إزالة الصورة") { if let file = model.profiles.avatarURL(profile) { try? FileManager.default.removeItem(at: file) }; profile.account?.avatarFilename = nil } }
                 } header: { Text("الهوية والصورة") } footer: { Text(profile.role.title) }
                 Section("حماية الحساب") {
                     if profile.role != .guest { Button("كلمة مرور الحساب", systemImage: "key") { passwordScreen = true } }

@@ -20,6 +20,6 @@ final class BrowserJourneyTests: XCTestCase {
             XCTAssertTrue(app.buttons["layout-" + layout].waitForExistence(timeout: 5)); app.buttons["layout-" + layout].tap(); capture("layout-choice-" + layout)
         }
     }
-    private func openToolbar(_ app: XCUIApplication) { let edge = app.otherElements["toolbarEdge"]; if edge.waitForExistence(timeout: 10) { edge.swipeLeft() } else { app.swipeLeft() } }
+    private func openToolbar(_ app: XCUIApplication) { let edge = app.otherElements["toolbarEdge"]; if edge.waitForExistence(timeout: 10) { edge.tap() } else { app.swipeLeft() } }
     private func capture(_ name: String) { let image = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); image.name = name; image.lifetime = .keepAlways; add(image) }
 }

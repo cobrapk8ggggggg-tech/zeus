@@ -150,8 +150,8 @@ enum BrowserDisk {
         self.root = root; self.downloadsRoot = downloadsRoot
         if let index = BrowserDisk.read(Index.self, from: root.appendingPathComponent("profiles.json")), !index.profiles.isEmpty {
             profiles = index.profiles
-            if !profiles.contains(where: { $0.isAdmin }) { profiles[0].account = AccountOptions(role: .administrator) }
             activeID = index.profiles.contains(where: { $0.id == index.activeID }) ? index.activeID : index.profiles[0].id
+            if !profiles.contains(where: { $0.isAdmin }) { profiles[0].account = AccountOptions(role: .administrator); persistIndex() }
         } else {
             var initial = BrowserProfile(name: "الرئيسي")
             initial.account = AccountOptions(role: .administrator)
@@ -215,7 +215,7 @@ enum BrowserDisk {
                 }
             }
         }
-        for path in [folder(for: profile), downloads(for: profile)] where FileManager.default.fileExists(atPath: path.path) { try FileManager.default.removeItem(at: path) }
+        for path in [folder(for: profile), downloads(for: profile), configurationFolder(profile)] where FileManager.default.fileExists(atPath: path.path) { try FileManager.default.removeItem(at: path) }
         AccountVault.remove(profile.id)
         profiles.removeAll { $0.id == profile.id }
         if activeID == profile.id { activeID = profiles[0].id }

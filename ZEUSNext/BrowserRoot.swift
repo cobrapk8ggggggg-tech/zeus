@@ -35,11 +35,12 @@ struct BrowserRoot: View {
             if model.requiresUnlock { lockedView }
             else {
                 VStack(spacing: 0) {
-                    if layout != .original && barsVisible { topBar.transition(.move(edge: .top).combined(with: .opacity)) }
+                    if model.profile.role != .kiosk && layout != .original && barsVisible { topBar.transition(.move(edge: .top).combined(with: .opacity)) }
                     browserContent.frame(maxWidth: .infinity, maxHeight: .infinity)
-                    if layout != .original && barsVisible { bottomBar.transition(.move(edge: .bottom).combined(with: .opacity)) }
+                    if model.profile.role != .kiosk && layout != .original && barsVisible { bottomBar.transition(.move(edge: .bottom).combined(with: .opacity)) }
                 }
-                if layout == .original { originalControls }
+                if model.profile.role == .kiosk { kioskControls }
+                else if layout == .original { originalControls.environment(\.layoutDirection, .leftToRight) }
                 else if !barsVisible { edgeReveal }
                 if topTray { tabsTray.transition(.move(edge: .top)).zIndex(10) }
             }
@@ -120,6 +121,9 @@ struct BrowserRoot: View {
                 Color.clear.frame(height: 24).contentShape(Rectangle()).accessibilityIdentifier("tabsEdge")
                     .gesture(DragGesture().onEnded { if $0.translation.height > 25 { withAnimation { topTray = true } } })
             }
+    }
+    private var kioskControls: some View {
+        VStack { Spacer(); HStack { Button("الحسابات") { model.logout(); panel = .profiles }; Spacer(); Button("الرئيسية") { model.open(model.profile.account?.homePage ?? "zeus://home") }; Button("رجوع") { model.webView?.goBack() } }.font(.caption).padding(12).background(.black) }
     }
     private var edgeReveal: some View {
         HStack { Spacer(); Button { model.chromeHidden = false } label: { Image(systemName: "chevron.left").font(.caption).padding(8).glassSurface(12) }.accessibilityLabel("إظهار الأشرطة") }.frame(maxHeight: .infinity, alignment: .center)

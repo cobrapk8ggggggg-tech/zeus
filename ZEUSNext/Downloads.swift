@@ -76,11 +76,11 @@ enum DownloadFiles {
 
     init(store: ProfileStore, useBackground: Bool = true) {
         self.store = store; self.useBackground = useBackground
+        super.init()
         for profile in store.profiles where !profile.isPrivate {
             records += BrowserDisk.read([BrowserDownload].self, from: store.folder(for: profile).appendingPathComponent("downloads.json")) ?? []
         }
         records.sort { $0.created > $1.created }
-        super.init()
         restore()
     }
     func forProfile(_ id: UUID) -> [BrowserDownload] { records.filter { $0.profileID == id } }
@@ -161,6 +161,7 @@ enum DownloadFiles {
         save(); task.resume()
     }
     func attach(_ download: WKDownload, profile: BrowserProfile, existingID: UUID? = nil) {
+        guard profile.account?.allowDownloads != false else { download.cancel { _ in }; message = "التنزيلات غير مسموحة لهذا الحساب."; return }
         let id: UUID
         if let existingID { id = existingID; change(id) { $0.state = .running; $0.error = nil } }
         else {

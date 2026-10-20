@@ -1,0 +1,5 @@
+zeus-project.json
+ZEUSNext.xcodeproj/
+.zeus-ci/Generated-Info.plist
+.zeus-ci/__pycache__/
+results/
