@@ -3,12 +3,14 @@ import hashlib
 import gzip
 import json
 import os
+import platform
 from pathlib import Path
 import subprocess
 import tempfile
 import urllib.request
 
 VERSION = '4.3.1'
+SOURCE_SHA = '1cfdcaf042880a5e0027a8fc6f7ebf9ee667acc9'
 DIGEST = '2a02d7fc6adc74198b0572cd7012d0371e608c2330969210c3dc53ecca47d865'
 SOURCES = ['https://easylist-downloads.adblockplus.org/easylist.txt', 'https://easylist-downloads.adblockplus.org/easyprivacy.txt']
 resources = Path('ZEUSNext/Resources')
@@ -21,11 +23,25 @@ def fetch(url, maximum):
         raise ValueError('Input exceeds the conversion size limit')
     return data
 
-binary = fetch(f'https://github.com/AdguardTeam/SafariConverterLib/releases/download/v{VERSION}/ConverterTool', 8_000_000)
-assert hashlib.sha256(binary).hexdigest() == DIGEST, 'Converter checksum mismatch'
-tool = work / 'ConverterTool'
-tool.write_bytes(binary)
-tool.chmod(0o700)
+cache = Path.home() / '.cache' / 'zeus-filter-converter' / SOURCE_SHA / platform.machine()
+cache.mkdir(parents=True, exist_ok=True)
+tool = cache / 'ConverterTool'
+if not tool.is_file():
+    if platform.machine() == 'arm64':
+        binary = fetch(f'https://github.com/AdguardTeam/SafariConverterLib/releases/download/v{VERSION}/ConverterTool', 8_000_000)
+        assert hashlib.sha256(binary).hexdigest() == DIGEST, 'Converter checksum mismatch'
+        tool.write_bytes(binary)
+        tool.chmod(0o700)
+    else:
+        source = work / 'converter-source'
+        subprocess.run(['git', 'clone', '--depth', '1', '--branch', 'v' + VERSION, 'https://github.com/AdguardTeam/SafariConverterLib.git', str(source)], check=True)
+        actual_sha = subprocess.check_output(['git', '-C', str(source), 'rev-parse', 'HEAD'], text=True).strip()
+        assert actual_sha == SOURCE_SHA, 'Converter source revision mismatch'
+        subprocess.run(['swift', 'build', '--package-path', str(source), '-c', 'release', '--product', 'ConverterTool'], check=True, timeout=1200)
+        binary = (source / '.build' / 'release' / 'ConverterTool').read_bytes()
+        tool.write_bytes(binary)
+        tool.chmod(0o700)
+actual_digest = hashlib.sha256(tool.read_bytes()).hexdigest()
 rules = []
 source_hashes = {}
 for entry in json.loads(Path('.zeus-ci/filter-sources/sources.json').read_text()):
@@ -40,7 +56,7 @@ subprocess.run([str(tool), 'convert', '--input-path', str(inputs), '--safari-ver
 parsed = json.loads(output.read_text())
 assert isinstance(parsed, list) and 1_000 < len(parsed) < 149_000
 assert all(row.get('action', {}).get('type') in ['block', 'block-cookies', 'css-display-none', 'ignore-previous-rules', 'make-https'] for row in parsed)
-metadata = {'converter': f'AdguardTeam/SafariConverterLib v{VERSION}', 'converter_sha256': DIGEST, 'source_hashes': source_hashes, 'rules': len(parsed), 'advanced_scriptlets': False, 'safari_version': 18}
+metadata = {'converter': f'AdguardTeam/SafariConverterLib v{VERSION}', 'converter_sha256': actual_digest, 'converter_source_sha': SOURCE_SHA, 'source_hashes': source_hashes, 'rules': len(parsed), 'advanced_scriptlets': False, 'safari_version': 18}
 (resources / 'filter-metadata.json').write_text(json.dumps(metadata, indent=2))
 Path('results/filter-metadata.json').write_text(json.dumps(metadata, indent=2))
 # Retain the original filter licenses and notices together with every distributed build.
