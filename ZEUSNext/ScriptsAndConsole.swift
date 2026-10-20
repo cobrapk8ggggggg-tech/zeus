@@ -5,24 +5,29 @@ struct ScriptsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var editing: BrowserScript?
     var body: some View {
-        NavigationStack {
-            List {
-                Section { Text("شغّل كودًا تثق به فقط. السكربتات تخص هذه المساحة، وتعمل على المضيف المحدد ونطاقاته الفرعية. النجمة * تعني كل المواقع.").font(.footnote).foregroundStyle(.secondary) }
-                ForEach(model.data.scripts) { script in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 5) { Text(script.name).font(.headline); Text(script.domain).font(.caption).foregroundStyle(.secondary) }.onTapGesture { editing = script }
-                        Spacer()
-                        Toggle("تشغيل", isOn: Binding(get: { model.data.scripts.first { $0.id == script.id }?.isActive ?? false }, set: { value in if let index = model.data.scripts.firstIndex(where: { $0.id == script.id }) { model.data.scripts[index].isActive = value; model.applySettings() } })).labelsHidden()
-                    }.contextMenu { Button("تعديل", systemImage: "pencil") { editing = script }; Button("حذف", systemImage: "trash", role: .destructive) { model.data.scripts.removeAll { $0.id == script.id }; model.applySettings() } }
-                }
-                if model.data.scripts.isEmpty { ContentUnavailableView("أدواتك بطريقتك", systemImage: "curlybraces", description: Text("أضف سكربتًا خاصًا لتحسين صفحة أو تسهيل عمل متكرر.")) }
-            }.scrollContentBackground(.hidden).background { OrbitBackground(tint: .white) }.navigationTitle("السكربتات")
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) { Button("تم") { dismiss() } }
-                    ToolbarItem(placement: .topBarLeading) { Button { editing = BrowserScript(name: "سكربت جديد", domain: "example.com", code: "// اكتب الكود هنا\n") } label: { Image(systemName: "plus") } }
-                }
-                .fullScreenCover(item: $editing) { script in ScriptEditor(script: script) { changed in if let index = model.data.scripts.firstIndex(where: { $0.id == changed.id }) { model.data.scripts[index] = changed } else { model.data.scripts.append(changed) }; model.applySettings() } }
-        }
+        VStack(spacing: 0) {
+            HStack {
+                Button { dismiss() } label: { Image(systemName: "xmark").font(.title2) }
+                Spacer(); Text("مدير السكربتات").font(.headline); Spacer()
+                Button { editing = BrowserScript(name: "سكربت جديد", domain: "*", code: "// اكتب كود جافا سكربت هنا\n") } label: { Image(systemName: "plus").font(.title2) }
+            }.padding().background(.black)
+            if model.data.scripts.isEmpty {
+                VStack { Spacer(); Image(systemName: "curlybraces").font(.system(size: 60)).opacity(0.5); Text("لا توجد سكربتات مضافة").opacity(0.5).padding(); Spacer() }.frame(maxWidth: .infinity)
+            } else {
+                List {
+                    ForEach(model.data.scripts) { script in
+                        HStack {
+                            VStack(alignment: .leading) { Text(script.name).font(.headline); Text(script.domain).font(.caption).opacity(0.5) }.onTapGesture { editing = script }
+                            Spacer()
+                            Toggle("تشغيل", isOn: Binding(get: { model.data.scripts.first { $0.id == script.id }?.isActive ?? false }, set: { value in if let index = model.data.scripts.firstIndex(where: { $0.id == script.id }) { model.data.scripts[index].isActive = value; model.applySettings() } })).labelsHidden()
+                            Button { editing = script } label: { Image(systemName: "pencil") }.buttonStyle(.borderless).padding(.leading, 10)
+                            Button { model.data.scripts.removeAll { $0.id == script.id }; model.applySettings() } label: { Image(systemName: "trash") }.buttonStyle(.borderless).padding(.leading, 10)
+                        }.listRowBackground(Color.black)
+                    }
+                }.listStyle(.plain).scrollContentBackground(.hidden)
+            }
+        }.background(.black).foregroundStyle(.white).tint(.white)
+            .fullScreenCover(item: $editing) { script in ScriptEditor(script: script) { changed in if let index = model.data.scripts.firstIndex(where: { $0.id == changed.id }) { model.data.scripts[index] = changed } else { model.data.scripts.append(changed) }; model.applySettings() } }
     }
 }
 

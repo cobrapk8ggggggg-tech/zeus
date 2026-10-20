@@ -21,6 +21,7 @@ enum BrowserAction: String, CaseIterable, Identifiable {
 struct BrowserRoot: View {
     @ObservedObject var model: BrowserModel
     @Environment(\.scenePhase) private var scenePhase
+    @AppStorage("showCurrentUserAvatar") private var showCurrentUserAvatar = true
     @State private var panel: BrowserPanel?
     @State private var toolbarVisible = false
     @State private var topTray = false
@@ -132,11 +133,24 @@ struct BrowserRoot: View {
     private var tabsTray: some View {
         ZStack(alignment: .top) {
             Color.black.opacity(0.5).ignoresSafeArea().onTapGesture { withAnimation { topTray = false } }
-            VStack(spacing: 12) {
-                HStack { Button("إغلاق") { withAnimation { topTray = false } }; Spacer(); Text("التبويبات").font(.headline); Spacer(); actionButton(.newTab) }
-                ScrollView(.horizontal, showsIndicators: false) { HStack { ForEach(model.tabs) { tab in VStack { Button(tab.title) { model.selectTab(tab); withAnimation { topTray = false } }.lineLimit(2); Button { model.closeTab(tab) } label: { Image(systemName: "xmark") } }.frame(width: 135, height: 95).glassSurface(14) } } }
-                HStack { actionButton(.profiles); actionButton(.downloads); actionButton(.library); actionButton(.settings); actionButton(.tools) }
-            }.padding(18).background(.black).glassSurface(22).padding(.horizontal, 8)
+            VStack(spacing: 0) {
+                Capsule().fill(.white.opacity(0.4)).frame(width: 40, height: 5).padding(.top, 10).padding(.bottom, 20)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 15) {
+                        ForEach(model.tabs) { tab in
+                            ZStack(alignment: .topTrailing) {
+                                Button { model.selectTab(tab); withAnimation { topTray = false } } label: {
+                                    VStack(spacing: 10) { Image(systemName: tab.isHome ? "house.fill" : "globe").font(.system(size: 32)).frame(width: 40, height: 40); Text(tab.title).font(.caption.bold()).lineLimit(2).multilineTextAlignment(.center).padding(.horizontal, 5) }.frame(width: 140, height: 180).background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(.white.opacity(model.selectedTabID == tab.id ? 1 : 0.2), lineWidth: 2))
+                                }.contextMenu { Button("إضافة للمفضلة", systemImage: "star") { if model.profile.role != .guest && !tab.isHome { model.data.bookmarks.append(Bookmark(title: tab.title, url: tab.url)); model.persist() } } }
+                                Button { model.closeTab(tab) } label: { Image(systemName: "xmark.circle.fill").padding(8) }
+                            }.scaleEffect(model.selectedTabID == tab.id ? 1.05 : 1)
+                        }
+                        Button { _ = model.newTab(); withAnimation { topTray = false } } label: { Image(systemName: "plus").font(.system(size: 30)).frame(width: 140, height: 180).background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [5])).foregroundStyle(.white.opacity(0.3))) }
+                    }.padding(.horizontal, 20)
+                }.frame(height: 200)
+                HStack { actionButton(.profiles); actionButton(.downloads); actionButton(.library); actionButton(.settings); actionButton(.tools) }.padding(.top, 10)
+            }.frame(height: 300).frame(maxWidth: .infinity).background(.ultraThinMaterial).background(.black.opacity(0.8)).clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 30, bottomTrailingRadius: 30))
+
         }
     }
     @ViewBuilder private func actionButton(_ action: BrowserAction) -> some View {
@@ -145,7 +159,7 @@ struct BrowserRoot: View {
                 ForEach(BrowserAction.allCases.filter { $0 != .tools }) { item in Button(item.title, systemImage: item.symbol) { perform(item) } }
                 Button("أدوات الصفحة وحفظها", systemImage: "slider.horizontal.3") { panel = .tools }
             } label: { Image(systemName: action.symbol).font(.system(size: 19)).frame(width: 44, height: 40) }.accessibilityIdentifier(action.identifier).accessibilityLabel(action.title)
-        } else { Button { perform(action) } label: { Image(systemName: action.symbol).font(.system(size: 19)).frame(width: 44, height: 40).overlay(alignment: .topTrailing) { if action == .tabs { Text("\(model.tabs.count)").font(.system(size: 9)).padding(2).background(.black, in: Circle()) } } }
+        } else { Button { perform(action) } label: { Group { if action == .profiles && showCurrentUserAvatar { AccountAvatar(profile: model.profile, store: model.profiles, size: 28) } else { Image(systemName: action.symbol).font(.system(size: 19)) } }.frame(width: 44, height: 40).overlay(alignment: .topTrailing) { if action == .tabs { Text("\(model.tabs.count)").font(.system(size: 9)).padding(2).background(.black, in: Circle()) } } }
             .buttonStyle(.plain).accessibilityLabel(action.title).accessibilityIdentifier(action.identifier)
             .disabled(action == .back && model.webView?.canGoBack != true || action == .forward && model.webView?.canGoForward != true)
     }

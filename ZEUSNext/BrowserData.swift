@@ -64,6 +64,7 @@ struct BrowserSettings: Codable {
     var developerTools = false
     var chromeLayout: ChromeLayout?
     var reading: ReadingPreferences?
+    var advanced: AdvancedSettings?
 }
 
 struct SavedTab: Codable, Identifiable {
@@ -159,6 +160,20 @@ enum BrowserDisk {
             persistIndex()
             migrateLegacy(into: initial)
         }
+        ensureSpecialAccounts()
+    }
+    private func ensureSpecialAccounts() {
+        for role in [AccountRole.guest, .kiosk] where !profiles.contains(where: { $0.role == role }) {
+            var special = BrowserProfile(name: role.title, symbol: role == .guest ? "person.crop.circle.badge.questionmark" : "display", kind: role == .guest ? .ephemeral : .standard)
+            special.account = AccountOptions(role: role, enabled: false, allowScripts: false, allowDeveloperTools: false, allowSettings: role != .kiosk)
+            profiles.append(special)
+        }
+        persistIndex()
+    }
+    func moveStandardAccounts(from indices: IndexSet, to destination: Int) {
+        guard active.isAdmin else { return }
+        var users = profiles.filter { $0.role == .standard }; users.move(fromOffsets: indices, toOffset: destination)
+        profiles = profiles.filter { $0.isAdmin } + users + profiles.filter { [.guest, .kiosk].contains($0.role) }; persistIndex()
     }
 
     var active: BrowserProfile { profiles.first(where: { $0.id == activeID }) ?? profiles[0] }
@@ -234,7 +249,7 @@ enum BrowserDisk {
         }
         stores.removeAll()
         var initial = BrowserProfile(name: "الرئيسي"); initial.account = AccountOptions(role: .administrator)
-        profiles = [initial]; activeID = initial.id; persistIndex()
+        profiles = [initial]; activeID = initial.id; ensureSpecialAccounts()
         let filters = root.appendingPathComponent("Filters"); if FileManager.default.fileExists(atPath: filters.path) { try FileManager.default.removeItem(at: filters) }
     }
     private func persistIndex() {

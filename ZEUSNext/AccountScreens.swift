@@ -10,7 +10,7 @@ struct AccountAvatar: View {
         Group {
             if let url = store.avatarURL(profile), let image = UIImage(contentsOfFile: url.path) { Image(uiImage: image).resizable().scaledToFill() }
             else { Image(systemName: profile.role == .guest ? "person.crop.circle.badge.questionmark" : profile.symbol).resizable().scaledToFit().padding(size * 0.15) }
-        }.frame(width: size, height: size).clipShape(Circle()).overlay(Circle().stroke(.white.opacity(0.2)))
+        }.frame(width: size, height: size).clipShape(Rectangle()).overlay(Rectangle().stroke(.white.opacity(0.2)))
     }
 }
 
@@ -22,6 +22,7 @@ struct ProfilesSheet: View {
     @State private var name = ""
     @State private var selectedRole: AccountRole = .standard
     @State private var editing: BrowserProfile?
+    @State private var deleting: BrowserProfile?
     @State private var login: BrowserProfile?
     @State private var password = ""
     @State private var failure: String?
@@ -34,7 +35,7 @@ struct ProfilesSheet: View {
                     ForEach(store.profiles.filter { $0.isAdmin }) { profile in accountRow(profile) }
                 }
                 Section("الحسابات") {
-                    ForEach(store.profiles.filter { $0.role == .standard && $0.account?.enabled != false }) { profile in accountRow(profile) }
+                    ForEach(store.profiles.filter { $0.role == .standard && $0.account?.enabled != false }) { profile in accountRow(profile) }.onMove { store.moveStandardAccounts(from: $0, to: $1) }
                 }
                 if store.profiles.contains(where: { [.guest, .kiosk].contains($0.role) && $0.account?.enabled == true }) {
                     Section("ضيف وكشك") { ForEach(store.profiles.filter { [.guest, .kiosk].contains($0.role) && $0.account?.enabled == true }) { profile in accountRow(profile) } }
@@ -52,12 +53,13 @@ struct ProfilesSheet: View {
             }.scrollContentBackground(.hidden).background(.black).navigationTitle("الحسابات").navigationBarTitleDisplayMode(.inline)
                 .toolbar { if !model.requiresUnlock { ToolbarItem(placement: .topBarTrailing) { Button("تم") { dismiss() } } } }
                 .fullScreenCover(isPresented: $creating) { createAccount }
-                .fullScreenCover(item: $editing) { AccountSettingsView(model: model, profile: $0) }
+                .fullScreenCover(item: $editing) { SettingsSheet(model: model, profile: $0) }
                 .alert("تسجيل الدخول إلى \(login?.name ?? "")", isPresented: Binding(get: { login != nil }, set: { if !$0 { login = nil } })) {
                     SecureField("كلمة المرور", text: $password)
                     Button("دخول") { if let target = login { attempt(target, password: password) }; login = nil; password = "" }
                     Button("إلغاء", role: .cancel) { login = nil; password = "" }
                 }
+                .confirmationDialog("حذف الحساب وبياناته؟", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })) { Button("حذف نهائي", role: .destructive) { if let target = deleting { Task { await model.deleteProfile(target) } }; deleting = nil } }
                 .disabled(busy).overlay { if busy { ProgressView().padding(25).glassSurface() } }
         }.tint(.white).preferredColorScheme(.dark)
     }
@@ -76,6 +78,7 @@ struct ProfilesSheet: View {
                 Button { editing = profile } label: { Image(systemName: "info.circle").frame(width: 40, height: 44) }.buttonStyle(.borderless).accessibilityLabel("إعدادات " + profile.name)
             }
         }.frame(minHeight: 88).listRowBackground(Color.black).listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 12))
+            .swipeActions { if model.profile.isAdmin && !model.requiresUnlock && profile.role == .standard { Button("حذف", role: .destructive) { deleting = profile } } }
     }
     private func attempt(_ target: BrowserProfile, password: String) {
         busy = true; failure = nil
@@ -110,7 +113,9 @@ struct ProfilesSheet: View {
 struct AccountSettingsView: View {
     @ObservedObject var model: BrowserModel
     @State var profile: BrowserProfile
+    var embedded = false
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("showCurrentUserAvatar") private var showCurrentUserAvatar = true
     @State private var photo: PhotosPickerItem?
     @State private var camera = false
     @State private var passwordScreen = false
@@ -119,23 +124,40 @@ struct AccountSettingsView: View {
     private var options: AccountOptions { profile.account ?? AccountOptions() }
     private var canAdminister: Bool { model.profile.isAdmin && !model.requiresUnlock }
     var body: some View {
-        NavigationStack {
+        Group { if embedded { accountForm } else { NavigationStack { accountForm } } }.tint(.white).preferredColorScheme(.dark)
+    }
+    private var accountForm: some View {
             Form {
                 Section {
-                    HStack { Spacer(); AccountAvatar(profile: profile, store: model.profiles, size: 96); Spacer() }.listRowBackground(Color.black)
+                    HStack { AccountAvatar(profile: profile, store: model.profiles, size: 70); Text("صورة الحساب"); Spacer() }.frame(minHeight: 88).listRowBackground(Color.black)
                     TextField("اسم الحساب", text: $profile.name)
                     PhotosPicker(selection: $photo, matching: .images) { Label("اختيار صورة من الألبوم", systemImage: "photo") }
                     if UIImagePickerController.isSourceTypeAvailable(.camera) { Button("التقاط صورة", systemImage: "camera") { camera = true } }
                     Picker("الصورة الرمزية", selection: $profile.symbol) { ForEach(["person.crop.circle.fill", "person.fill", "house.fill", "briefcase.fill", "book.fill", "star.fill"], id: \.self) { Image(systemName: $0).tag($0) } }
                     if options.avatarFilename != nil { Button("إزالة الصورة") { if let file = model.profiles.avatarURL(profile) { try? FileManager.default.removeItem(at: file) }; profile.account?.avatarFilename = nil } }
-                } header: { Text("الهوية والصورة") } footer: { Text(profile.role.title) }
+                } header: { Text("هذا الحساب") } footer: { Text(profile.role.title) }
+                .disabled(profile.role == .guest && !canAdminister)
                 Section("حماية الحساب") {
                     if profile.role != .guest { Button("كلمة مرور الحساب", systemImage: "key") { passwordScreen = true } }
                     Picker("تسجيل الخروج بعد مغادرة التطبيق", selection: option(\.logoutAfter)) { Text("أبدًا").tag(Double(-1)); Text("فورًا").tag(Double(0)); Text("دقيقة").tag(Double(60)); Text("5 دقائق").tag(Double(300)); Text("10 دقائق").tag(Double(600)); Text("30 دقيقة").tag(Double(1800)) }
                     if model.profile.id == profile.id { Button(profile.locked ? "إلغاء قفل الجهاز والبصمة" : "حماية إضافية برمز الجهاز والبصمة") { Task { await model.setProfileLock(!profile.locked); profile = model.profile } } }
                 }
+                if model.profile.id == profile.id { Section { Button("تسجيل الخروج الآن") { model.logout(); dismiss() } } }
+                if canAdminister && profile.isAdmin {
+                    Section { Toggle("إظهار صورة الحساب الحالي دائمًا", isOn: $showCurrentUserAvatar) }
+                    Section("حسابات أخرى") {
+                        ForEach(model.profiles.profiles.filter { [.guest, .kiosk].contains($0.role) }) { account in NavigationLink { AccountSettingsView(model: model, profile: account) } label: { HStack { AccountAvatar(profile: account, store: model.profiles, size: 50); Text(account.name); Spacer(); Text(account.account?.enabled == true ? "مفعّل" : "متوقف").font(.caption) } } }
+                    }
+                    Section("حسابات المستخدمين") {
+                        ForEach(model.profiles.profiles.filter { $0.role == .standard }) { account in
+                            if AccountVault.exists(account.id) { Label(account.name + " — سجّل الدخول لتغيير إعداداته", systemImage: "lock") }
+                            else { NavigationLink(account.name) { AccountSettingsView(model: model, profile: account) } }
+                        }
+                    }
+                }
                 if canAdminister && !profile.isAdmin {
                     Section("الصلاحيات") {
+                        if [.guest, .kiosk].contains(profile.role) { Toggle("تفعيل الحساب", isOn: option(\.enabled)) }
                         Toggle("التنزيلات", isOn: option(\.allowDownloads)); Toggle("السكربتات", isOn: option(\.allowScripts)); Toggle("أدوات المطور", isOn: option(\.allowDeveloperTools)); Toggle("تغيير إعدادات التصفح", isOn: option(\.allowSettings))
                         TextField("صفحة البداية", text: option(\.homePage)).textInputAutocapitalization(.never).keyboardType(.URL)
                         TextField("المواقع المسموحة، نطاق في كل سطر", text: Binding(get: { options.allowedDomains.joined(separator: "\n") }, set: { profile.account = options; profile.account?.allowedDomains = $0.components(separatedBy: .whitespacesAndNewlines).filter { FilterRules.validDomain($0) } }), axis: .vertical).textInputAutocapitalization(.never).autocorrectionDisabled()
@@ -145,7 +167,6 @@ struct AccountSettingsView: View {
                 Section("إعدادات الحساب") {
                     if model.profile.id == profile.id {
                         NavigationLink("واجهة المستخدم والأشرطة") { AppearanceSettings(model: model) }
-                        NavigationLink("التصفح والخصوصية والبيانات") { SettingsSheet(model: model) }
                         NavigationLink("المفضلة والسجل") { LibrarySheet(model: model) }
                         NavigationLink("التنزيلات") { DownloadsSheet(model: model) }
                         NavigationLink("السكربتات") { ScriptsSheet(model: model) }
@@ -156,13 +177,12 @@ struct AccountSettingsView: View {
                 if canAdminister && !profile.isAdmin { Section { Button("حذف الحساب وبياناته", role: .destructive) { deleting = true } } }
                 if let issue { Text(issue).font(.caption) }
             }.scrollContentBackground(.hidden).background(.black).navigationTitle("إعدادات الحساب").navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("تم") { dismiss() } } }
+                .toolbar { if !embedded { ToolbarItem(placement: .topBarTrailing) { Button("تم") { dismiss() } } } }
                 .onChange(of: profile) { _, value in if !value.name.trimmingCharacters(in: .whitespaces).isEmpty { model.profiles.update(value) } }
                 .onChange(of: photo) { _, value in Task { if let data = try? await value?.loadTransferable(type: Data.self), let image = UIImage(data: data) { saveImage(image) } } }
                 .fullScreenCover(isPresented: $camera) { CameraPicker { if let image = $0 { saveImage(image) }; camera = false }.ignoresSafeArea() }
                 .fullScreenCover(isPresented: $passwordScreen) { AccountPasswordView(profile: profile) }
                 .confirmationDialog("حذف الحساب وكل ملفاته؟", isPresented: $deleting) { Button("حذف نهائي", role: .destructive) { Task { await model.deleteProfile(profile); dismiss() } } }
-        }.tint(.white).preferredColorScheme(.dark)
     }
     private func option<T>(_ key: WritableKeyPath<AccountOptions, T>) -> Binding<T> {
         Binding(get: { options[keyPath: key] }, set: { value in var updated = options; updated[keyPath: key] = value; profile.account = updated })
