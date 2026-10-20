@@ -43,7 +43,7 @@ struct SettingsSheet: View {
         List {
             ForEach(0..<6) { group in
                 Section {
-                    ForEach(SettingsCategory.allCases.filter { $0.group == group && (search.isEmpty || $0.title.localizedCaseInsensitiveContains(search)) }) { category in
+                    ForEach(SettingsCategory.allCases.filter { $0.group == group && (context.profile.account?.allowSettings != false || context.model.profile.isAdmin || [.account, .help].contains($0)) && (search.isEmpty || $0.title.localizedCaseInsensitiveContains(search)) }) { category in
                         if sizeClass == .regular {
                             Button { selection = category } label: { categoryLabel(category) }.buttonStyle(.plain).listRowBackground(Color.black).overlay(alignment: .leading) { if selection == category { Rectangle().fill(.white).frame(width: 2) } }
                         } else { NavigationLink(value: category) { categoryLabel(category) }.listRowBackground(Color.black) }

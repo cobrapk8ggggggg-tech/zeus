@@ -57,7 +57,7 @@ struct AdvancedSettings: Codable {
     var isActive: Bool { model.profile.id == profileID }
     var permitted: Bool { isActive || model.profile.isAdmin && !AccountVault.exists(profileID) }
     func save(reload: Bool = false) {
-        guard permitted, !model.requiresUnlock else { return }
+        guard permitted, !model.requiresUnlock, profile.account?.allowSettings != false || model.profile.isAdmin else { return }
         if isActive { model.data.settings = settings; if reload { model.applySettings() } else { model.persist() } }
         else {
             var data = model.profiles.load(profile); data.settings = settings

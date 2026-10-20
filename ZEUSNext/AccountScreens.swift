@@ -165,12 +165,12 @@ struct AccountSettingsView: View {
                     }
                 }
                 Section("إعدادات الحساب") {
-                    if model.profile.id == profile.id {
+                    if model.profile.id == profile.id && profile.account?.allowSettings != false {
                         NavigationLink("واجهة المستخدم والأشرطة") { AppearanceSettings(model: model) }
                         NavigationLink("المفضلة والسجل") { LibrarySheet(model: model) }
                         NavigationLink("التنزيلات") { DownloadsSheet(model: model) }
                         NavigationLink("السكربتات") { ScriptsSheet(model: model) }
-                    } else {
+                    } else if canAdminister {
                         NavigationLink("إعدادات التصفح لهذا الحساب") { AccountDefaultsEditor(model: model, profile: profile) }
                     }
                 }

@@ -77,10 +77,10 @@ struct FilterRules {
         }
         let converted = settings.cosmeticFiltering ? nativeRules : nativeRules.filter { ($0["action"] as? [String: Any])?["type"] as? String != "css-display-none" }
         rules = (settings.shieldsEnabled ? converted : []) + rules
-        if !options.showImages { rules.append(["trigger": ["url-filter": ".*", "resource-type": ["image"]], "action": ["type": "block"]]) }
-        if options.blockThirdPartyCookies { rules.append(["trigger": ["url-filter": ".*", "load-type": ["third-party"]], "action": ["type": "block-cookies"]]) }
         // Applied after every blocking rule so compatibility overrides all lists.
         for host in exceptions { rules.append(["trigger": ["url-filter": ".*", "if-top-url": [FilterRules.regex(for: host)]], "action": ["type": "ignore-previous-rules"]]) }
+        if !options.showImages { rules.append(["trigger": ["url-filter": ".*", "resource-type": ["image"]], "action": ["type": "block"]]) }
+        if options.blockThirdPartyCookies { rules.append(["trigger": ["url-filter": ".*", "load-type": ["third-party"]], "action": ["type": "block-cookies"]]) }
         guard let json = String(data: try JSONSerialization.data(withJSONObject: rules), encoding: .utf8) else { return nil }
         let value: WKContentRuleList = try await withCheckedThrowingContinuation { continuation in
             WKContentRuleListStore.default().compileContentRuleList(forIdentifier: "zeus-v2-" + profile.id.uuidString, encodedContentRuleList: json) { list, error in
@@ -90,13 +90,14 @@ struct FilterRules {
         }
         compiled[profile.id] = value; return value
     }
+    func erase(_ profile: UUID) { compiled.removeValue(forKey: profile); WKContentRuleListStore.default().removeContentRuleList(forIdentifier: "zeus-v2-" + profile.uuidString) { _ in } }
     func invalidate(_ profile: UUID) { compiled.removeValue(forKey: profile) }
     func update() async {
         guard !updating else { return }; updating = true; defer { updating = false }
         do {
             let config = URLSessionConfiguration.ephemeral; config.httpCookieStorage = nil; config.httpShouldSetCookies = false
             let session = URLSession(configuration: config); defer { session.invalidateAndCancel() }
-            let (bytes, response) = try await session.data(from: URL(string: "https://easylist.to/easylist/easylist.txt")!)
+            let (bytes, response) = try await session.data(from: URL(string: "https://easylist-downloads.adblockplus.org/easylist.txt")!)
             guard (response as? HTTPURLResponse)?.statusCode == 200, bytes.count <= 12_000_000, let text = String(data: bytes, encoding: .utf8), FilterRules.parse(text).domains.count > 100 else { throw URLError(.cannotParseResponse) }
             try BrowserDisk.ensure(updatesURL.deletingLastPathComponent()); try bytes.write(to: updatesURL, options: .atomic)
             merge(text)

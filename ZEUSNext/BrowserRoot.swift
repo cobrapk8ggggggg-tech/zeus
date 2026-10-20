@@ -226,7 +226,7 @@ struct OriginalHome: View {
                     ForEach(model.data.bookmarks) { item in
                         Button { model.open(item.url) } label: { VStack(spacing: 8) { Image(systemName: "globe").font(.system(size: 32)).frame(width: 60, height: 60).background(.white.opacity(0.08), in: Circle()); Text(item.title).font(.system(size: 12)).lineLimit(1).frame(width: 75) } }.buttonStyle(.plain).contextMenu { Button("حذف", role: .destructive) { model.data.bookmarks.removeAll { $0.id == item.id }; model.persist() } }
                     }
-                    Button { adding = true } label: { VStack(spacing: 8) { Image(systemName: "plus").font(.title2).frame(width: 60, height: 60).overlay(Circle().strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [5]))); Text("إضافة").font(.system(size: 12)).frame(width: 75) } }.buttonStyle(.plain).disabled(model.profile.role == .guest)
+                    Button { adding = true } label: { VStack(spacing: 8) { Image(systemName: "plus").font(.title2).frame(width: 60, height: 60).overlay(Circle().strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [5]))); Text("إضافة").font(.system(size: 12)).frame(width: 75) } }.buttonStyle(.plain).disabled([.guest, .kiosk].contains(model.profile.role))
                 }.padding(.horizontal, 15).padding(.top, 35)
                 Spacer().frame(height: 50)
             }

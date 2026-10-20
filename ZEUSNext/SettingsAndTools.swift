@@ -57,7 +57,7 @@ extension BrowserModel {
     func resetApplication() async {
         guard profile.isAdmin else { notify(AccountError.permission.localizedDescription); return }
         for tab in tabs { tab.dispose() }
-        for item in profiles.profiles { downloads.removeAll(profileID: item.id) }
+        for item in profiles.profiles { shield.erase(item.id); downloads.removeAll(profileID: item.id) }
         do { try await profiles.resetAll() } catch { notify(error.localizedDescription); return }
         await WKWebsiteDataStore.default().removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
         for cookie in HTTPCookieStorage.shared.cookies ?? [] { HTTPCookieStorage.shared.deleteCookie(cookie) }

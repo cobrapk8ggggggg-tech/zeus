@@ -26,7 +26,7 @@ struct ScriptsSheet: View {
                     }
                 }.listStyle(.plain).scrollContentBackground(.hidden)
             }
-        }.background(.black).foregroundStyle(.white).tint(.white)
+        }.background(.black).foregroundStyle(.white).tint(.white).disabled(model.profile.account?.allowScripts == false)
             .fullScreenCover(item: $editing) { script in ScriptEditor(script: script) { changed in if let index = model.data.scripts.firstIndex(where: { $0.id == changed.id }) { model.data.scripts[index] = changed } else { model.data.scripts.append(changed) }; model.applySettings() } }
     }
 }
@@ -58,7 +58,7 @@ struct ConsoleSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                if !model.data.settings.developerTools {
+                if !model.data.settings.developerTools || model.profile.account?.allowDeveloperTools == false {
                     ContentUnavailableView("الكونسول غير مفعّل", systemImage: "terminal", description: Text("فعّله من الإعدادات لالتقاط سجلات الصفحات الجديدة."))
                 } else {
                     ScrollView {
@@ -76,7 +76,7 @@ struct ConsoleSheet: View {
         }
     }
     private func execute() {
-        guard model.data.settings.developerTools, !command.isEmpty else { return }
+        guard model.data.settings.developerTools, model.profile.account?.allowDeveloperTools != false, !command.isEmpty else { return }
         let source = String(command.prefix(100_000)); command = ""
         model.console.append(ConsoleEntry(text: "> " + source, kind: "command"))
         model.webView?.evaluateJavaScript(source) { value, error in

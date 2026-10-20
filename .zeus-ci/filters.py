@@ -1,5 +1,6 @@
 """Build-time conversion only: no third-party converter code is linked into ZEUS."""
 import hashlib
+import gzip
 import json
 import os
 from pathlib import Path
@@ -27,9 +28,10 @@ tool.write_bytes(binary)
 tool.chmod(0o700)
 rules = []
 source_hashes = {}
-for url in SOURCES:
-    data = fetch(url, 12_000_000)
-    source_hashes[url] = hashlib.sha256(data).hexdigest()
+for entry in json.loads(Path('.zeus-ci/filter-sources/sources.json').read_text()):
+    data = gzip.decompress(Path('.zeus-ci/filter-sources', entry['name'] + '.txt.gz').read_bytes())
+    assert hashlib.sha256(data).hexdigest() == entry['sha256'], 'Filter snapshot checksum mismatch'
+    source_hashes[entry['source']] = entry['sha256']
     rules.append(data.decode('utf-8'))
 inputs = work / 'rules.txt'
 inputs.write_text('\n'.join(rules), encoding='utf-8')

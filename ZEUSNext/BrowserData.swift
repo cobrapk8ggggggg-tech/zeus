@@ -24,6 +24,7 @@ struct BrowserProfile: Codable, Identifiable, Equatable {
     var kind: ProfileKind = .standard
     var locked = false
     var isPrivate: Bool { kind == .ephemeral }
+    var legacyWebsiteStore: Bool?
     var account: AccountOptions?
     var role: AccountRole { account?.role ?? .standard }
     var isAdmin: Bool { role == .administrator }
@@ -160,10 +161,15 @@ enum BrowserDisk {
         if let index = BrowserDisk.read(Index.self, from: root.appendingPathComponent("profiles.json")), !index.profiles.isEmpty {
             profiles = index.profiles
             activeID = index.profiles.contains(where: { $0.id == index.activeID }) ? index.activeID : index.profiles[0].id
-            if !profiles.contains(where: { $0.isAdmin }) { profiles[0].account = AccountOptions(role: .administrator); persistIndex() }
+            if !profiles.contains(where: { $0.isAdmin }) {
+                if let index = profiles.firstIndex(where: { !$0.isPrivate }) { profiles[index].account = AccountOptions(role: .administrator) }
+                else { var admin = BrowserProfile(name: "الرئيسي"); admin.account = AccountOptions(role: .administrator); profiles.insert(admin, at: 0) }
+                persistIndex()
+            }
         } else {
             var initial = BrowserProfile(name: "الرئيسي")
             initial.account = AccountOptions(role: .administrator)
+            initial.legacyWebsiteStore = UserDefaults.standard.data(forKey: "browser_saved_tabs_list") != nil || UserDefaults.standard.data(forKey: "saved_websites") != nil
             profiles = [initial]; activeID = initial.id
             persistIndex()
             migrateLegacy(into: initial)
@@ -173,7 +179,7 @@ enum BrowserDisk {
     private func ensureSpecialAccounts() {
         for role in [AccountRole.guest, .kiosk] where !profiles.contains(where: { $0.role == role }) {
             var special = BrowserProfile(name: role.title, symbol: role == .guest ? "person.crop.circle.badge.questionmark" : "display", kind: role == .guest ? .ephemeral : .standard)
-            special.account = AccountOptions(role: role, enabled: false, allowScripts: false, allowDeveloperTools: false, allowSettings: role != .kiosk)
+            special.account = AccountOptions(role: role, enabled: false, allowDownloads: role != .kiosk, allowScripts: false, allowDeveloperTools: false, allowSettings: role != .kiosk)
             profiles.append(special)
         }
         persistIndex()
@@ -195,7 +201,7 @@ enum BrowserDisk {
     }
     func websiteDataStore(for profile: BrowserProfile) -> WKWebsiteDataStore {
         if let store = stores[profile.id] { return store }
-        let store = profile.isPrivate ? WKWebsiteDataStore.nonPersistent() : WKWebsiteDataStore(forIdentifier: profile.id)
+        let store = profile.isPrivate ? WKWebsiteDataStore.nonPersistent() : profile.legacyWebsiteStore == true ? WKWebsiteDataStore.default() : WKWebsiteDataStore(forIdentifier: profile.id)
         stores[profile.id] = store
         return store
     }
@@ -231,7 +237,7 @@ enum BrowserDisk {
         let store = websiteDataStore(for: profile)
         await store.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
         stores.removeValue(forKey: profile.id)
-        if !profile.isPrivate {
+        if !profile.isPrivate && profile.legacyWebsiteStore != true {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 WKWebsiteDataStore.remove(forIdentifier: profile.id) { error in
                     if let error { continuation.resume(throwing: error) } else { continuation.resume() }
@@ -249,7 +255,7 @@ enum BrowserDisk {
         let old = profiles
         for profile in old {
             await websiteDataStore(for: profile).removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
-            if !profile.isPrivate {
+            if !profile.isPrivate && profile.legacyWebsiteStore != true {
                 try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in WKWebsiteDataStore.remove(forIdentifier: profile.id) { if let error = $0 { c.resume(throwing: error) } else { c.resume() } } }
             }
             AccountVault.remove(profile.id)

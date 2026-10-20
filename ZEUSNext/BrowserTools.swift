@@ -37,6 +37,7 @@ extension BrowserModel {
         }
     }
     func savePDF() {
+        guard profile.account?.allowDownloads != false else { notify("حفظ الملفات غير مسموح لهذا الحساب."); return }
         guard let view = webView else { return }
         if data.settings.advanced?.paperSizedPDF != false {
             let renderer = pageRenderer(view)
@@ -64,6 +65,7 @@ extension BrowserModel {
         }
     }
     func saveScreenshot() {
+        guard profile.account?.allowDownloads != false else { notify("حفظ الملفات غير مسموح لهذا الحساب."); return }
         guard let view = webView else { return }; let owner = profile
         let options = data.settings.advanced ?? AdvancedSettings()
         let config = WKSnapshotConfiguration(); config.snapshotWidth = NSNumber(value: Double(view.bounds.width) * options.screenshotScale)

@@ -177,7 +177,7 @@ struct WebDialog: Identifiable {
         view.takeSnapshot(with: config) { [weak self, weak tab] image, _ in tab?.snapshot = image; self?.changed() }
     }
     func addVisit(tab: BrowserTab) {
-        guard data.settings.advanced?.saveHistory != false, profile.id == tab.profileID, !profile.isPrivate, let url = URL(string: tab.url), BrowserURL.isWeb(url) else { return }
+        guard profile.role != .kiosk, data.settings.advanced?.saveHistory != false, profile.id == tab.profileID, !profile.isPrivate, let url = URL(string: tab.url), BrowserURL.isWeb(url) else { return }
         if data.history.first?.url == tab.url { data.history.removeFirst() }
         data.history.insert(Visit(title: tab.title, url: tab.url), at: 0)
         data.history = Array(data.history.prefix(data.settings.advanced?.historyLimit ?? 1000)); persist()
@@ -194,7 +194,7 @@ struct WebDialog: Identifiable {
         let previous = profile; if !requiresUnlock { persist() }
         for tab in tabs { tab.dispose() }; console.removeAll(); pendingPopup = nil
         dialog?.complete(nil); dialog = nil; article = nil; gallery = nil; share = nil
-        if previous.isPrivate { downloads.removeAll(profileID: previous.id); await profiles.clearEphemeral(previous) }
+        if previous.isPrivate { shield.erase(previous.id); downloads.removeAll(profileID: previous.id); await profiles.clearEphemeral(previous) }
         profiles.select(target.id); data = profiles.load(target); blockedNavigations = 0; requiresUnlock = false; chromeHidden = false; restoreTabs()
         if let home = target.account?.homePage, home != "zeus://home", tabs.count == 1, current?.isHome == true { open(home) }
         await ensureCurrentLoaded()
@@ -272,6 +272,6 @@ struct WebDialog: Identifiable {
         if !requiresUnlock { persist() }
         cleanOnExit(profile)
         for tab in tabs { tab.dispose() }; tabs.removeAll(); data = ProfileData(); console.removeAll(); article = nil; gallery = nil; share = nil; pendingPopup = nil; address = ""; requiresUnlock = true
-        if profile.isPrivate { let owner = profile; downloads.removeAll(profileID: owner.id); Task { await profiles.clearEphemeral(owner) } }
+        if profile.isPrivate { shield.erase(profile.id); let owner = profile; downloads.removeAll(profileID: owner.id); Task { await profiles.clearEphemeral(owner) } }
     }
 }

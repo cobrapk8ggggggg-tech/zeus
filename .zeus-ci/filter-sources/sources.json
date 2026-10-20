@@ -1,0 +1,14 @@
+[
+  {
+    "name": "easylist",
+    "source": "https://easylist-downloads.adblockplus.org/easylist.txt",
+    "sha256": "3e2e9de02e16aa1d317dc44d1533739f3b171ae1554d23c9d201c5f842ae6666",
+    "bytes": 2206078
+  },
+  {
+    "name": "easyprivacy",
+    "source": "https://easylist-downloads.adblockplus.org/easyprivacy.txt",
+    "sha256": "9f18c3bef2d3fae446d09e9c99b641a33fab1075c27e42157419ab1594813cff",
+    "bytes": 1443880
+  }
+]
