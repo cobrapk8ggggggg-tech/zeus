@@ -56,6 +56,9 @@ jobs:
           (cd results && zip -qry ZEUS-2.0-unsigned.ipa Payload)
           test -s results/ZEUS-2.0-unsigned.ipa
           unzip -t results/ZEUS-2.0-unsigned.ipa > results/ipa-integrity.log
+          unzip -Z1 results/ZEUS-2.0-unsigned.ipa | grep -Fqx 'Payload/ZEUSNext.app/Info.plist'
+          unzip -Z1 results/ZEUS-2.0-unsigned.ipa | grep -Fqx 'Payload/ZEUSNext.app/ZEUSNext'
+          xcrun lipo -info "$app/ZEUSNext" | tee results/ipa-binary-architecture.txt
           cp "$app/Info.plist" results/Info.plist
           python3 - <<'PY'
           import plistlib
@@ -65,6 +68,13 @@ jobs:
           print('Required device usage descriptions are present.')
           PY
           rm -r results/Payload
+      - name: Publish downloadable IPA immediately after packaging
+        uses: actions/upload-artifact@v4
+        with:
+          name: zeus-next-ipa
+          path: results/ZEUS-2.0-unsigned.ipa
+          retention-days: 14
+          if-no-files-found: error
       - name: Start local deterministic download fixture
         run: |
           python3 .zeus-ci/fixture_server.py > results/fixture.log 2>&1 &
