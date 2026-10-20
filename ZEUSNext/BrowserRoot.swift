@@ -106,7 +106,7 @@ struct BrowserRoot: View {
                 if model.data.settings.advanced?.showTabsBar != false {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 1) {
-                            ForEach(model.tabs) { tab in HStack(spacing: 10) { Button { model.closeTab(tab) } label: { Image(systemName: "xmark").font(.caption) }; Button { model.selectTab(tab) } label: { Text(tab.title).font(.caption).lineLimit(1).frame(minWidth: 75, maxWidth: 170) } }.padding(.horizontal, 12).frame(height: 34).background(model.selectedTabID == tab.id ? .white.opacity(0.12) : .black).overlay(Rectangle().stroke(.white.opacity(0.12), lineWidth: 0.5)) }
+                            ForEach(model.tabs) { tab in HStack(spacing: 10) { Button { model.closeTab(tab) } label: { Image(systemName: "xmark").font(.caption) }; Button { model.selectTab(tab) } label: { Text(tab.title).font(.caption).lineLimit(1).frame(minWidth: 75, maxWidth: 170) } }.padding(.horizontal, 12).frame(height: 34).background(model.current?.id == tab.id ? .white.opacity(0.12) : .black).overlay(Rectangle().stroke(.white.opacity(0.12), lineWidth: 0.5)) }
                             actionButton(.newTab)
                         }
                     }
@@ -161,10 +161,10 @@ struct BrowserRoot: View {
                         ForEach(model.tabs) { tab in
                             ZStack(alignment: .topTrailing) {
                                 Button { model.selectTab(tab); withAnimation { topTray = false } } label: {
-                                    VStack(spacing: 10) { Image(systemName: tab.isHome ? "house.fill" : "globe").font(.system(size: 32)).frame(width: 40, height: 40); Text(tab.title).font(.caption.bold()).lineLimit(2).multilineTextAlignment(.center).padding(.horizontal, 5) }.frame(width: 140, height: 180).background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(.white.opacity(model.selectedTabID == tab.id ? 1 : 0.2), lineWidth: 2))
+                                    VStack(spacing: 10) { Image(systemName: tab.isHome ? "house.fill" : "globe").font(.system(size: 32)).frame(width: 40, height: 40); Text(tab.title).font(.caption.bold()).lineLimit(2).multilineTextAlignment(.center).padding(.horizontal, 5) }.frame(width: 140, height: 180).background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(.white.opacity(model.current?.id == tab.id ? 1 : 0.2), lineWidth: 2))
                                 }.contextMenu { Button("إضافة للمفضلة", systemImage: "star") { if model.profile.role != .guest && !tab.isHome { model.data.bookmarks.append(Bookmark(title: tab.title, url: tab.url)); model.persist() } } }
                                 Button { model.closeTab(tab) } label: { Image(systemName: "xmark.circle.fill").padding(8) }
-                            }.scaleEffect(model.selectedTabID == tab.id ? 1.05 : 1)
+                            }.scaleEffect(model.current?.id == tab.id ? 1.05 : 1)
                         }
                         Button { _ = model.newTab(); withAnimation { topTray = false } } label: { Image(systemName: "plus").font(.system(size: 30)).frame(width: 140, height: 180).background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [5])).foregroundStyle(.white.opacity(0.3))) }
                     }.padding(.horizontal, 20)

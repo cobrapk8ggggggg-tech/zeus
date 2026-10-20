@@ -12,7 +12,7 @@ import UIKit
             if attempt < 8 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { present(dialog, attempt: attempt + 1, epoch: validEpoch) } } else { dialog.complete(nil) }
             return
         }
-        guard !(root is UIAlertController) else { dialog.complete(nil); return }
+        guard !(root is UIAlertController) else { if attempt < 8 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { present(dialog, attempt: attempt + 1, epoch: validEpoch) } } else { dialog.complete(nil) }; return }
         let controller = UIAlertController(title: "ZEUS", message: dialog.text, preferredStyle: .alert)
         controller.overrideUserInterfaceStyle = .dark; controller.view.tintColor = .white
         if dialog.kind == .prompt { controller.addTextField { $0.text = dialog.initial } }

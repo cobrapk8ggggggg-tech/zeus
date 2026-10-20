@@ -169,7 +169,7 @@ enum DownloadFiles {
     func start(url: URL, profile: BrowserProfile, referrer: URL? = nil, webView: WKWebView? = nil) async {
         guard !profile.isPrivate || store.activeID == profile.id else { return }
         guard profile.account?.allowDownloads != false else { message = "التنزيلات غير مسموحة لهذا الحساب."; return }
-        if BrowserURL.isWeb(url) && options(profile.id).confirmDownloads && !(await confirmation(DownloadFiles.safeName(url.lastPathComponent))) { return }
+        if BrowserURL.isWeb(url) && options(profile.id).confirmDownloads { let approved = await confirmation(DownloadFiles.safeName(url.lastPathComponent)); if !approved { return } }
         if ["blob", "data"].contains(url.scheme ?? ""), let webView, webView.configuration.websiteDataStore === store.websiteDataStore(for: profile) {
             webView.startDownload(using: URLRequest(url: url)) { [weak self] download in self?.attach(download, profile: profile) }; return
         }
@@ -234,7 +234,7 @@ enum DownloadFiles {
     func pause(_ item: BrowserDownload) {
         guard item.isBusy else { return }
         change(item.id) { $0.state = .pausing }; queuedDestinations.removeValue(forKey: item.id)?(nil); save()
-        let handler: (Data?) -> Void = { [weak self] bytes in
+        let handler: @Sendable (Data?) -> Void = { [weak self] bytes in
             Task { @MainActor in
                 guard let self, self.records.contains(where: { $0.id == item.id }) else { return }
                 self.saveResume(bytes, item: item)
@@ -366,7 +366,7 @@ extension DownloadService: WKDownloadDelegate {
         guard let id = id(for: download), let item = records.first(where: { $0.id == id }), let profile = store.profile(item.profileID) else { completionHandler(nil); return }
         if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) { completionHandler(nil); failed(id, error: NSError(domain: "Download", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: "رفض الخادم التنزيل (HTTP \(http.statusCode))."])); return }
         Task { @MainActor in
-            if options(profile.id).confirmDownloads && !confirmed.contains(id) && !(await confirmation(suggestedFilename)) { completionHandler(nil); remove(item); return }
+            if options(profile.id).confirmDownloads && !confirmed.contains(id) { let approved = await confirmation(suggestedFilename); if !approved { completionHandler(nil); remove(item); return } }
             guard records.contains(where: { $0.id == id }), permittedNetwork(profile.id) else { completionHandler(nil); failed(id, error: URLError(.notConnectedToInternet)); return }
             do {
                 let folder = store.downloads(for: profile); try BrowserDisk.ensure(folder)

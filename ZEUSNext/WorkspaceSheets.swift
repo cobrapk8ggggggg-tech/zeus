@@ -22,7 +22,7 @@ struct TabsSheet: View {
                                         else { LinearGradient(colors: [model.profile.color.opacity(0.15), .black.opacity(0.2)], startPoint: .topTrailing, endPoint: .bottomLeading); Image(systemName: tab.isHome ? "sparkles" : "globe").font(.system(size: 34, weight: .ultraLight)).foregroundStyle(model.profile.color) }
                                     }.frame(height: 155).clipped()
                                     HStack { Text(tab.title).font(.caption.weight(.semibold)).lineLimit(1); Spacer(minLength: 0); Button { model.closeTab(tab) } label: { Image(systemName: "xmark").padding(8) }.accessibilityLabel("إغلاق \(tab.title)") }.padding(10)
-                                }.glassSurface(23).clipShape(RoundedRectangle(cornerRadius: 23)).overlay(RoundedRectangle(cornerRadius: 23).stroke(model.selectedTabID == tab.id ? model.profile.color : .clear, lineWidth: 2))
+                                }.glassSurface(23).clipShape(RoundedRectangle(cornerRadius: 23)).overlay(RoundedRectangle(cornerRadius: 23).stroke(model.current?.id == tab.id ? model.profile.color : .clear, lineWidth: 2))
                             }.buttonStyle(.plain)
                         }
                     }

@@ -26,14 +26,21 @@ jobs:
           python3 .zeus-ci/project.py
           xcodegen generate --spec zeus-project.json
           mkdir -p results
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
+        id: converter-cache
         with:
           path: ~/.cache/zeus-filter-converter
           key: zeus-converter-1cfdcaf042880a5e0027a8fc6f7ebf9ee667acc9-${{ runner.arch }}
       - name: Convert EasyList and EasyPrivacy to native WebKit rules
+        id: filters
         run: |
           python3 .zeus-ci/filters.py
           xcodegen generate --spec zeus-project.json
+      - uses: actions/cache/save@v4
+        if: steps.converter-cache.outputs.cache-hit != 'true' && steps.filters.outcome == 'success'
+        with:
+          path: ~/.cache/zeus-filter-converter
+          key: zeus-converter-1cfdcaf042880a5e0027a8fc6f7ebf9ee667acc9-${{ runner.arch }}
       - name: Build unsigned iPhone and iPad application
         run: |
           set -o pipefail

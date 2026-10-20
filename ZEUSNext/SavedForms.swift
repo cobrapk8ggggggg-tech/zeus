@@ -55,9 +55,12 @@ extension BrowserModel {
     func fillForm(_ form: SavedForm) {
         guard let view = webView, view.url.flatMap(Self.origin) == form.origin else { notify("يمكن ملء النموذج في مصدره الأصلي فقط (البروتوكول والنطاق والمنفذ)."); return }
         guard let fields = profile.isPrivate ? temporaryFormValues[form.id] : FormVault.load(profileID: profile.id, id: form.id), let raw = try? JSONSerialization.jsonObject(with: JSONEncoder().encode(fields)) else { notify("قيم هذا النموذج غير متاحة."); return }
-        view.callAsyncJavaScript("let count=0;for(const field of fields){let e;try{e=document.querySelectorAll(field.selector)[field.index||0]}catch{continue}if(!e||e.type!==field.type)continue;if(['checkbox','radio'].includes(e.type)){e.checked=field.checked}else{const proto=e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:e.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLInputElement.prototype;const setter=Object.getOwnPropertyDescriptor(proto,'value')?.set;if(setter)setter.call(e,field.value);else e.value=field.value}e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));count++}return count;", arguments: ["fields": raw], in: nil, contentWorld: .page) { [weak self] result in
-            switch result { case .success(let value): self?.notify("مُلئت \(value as? Int ?? 0) حقول. راجعها قبل إرسال النموذج."); case .failure(let error): self?.notify(error.localizedDescription) }
+        let owner = profile.id
+        Task {
+            do { let value = try await view.callAsyncJavaScript("let count=0;for(const field of fields){let e;try{e=document.querySelectorAll(field.selector)[field.index||0]}catch{continue}if(!e||e.type!==field.type)continue;if(['checkbox','radio'].includes(e.type)){e.checked=field.checked}else{const proto=e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:e.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLInputElement.prototype;const setter=Object.getOwnPropertyDescriptor(proto,'value')?.set;if(setter)setter.call(e,field.value);else e.value=field.value}e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));count++}return count;", arguments: ["fields": raw], in: nil, contentWorld: .page); if profile.id == owner { notify("مُلئت \(value as? Int ?? 0) حقول. راجعها قبل إرسال النموذج.") } }
+            catch { if profile.id == owner { notify(error.localizedDescription) } }
         }
+
     }
     func deleteForm(_ form: SavedForm) { FormVault.remove(profileID: profile.id, id: form.id); temporaryFormValues.removeValue(forKey: form.id); data.forms?.removeAll { $0.id == form.id }; persist() }
 }

@@ -161,7 +161,7 @@ struct WebDialog: Identifiable {
         let activate = foreground ?? (url == nil || data.settings.advanced?.openTabsInBackground != true)
         if activate { snapshotCurrent() }
         let tab = BrowserTab(saved: SavedTab(), profileID: profile.id)
-        if data.settings.advanced?.openTabsNextToActive == true, let index = tabs.firstIndex(where: { $0.id == selectedTabID }) { tabs.insert(tab, at: index + 1) } else { tabs.append(tab) }
+        if data.settings.advanced?.openTabsNextToActive == true, let index = tabs.firstIndex(where: { $0.id == current?.id }) { tabs.insert(tab, at: index + 1) } else { tabs.append(tab) }
         if activate { if twinFocused && twinTabID != nil { twinTabID = tab.id } else { selectedTabID = tab.id }; address = "" }
         if let url { tab.url = url.absoluteString; tab.title = url.host ?? "صفحة جديدة"; if activate { address = tab.url }; Task { if let view = await prepare(tab) { view.load(URLRequest(url: url)) } } }
         persist()
@@ -169,7 +169,7 @@ struct WebDialog: Identifiable {
     }
     func selectTab(_ tab: BrowserTab) {
         guard tabs.contains(where: { $0.id == tab.id }) else { return }
-        snapshotCurrent(); if twinFocused && twinTabID != nil && tab.id != selectedTabID { twinTabID = tab.id } else if tab.id == twinTabID { twinFocused = true } else { selectedTabID = tab.id }; tab.lastUsed = Date(); address = tab.isHome ? "" : tab.url; persist()
+        snapshotCurrent(); if twinFocused && twinTabID != nil && tab.id != selectedTabID { twinTabID = tab.id } else if tab.id == twinTabID { twinFocused = true } else { selectedTabID = tab.id; twinFocused = false }; tab.lastUsed = Date(); address = tab.isHome ? "" : tab.url; persist()
         Task { await ensureCurrentLoaded() }
     }
     func closeTab(_ tab: BrowserTab) {
@@ -287,7 +287,7 @@ struct WebDialog: Identifiable {
         }
         twinFocused = false
     }
-    func focusPane(_ tab: BrowserTab) { twinFocused = tab.id == twinTabID; address = tab.isHome ? "" : tab.url; changed() }
+    func focusPane(_ tab: BrowserTab) { guard tabs.contains(where: { $0.id == tab.id }) else { return }; twinFocused = tab.id == twinTabID; address = tab.isHome ? "" : tab.url; changed() }
     func pinCurrent() { current?.pinned.toggle(); tabs.sort { $0.pinned && !$1.pinned }; changed(); persist() }
     func permits(_ url: URL) -> Bool {
         let domains = profile.account?.allowedDomains ?? []
