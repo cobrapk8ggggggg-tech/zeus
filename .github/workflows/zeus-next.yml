@@ -1,7 +1,7 @@
 name: ZEUS Next build and verification
 on:
   push:
-    branches: [codex/zeus-browser-next]
+    branches: [codex/zeus-browser-next, fix/zeus-next-ipa-build-20261020]
     paths: [ZEUSNext/**, ZEUSNextTests/**, ZEUSNextUITests/**, .zeus-ci/**, .github/workflows/zeus-next.yml]
   workflow_dispatch:
 permissions:
@@ -39,6 +39,8 @@ jobs:
           mkdir -p results/Payload
           cp -R "$app" results/Payload/
           (cd results && zip -qry ZEUS-2.0-unsigned.ipa Payload)
+          test -s results/ZEUS-2.0-unsigned.ipa
+          unzip -t results/ZEUS-2.0-unsigned.ipa > results/ipa-integrity.log
           cp "$app/Info.plist" results/Info.plist
           python3 - <<'PY'
           import plistlib

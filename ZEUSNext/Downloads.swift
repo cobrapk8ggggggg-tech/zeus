@@ -160,7 +160,7 @@ enum DownloadFiles {
         let id: UUID
         if let existingID { id = existingID; change(id) { $0.state = .running; $0.error = nil } }
         else {
-            let source = download.originalRequest.url?.absoluteString ?? ""
+            let source = download.originalRequest?.url?.absoluteString ?? ""
             let item = BrowserDownload(profileID: profile.id, source: source, filename: "download", state: .running, engine: .webKit)
             records.insert(item, at: 0); id = item.id
         }

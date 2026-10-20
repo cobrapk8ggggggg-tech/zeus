@@ -112,42 +112,97 @@ struct DownloadsSheet: View {
     @State private var deleting: BrowserDownload?
     init(model: BrowserModel) { self.model = model; service = model.downloads }
     private var items: [BrowserDownload] { service.forProfile(model.profile.id) }
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 19) {
-                    PanelHeader(title: "التنزيلات", caption: "ملفات \(model.profile.name) · \(byteText(items.reduce(0) { $0 + ($1.state == .completed ? $1.received : 0) }))")
-                    HStack(spacing: 12) {
-                        Button { adding = true } label: { Label("إضافة رابط", systemImage: "link.badge.plus").frame(maxWidth: .infinity).padding(15).glassSurface(20) }
-                        Button { importing = true } label: { Label("من الملفات", systemImage: "folder.badge.plus").frame(maxWidth: .infinity).padding(15).glassSurface(20) }
-                    }.font(.subheadline).buttonStyle(.plain)
-                    if items.isEmpty {
-                        ContentUnavailableView("جاهز لملفاتك", systemImage: "arrow.down.circle", description: Text("اضغط رابط تنزيل داخل الموقع، أو أضف رابطًا مباشرًا. تبقى الملفات داخل هذه المساحة."))
-                            .padding(.top, 35)
-                    }
-                    ForEach(items) { item in downloadRow(item) }
-                }.padding(22)
-            }.background { OrbitBackground(tint: model.profile.color) }.navigationTitle("مدير الملفات").navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("تم") { dismiss() } } }
-                .alert("تنزيل من رابط", isPresented: $adding) {
-                    TextField("https://…", text: $link).textInputAutocapitalization(.never).keyboardType(.URL)
-                    Button("تنزيل") { if let url = URL(string: link), BrowserURL.isWeb(url) { Task { await service.start(url: url, profile: model.profile, referrer: model.webView?.url, webView: model.webView) } } else { model.notify("أدخل رابط HTTP أو HTTPS صالحًا.") } }
-                    Button("إلغاء", role: .cancel) {}
-                } message: { Text("التنزيلات المباشرة تستخدم جلسة المساحة الحالية. ملفات blob وطلبات POST تُنزّل من الصفحة الأصلية.") }
-                .alert("اسم الملف", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
-                    TextField("الاسم", text: $newName)
-                    Button("حفظ") { if let item = renaming { service.rename(item, to: newName) }; renaming = nil }
-                    Button("إلغاء", role: .cancel) { renaming = nil }
-                }
-                .confirmationDialog("حذف الملف وإيقاف تنزيله؟", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })) { Button("حذف", role: .destructive) { if let item = deleting { service.remove(item) }; deleting = nil } }
-                .fileImporter(isPresented: $importing, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
-                    switch result { case .success(let files): for file in files { Task { await service.importFile(file, profile: model.profile, webView: model.webView) } }; case .failure(let error): model.notify(error.localizedDescription) }
-                }
-                .sheet(item: $preview) { FilePreview(url: $0.url).ignoresSafeArea() }
-                .sheet(item: $sharing) { ActivitySheet(url: $0.url) }
-                .sheet(item: $exporting) { FileExporter(url: $0.url).ignoresSafeArea() }
+    private var completedBytes: Int64 {
+        items.filter { $0.state == .completed }.reduce(Int64(0)) { total, item in
+            total + item.received
         }
     }
+
+    var body: some View {
+        NavigationStack {
+            downloadsPresentation
+        }
+    }
+
+    private var downloadsPresentation: some View {
+        downloadsContent
+            .navigationTitle("مدير الملفات")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("تم") { dismiss() } } }
+            .alert("تنزيل من رابط", isPresented: $adding) {
+                TextField("https://…", text: $link).textInputAutocapitalization(.never).keyboardType(.URL)
+                Button("تنزيل") { startLinkedDownload() }
+                Button("إلغاء", role: .cancel) {}
+            } message: {
+                Text("التنزيلات المباشرة تستخدم جلسة المساحة الحالية. ملفات blob وطلبات POST تُنزّل من الصفحة الأصلية.")
+            }
+            .alert("اسم الملف", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+                TextField("الاسم", text: $newName)
+                Button("حفظ") {
+                    if let item = renaming { service.rename(item, to: newName) }
+                    renaming = nil
+                }
+                Button("إلغاء", role: .cancel) { renaming = nil }
+            }
+            .confirmationDialog("حذف الملف وإيقاف تنزيله؟", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })) {
+                Button("حذف", role: .destructive) {
+                    if let item = deleting { service.remove(item) }
+                    deleting = nil
+                }
+            }
+            .fileImporter(isPresented: $importing, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
+                switch result {
+                case .success(let files):
+                    for file in files { Task { await service.importFile(file, profile: model.profile) } }
+                case .failure(let error):
+                    model.notify(error.localizedDescription)
+                }
+            }
+            .sheet(item: $preview) { FilePreview(url: $0.url).ignoresSafeArea() }
+            .sheet(item: $sharing) { ActivitySheet(url: $0.url) }
+            .sheet(item: $exporting) { FileExporter(url: $0.url).ignoresSafeArea() }
+    }
+
+    private var downloadsContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 19) {
+                PanelHeader(title: "التنزيلات", caption: "ملفات \(model.profile.name) · \(byteText(completedBytes))")
+                downloadActions
+                if items.isEmpty {
+                    ContentUnavailableView("جاهز لملفاتك", systemImage: "arrow.down.circle", description: Text("اضغط رابط تنزيل داخل الموقع، أو أضف رابطًا مباشرًا. تبقى الملفات داخل هذه المساحة."))
+                        .padding(.top, 35)
+                }
+                ForEach(items) { item in downloadRow(item) }
+            }.padding(22)
+        }
+        .background { OrbitBackground(tint: model.profile.color) }
+    }
+
+    private var downloadActions: some View {
+        HStack(spacing: 12) {
+            Button { adding = true } label: {
+                Label("إضافة رابط", systemImage: "link.badge.plus")
+                    .frame(maxWidth: .infinity).padding(15).glassSurface(20)
+            }
+            Button { importing = true } label: {
+                Label("من الملفات", systemImage: "folder.badge.plus")
+                    .frame(maxWidth: .infinity).padding(15).glassSurface(20)
+            }
+        }
+        .font(.subheadline).buttonStyle(.plain)
+    }
+
+    private func startLinkedDownload() {
+        guard let url = URL(string: link), BrowserURL.isWeb(url) else {
+            model.notify("أدخل رابط HTTP أو HTTPS صالحًا.")
+            return
+        }
+        Task {
+            await service.start(url: url, profile: model.profile,
+                                referrer: model.webView?.url, webView: model.webView)
+        }
+    }
+
     private func downloadRow(_ item: BrowserDownload) -> some View {
         VStack(alignment: .leading, spacing: 13) {
             HStack(spacing: 13) {
