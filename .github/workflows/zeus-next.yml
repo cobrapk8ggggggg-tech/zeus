@@ -1,0 +1,88 @@
+name: ZEUS Next build and verification
+on:
+  push:
+    branches: [codex/zeus-browser-next]
+    paths: [ZEUSNext/**, ZEUSNextTests/**, ZEUSNextUITests/**, .zeus-ci/**, .github/workflows/zeus-next.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: zeus-next-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26.3'
+      - name: Generate native application project
+        run: |
+          brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+          python3 .zeus-ci/project.py
+          xcodegen generate --spec zeus-project.json
+          mkdir -p results
+      - name: Build unsigned iPhone and iPad application
+        run: |
+          set -o pipefail
+          xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -configuration Release \
+            -destination 'generic/platform=iOS' -sdk iphoneos \
+            -derivedDataPath "$RUNNER_TEMP/ZEUSDevice" \
+            build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO 2>&1 | tee results/device-build.log
+      - name: Package IPA and verify usage descriptions
+        run: |
+          app="$RUNNER_TEMP/ZEUSDevice/Build/Products/Release-iphoneos/ZEUSNext.app"
+          mkdir -p results/Payload
+          cp -R "$app" results/Payload/
+          (cd results && zip -qry ZEUS-2.0-unsigned.ipa Payload)
+          cp "$app/Info.plist" results/Info.plist
+          python3 - <<'PY'
+          import plistlib
+          with open('results/Info.plist','rb') as f: data=plistlib.load(f)
+          for key in ['NSPhotoLibraryUsageDescription','NSPhotoLibraryAddUsageDescription','NSCameraUsageDescription','NSMicrophoneUsageDescription','NSFaceIDUsageDescription']:
+              assert data.get(key), key
+          print('Required device usage descriptions are present.')
+          PY
+          rm -r results/Payload
+      - name: Start local deterministic download fixture
+        run: |
+          python3 .zeus-ci/fixture_server.py > results/fixture.log 2>&1 &
+          echo $! > "$RUNNER_TEMP/zeus-fixture.pid"
+          curl --fail --retry 5 --retry-delay 1 http://127.0.0.1:8765/ > /dev/null
+      - name: Run core, WebKit isolation, download and UI tests
+        run: |
+          set -o pipefail
+          device_id=$(python3 - <<'PY'
+          import json,subprocess
+          devices=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','--json']))['devices']
+          for runtime,items in sorted(devices.items(),reverse=True):
+              if 'iOS-26' in runtime:
+                  for item in items:
+                      if 'iPhone' in item['name']:
+                          print(item['udid']);raise SystemExit
+          raise SystemExit('No iOS 26 iPhone simulator available')
+          PY
+          )
+          xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -configuration Debug \
+            -destination "platform=iOS Simulator,id=$device_id" \
+            -parallel-testing-enabled NO -maximum-concurrent-test-simulator-destinations 1 \
+            -derivedDataPath "$RUNNER_TEMP/ZEUSSimulator" \
+            -resultBundlePath "$GITHUB_WORKSPACE/results/tests.xcresult" \
+            test CODE_SIGNING_ALLOWED=NO 2>&1 | tee results/test.log
+      - name: Export screenshot attachments
+        if: always()
+        run: |
+          if [ -d results/tests.xcresult ]; then
+            xcrun xcresulttool export attachments --path results/tests.xcresult --output-path results/screenshots || true
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zeus-next-build-and-tests
+          path: results
+          retention-days: 14
+          if-no-files-found: warn
