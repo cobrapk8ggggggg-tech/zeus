@@ -30,6 +30,7 @@ import UIKit
         guard let model, let tab, model.profile.id == tab.profileID, let url = navigationAction.request.url else { decisionHandler(.cancel); return }
         let scheme = url.scheme?.lowercased() ?? ""
         if ["mailto", "tel", "sms"].contains(scheme) {
+            if model.profile.role == .kiosk { decisionHandler(.cancel); return }
             model.dialog = WebDialog(kind: .confirm, text: "فتح الرابط في تطبيق الجهاز؟") { result in if result != nil { UIApplication.shared.open(url) } }
             decisionHandler(.cancel); return
         }
@@ -50,7 +51,7 @@ import UIKit
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
         let response = navigationResponse.response as? HTTPURLResponse
         let disposition = response?.value(forHTTPHeaderField: "Content-Disposition")?.lowercased() ?? ""
-        if !navigationResponse.canShowMIMEType || disposition.hasPrefix("attachment") { decisionHandler(.download) }
+        if !navigationResponse.canShowMIMEType || disposition.hasPrefix("attachment") { decisionHandler(model?.profile.account?.allowDownloads == false ? .cancel : .download) }
         else { decisionHandler(.allow) }
     }
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) { attach(download) }
@@ -90,6 +91,7 @@ import UIKit
         // exact configuration so target=_blank/OAuth windows keep their opener.
         let view = WKWebView(frame: .zero, configuration: configuration)
         let driver = WebDriver(model: model, tab: tab)
+        view.scrollView.delegate = driver
         view.navigationDelegate = driver; view.uiDelegate = driver; view.allowsBackForwardNavigationGestures = true; view.isFindInteractionEnabled = true
         tab.webView = view; tab.driver = driver; driver.observe(view)
         model.tabs.append(tab); model.selectedTabID = tab.id; model.persist()

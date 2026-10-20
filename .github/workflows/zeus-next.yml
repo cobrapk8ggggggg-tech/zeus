@@ -52,7 +52,7 @@ jobs:
         run: |
           python3 .zeus-ci/fixture_server.py > results/fixture.log 2>&1 &
           echo $! > "$RUNNER_TEMP/zeus-fixture.pid"
-          curl --fail --retry 5 --retry-delay 1 http://127.0.0.1:8765/ > /dev/null
+          curl --fail --retry 15 --retry-connrefused --retry-delay 1 http://127.0.0.1:8765/ > /dev/null
       - name: Run core, WebKit isolation, download and UI tests
         run: |
           set -o pipefail

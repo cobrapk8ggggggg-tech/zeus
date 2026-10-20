@@ -123,7 +123,10 @@ struct WebDialog: Identifiable {
     }
     func open(_ text: String) {
         guard let url = BrowserURL.resolve(text, provider: data.settings.searchProvider) else { notify("اكتب رابطًا أو عبارة بحث."); return }
-        open(URLRequest(url: url))
+        if url.scheme != "zeus" {
+            var searches = data.searches ?? []; searches.removeAll { $0 == text }; searches.insert(text, at: 0); data.searches = Array(searches.prefix(100))
+        }
+        chromeHidden = false; open(URLRequest(url: url))
     }
     func open(_ request: URLRequest) {
         guard let tab = current, let url = request.url else { return }
@@ -180,7 +183,7 @@ struct WebDialog: Identifiable {
         dialog?.complete(nil); dialog = nil; article = nil; gallery = nil; share = nil
         if previous.isPrivate { downloads.removeAll(profileID: previous.id); await profiles.clearEphemeral(previous) }
         profiles.select(target.id); data = profiles.load(target); blockedNavigations = 0; requiresUnlock = false; chromeHidden = false; restoreTabs()
-        if target.role == .kiosk, let home = target.account?.homePage, home != "zeus://home" { open(home) }
+        if let home = target.account?.homePage, home != "zeus://home", tabs.count == 1, current?.isHome == true { open(home) }
         await ensureCurrentLoaded()
     }
     func authenticate(reason: String) async -> Bool {

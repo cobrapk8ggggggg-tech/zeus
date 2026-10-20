@@ -7,6 +7,7 @@ struct LibrarySheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var section = 0
     @State private var search = ""
+    init(model: BrowserModel, initialSection: Int = 0) { self.model = model; _section = State(initialValue: initialSection) }
     var body: some View {
         NavigationStack {
             List {
@@ -69,7 +70,7 @@ struct ReaderSheet: View {
                     Button { dismiss() } label: { Image(systemName: "xmark").padding(12) }
                 }.padding(.horizontal, 12).background(.black).transition(.move(edge: .top).combined(with: .opacity))
             }
-            rightReveal
+            rightReveal.environment(\.layoutDirection, .leftToRight)
         }.foregroundStyle(.white).tint(.white).statusBarHidden()
             .fullScreenCover(isPresented: $settings) {
                 NavigationStack { Form {
@@ -163,7 +164,7 @@ struct GallerySheet: View {
                     Color.clear.frame(width: 25).contentShape(Rectangle()).gesture(DragGesture().onEnded { if $0.translation.width < -10 { withAnimation { controls = true } } })
                 }
             }
-        }.background(.black)
+        }.background(.black).environment(\.layoutDirection, .leftToRight)
     }
     private func scroll(_ direction: CGFloat) { guard let view = scrollView else { return }; let value = min(max(0, view.contentOffset.y + direction * prefs.scrollDistance), max(0, view.contentSize.height-view.bounds.height)); view.setContentOffset(CGPoint(x: 0, y: value), animated: true) }
     private func toggle(_ address: String) { if selection.contains(address) { selection.remove(address) } else { selection.insert(address) } }
