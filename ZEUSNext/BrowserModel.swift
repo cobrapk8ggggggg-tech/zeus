@@ -46,6 +46,8 @@ struct WebDialog: Identifiable {
     @Published var selectedTabID: UUID?
     @Published var notice: BrowserNotice?
     @Published var article: ReaderArticle?
+    @Published var formDraft: FormDraft?
+    var temporaryFormValues: [UUID: [SavedFormField]] = [:]
     @Published var gallery: GalleryArticle?
     @Published var console: [ConsoleEntry] = []
     @Published var share: ShareItem?
@@ -61,6 +63,7 @@ struct WebDialog: Identifiable {
     @Published var twinFocused = false
     @Published var twinFraction: CGFloat = 0.5
     private var leftAt: Date?
+    private var transitionEpoch = UUID()
     init(profiles: ProfileStore? = nil, useBackgroundDownloads: Bool = true) {
         let store = profiles ?? ProfileStore()
         self.profiles = store; downloads = DownloadService(store: store, useBackground: useBackgroundDownloads)
@@ -199,9 +202,10 @@ struct WebDialog: Identifiable {
         guard !switching, target.account?.enabled != false, target.id != profile.id || requiresUnlock else { return }; switching = true; defer { switching = false }
         if AccountVault.exists(target.id), !(await AccountVault.verify(password, id: target.id)) { notify(AccountError.password.localizedDescription); return }
         if target.locked, !(await authenticate(reason: "فتح مساحة \(target.name)")) { return }
+        transitionEpoch = UUID()
         let previous = profile; twinTabID = nil; twinFocused = false; if !requiresUnlock { persist() }
         for tab in tabs { tab.dispose() }; console.removeAll(); pendingPopup = nil
-        dialog?.complete(nil); dialog = nil; article = nil; gallery = nil; share = nil
+        dialog?.complete(nil); dialog = nil; article = nil; gallery = nil; share = nil; formDraft = nil; temporaryFormValues.removeAll()
         if previous.isPrivate { shield.erase(previous.id); downloads.removeAll(profileID: previous.id); await profiles.clearEphemeral(previous) }
         profiles.select(target.id); data = profiles.load(target); blockedNavigations = 0; requiresUnlock = false; chromeHidden = false; restoreTabs()
         if let home = target.account?.homePage, home != "zeus://home", tabs.count == 1, current?.isHome == true { open(home) }
@@ -223,9 +227,10 @@ struct WebDialog: Identifiable {
         cleanOnExit(profile)
         persist(); if profile.locked { requiresUnlock = true }
         if profile.isPrivate {
+            temporaryFormValues.removeAll(); formDraft = nil
             for tab in tabs { tab.dispose() }; downloads.removeAll(profileID: profile.id)
-            let owner = profile
-            Task { await profiles.clearEphemeral(owner); data = ProfileData(); restoreTabs() }
+            let owner = profile; transitionEpoch = UUID(); let epoch = transitionEpoch; requiresUnlock = true
+            Task { await profiles.clearEphemeral(owner); guard profile.id == owner.id, transitionEpoch == epoch else { return }; data = profiles.load(owner); restoreTabs(); requiresUnlock = owner.locked || AccountVault.exists(owner.id) }
         }
     }
     func applySettings(reload: Bool = true) {
@@ -289,10 +294,11 @@ struct WebDialog: Identifiable {
         leftAt = nil
     }
     func logout() {
+        transitionEpoch = UUID()
         if !requiresUnlock { persist() }
         cleanOnExit(profile)
         twinTabID = nil; twinFocused = false
-        for tab in tabs { tab.dispose() }; tabs.removeAll(); data = ProfileData(); console.removeAll(); article = nil; gallery = nil; share = nil; pendingPopup = nil; address = ""; requiresUnlock = true
+        for tab in tabs { tab.dispose() }; tabs.removeAll(); data = ProfileData(); temporaryFormValues.removeAll(); formDraft = nil; console.removeAll(); article = nil; gallery = nil; share = nil; pendingPopup = nil; address = ""; requiresUnlock = true
         if profile.isPrivate { shield.erase(profile.id); let owner = profile; downloads.removeAll(profileID: owner.id); Task { await profiles.clearEphemeral(owner) } }
     }
 }

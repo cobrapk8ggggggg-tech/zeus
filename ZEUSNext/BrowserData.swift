@@ -83,6 +83,7 @@ struct ProfileData: Codable {
     var selectedTabID: UUID?
     var settings = BrowserSettings()
     var searches: [String]?
+    var forms: [SavedForm]?
 }
 
 enum BrowserURL {
@@ -246,7 +247,7 @@ enum BrowserDisk {
             }
         }
         for path in [folder(for: profile), downloads(for: profile), configurationFolder(profile)] where FileManager.default.fileExists(atPath: path.path) { try FileManager.default.removeItem(at: path) }
-        AccountVault.remove(profile.id)
+        AccountVault.remove(profile.id); FormVault.remove(profileID: profile.id)
         profiles.removeAll { $0.id == profile.id }
         if activeID == profile.id { activeID = profiles[0].id }
         persistIndex()
@@ -259,7 +260,7 @@ enum BrowserDisk {
             if !profile.isPrivate && profile.legacyWebsiteStore != true {
                 try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in WKWebsiteDataStore.remove(forIdentifier: profile.id) { if let error = $0 { c.resume(throwing: error) } else { c.resume() } } }
             }
-            AccountVault.remove(profile.id)
+            AccountVault.remove(profile.id); FormVault.remove(profileID: profile.id)
             for path in [folder(for: profile), downloads(for: profile), configurationFolder(profile)] where FileManager.default.fileExists(atPath: path.path) { try FileManager.default.removeItem(at: path) }
         }
         stores.removeAll()

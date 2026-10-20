@@ -19,6 +19,7 @@ spec = {
             'info': {'path': '.zeus-ci/Generated-Info.plist', 'properties': {
                 'CFBundleDisplayName': 'ZEUS', 'UILaunchScreen': {},
                 'UISupportedInterfaceOrientations': ['UIInterfaceOrientationPortrait', 'UIInterfaceOrientationLandscapeLeft', 'UIInterfaceOrientationLandscapeRight'],
+                'NSLocalNetworkUsageDescription': 'نقل نسخة الحساب عبر Wi-Fi بين أجهزتك عند تشغيلك المشاركة المحلية.',
                 'NSFaceIDUsageDescription': 'حماية المساحات التي تختار قفلها ببصمة الوجه.',
                 'NSCameraUsageDescription': 'استخدام الكاميرا عند طلبك من موقع داخل المتصفح.',
                 'NSMicrophoneUsageDescription': 'استخدام الميكروفون عند طلبك من موقع داخل المتصفح.',

@@ -93,7 +93,7 @@ final class BrowserCoreTests: XCTestCase {
 @MainActor final class WebKitBehaviorTests: XCTestCase {
     func testGalleryRestoresCSSBackgroundsAndLazySourcesAndReaderKeepsShortDivText() async throws {
         let loader = WebKitFixtureLoader()
-        let view = WKWebView()
+        let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 800))
         await loader.load("""
         <html><body><article><h1>Fixture</h1><div>ظلام...</div><p>This is a real paragraph used for testing the original extraction behavior. It contains enough content to select this article as the reading root.</p></article>
         <div style="width:200px;height:200px;background-image:url('https://example.com/background.jpg')"></div>
@@ -171,4 +171,72 @@ final class BrowserCoreTests: XCTestCase {
     func loadURL(_ url: URL, view: WKWebView) async { await withCheckedContinuation { c in continuation = c; view.navigationDelegate = self; view.load(URLRequest(url: url)) } }
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { continuation?.resume(); continuation = nil }
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { continuation?.resume(); continuation = nil }
+}
+
+final class TransferAndPreferenceTests: XCTestCase {
+    func testLocalTransferParserRejectsAmbiguousLengthsAndChunkedUploads() throws {
+        XCTAssertNil(try LocalHTTPRequest.parse(Data("GET /token/ HTTP/1.1\r\nHost: phone".utf8)))
+        let valid = try XCTUnwrap(LocalHTTPRequest.parse(Data("POST /token/import HTTP/1.1\r\nHost: phone\r\nContent-Length: 2\r\n\r\n{}".utf8)))
+        XCTAssertEqual(valid.contentLength, 2); XCTAssertEqual(valid.path, "/token/import")
+        for headers in ["Content-Length: 2\r\nContent-Length: 4", "Transfer-Encoding: chunked", "Content-Length: 6000001", "Content-Length: -1"] {
+            XCTAssertThrowsError(try LocalHTTPRequest.parse(Data(("POST /token/import HTTP/1.1\r\n" + headers + "\r\n\r\n").utf8)))
+        }
+    }
+    func testImportRejectsSettingsThatWouldCrashCollectionLimits() {
+        var data = ProfileData(); var options = AdvancedSettings(); options.historyLimit = -1; data.settings.advanced = options
+        XCTAssertThrowsError(try ProfileBackup(name: "untrusted", data: data).validated())
+        data.settings.advanced = AdvancedSettings(); data.bookmarks = [Bookmark(title: "bad", url: "javascript:alert(1)")]
+        XCTAssertThrowsError(try ProfileBackup(name: "untrusted", data: data).validated())
+    }
+    func testCustomSearchEncodesQueryAsOneValue() throws {
+        var settings = BrowserSettings(); var options = AdvancedSettings()
+        let engine = CustomSearchEngine(name: "Fixture", template: "https://example.com/search?q={query}")
+        options.customSearchEngines = [engine]; options.selectedSearchEngineID = engine.id; settings.advanced = options
+        let url = try XCTUnwrap(BrowserURL.resolve("one & admin=true", settings: settings))
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
+        XCTAssertEqual(items?.count, 1); XCTAssertEqual(items?.first?.value, "one & admin=true")
+    }
+    @MainActor func testAdminEditingAnotherAccountsSettingsDoesNotModifyOwnSettings() {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let store = ProfileStore(root: root, downloadsRoot: root.appendingPathComponent("Downloads"))
+        let target = store.add(name: "Other", accent: "white", isPrivate: false)
+        let model = BrowserModel(profiles: store, useBackgroundDownloads: false)
+        let context = ProfileSettingsContext(model: model, profile: target)
+        context.setting(\.desktopMode).wrappedValue = true
+        XCTAssertTrue(store.load(target).settings.desktopMode); XCTAssertFalse(model.data.settings.desktopMode)
+        context.option(\.downloadsWiFiOnly).wrappedValue = true
+        XCTAssertTrue(store.load(target).settings.advanced?.downloadsWiFiOnly == true)
+    }
+    @MainActor func testTwinBrowserKeepsDifferentWebViewsInSameProfileStore() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let store = ProfileStore(root: root, downloadsRoot: root.appendingPathComponent("Downloads"))
+        let model = BrowserModel(profiles: store, useBackgroundDownloads: false)
+        model.data.settings.shieldsEnabled = false
+        let primary = try XCTUnwrap(model.primary); primary.url = "https://example.com/first"
+        model.toggleTwin(vertical: false)
+        let secondary = try XCTUnwrap(model.secondary)
+        let left = await model.prepare(primary), right = await model.prepare(secondary)
+        XCTAssertFalse(left === right); XCTAssertTrue(left?.configuration.websiteDataStore === right?.configuration.websiteDataStore)
+        model.focusPane(secondary); model.home()
+        XCTAssertTrue(secondary.isHome); XCTAssertEqual(primary.url, "https://example.com/first")
+        model.closeTab(secondary); XCTAssertNil(model.secondary)
+        primary.dispose()
+    }
+    func testSavedFormValuesAreScopedToProfileInKeychain() throws {
+        let a = UUID(), b = UUID(), id = UUID()
+        let fields = [SavedFormField(selector: "#email", type: "email", value: "fixture@example.com", checked: false)]
+        try FormVault.save(fields, profileID: a, id: id)
+        XCTAssertEqual(FormVault.load(profileID: a, id: id)?.first?.value, "fixture@example.com")
+        XCTAssertNil(FormVault.load(profileID: b, id: id))
+        FormVault.remove(profileID: a); XCTAssertNil(FormVault.load(profileID: a, id: id))
+    }
+    @MainActor func testFullBundledFilterListCompilesInWebKit() async throws {
+        let resource = try XCTUnwrap(Bundle.main.url(forResource: "safari-rules", withExtension: "json"))
+        let rows = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: resource)) as? [[String: Any]])
+        XCTAssertGreaterThan(rows.count, 1000)
+        let profile = BrowserProfile(name: "Filter fixture")
+        let shield = ShieldEngine(root: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        let compiled = try await shield.list(profile: profile, settings: BrowserSettings())
+        XCTAssertNotNil(compiled); shield.erase(profile.id)
+    }
 }

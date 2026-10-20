@@ -18,6 +18,8 @@ struct ProfileBackup: Codable {
 }
 struct ProfileTransferPage: View {
     @ObservedObject var context: ProfileSettingsContext
+    @StateObject private var lan = LANProfileTransfer()
+    @Environment(\.scenePhase) private var scenePhase
     @State private var includeHistory = false
     @State private var includeScripts = false
     @State private var importSettings = true
@@ -28,23 +30,39 @@ struct ProfileTransferPage: View {
     var body: some View {
         Form {
             Section("تصدير هذا الحساب") { Toggle("تضمين سجل التصفح والبحث", isOn: $includeHistory); Toggle("تضمين السكربتات", isOn: $includeScripts); Button("تصدير إلى الملفات أو تطبيق آخر", systemImage: "square.and.arrow.up") { export() } }
+            Section("تصدير واستيراد عبر WLAN") {
+                if lan.running {
+                    if let address = lan.address { Text(address).font(.footnote.monospaced()).textSelection(.enabled); Button("نسخ رابط النقل المحلي") { UIPasteboard.general.string = address } } else { ProgressView("بانتظار الشبكة المحلية…") }
+                    Button("إيقاف المشاركة") { lan.stop() }
+                } else { Button("بدء النقل على شبكة Wi-Fi") { do { lan.start(snapshot: try exportBytes()) } catch { message = error.localizedDescription } } }
+                if let error = lan.error { Text(error).font(.caption) }
+                Text("افتح الرابط من جهاز على شبكة Wi-Fi نفسها. الرابط يتغير عند كل تشغيل، والاستيراد يحتاج مراجعتك هنا. النقل المحلي عبر HTTP؛ استخدم شبكة تثق بها. تنتهي المشاركة عند مغادرة هذه الصفحة أو انتقال التطبيق للخلفية.").font(.footnote)
+            }
             Section("استيراد") { Button("اختيار نسخة من الملفات أو iCloud Drive", systemImage: "folder") { importing = true }; if let backup { LabeledContent("الحساب المصدر", value: backup.name); Text("\(backup.data.bookmarks.count) موقع · \(backup.data.scripts.count) سكربت"); Toggle("استيراد إعدادات التصفح", isOn: $importSettings); Button("دمج البيانات في هذا الحساب") { apply(backup) }; Text("السكربتات المستوردة تكون متوقفة حتى تراجعها وتفعّلها بنفسك.").font(.footnote) } }
-            Section { Text("تتضمن النسخة الإعدادات والمفضلة والتبويبات وصورة الحساب، مع السجل والسكربتات إذا اخترتهما. لا تتضمن كلمات مرور الحساب أو جلسات المواقع أو ملفات التنزيلات. يمكنك تصدير الملفات من مدير التنزيلات.").font(.footnote) }
+            Section { Text("تتضمن النسخة الإعدادات والمفضلة والتبويبات وصورة الحساب، مع السجل والسكربتات إذا اخترتهما. لا تتضمن كلمات مرور الحساب أو النماذج المحفوظة أو جلسات المواقع أو ملفات التنزيلات. يمكنك تصدير الملفات من مدير التنزيلات.").font(.footnote) }
             if let message { Text(message).font(.footnote) }
         }.settingsPage("تصدير واستيراد")
+            .onDisappear { lan.stop() }
+            .onChange(of: scenePhase) { _, phase in if phase != .active { lan.stop() } }
+            .onReceive(lan.$received) { bytes in if let bytes { do { backup = try JSONDecoder().decode(ProfileBackup.self, from: bytes).validated(); message = "استُلمت نسخة عبر الشبكة. راجع محتواها قبل الاستيراد." } catch { message = error.localizedDescription }; lan.received = nil } }
             .fileImporter(isPresented: $importing, allowedContentTypes: [.json, .data]) { result in
                 do { let url = try result.get(); let scoped = url.startAccessingSecurityScopedResource(); defer { if scoped { url.stopAccessingSecurityScopedResource() } }; guard ((try url.resourceValues(forKeys: [.fileSizeKey])).fileSize ?? 0) <= 6_000_000 else { throw URLError(.dataLengthExceedsMaximum) }; backup = try JSONDecoder().decode(ProfileBackup.self, from: Data(contentsOf: url)).validated(); message = nil }
                 catch { message = "تعذر قراءة النسخة: " + error.localizedDescription }
             }
             .sheet(item: $exported) { FileExporter(url: $0.url) }
     }
-    private func export() {
+    private func exportBytes() throws -> Data {
         var data = context.isActive ? context.model.data : context.model.profiles.load(context.profile)
+        data.forms = []
         if !includeHistory { data.history = []; data.searches = [] }
         if !includeScripts { data.scripts = [] }
         let avatar = context.model.profiles.avatarURL(context.profile).flatMap { try? Data(contentsOf: $0) }
         let backup = ProfileBackup(name: context.profile.name, data: data, avatar: avatar)
-        do { let url = FileManager.default.temporaryDirectory.appendingPathComponent("ZEUS-Profile-" + UUID().uuidString + ".json"); try BrowserDisk.write(backup, to: url); exported = ShareItem(url: url) }
+        let bytes = try JSONEncoder().encode(backup)
+        guard bytes.count <= 6_000_000 else { throw URLError(.dataLengthExceedsMaximum) }; return bytes
+    }
+    private func export() {
+        do { let bytes = try exportBytes(); let url = FileManager.default.temporaryDirectory.appendingPathComponent("ZEUS-Profile-" + UUID().uuidString + ".json"); try bytes.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication]); exported = ShareItem(url: url) }
         catch { message = error.localizedDescription }
     }
     private func apply(_ backup: ProfileBackup) {

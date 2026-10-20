@@ -15,7 +15,7 @@ final class BrowserJourneyTests: XCTestCase {
         let app = XCUIApplication(); app.launchArguments = ["--uitesting"]; app.launch()
         openToolbar(app)
         app.buttons["toolsButton"].tap(); app.buttons["settingsButton"].tap()
-        app.buttons["واجهة المستخدم والأشرطة"].tap()
+        app.buttons["category-appearance"].tap()
         for layout in ["dualBars", "icab", "original"] {
             XCTAssertTrue(app.buttons["layout-" + layout].waitForExistence(timeout: 5)); app.buttons["layout-" + layout].tap(); capture("layout-choice-" + layout)
         }

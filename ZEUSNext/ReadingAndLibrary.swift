@@ -89,6 +89,9 @@ struct GallerySheet: View {
     @ObservedObject var model: BrowserModel
     let gallery: GalleryArticle
     @Environment(\.dismiss) private var dismiss
+    @State private var saving = false
+    @State private var photoProgress = ""
+    @State private var photoMessage: String?
     @State private var selection: Set<String> = []
     @State private var selecting = false
     @State private var selectedIndex: Int?
@@ -113,10 +116,11 @@ struct GallerySheet: View {
                         }
                     }.padding(.horizontal, 2)
                 }
-                if selecting { HStack { Text("\(selection.count) صورة"); Spacer(); Button("تنزيل المحدد", systemImage: "arrow.down.circle") { downloadSelection() }.disabled(selection.isEmpty) }.padding(16).background(.black) }
+                if selecting { HStack { Text(saving ? photoProgress : "\(selection.count) صورة"); Spacer(); Menu("حفظ المحدد", systemImage: "arrow.down.circle") { Button("حفظ في ألبوم الصور") { saveToPhotos() }; Button("تنزيل إلى ملفات المتصفح") { downloadSelection() } }.disabled(selection.isEmpty || saving) }.padding(16).background(.black) }
             }
             if let index = selectedIndex { imageReader(start: index).transition(.move(edge: .bottom)) }
         }.foregroundStyle(.white).tint(.white).statusBarHidden(selectedIndex != nil)
+            .alert("حفظ الصور", isPresented: Binding(get: { photoMessage != nil }, set: { if !$0 { photoMessage = nil } })) { Button("حسنًا") { photoMessage = nil } } message: { Text(photoMessage ?? "") }
             .fullScreenCover(isPresented: $settings) {
                 NavigationStack { Form {
                     Section("وضع قراءة الصور") { Text("عرض الصورة \(Int(prefs.imageScale * 100))٪"); Slider(value: preference(\.imageScale), in: 0.2...1, step: 0.05); Text("مسافة التمرير \(Int(prefs.scrollDistance)) نقطة"); Slider(value: preference(\.scrollDistance), in: 100...1000, step: 50) }
@@ -168,6 +172,17 @@ struct GallerySheet: View {
     }
     private func scroll(_ direction: CGFloat) { guard let view = scrollView else { return }; let value = min(max(0, view.contentOffset.y + direction * prefs.scrollDistance), max(0, view.contentSize.height-view.bounds.height)); view.setContentOffset(CGPoint(x: 0, y: value), animated: true) }
     private func toggle(_ address: String) { if selection.contains(address) { selection.remove(address) } else { selection.insert(address) } }
+    private func saveToPhotos() {
+        let addresses = gallery.images.filter { selection.contains($0) }
+        let store = model.profiles.websiteDataStore(for: model.profile), source = model.webView
+        saving = true
+        Task {
+            guard await GalleryPhotoSaver.authorize() else { saving = false; photoMessage = "لم يُمنح إذن إضافة الصور."; return }
+            var count = 0
+            for (index, address) in addresses.enumerated() { photoProgress = "\(index + 1) / \(addresses.count)"; do { try await GalleryPhotoSaver.save(address: address, store: store, source: source); count += 1 } catch { } }
+            saving = false; selection.removeAll(); selecting = false; photoMessage = "حُفظت \(count) من \(addresses.count) صورة في الألبوم."
+        }
+    }
     private func downloadSelection() { let urls = gallery.images.filter { selection.contains($0) }; selection.removeAll(); selecting = false; Task { for item in urls { if let url = URL(string: item) { await model.downloads.start(url: url, profile: model.profile, referrer: model.webView?.url, webView: model.webView) } } } }
     private func preference(_ key: WritableKeyPath<ReadingPreferences, Double>) -> Binding<Double> { Binding(get: { prefs[keyPath: key] }, set: { var value = prefs; value[keyPath: key] = $0; model.data.settings.reading = value; model.persist() }) }
 }
