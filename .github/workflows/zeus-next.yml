@@ -52,9 +52,28 @@ jobs:
           rm -r results/Payload
       - name: Start local deterministic download fixture
         run: |
-          python3 .zeus-ci/fixture_server.py > results/fixture.log 2>&1 &
-          echo $! > "$RUNNER_TEMP/zeus-fixture.pid"
-          curl --fail --retry 5 --retry-delay 1 http://127.0.0.1:8765/ > /dev/null
+          python3 -u .zeus-ci/fixture_server.py > results/fixture.log 2>&1 &
+          fixture_pid=$!
+          echo "$fixture_pid" > "$RUNNER_TEMP/zeus-fixture.pid"
+          fixture_ready=0
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error http://127.0.0.1:8765/ > /dev/null 2>&1; then
+              fixture_ready=1
+              break
+            fi
+            if ! kill -0 "$fixture_pid" 2>/dev/null; then
+              echo "Fixture server terminated unexpectedly"
+              cat results/fixture.log
+              exit 1
+            fi
+            sleep 1
+          done
+          if [ "$fixture_ready" != "1" ]; then
+            echo "Fixture server failed to become ready within 30 seconds"
+            cat results/fixture.log
+            exit 1
+          fi
+          echo "Local test fixture ready on 127.0.0.1:8765"
       - name: Run core, WebKit isolation, download and UI tests
         run: |
           set -o pipefail
