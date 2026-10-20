@@ -53,7 +53,7 @@ enum DownloadFiles {
 }
 
 @MainActor final class DownloadService: NSObject, ObservableObject {
-    @Published private(set) var records: [BrowserDownload] = []
+    @Published private(set) var records: [BrowserDownload]
     @Published var message: String?
     static var backgroundCompletion: (() -> Void)?
     static let sessionIdentifier = "tools.zeus.browser.downloads.v2"
@@ -75,11 +75,15 @@ enum DownloadFiles {
     }()
 
     init(store: ProfileStore, useBackground: Bool = true) {
-        self.store = store; self.useBackground = useBackground
+        self.store = store
+        self.useBackground = useBackground
+        var persisted: [BrowserDownload] = []
         for profile in store.profiles where !profile.isPrivate {
-            records += BrowserDisk.read([BrowserDownload].self, from: store.folder(for: profile).appendingPathComponent("downloads.json")) ?? []
+            let path = store.folder(for: profile).appendingPathComponent("downloads.json")
+            persisted.append(contentsOf: BrowserDisk.read([BrowserDownload].self, from: path) ?? [])
         }
-        records.sort { $0.created > $1.created }
+        persisted.sort { $0.created > $1.created }
+        self.records = persisted
         super.init()
         restore()
     }
