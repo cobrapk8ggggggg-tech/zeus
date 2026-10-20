@@ -1,0 +1,120 @@
+{
+  "workflow_run": "https://github.com/cobrapk8ggggggg-tech/zeus/actions/runs/39413905660",
+  "tested_harness_commit": "a3228e086c66d7a15f83bd3a0091a76c74320dda",
+  "target_source_commit": "0542beb72680458cac6fcf365c1247324b4b2402",
+  "xcode": "16.4",
+  "sdk": "iphoneos18.5",
+  "minimum_ios": "18.1",
+  "binary_sha256": "bc70f513efac7ecb4e1d9fcb0c7d280aba331c8dcdcb658d66e0fbb9f33dc19d",
+  "architecture": "arm64",
+  "photo_usage_keys_present": {
+    "NSPhotoLibraryUsageDescription": false,
+    "NSPhotoLibraryAddUsageDescription": false
+  },
+  "unsigned": true,
+  "macho_collections": {
+    "entrypoints": {
+      "returned": 1,
+      "total": 1,
+      "exhaustive": true
+    },
+    "architectures": {
+      "returned": 1,
+      "total": 1,
+      "exhaustive": true
+    },
+    "build_metadata": {
+      "returned": 1,
+      "total": 1,
+      "exhaustive": true
+    },
+    "load_commands": {
+      "returned": 72,
+      "total": 72,
+      "exhaustive": true
+    },
+    "dependencies": {
+      "returned": 54,
+      "total": 54,
+      "exhaustive": true
+    },
+    "imports": {
+      "returned": 1511,
+      "total": null,
+      "exhaustive": false
+    },
+    "exports": {
+      "returned": 2160,
+      "total": null,
+      "exhaustive": false
+    },
+    "segments": {
+      "returned": 5,
+      "total": 5,
+      "exhaustive": true
+    }
+  },
+  "build_provenance": "Original Swift sources in a generated XcodeGen harness; analysis bundle ID and no signing.",
+  "runtime_execution": false,
+  "workflow_conclusion": "success",
+  "jobs": [
+    {
+      "name": "macos",
+      "conclusion": "success"
+    },
+    {
+      "name": "ghidra",
+      "conclusion": "success"
+    }
+  ],
+  "native_functions": [
+    {
+      "address": "0x10002a6d0",
+      "name": "entry",
+      "pseudocode_characters": 169,
+      "assembly_instructions": 13,
+      "provider": {
+        "id": "ghidra",
+        "name": "Ghidra",
+        "version": "12.1.4"
+      },
+      "evidence_id": "ev_0d816baff3fb21ab11cb081c194860d66ac7bc9c80434e7b9b280b51f286aea1"
+    },
+    {
+      "address": "0x10000479c",
+      "name": "_$s11ZEUSBrowser14AdBlockManagerC25createContentBlockerRulesSSyFTf4d_n",
+      "pseudocode_characters": 33178,
+      "assembly_instructions": 1236,
+      "provider": {
+        "id": "ghidra",
+        "name": "Ghidra",
+        "version": "12.1.4"
+      },
+      "evidence_id": "ev_e6997a501ef036d5dee391317cb8d19b4bca0292cddf7d10463e2c08133044b8"
+    },
+    {
+      "address": "0x1000341d8",
+      "name": "_$s11ZEUSBrowser12WebViewModelC13performSearchyySSF",
+      "pseudocode_characters": 12201,
+      "assembly_instructions": 463,
+      "provider": {
+        "id": "ghidra",
+        "name": "Ghidra",
+        "version": "12.1.4"
+      },
+      "evidence_id": "ev_93e071b895e652efe348488784415ac2b6c65f4baa8576a7af7670bb4fc309c9"
+    }
+  ],
+  "artifacts": [
+    {
+      "name": "rea-ios-macos-results",
+      "id": 12260249047,
+      "sha256": "8a8368ee76f09ef1ce4be235773303b5efb58d613c8fc8bfb4f6170313c02a50"
+    },
+    {
+      "name": "rea-ios-ghidra-results",
+      "id": 12260254358,
+      "sha256": "bb5cbf7a6c98533a08b190d5c165af6dd115a050031b15aa71d0f44b2dbb9a39"
+    }
+  ]
+}
