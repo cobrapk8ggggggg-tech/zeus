@@ -4,6 +4,7 @@ import gzip
 import json
 import os
 import platform
+import shutil
 from pathlib import Path
 import subprocess
 import tempfile
@@ -26,7 +27,11 @@ def fetch(url, maximum):
 cache = Path.home() / '.cache' / 'zeus-filter-converter' / SOURCE_SHA / platform.machine()
 cache.mkdir(parents=True, exist_ok=True)
 tool = cache / 'ConverterTool'
-if not tool.is_file():
+# SwiftPM-generated executables locate the PublicSuffixList bundle beside the
+# executable. Cache the bundle as well as the binary or the converter traps.
+bundle = cache / 'swift-psl_PublicSuffixList.bundle'
+needs_build = not tool.is_file() or (platform.machine() != 'arm64' and not bundle.is_dir())
+if needs_build:
     if platform.machine() == 'arm64':
         binary = fetch(f'https://github.com/AdguardTeam/SafariConverterLib/releases/download/v{VERSION}/ConverterTool', 8_000_000)
         assert hashlib.sha256(binary).hexdigest() == DIGEST, 'Converter checksum mismatch'
@@ -38,9 +43,14 @@ if not tool.is_file():
         actual_sha = subprocess.check_output(['git', '-C', str(source), 'rev-parse', 'HEAD'], text=True).strip()
         assert actual_sha == SOURCE_SHA, 'Converter source revision mismatch'
         subprocess.run(['swift', 'build', '--package-path', str(source), '-c', 'release', '--product', 'ConverterTool'], check=True, timeout=1200)
-        binary = (source / '.build' / 'release' / 'ConverterTool').read_bytes()
-        tool.write_bytes(binary)
+        built = source / '.build' / 'release' / 'ConverterTool'
+        tool.write_bytes(built.read_bytes())
         tool.chmod(0o700)
+        bundles = list((source / '.build').rglob('swift-psl_PublicSuffixList.bundle'))
+        assert bundles, 'SwiftPM PublicSuffixList resource bundle missing after build'
+        shutil.copytree(bundles[0], bundle, dirs_exist_ok=True)
+if platform.machine() != 'arm64':
+    assert bundle.is_dir(), 'Missing PublicSuffixList bundle beside cached ConverterTool'
 actual_digest = hashlib.sha256(tool.read_bytes()).hexdigest()
 rules = []
 source_hashes = {}

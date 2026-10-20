@@ -1,7 +1,7 @@
 name: ZEUS Next build and verification
 on:
   push:
-    branches: [codex/zeus-browser-next]
+    branches: [codex/zeus-browser-next, fix/zeus-next-latest-build-20261020]
     paths: [ZEUSNext/**, ZEUSNextTests/**, ZEUSNextUITests/**, .zeus-ci/**, .github/workflows/zeus-next.yml]
   workflow_dispatch:
 permissions:
@@ -30,7 +30,7 @@ jobs:
         id: converter-cache
         with:
           path: ~/.cache/zeus-filter-converter
-          key: zeus-converter-1cfdcaf042880a5e0027a8fc6f7ebf9ee667acc9-${{ runner.arch }}
+          key: zeus-converter-resources-v2-1cfdcaf042880a5e0027a8fc6f7ebf9ee667acc9-${{ runner.arch }}
       - name: Convert EasyList and EasyPrivacy to native WebKit rules
         id: filters
         run: |
@@ -40,7 +40,7 @@ jobs:
         if: steps.converter-cache.outputs.cache-hit != 'true' && steps.filters.outcome == 'success'
         with:
           path: ~/.cache/zeus-filter-converter
-          key: zeus-converter-1cfdcaf042880a5e0027a8fc6f7ebf9ee667acc9-${{ runner.arch }}
+          key: zeus-converter-resources-v2-1cfdcaf042880a5e0027a8fc6f7ebf9ee667acc9-${{ runner.arch }}
       - name: Build unsigned iPhone and iPad application
         run: |
           set -o pipefail
@@ -54,6 +54,8 @@ jobs:
           mkdir -p results/Payload
           cp -R "$app" results/Payload/
           (cd results && zip -qry ZEUS-2.0-unsigned.ipa Payload)
+          test -s results/ZEUS-2.0-unsigned.ipa
+          unzip -t results/ZEUS-2.0-unsigned.ipa > results/ipa-integrity.log
           cp "$app/Info.plist" results/Info.plist
           python3 - <<'PY'
           import plistlib
