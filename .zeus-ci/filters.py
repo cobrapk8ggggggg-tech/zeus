@@ -9,7 +9,7 @@ import urllib.request
 
 VERSION = '4.3.1'
 DIGEST = '2a02d7fc6adc74198b0572cd7012d0371e608c2330969210c3dc53ecca47d865'
-SOURCES = ['https://easylist.to/easylist/easylist.txt', 'https://easylist.to/easylist/easyprivacy.txt']
+SOURCES = ['https://easylist-downloads.adblockplus.org/easylist.txt', 'https://easylist-downloads.adblockplus.org/easyprivacy.txt']
 resources = Path('ZEUSNext/Resources')
 work = Path(tempfile.mkdtemp(prefix='zeus-filters-'))
 

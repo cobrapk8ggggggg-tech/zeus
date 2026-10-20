@@ -9,6 +9,10 @@ struct ProfileBackup: Codable {
     func validated() throws -> ProfileBackup {
         guard version == 1, data.bookmarks.count <= 5000, data.history.count <= 5000, data.scripts.count <= 100, data.tabs.count <= 30, (avatar?.count ?? 0) < 2_000_000 else { throw URLError(.cannotParseResponse) }
         guard data.bookmarks.allSatisfy({ URL(string: $0.url).map(BrowserURL.isWeb) == true }), data.tabs.allSatisfy({ $0.url == "zeus://home" || URL(string: $0.url).map(BrowserURL.isWeb) == true }), data.scripts.allSatisfy({ $0.code.utf8.count <= 100_000 && ($0.domain == "*" || FilterRules.validDomain($0.domain)) }), (0.5...2).contains(data.settings.textScale) else { throw URLError(.cannotParseResponse) }
+        if let o = data.settings.advanced {
+            guard (1...5000).contains(o.historyLimit), (1...500).contains(o.searchHistoryLimit), (1...8).contains(o.downloadsWiFiLimit), (1...5).contains(o.downloadsCellularLimit), (0.5...1).contains(o.screenshotQuality), (1...2).contains(o.screenshotScale), (0...100).contains(o.printMargin), o.userAgent.count <= 500, !o.userAgent.contains("\r"), !o.userAgent.contains("\n"), o.customSearchEngines.count <= 30 else { throw URLError(.cannotParseResponse) }
+        }
+        if let r = data.settings.reading { guard (14...40).contains(r.fontSize), (0.1...1).contains(r.textOpacity), (0.2...1).contains(r.imageScale), (100...1000).contains(r.scrollDistance), r.blockedWords.count <= 1000 else { throw URLError(.cannotParseResponse) } }
         return self
     }
 }

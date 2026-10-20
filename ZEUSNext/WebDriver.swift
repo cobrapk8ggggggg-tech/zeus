@@ -8,7 +8,7 @@ import UIKit
     private var scrollAnchor: CGFloat = 0
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) { scrollAnchor = scrollView.contentOffset.y }
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        guard scrollView.isDragging || scrollView.isDecelerating, let model, tab?.id == model.selectedTabID else { return }
+        guard scrollView.isDragging || scrollView.isDecelerating, let model, model.data.settings.advanced?.hideChromeOnScroll != false, tab?.id == model.selectedTabID else { return }
         let y = scrollView.contentOffset.y
         guard y >= -scrollView.adjustedContentInset.top, y <= max(0, scrollView.contentSize.height - scrollView.bounds.height) else { return }
         let delta = y - scrollAnchor
@@ -35,6 +35,7 @@ import UIKit
             decisionHandler(.cancel); return
         }
         guard ["http", "https", "about", "blob", "data"].contains(scheme) else { decisionHandler(.cancel); model.notify("تعذر فتح مخطط الرابط داخل المتصفح."); return }
+        if scheme == "http", model.data.settings.advanced?.upgradeHTTPS == true, var components = URLComponents(url: url, resolvingAgainstBaseURL: false) { components.scheme = "https"; if let secure = components.url { var request = navigationAction.request; request.url = secure; decisionHandler(.cancel); webView.load(request); return } }
         let host = url.host ?? ""
         if BrowserURL.isWeb(url), !model.permits(url) { decisionHandler(.cancel); return }
         if navigationAction.shouldPerformDownload, model.profile.account?.allowDownloads == false { decisionHandler(.cancel); model.notify("التنزيلات غير مسموحة لهذا الحساب."); return }
@@ -111,7 +112,7 @@ import UIKit
         guard let model, model.dialog == nil else { completionHandler(nil); return }
         model.dialog = WebDialog(kind: .prompt, text: String(prompt.prefix(3000)), initial: defaultText ?? "", complete: completionHandler)
     }
-    func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo, type: WKMediaCaptureType, decisionHandler: @escaping (WKPermissionDecision) -> Void) { decisionHandler(.prompt) }
+    func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo, type: WKMediaCaptureType, decisionHandler: @escaping (WKPermissionDecision) -> Void) { decisionHandler(model?.data.settings.advanced?.allowMediaCapture == false ? .deny : .prompt) }
     func webView(_ webView: WKWebView, contextMenuConfigurationForElement elementInfo: WKContextMenuElementInfo, completionHandler: @escaping (UIContextMenuConfiguration?) -> Void) {
         guard let url = elementInfo.linkURL, BrowserURL.isWeb(url) else { completionHandler(nil); return }
         completionHandler(UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { [weak self] _ in

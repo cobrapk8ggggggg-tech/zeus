@@ -61,6 +61,10 @@ struct WebDialog: Identifiable {
         self.profiles = store; downloads = DownloadService(store: store, useBackground: useBackgroundDownloads)
         shield = ShieldEngine(root: store.root); data = store.load(store.active)
         restoreTabs(); requiresUnlock = store.active.locked || AccountVault.exists(store.activeID)
+        if data.settings.advanced?.launchBehavior == .home && !requiresUnlock { home() }
+        downloads.settingsForProfile = { [weak self] id in guard let self else { return BrowserSettings() }; return self.profile.id == id ? self.data.settings : self.profiles.profile(id).map { self.profiles.load($0).settings } ?? BrowserSettings() }
+        downloads.askDownload = { [weak self] filename, answer in guard let self, self.dialog == nil else { answer(false); return }; self.dialog = WebDialog(kind: .confirm, text: "تنزيل الملف \(filename)؟") { answer($0 != nil) } }
+
     }
     var profile: BrowserProfile { profiles.active }
     var current: BrowserTab? { tabs.first { $0.id == selectedTabID } }
@@ -83,12 +87,14 @@ struct WebDialog: Identifiable {
         if let view = tab.webView { return view }
         guard tab.profileID == profile.id, !requiresUnlock else { return nil }
         let owner = profile, settings = data.settings
+        let options = settings.advanced ?? AdvancedSettings()
         let config = supplied ?? WKWebViewConfiguration()
         config.websiteDataStore = profiles.websiteDataStore(for: owner)
-        config.defaultWebpagePreferences.allowsContentJavaScript = true
+        config.defaultWebpagePreferences.allowsContentJavaScript = options.javaScriptEnabled
         config.preferences.javaScriptCanOpenWindowsAutomatically = true
         config.defaultWebpagePreferences.preferredContentMode = settings.desktopMode ? .desktop : .mobile
         config.allowsInlineMediaPlayback = true
+        config.mediaTypesRequiringUserActionForPlayback = options.autoplayMedia ? [] : .all
         let controller = WKUserContentController(); config.userContentController = controller
         do { if let list = try await shield.list(profile: owner, settings: settings) { controller.add(list) } }
         catch { notify("تعذر تحميل قواعد الحجب: \(error.localizedDescription)") }
@@ -101,7 +107,9 @@ struct WebDialog: Identifiable {
             controller.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
         }
         let view = WKWebView(frame: .zero, configuration: config)
-        view.allowsBackForwardNavigationGestures = true; view.allowsLinkPreview = true
+        view.allowsBackForwardNavigationGestures = options.swipeNavigation;
+        if !options.userAgent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { view.customUserAgent = options.userAgent }
+        if options.forceDarkWebPages { controller.addUserScript(WKUserScript(source: BrowserTools.darkPage, injectionTime: .atDocumentEnd, forMainFrameOnly: false)) }; view.allowsLinkPreview = true
         view.isFindInteractionEnabled = true; view.isInspectable = settings.developerTools && owner.account?.allowDeveloperTools != false
         view.pageZoom = settings.textScale
         view.scrollView.contentInsetAdjustmentBehavior = .never
@@ -122,11 +130,12 @@ struct WebDialog: Identifiable {
         view.load(URLRequest(url: url))
     }
     func open(_ text: String) {
-        guard let url = BrowserURL.resolve(text, provider: data.settings.searchProvider) else { notify("اكتب رابطًا أو عبارة بحث."); return }
+        guard let url = BrowserURL.resolve(text, settings: data.settings) else { notify("اكتب رابطًا أو عبارة بحث."); return }
         if url.scheme != "zeus" {
-            var searches = data.searches ?? []; searches.removeAll { $0 == text }; searches.insert(text, at: 0); data.searches = Array(searches.prefix(100))
+            var searches = data.searches ?? []; searches.removeAll { $0 == text }; searches.insert(text, at: 0); data.searches = Array(searches.prefix(data.settings.advanced?.searchHistoryLimit ?? 100))
         }
-        chromeHidden = false; open(URLRequest(url: url))
+        chromeHidden = false
+        if data.settings.advanced?.searchInNewTab == true && BrowserURL.isSearch(text) { _ = newTab(url: url, foreground: true) } else { open(URLRequest(url: url)) }
     }
     func open(_ request: URLRequest) {
         guard let tab = current, let url = request.url else { return }
@@ -136,12 +145,15 @@ struct WebDialog: Identifiable {
         tab.url = url.absoluteString; tab.error = nil; address = tab.url; tab.lastUsed = Date(); changed(); persist()
         Task { if let view = await prepare(tab), profile.id == tab.profileID { view.load(request) } }
     }
-    @discardableResult func newTab(url: URL? = nil) -> BrowserTab? {
+    @discardableResult func newTab(url: URL? = nil, foreground: Bool? = nil) -> BrowserTab? {
         guard tabs.count < 30 else { notify("الحد الحالي 30 تبويبًا لحماية ذاكرة الجهاز."); return nil }
-        snapshotCurrent()
+        let activate = foreground ?? (url == nil || data.settings.advanced?.openTabsInBackground != true)
+        if activate { snapshotCurrent() }
         let tab = BrowserTab(saved: SavedTab(), profileID: profile.id)
-        tabs.append(tab); selectedTabID = tab.id; address = ""; persist()
-        if let url { open(URLRequest(url: url)) }
+        if data.settings.advanced?.openTabsNextToActive == true, let index = tabs.firstIndex(where: { $0.id == selectedTabID }) { tabs.insert(tab, at: index + 1) } else { tabs.append(tab) }
+        if activate { selectedTabID = tab.id; address = "" }
+        if let url { tab.url = url.absoluteString; tab.title = url.host ?? "صفحة جديدة"; if activate { address = tab.url }; Task { if let view = await prepare(tab) { view.load(URLRequest(url: url)) } } }
+        persist()
         return tab
     }
     func selectTab(_ tab: BrowserTab) {
@@ -150,9 +162,10 @@ struct WebDialog: Identifiable {
         Task { await ensureCurrentLoaded() }
     }
     func closeTab(_ tab: BrowserTab) {
+        let previousIndex = tabs.firstIndex { $0.id == tab.id } ?? 0
         tab.dispose(); tabs.removeAll { $0.id == tab.id }
         if tabs.isEmpty { _ = newTab() }
-        else if selectedTabID == tab.id { selectTab(tabs[tabs.count - 1]) }
+        else if selectedTabID == tab.id { selectTab(tabs[min(max(0, previousIndex - (data.settings.advanced?.selectLeftAfterClosing == true ? 1 : 0)), tabs.count - 1)]) }
         persist()
     }
     func closeAllTabs() { for tab in tabs { tab.dispose() }; tabs.removeAll(); _ = newTab() }
@@ -164,10 +177,10 @@ struct WebDialog: Identifiable {
         view.takeSnapshot(with: config) { [weak self, weak tab] image, _ in tab?.snapshot = image; self?.changed() }
     }
     func addVisit(tab: BrowserTab) {
-        guard profile.id == tab.profileID, !profile.isPrivate, let url = URL(string: tab.url), BrowserURL.isWeb(url) else { return }
+        guard data.settings.advanced?.saveHistory != false, profile.id == tab.profileID, !profile.isPrivate, let url = URL(string: tab.url), BrowserURL.isWeb(url) else { return }
         if data.history.first?.url == tab.url { data.history.removeFirst() }
         data.history.insert(Visit(title: tab.title, url: tab.url), at: 0)
-        data.history = Array(data.history.prefix(1000)); persist()
+        data.history = Array(data.history.prefix(data.settings.advanced?.historyLimit ?? 1000)); persist()
     }
     func bookmarkCurrent() {
         guard profile.role != .guest, profile.role != .kiosk else { notify("هذا الحساب لا يحفظ مفضلة جديدة."); return }
@@ -199,6 +212,7 @@ struct WebDialog: Identifiable {
     }
     func backgrounded() {
         leftAt = Date()
+        cleanOnExit(profile)
         persist(); if profile.locked { requiresUnlock = true }
         if profile.isPrivate {
             for tab in tabs { tab.dispose() }; downloads.removeAll(profileID: profile.id)
@@ -234,6 +248,18 @@ struct WebDialog: Identifiable {
         downloads.removeAll(profileID: target.id)
         do { try await profiles.delete(target) } catch { notify(error.localizedDescription) }
     }
+    private func cleanOnExit(_ owner: BrowserProfile) {
+        let options = data.settings.advanced ?? AdvancedSettings()
+        if options.clearHistoryOnExit {
+            data.history = []; persist()
+        }
+        var types = Set<String>()
+        if options.clearCookiesOnExit { types.insert(WKWebsiteDataTypeCookies) }
+        if options.clearCacheOnExit { types.formUnion([WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache, WKWebsiteDataTypeFetchCache]) }
+        guard !types.isEmpty else { return }
+        let store = profiles.websiteDataStore(for: owner)
+        Task { await store.removeData(ofTypes: types, modifiedSince: .distantPast) }
+    }
     func permits(_ url: URL) -> Bool {
         let domains = profile.account?.allowedDomains ?? []
         return domains.isEmpty || domains.contains { BrowserURL.hostMatches(url.host ?? "", domain: $0) }
@@ -244,6 +270,7 @@ struct WebDialog: Identifiable {
     }
     func logout() {
         if !requiresUnlock { persist() }
+        cleanOnExit(profile)
         for tab in tabs { tab.dispose() }; tabs.removeAll(); data = ProfileData(); console.removeAll(); article = nil; gallery = nil; share = nil; pendingPopup = nil; address = ""; requiresUnlock = true
         if profile.isPrivate { let owner = profile; downloads.removeAll(profileID: owner.id); Task { await profiles.clearEphemeral(owner) } }
     }

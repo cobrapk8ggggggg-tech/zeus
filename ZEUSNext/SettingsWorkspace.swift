@@ -128,6 +128,10 @@ struct NetworkSettingsPage: View {
     }
 }
 
+private struct CookieRow: Identifiable {
+    let cookie: HTTPCookie
+    var id: String { cookie.domain + "|" + cookie.path + "|" + cookie.name }
+}
 struct CookieSettingsPage: View {
     @ObservedObject var context: ProfileSettingsContext
     @State private var cookies: [HTTPCookie] = []
@@ -135,7 +139,8 @@ struct CookieSettingsPage: View {
     @State private var revealed: Set<String> = []
     var body: some View {
         List {
-            ForEach(cookies.filter { search.isEmpty || $0.domain.localizedCaseInsensitiveContains(search) || $0.name.localizedCaseInsensitiveContains(search) }, id: \.name) { cookie in
+            ForEach(cookies.filter { search.isEmpty || $0.domain.localizedCaseInsensitiveContains(search) || $0.name.localizedCaseInsensitiveContains(search) }.map { CookieRow(cookie: $0) }) { row in
+                let cookie = row.cookie
                 VStack(alignment: .leading, spacing: 6) {
                     Text(cookie.name).font(.headline); Text(cookie.domain + cookie.path).font(.caption).foregroundStyle(.secondary)
                     Text(revealed.contains(key(cookie)) ? cookie.value : "••••••••").font(.caption.monospaced()).textSelection(.enabled)

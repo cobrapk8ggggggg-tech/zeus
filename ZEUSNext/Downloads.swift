@@ -1,6 +1,7 @@
 import Foundation
 import WebKit
 import Combine
+import Network
 
 enum DownloadState: String, Codable { case queued, running, pausing, paused, completed, failed }
 enum DownloadEngine: String, Codable { case webKit, backgroundSession }
@@ -57,6 +58,13 @@ enum DownloadFiles {
     @Published var message: String?
     static var backgroundCompletion: (() -> Void)?
     static let sessionIdentifier = "tools.zeus.browser.downloads.v2"
+    var settingsForProfile: ((UUID) -> BrowserSettings)?
+    var askDownload: ((String, @escaping (Bool) -> Void) -> Void)?
+    private let pathMonitor = NWPathMonitor()
+    private var cellular = false
+    private var queuedDestinations: [UUID: (URL?) -> Void] = [:]
+    private var destinations: [UUID: URL] = [:]
+    private var confirmed = Set<UUID>()
     private let store: ProfileStore
     private let useBackground: Bool
     private var tasks: [UUID: URLSessionDownloadTask] = [:]
@@ -82,6 +90,39 @@ enum DownloadFiles {
         }
         records.sort { $0.created > $1.created }
         restore()
+        pathMonitor.pathUpdateHandler = { [weak self] path in Task { @MainActor in
+            guard let self else { return }; self.cellular = path.usesInterfaceType(.cellular)
+            for item in self.records where item.state == .running && self.cellular && self.options(item.profileID).downloadsWiFiOnly { self.pause(item) }
+            self.pump()
+        } }
+        pathMonitor.start(queue: DispatchQueue(label: "tools.zeus.download-network"))
+    }
+    private func options(_ id: UUID) -> AdvancedSettings {
+        if let settings = settingsForProfile?(id) { return settings.advanced ?? AdvancedSettings() }
+        return store.profile(id).flatMap { store.load($0).settings.advanced } ?? AdvancedSettings()
+    }
+    private func permittedNetwork(_ id: UUID) -> Bool { !cellular || !options(id).downloadsWiFiOnly }
+    private func pump() {
+        for item in records.reversed() where item.state == .queued {
+            guard permittedNetwork(item.profileID) else { continue }
+            let preferences = options(item.profileID)
+            let maximum = max(1, min(8, cellular ? preferences.downloadsCellularLimit : preferences.downloadsWiFiLimit))
+            guard records.filter({ $0.profileID == item.profileID && $0.state == .running }).count < maximum else { continue }
+            if let task = tasks[item.id] { change(item.id) { $0.state = .running }; task.resume() }
+            else if let destination = destinations[item.id], let completion = queuedDestinations.removeValue(forKey: item.id) { change(item.id) { $0.state = .running }; completion(destination) }
+        }
+        save()
+    }
+    func preferencesDidChange(_ profile: BrowserProfile) {
+        let preferences = options(profile.id)
+        if preferences.downloadsWiFiOnly && cellular { for item in records where item.profileID == profile.id && item.state == .running { pause(item) } }
+        let folder = store.downloads(for: profile)
+        Task.detached { var folder = folder; var values = URLResourceValues(); values.isExcludedFromBackup = !preferences.downloadsInBackup; try? folder.setResourceValues(values); for var file in (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? [] { try? file.setResourceValues(values) } }
+        pump()
+    }
+    private func confirmation(_ filename: String) async -> Bool {
+        guard let askDownload else { return false }
+        return await withCheckedContinuation { continuation in askDownload(filename) { continuation.resume(returning: $0) } }
     }
     func forProfile(_ id: UUID) -> [BrowserDownload] { records.filter { $0.profileID == id } }
     func fileURL(_ item: BrowserDownload) -> URL? {
@@ -126,12 +167,13 @@ enum DownloadFiles {
     }
     func start(url: URL, profile: BrowserProfile, referrer: URL? = nil, webView: WKWebView? = nil) async {
         guard profile.account?.allowDownloads != false else { message = "التنزيلات غير مسموحة لهذا الحساب."; return }
+        if BrowserURL.isWeb(url) && options(profile.id).confirmDownloads && !(await confirmation(DownloadFiles.safeName(url.lastPathComponent))) { return }
         if ["blob", "data"].contains(url.scheme ?? ""), let webView, webView.configuration.websiteDataStore === store.websiteDataStore(for: profile) {
             webView.startDownload(using: URLRequest(url: url)) { [weak self] download in self?.attach(download, profile: profile) }; return
         }
         guard BrowserURL.isWeb(url) else { message = "افتح الرابط داخل الصفحة لتنزيل ملفات blob أو data."; return }
         let item = BrowserDownload(profileID: profile.id, source: url.absoluteString, filename: DownloadFiles.safeName(url.lastPathComponent), engine: .backgroundSession)
-        records.insert(item, at: 0)
+        records.insert(item, at: 0); confirmed.insert(item.id)
         await startRequest(item: item, profile: profile, referrer: referrer, webView: webView)
     }
     private func startRequest(item: BrowserDownload, profile: BrowserProfile, referrer: URL?, webView: WKWebView? = nil) async {
@@ -144,6 +186,7 @@ enum DownloadFiles {
         // Authenticated requests stay inside the owning WebKit store. Do not
         // put Cookie headers into a cross-origin background redirect chain.
         if !DownloadFiles.cookieHeaders(cookies, for: url).isEmpty {
+            guard permittedNetwork(profile.id) else { change(item.id) { $0.state = .paused; $0.error = "اتصل بشبكة Wi-Fi ثم استأنف التنزيل." }; save(); return }
             guard let webView, webView.configuration.websiteDataStore === store.websiteDataStore(for: profile) else {
                 failed(item.id, error: NSError(domain: "Download", code: 1, userInfo: [NSLocalizedDescriptionKey: "افتح الموقع في هذه المساحة ثم نزّل الرابط للحفاظ على جلسة الدخول."]))
                 return
@@ -156,17 +199,18 @@ enum DownloadFiles {
             origin.path = "/"; origin.query = nil; origin.fragment = nil
             request.setValue(origin.url?.absoluteString, forHTTPHeaderField: "Referer")
         }
+        request.allowsCellularAccess = !options(profile.id).downloadsWiFiOnly
         let task = session.downloadTask(with: request); task.taskDescription = item.id.uuidString; tasks[item.id] = task
-        change(item.id) { $0.state = .running; $0.error = nil; $0.received = 0; $0.expected = -1 }
-        save(); task.resume()
+        change(item.id) { $0.state = .queued; $0.error = nil; $0.received = 0; $0.expected = -1 }
+        pump()
     }
     func attach(_ download: WKDownload, profile: BrowserProfile, existingID: UUID? = nil) {
         guard profile.account?.allowDownloads != false else { download.cancel { _ in }; message = "التنزيلات غير مسموحة لهذا الحساب."; return }
         let id: UUID
-        if let existingID { id = existingID; change(id) { $0.state = .running; $0.error = nil } }
+        if let existingID { id = existingID; change(id) { $0.state = .queued; $0.error = nil } }
         else {
             let source = download.originalRequest?.url?.absoluteString ?? ""
-            let item = BrowserDownload(profileID: profile.id, source: source, filename: "download", state: .running, engine: .webKit)
+            let item = BrowserDownload(profileID: profile.id, source: source, filename: "download", state: .queued, engine: .webKit)
             records.insert(item, at: 0); id = item.id
         }
         download.delegate = self; webDownloads[id] = download
@@ -183,14 +227,14 @@ enum DownloadFiles {
     }
     func pause(_ item: BrowserDownload) {
         guard item.isBusy else { return }
-        change(item.id) { $0.state = .pausing }; save()
+        change(item.id) { $0.state = .pausing }; queuedDestinations.removeValue(forKey: item.id)?(nil); save()
         let handler: (Data?) -> Void = { [weak self] bytes in
             Task { @MainActor in
                 guard let self, self.records.contains(where: { $0.id == item.id }) else { return }
                 self.saveResume(bytes, item: item)
                 self.change(item.id) { $0.state = .paused; $0.error = bytes == nil ? "المصدر لا يدعم الاستئناف؛ سيعاد الطلب من البداية." : nil }
                 self.tasks.removeValue(forKey: item.id); self.webDownloads.removeValue(forKey: item.id); self.progressObservers.removeValue(forKey: item.id)
-                self.save()
+                self.destinations.removeValue(forKey: item.id); self.pump()
             }
         }
         if let task = tasks[item.id] { task.cancel(byProducingResumeData: handler) }
@@ -199,13 +243,15 @@ enum DownloadFiles {
     }
     func resume(_ item: BrowserDownload, webView: WKWebView?) async {
         guard let profile = store.profile(item.profileID), !item.isBusy else { return }
+        guard permittedNetwork(profile.id) else { message = "الاتصال الحالي لا يطابق شرط Wi-Fi لهذا الحساب."; return }
+        confirmed.insert(item.id)
         let bytes = resumeURL(item).flatMap { try? Data(contentsOf: $0) }
-        if item.engine == .webKit, let bytes, let webView {
+        if item.engine == .webKit, let bytes, let webView, webView.configuration.websiteDataStore === store.websiteDataStore(for: profile) {
             change(item.id) { $0.state = .queued; $0.error = nil }
             webView.resumeDownload(fromResumeData: bytes) { [weak self] download in self?.attach(download, profile: profile, existingID: item.id) }
         } else if item.engine == .backgroundSession, let bytes {
             let task = session.downloadTask(withResumeData: bytes); task.taskDescription = item.id.uuidString; tasks[item.id] = task
-            change(item.id) { $0.state = .running; $0.error = nil }; task.resume()
+            change(item.id) { $0.state = .queued; $0.error = nil }; pump()
         } else if let url = URL(string: item.source), BrowserURL.isWeb(url) {
             change(item.id) { $0.engine = .backgroundSession }
             await startRequest(item: item, profile: profile, referrer: nil, webView: webView)
@@ -216,9 +262,12 @@ enum DownloadFiles {
         tasks.removeValue(forKey: item.id)?.cancel()
         if let download = webDownloads.removeValue(forKey: item.id) { download.cancel { _ in } }
         progressObservers.removeValue(forKey: item.id)
+        queuedDestinations.removeValue(forKey: item.id)?(nil)
+        if let partial = destinations.removeValue(forKey: item.id) { try? FileManager.default.removeItem(at: partial) }
+        confirmed.remove(item.id)
         if let path = fileURL(item) { do { try FileManager.default.removeItem(at: path) } catch { message = error.localizedDescription; return } }
         if let path = resumeURL(item) { try? FileManager.default.removeItem(at: path) }
-        records.removeAll { $0.id == item.id }; save()
+        records.removeAll { $0.id == item.id }; pump()
     }
     func removeAll(profileID: UUID) { for item in forProfile(profileID) { remove(item) } }
     func rename(_ item: BrowserDownload, to name: String) {
@@ -243,7 +292,7 @@ enum DownloadFiles {
             guard store.profile(profile.id) != nil else { try? FileManager.default.removeItem(at: target); return }
             var item = BrowserDownload(profileID: profile.id, source: "", filename: target.lastPathComponent, state: .completed, engine: .backgroundSession)
             item.received = size; item.expected = item.received
-            records.insert(item, at: 0); save()
+            records.insert(item, at: 0); preferencesDidChange(profile); save()
         } catch { message = "تعذر استيراد الملف: \(error.localizedDescription)" }
     }
     private func id(for download: WKDownload) -> UUID? { webDownloads.first(where: { $0.value === download })?.key }
@@ -251,13 +300,14 @@ enum DownloadFiles {
         change(id) { $0.state = .completed; $0.error = nil; $0.expected = $0.received }
         if let item = records.first(where: { $0.id == id }), let resume = resumeURL(item) { try? FileManager.default.removeItem(at: resume) }
         tasks.removeValue(forKey: id); webDownloads.removeValue(forKey: id); progressObservers.removeValue(forKey: id)
-        save()
+        destinations.removeValue(forKey: id); queuedDestinations.removeValue(forKey: id); confirmed.remove(id)
+        if let profileID = records.first(where: { $0.id == id })?.profileID, let profile = store.profile(profileID) { preferencesDidChange(profile) }; pump()
     }
     private func failed(_ id: UUID, error: Error, resumeData: Data? = nil) {
-        guard let item = records.first(where: { $0.id == id }), item.state != .pausing && item.state != .paused else { return }
+        guard let item = records.first(where: { $0.id == id }), item.state != .pausing && item.state != .paused && item.state != .failed else { return }
         saveResume(resumeData, item: item)
         change(id) { $0.state = .failed; $0.error = error.localizedDescription }
-        tasks.removeValue(forKey: id); webDownloads.removeValue(forKey: id); progressObservers.removeValue(forKey: id); save()
+        tasks.removeValue(forKey: id); webDownloads.removeValue(forKey: id); progressObservers.removeValue(forKey: id); queuedDestinations.removeValue(forKey: id)?(nil); if let path = destinations.removeValue(forKey: id) { try? FileManager.default.removeItem(at: path) }; confirmed.remove(id); pump()
     }
     private func adopt(staged: URL, id: UUID, response: URLResponse?) {
         defer { try? FileManager.default.removeItem(at: staged) }
@@ -270,7 +320,7 @@ enum DownloadFiles {
             let folder = store.downloads(for: profile); try BrowserDisk.ensure(folder)
             let target = DownloadFiles.uniqueURL(name: response?.suggestedFilename ?? item.filename, folder: folder)
             try FileManager.default.moveItem(at: staged, to: target)
-            var values = URLResourceValues(); values.isExcludedFromBackup = true; var mutable = target; try? mutable.setResourceValues(values)
+            var values = URLResourceValues(); values.isExcludedFromBackup = !options(profile.id).downloadsInBackup; var mutable = target; try? mutable.setResourceValues(values)
             let size = Int64((try? target.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
             change(id) { $0.filename = target.lastPathComponent; $0.received = size; $0.mimeType = response?.mimeType }
             completed(id)
@@ -307,13 +357,21 @@ extension DownloadService: URLSessionDownloadDelegate {
 extension DownloadService: WKDownloadDelegate {
     func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String, completionHandler: @escaping (URL?) -> Void) {
         guard let id = id(for: download), let item = records.first(where: { $0.id == id }), let profile = store.profile(item.profileID) else { completionHandler(nil); return }
-        do {
-            let folder = store.downloads(for: profile); try BrowserDisk.ensure(folder)
-            let target = DownloadFiles.uniqueURL(name: suggestedFilename, folder: folder)
-            change(id) { $0.filename = target.lastPathComponent; $0.expected = response.expectedContentLength; $0.mimeType = response.mimeType }
-            save(); completionHandler(target)
-        } catch { failed(id, error: error); completionHandler(nil) }
+        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) { completionHandler(nil); failed(id, error: NSError(domain: "Download", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: "رفض الخادم التنزيل (HTTP \(http.statusCode))."])); return }
+        Task { @MainActor in
+            if options(profile.id).confirmDownloads && !confirmed.contains(id) && !(await confirmation(suggestedFilename)) { completionHandler(nil); remove(item); return }
+            guard records.contains(where: { $0.id == id }), permittedNetwork(profile.id) else { completionHandler(nil); failed(id, error: URLError(.notConnectedToInternet)); return }
+            do {
+                let folder = store.downloads(for: profile); try BrowserDisk.ensure(folder)
+                var target = DownloadFiles.uniqueURL(name: suggestedFilename, folder: folder)
+                if destinations.values.contains(target) { target = folder.appendingPathComponent(UUID().uuidString.prefix(8) + "-" + DownloadFiles.safeName(suggestedFilename)) }
+                destinations[id] = target
+                change(id) { $0.filename = target.lastPathComponent; $0.expected = response.expectedContentLength; $0.mimeType = response.mimeType; $0.state = .queued }
+                queuedDestinations[id] = completionHandler; pump()
+            } catch { failed(id, error: error); completionHandler(nil) }
+        }
     }
+
     func downloadDidFinish(_ download: WKDownload) {
         guard let id = id(for: download), let item = records.first(where: { $0.id == id }), let profile = store.profile(item.profileID) else { return }
         let path = store.downloads(for: profile).appendingPathComponent(item.filename)

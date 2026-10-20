@@ -58,24 +58,27 @@ struct FilterRules {
         return domains.contains(where: { BrowserURL.hostMatches(host, domain: $0) })
     }
     func list(profile: BrowserProfile, settings: BrowserSettings) async throws -> WKContentRuleList? {
-        guard settings.shieldsEnabled else { return nil }
+        let options = settings.advanced ?? AdvancedSettings()
+        guard settings.shieldsEnabled || !options.showImages || options.blockThirdPartyCookies else { return nil }
         if let cached = compiled[profile.id] { return cached }
         let exceptions = settings.siteExceptions.filter(FilterRules.validDomain)
-        var rules: [[String: Any]] = domains.sorted().prefix(28000).map { domain in
+        var rules: [[String: Any]] = (settings.shieldsEnabled ? domains.sorted() : []).prefix(28000).map { domain in
             var trigger: [String: Any] = ["url-filter": FilterRules.regex(for: domain)]
             if !exceptions.isEmpty { trigger["unless-top-url"] = exceptions.map(FilterRules.regex(for:)) }
             return ["trigger": trigger, "action": ["type": "block"]]
         }
-        for host in allowed.sorted().prefix(2000) {
+        for host in (settings.shieldsEnabled ? allowed.sorted() : []).prefix(2000) {
             rules.append(["trigger": ["url-filter": FilterRules.regex(for: host)], "action": ["type": "ignore-previous-rules"]])
         }
-        if settings.cosmeticFiltering {
+        if settings.shieldsEnabled && settings.cosmeticFiltering {
             var trigger: [String: Any] = ["url-filter": ".*"]
             if !exceptions.isEmpty { trigger["unless-top-url"] = exceptions.map(FilterRules.regex(for:)) }
             rules.append(["trigger": trigger, "action": ["type": "css-display-none", "selector": ".adsbygoogle,[id^='google_ads_'],[data-ad-slot],iframe[src*='doubleclick.net']"]])
         }
         let converted = settings.cosmeticFiltering ? nativeRules : nativeRules.filter { ($0["action"] as? [String: Any])?["type"] as? String != "css-display-none" }
-        rules = converted + rules
+        rules = (settings.shieldsEnabled ? converted : []) + rules
+        if !options.showImages { rules.append(["trigger": ["url-filter": ".*", "resource-type": ["image"]], "action": ["type": "block"]]) }
+        if options.blockThirdPartyCookies { rules.append(["trigger": ["url-filter": ".*", "load-type": ["third-party"]], "action": ["type": "block-cookies"]]) }
         // Applied after every blocking rule so compatibility overrides all lists.
         for host in exceptions { rules.append(["trigger": ["url-filter": ".*", "if-top-url": [FilterRules.regex(for: host)]], "action": ["type": "ignore-previous-rules"]]) }
         guard let json = String(data: try JSONSerialization.data(withJSONObject: rules), encoding: .utf8) else { return nil }

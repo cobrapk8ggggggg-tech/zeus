@@ -98,6 +98,14 @@ enum BrowserURL {
         return components?.url
     }
 
+    static func isSearch(_ text: String) -> Bool {
+        let input = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !input.contains("://") && !(input.contains(".") && !input.contains(where: { $0.isWhitespace }))
+    }
+    static func resolve(_ text: String, settings: BrowserSettings) -> URL? {
+        if isSearch(text), let options = settings.advanced, let engine = options.customSearchEngines.first(where: { $0.id == options.selectedSearchEngineID }), let query = text.addingPercentEncoding(withAllowedCharacters: .alphanumerics), let url = URL(string: engine.template.replacingOccurrences(of: "{query}", with: query)), isWeb(url) { return url }
+        return resolve(text, provider: settings.searchProvider)
+    }
     static func hostMatches(_ host: String, domain: String) -> Bool {
         let host = host.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
         let domain = domain.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))

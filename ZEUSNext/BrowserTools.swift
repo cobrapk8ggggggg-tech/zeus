@@ -3,6 +3,9 @@ import WebKit
 import UIKit
 
 enum BrowserTools {
+    static let darkPage = """
+    (()=>{const s=document.createElement('style');s.textContent='html,body{background:#000!important;color:#fff!important;color-scheme:dark} input,textarea,select{color-scheme:dark}';document.documentElement.appendChild(s)})();
+    """
     static let consoleScript = """
     (()=>{for(const kind of ['log','warn','error','info']){const original=console[kind];console[kind]=function(...args){try{window.webkit.messageHandlers.zeusConsole.postMessage({type:kind,message:args.map(a=>{try{return typeof a==='string'?a:JSON.stringify(a)}catch{return String(a)}}).join(' ').slice(0,4000)})}catch{};original.apply(console,args)}}})();
     """
@@ -35,6 +38,18 @@ extension BrowserModel {
     }
     func savePDF() {
         guard let view = webView else { return }
+        if data.settings.advanced?.paperSizedPDF != false {
+            let renderer = pageRenderer(view)
+            let pages = renderer.numberOfPages
+            guard pages > 0, pages <= 500 else { notify("عدد صفحات المستند خارج الحد المدعوم (500 صفحة). اختر جزءًا أصغر للطباعة."); return }
+            let bytes = UIGraphicsPDFRenderer(bounds: renderer.paperRect).pdfData { context in
+                for page in 0..<pages { context.beginPage(); renderer.drawPage(at: page, in: renderer.paperRect) }
+            }
+            let owner = profile
+            let path = FileManager.default.temporaryDirectory.appendingPathComponent("ZEUS-" + UUID().uuidString + ".pdf")
+            do { try bytes.write(to: path, options: .atomic); Task { await downloads.importFile(path, profile: owner); try? FileManager.default.removeItem(at: path); notify("حُفظ PDF مقسّمًا إلى \(pages) صفحة.") } } catch { notify(error.localizedDescription) }
+            return
+        }
         let config = WKPDFConfiguration()
         config.rect = CGRect(x: 0, y: 0, width: max(view.bounds.width, 320), height: min(max(view.scrollView.contentSize.height, view.bounds.height), 20_000))
         let owner = profile
@@ -50,9 +65,11 @@ extension BrowserModel {
     }
     func saveScreenshot() {
         guard let view = webView else { return }; let owner = profile
-        view.takeSnapshot(with: nil) { [weak self] image, error in
-            guard let self, let bytes = image?.pngData() else { self?.notify(error?.localizedDescription ?? "تعذّر تصوير الصفحة."); return }
-            let path = FileManager.default.temporaryDirectory.appendingPathComponent("ZEUS-" + UUID().uuidString.prefix(8) + ".png")
+        let options = data.settings.advanced ?? AdvancedSettings()
+        let config = WKSnapshotConfiguration(); config.snapshotWidth = NSNumber(value: Double(view.bounds.width) * options.screenshotScale)
+        view.takeSnapshot(with: config) { [weak self] image, error in
+            guard let self, let image, let bytes = options.screenshotJPEG ? image.jpegData(compressionQuality: options.screenshotQuality) : image.pngData() else { self?.notify(error?.localizedDescription ?? "تعذّر تصوير الصفحة."); return }
+            let path = FileManager.default.temporaryDirectory.appendingPathComponent("ZEUS-" + UUID().uuidString.prefix(8) + (options.screenshotJPEG ? ".jpg" : ".png"))
             do { try bytes.write(to: path, options: .atomic); Task { await self.downloads.importFile(path, profile: owner); try? FileManager.default.removeItem(at: path); self.notify("حُفظت اللقطة في التنزيلات.") } }
             catch { self.notify(error.localizedDescription) }
         }
@@ -61,7 +78,14 @@ extension BrowserModel {
         guard let view = webView, view.window != nil else { return }
         let controller = UIPrintInteractionController.shared
         let info = UIPrintInfo(dictionary: nil); info.jobName = current?.title ?? "ZEUS"; info.outputType = .general
-        controller.printInfo = info; controller.printFormatter = view.viewPrintFormatter()
+        controller.printInfo = info; controller.printPageRenderer = pageRenderer(view)
         controller.present(from: CGRect(x: view.bounds.midX, y: view.bounds.maxY - 1, width: 1, height: 1), in: view, animated: true)
     }
+    private func pageRenderer(_ view: WKWebView) -> BrowserPrintRenderer {
+        let options = data.settings.advanced ?? AdvancedSettings()
+        let renderer = BrowserPrintRenderer(); renderer.documentTitle = current?.title ?? "ZEUS"; renderer.showsHeader = options.printHeader; renderer.showsFooter = options.printFooter; renderer.margin = options.printMargin; renderer.headerHeight = options.printHeader ? 24 : 0; renderer.footerHeight = options.printFooter ? 24 : 0
+        renderer.addPrintFormatter(view.viewPrintFormatter(), startingAtPageAt: 0)
+        return renderer
+    }
+
 }

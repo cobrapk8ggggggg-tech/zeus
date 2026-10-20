@@ -21,6 +21,7 @@ enum BrowserAction: String, CaseIterable, Identifiable {
 struct BrowserRoot: View {
     @ObservedObject var model: BrowserModel
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @AppStorage("showCurrentUserAvatar") private var showCurrentUserAvatar = true
     @State private var panel: BrowserPanel?
     @State private var toolbarVisible = false
@@ -38,7 +39,7 @@ struct BrowserRoot: View {
                 VStack(spacing: 0) {
                     if model.profile.role != .kiosk && layout != .original && barsVisible { topBar.transition(.move(edge: .top).combined(with: .opacity)) }
                     browserContent.frame(maxWidth: .infinity, maxHeight: .infinity)
-                    if model.profile.role != .kiosk && layout != .original && barsVisible { bottomBar.transition(.move(edge: .bottom).combined(with: .opacity)) }
+                    if model.profile.role != .kiosk && layout == .dualBars && barsVisible { bottomBar.transition(.move(edge: .bottom).combined(with: .opacity)) }
                 }
                 if model.profile.role == .kiosk { kioskControls }
                 else if layout == .original { originalControls.environment(\.layoutDirection, .leftToRight) }
@@ -49,6 +50,7 @@ struct BrowserRoot: View {
         }
         .foregroundStyle(.white).tint(.white).background(.black)
         .statusBarHidden(layout == .original)
+        .ignoresSafeArea(.container, edges: layout == .original ? .all : [])
         .animation(.spring(response: 0.34, dampingFraction: 0.86), value: model.chromeHidden)
         .fullScreenCover(item: $panel) { item in panelContent(item).tint(.white).preferredColorScheme(.dark).environment(\.layoutDirection, .rightToLeft) }
         .fullScreenCover(item: $model.article) { ReaderSheet(model: model, article: $0).tint(.white) }
@@ -86,13 +88,28 @@ struct BrowserRoot: View {
     private var topBar: some View {
         VStack(spacing: 5) {
             if layout == .icab {
-                HStack { actionButton(.back); actionButton(.forward); addressBar; actionButton(.tools) }
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack { ForEach(model.tabs) { tab in Button { model.selectTab(tab) } label: { Text(tab.title).font(.caption).lineLimit(1).frame(maxWidth: 130).padding(10).background(model.selectedTabID == tab.id ? .white.opacity(0.14) : .clear, in: Capsule()) } }; actionButton(.newTab) }
-                }.environment(\.layoutDirection, .leftToRight)
+                HStack(spacing: 0) {
+                    if sizeClass == .regular { actionButton(.library); actionButton(.share); actionButton(.tabs) }
+                    actionButton(.back); actionButton(.forward); addressBar; actionButton(.profiles)
+                }
+                if model.data.settings.advanced?.showBookmarksBar != false {
+                    HStack(spacing: 0) {
+                        actionButton(.home)
+                        ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 18) { ForEach(model.data.bookmarks) { bookmark in Button(bookmark.title) { model.open(bookmark.url) }.font(.subheadline).lineLimit(1) } } }
+                        ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 0) { ForEach([BrowserAction.reader, .scripts, .downloads, .gallery, .settings, .tools]) { actionButton($0) } } }.frame(maxWidth: sizeClass == .regular ? 270 : 140)
+                    }
+                }
+                if model.data.settings.advanced?.showTabsBar != false {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 1) {
+                            ForEach(model.tabs) { tab in HStack(spacing: 10) { Button { model.closeTab(tab) } label: { Image(systemName: "xmark").font(.caption) }; Button { model.selectTab(tab) } label: { Text(tab.title).font(.caption).lineLimit(1).frame(minWidth: 75, maxWidth: 170) } }.padding(.horizontal, 12).frame(height: 34).background(model.selectedTabID == tab.id ? .white.opacity(0.12) : .black).overlay(Rectangle().stroke(.white.opacity(0.12), lineWidth: 0.5)) }
+                            actionButton(.newTab)
+                        }
+                    }
+                }
             } else { HStack { actionButton(.profiles); Spacer(); Text(model.profile.name).font(.subheadline); Spacer(); actionButton(.tools) } }
             if model.current?.loading == true { ProgressView(value: model.current?.progress ?? 0).tint(.white).frame(height: 2) }
-        }.padding(.horizontal, 12).padding(.vertical, 5).background(.black)
+        }.padding(.horizontal, layout == .icab ? 4 : 12).padding(.vertical, 5).background(.black).environment(\.layoutDirection, .leftToRight)
     }
     private var bottomBar: some View {
         VStack(spacing: 4) {

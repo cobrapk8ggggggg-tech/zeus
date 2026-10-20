@@ -64,6 +64,7 @@ struct AdvancedSettings: Codable {
             if profile.isPrivate { do { try model.profiles.saveTemplate(data, profile: profile) } catch { model.notify(error.localizedDescription) } }
             else { model.profiles.save(data, for: profile) }
         }
+        model.downloads.preferencesDidChange(profile)
     }
     func option<T>(_ key: WritableKeyPath<AdvancedSettings,T>, reload: Bool = false) -> Binding<T> {
         Binding(get: { self.options[keyPath: key] }, set: { var value = self.options; value[keyPath: key] = $0; self.settings.advanced = value; self.save(reload: reload) })
