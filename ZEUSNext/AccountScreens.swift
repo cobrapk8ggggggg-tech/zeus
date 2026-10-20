@@ -59,7 +59,7 @@ struct ProfilesSheet: View {
                     Button("دخول") { if let target = login { attempt(target, password: password) }; login = nil; password = "" }
                     Button("إلغاء", role: .cancel) { login = nil; password = "" }
                 }
-                .confirmationDialog("حذف الحساب وبياناته؟", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })) { Button("حذف نهائي", role: .destructive) { if let target = deleting { Task { await model.deleteProfile(target) } }; deleting = nil } }
+                .confirmationDialog("حذف الحساب وبياناته؟", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })) { Button("حذف نهائي") { if let target = deleting { Task { await model.deleteProfile(target) } }; deleting = nil } }
                 .disabled(busy).overlay { if busy { ProgressView().padding(25).glassSurface() } }
         }.tint(.white).preferredColorScheme(.dark)
     }
@@ -78,7 +78,7 @@ struct ProfilesSheet: View {
                 Button { editing = profile } label: { Image(systemName: "info.circle").frame(width: 40, height: 44) }.buttonStyle(.borderless).accessibilityLabel("إعدادات " + profile.name)
             }
         }.frame(minHeight: 88).listRowBackground(Color.black).listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 12))
-            .swipeActions { if model.profile.isAdmin && !model.requiresUnlock && profile.role == .standard { Button("حذف", role: .destructive) { deleting = profile } } }
+            .swipeActions { if model.profile.isAdmin && !model.requiresUnlock && profile.role == .standard { Button("حذف") { deleting = profile } } }
     }
     private func attempt(_ target: BrowserProfile, password: String) {
         busy = true; failure = nil
@@ -115,9 +115,12 @@ struct AccountSettingsView: View {
     @State var profile: BrowserProfile
     var embedded = false
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("showCurrentUserAvatar") private var showCurrentUserAvatar = true
+    @AppStorage("showCurrentUserAvatar") private var showCurrentUserAvatar = false
     @State private var photo: PhotosPickerItem?
     @State private var camera = false
+    @State private var avatars = false
+    @State private var accountsManager = false
+    @State private var editingAccount: BrowserProfile?
     @State private var passwordScreen = false
     @State private var deleting = false
     @State private var issue: String?
@@ -128,30 +131,33 @@ struct AccountSettingsView: View {
     }
     private var accountForm: some View {
             Form {
-                Section {
-                    HStack { AccountAvatar(profile: profile, store: model.profiles, size: 70); Text("صورة الحساب"); Spacer() }.frame(minHeight: 88).listRowBackground(Color.black)
-                    TextField("اسم الحساب", text: $profile.name)
-                    PhotosPicker(selection: $photo, matching: .images) { Label("اختيار صورة من الألبوم", systemImage: "photo") }
-                    if UIImagePickerController.isSourceTypeAvailable(.camera) { Button("التقاط صورة", systemImage: "camera") { camera = true } }
-                    Picker("الصورة الرمزية", selection: $profile.symbol) { ForEach(["person.crop.circle.fill", "person.fill", "house.fill", "briefcase.fill", "book.fill", "star.fill"], id: \.self) { Image(systemName: $0).tag($0) } }
+                Section("البيانات الشخصية") {
+                    HStack(spacing: 18) {
+                        AccountAvatar(profile: profile, store: model.profiles, size: 70)
+                        VStack(spacing: 12) {
+                            HStack { Button("الكاميرا") { camera = true }.disabled(!UIImagePickerController.isSourceTypeAvailable(.camera)); Divider(); PhotosPicker(selection: $photo, matching: .images) { Text("الألبوم") } }.frame(height: 30)
+                            Button("صور رمزية") { avatars = true }.frame(maxWidth: .infinity)
+                        }
+                    }.frame(minHeight: 88).listRowBackground(Color.black)
+                    LabeledContent("الاسم") { TextField("اسم الحساب", text: $profile.name).multilineTextAlignment(.trailing) }
                     if options.avatarFilename != nil { Button("إزالة الصورة") { if let file = model.profiles.avatarURL(profile) { try? FileManager.default.removeItem(at: file) }; profile.account?.avatarFilename = nil } }
-                } header: { Text("هذا الحساب") } footer: { Text(profile.role.title) }
-                .disabled(profile.role == .guest && !canAdminister)
-                Section("حماية الحساب") {
+
                     if profile.role != .guest { Button("كلمة مرور الحساب", systemImage: "key") { passwordScreen = true } }
                     Picker("تسجيل الخروج بعد مغادرة التطبيق", selection: option(\.logoutAfter)) { Text("أبدًا").tag(Double(-1)); Text("فورًا").tag(Double(0)); Text("دقيقة").tag(Double(60)); Text("5 دقائق").tag(Double(300)); Text("10 دقائق").tag(Double(600)); Text("30 دقيقة").tag(Double(1800)) }
                     if model.profile.id == profile.id { Button(profile.locked ? "إلغاء قفل الجهاز والبصمة" : "حماية إضافية برمز الجهاز والبصمة") { Task { await model.setProfileLock(!profile.locked); profile = model.profile } } }
                 }
-                if model.profile.id == profile.id { Section { Button("تسجيل الخروج الآن") { model.logout(); dismiss() } } }
+                .disabled(profile.role == .guest && !canAdminister)
+                if model.profile.id == profile.id { Button("تسجيل الخروج الآن") { model.logout(); dismiss() } }
                 if canAdminister && profile.isAdmin {
                     Section { Toggle("إظهار صورة الحساب الحالي دائمًا", isOn: $showCurrentUserAvatar) }
                     Section("حسابات أخرى") {
-                        ForEach(model.profiles.profiles.filter { [.guest, .kiosk].contains($0.role) }) { account in NavigationLink { AccountSettingsView(model: model, profile: account) } label: { HStack { AccountAvatar(profile: account, store: model.profiles, size: 50); Text(account.name); Spacer(); Text(account.account?.enabled == true ? "مفعّل" : "متوقف").font(.caption) } } }
+                        ForEach(model.profiles.profiles.filter { [.guest, .kiosk].contains($0.role) }) { account in Button { editingAccount = account } label: { HStack { AccountAvatar(profile: account, store: model.profiles, size: 50); Text(account.name); Spacer(); Text(account.account?.enabled == true ? "مفعّل" : "متوقف").font(.caption) } } }
                     }
                     Section("حسابات المستخدمين") {
+                        Button("إدارة الحسابات وإضافة حساب") { accountsManager = true }
                         ForEach(model.profiles.profiles.filter { $0.role == .standard }) { account in
                             if AccountVault.exists(account.id) { Label(account.name + " — سجّل الدخول لتغيير إعداداته", systemImage: "lock") }
-                            else { NavigationLink(account.name) { AccountSettingsView(model: model, profile: account) } }
+                            else { Button(account.name) { editingAccount = account } }
                         }
                     }
                 }
@@ -164,25 +170,20 @@ struct AccountSettingsView: View {
                         Text("اترك قائمة المواقع فارغة للسماح بجميع النطاقات. قيد المواقع ينطبق على التنقلات؛ لا يعزل موارد المواقع الفرعية.").font(.caption).foregroundStyle(.secondary)
                     }
                 }
-                Section("إعدادات الحساب") {
-                    if model.profile.id == profile.id && profile.account?.allowSettings != false {
-                        NavigationLink("واجهة المستخدم والأشرطة") { AppearanceSettings(model: model) }
-                        NavigationLink("المفضلة والسجل") { LibrarySheet(model: model) }
-                        NavigationLink("التنزيلات") { DownloadsSheet(model: model) }
-                        NavigationLink("السكربتات") { ScriptsSheet(model: model) }
-                    } else if canAdminister {
-                        NavigationLink("إعدادات التصفح لهذا الحساب") { AccountDefaultsEditor(model: model, profile: profile) }
-                    }
-                }
-                if canAdminister && !profile.isAdmin { Section { Button("حذف الحساب وبياناته", role: .destructive) { deleting = true } } }
+                if canAdminister && !profile.isAdmin { Section { Button("حذف الحساب وبياناته") { deleting = true } } }
                 if let issue { Text(issue).font(.caption) }
             }.scrollContentBackground(.hidden).background(.black).navigationTitle("إعدادات الحساب").navigationBarTitleDisplayMode(.inline)
                 .toolbar { if !embedded { ToolbarItem(placement: .topBarTrailing) { Button("تم") { dismiss() } } } }
                 .onChange(of: profile) { _, value in if !value.name.trimmingCharacters(in: .whitespaces).isEmpty { model.profiles.update(value) } }
                 .onChange(of: photo) { _, value in Task { if let data = try? await value?.loadTransferable(type: Data.self), let image = UIImage(data: data) { saveImage(image) } } }
                 .fullScreenCover(isPresented: $camera) { CameraPicker { if let image = $0 { saveImage(image) }; camera = false }.ignoresSafeArea() }
+                .fullScreenCover(isPresented: $accountsManager) { ProfilesSheet(model: model) }
+                .fullScreenCover(item: $editingAccount) { SettingsSheet(model: model, profile: $0) }
+                .fullScreenCover(isPresented: $avatars) {
+                    NavigationStack { ScrollView { LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 24) { ForEach(["person.crop.circle.fill", "person.fill", "house.fill", "briefcase.fill", "book.fill", "star.fill", "moon.fill", "sun.max.fill", "globe", "bolt.fill", "leaf.fill", "heart.fill", "pawprint.fill", "paperplane.fill", "gamecontroller.fill", "desktopcomputer"], id: \.self) { symbol in Button { profile.symbol = symbol; profile.account = options; profile.account?.avatarFilename = nil; avatars = false } label: { Image(systemName: symbol).font(.system(size: 36)).frame(width: 70, height: 70).glassSurface(12) } } }.padding() }.background(.black).navigationTitle("الصور الرمزية").toolbar { Button("تم") { avatars = false } } }.tint(.white).preferredColorScheme(.dark)
+                }
                 .fullScreenCover(isPresented: $passwordScreen) { AccountPasswordView(profile: profile) }
-                .confirmationDialog("حذف الحساب وكل ملفاته؟", isPresented: $deleting) { Button("حذف نهائي", role: .destructive) { Task { await model.deleteProfile(profile); dismiss() } } }
+                .confirmationDialog("حذف الحساب وكل ملفاته؟", isPresented: $deleting) { Button("حذف نهائي") { Task { await model.deleteProfile(profile); dismiss() } } }
     }
     private func option<T>(_ key: WritableKeyPath<AccountOptions, T>) -> Binding<T> {
         Binding(get: { options[keyPath: key] }, set: { value in var updated = options; updated[keyPath: key] = value; profile.account = updated })

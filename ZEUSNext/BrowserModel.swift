@@ -223,6 +223,7 @@ struct WebDialog: Identifiable {
         var changed = profile; changed.locked = locked; profiles.update(changed)
     }
     func backgrounded() {
+        BrowserPresentation.cancel()
         leftAt = Date()
         cleanOnExit(profile)
         persist(); if profile.locked { requiresUnlock = true }
@@ -294,6 +295,8 @@ struct WebDialog: Identifiable {
         leftAt = nil
     }
     func logout() {
+        BrowserPresentation.cancel()
+        dialog?.complete(nil); dialog = nil
         transitionEpoch = UUID()
         if !requiresUnlock { persist() }
         cleanOnExit(profile)

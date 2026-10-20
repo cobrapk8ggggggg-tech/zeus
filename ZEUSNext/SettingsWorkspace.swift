@@ -21,7 +21,9 @@ struct SettingsSheet: View {
     @State private var selection: SettingsCategory? = .account
     @State private var path: [SettingsCategory]
     @State private var search = ""
+    private let activeAtOpening: UUID
     init(model: BrowserModel, profile: BrowserProfile? = nil) {
+        activeAtOpening = model.profiles.activeID
         _context = StateObject(wrappedValue: ProfileSettingsContext(model: model, profile: profile))
         _path = State(initialValue: profile == nil ? [] : [.account])
     }
@@ -38,6 +40,8 @@ struct SettingsSheet: View {
                 }
             }
         }.tint(.white).foregroundStyle(.white).preferredColorScheme(.dark).environment(\.layoutDirection, .leftToRight)
+            .onReceive(context.model.profiles.$activeID) { id in if id != activeAtOpening { dismiss() } }
+            .onReceive(context.model.$requiresUnlock) { locked in if locked { dismiss() } }
     }
     private var categoryList: some View {
         List {
@@ -55,7 +59,7 @@ struct SettingsSheet: View {
     }
     private func categoryLabel(_ category: SettingsCategory) -> some View { Label(category.title, systemImage: category.symbol).frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 8).accessibilityIdentifier("category-" + category.rawValue) }
     @ViewBuilder private func detail(_ category: SettingsCategory) -> some View {
-        switch category {
+        Group { switch category {
         case .account: AccountSettingsView(model: context.model, profile: context.profile, embedded: true)
         case .appearance: appearance
         case .tabs: tabSettings
@@ -68,7 +72,7 @@ struct SettingsSheet: View {
         case .services: ProfileTransferPage(context: context)
         case .other: other
         case .help: help
-        }
+        } }.toolbar { ToolbarItem(placement: .topBarTrailing) { Button("تم") { dismiss() } } }
     }
     private var appearance: some View {
         Form {
@@ -146,12 +150,12 @@ struct CookieSettingsPage: View {
                     Text(revealed.contains(key(cookie)) ? cookie.value : "••••••••").font(.caption.monospaced()).textSelection(.enabled)
                     HStack { Text(cookie.isHTTPOnly ? "HttpOnly" : "JavaScript"); Text(cookie.isSecure ? "Secure" : "HTTP"); if let expiry = cookie.expiresDate { Text(expiry, style: .date) } }.font(.caption2).foregroundStyle(.secondary)
                 }.padding(.vertical, 5).onTapGesture { if revealed.contains(key(cookie)) { revealed.remove(key(cookie)) } else { revealed.insert(key(cookie)) } }
-                    .swipeActions { Button("حذف", role: .destructive) { context.model.profiles.websiteDataStore(for: context.profile).httpCookieStore.delete(cookie) { Task { @MainActor in await reload() } } } }
+                    .swipeActions { Button("حذف") { context.model.profiles.websiteDataStore(for: context.profile).httpCookieStore.delete(cookie) { Task { @MainActor in await reload() } } } }
             }.listRowBackground(Color.black)
         }.settingsPage("الكوكيز (\(cookies.count))").searchable(text: $search, prompt: "النطاق أو الاسم").task { await reload() }
     }
     private func key(_ cookie: HTTPCookie) -> String { cookie.domain + cookie.path + cookie.name }
-    private func reload() async { cookies = await withCheckedContinuation { c in context.model.profiles.websiteDataStore(for: context.profile).httpCookieStore.getAllCookies { c.resume(returning: $0.sorted { ($0.domain, $0.name) < ($1.domain, $1.name) }) } } }
+    private func reload() async { guard context.permitted else { cookies = []; return }; cookies = await withCheckedContinuation { c in context.model.profiles.websiteDataStore(for: context.profile).httpCookieStore.getAllCookies { c.resume(returning: $0.sorted { ($0.domain, $0.name) < ($1.domain, $1.name) }) } } }
 }
 
 struct StorageSettingsPage: View {
@@ -163,12 +167,12 @@ struct StorageSettingsPage: View {
     @State private var result: String?
     var body: some View {
         Form {
-            Section("البيانات") { LabeledContent("ملفات الحساب", value: byteText(bytes)); LabeledContent("مواقع خزّنت بيانات", value: "\(sites)"); Button("مسح الملفات المؤقتة") { action = "cache" }.accessibilityIdentifier("clearCacheButton"); Button("مسح الكوكيز وبيانات المواقع") { action = "web" }; Button("مسح سجل التصفح") { action = "history" }; Button("مسح سجل البحث") { action = "search" }; Button("حذف التنزيلات", role: .destructive) { action = "downloads" } }
+            Section("البيانات") { LabeledContent("ملفات الحساب", value: byteText(bytes)); LabeledContent("مواقع خزّنت بيانات", value: "\(sites)"); Button("مسح الملفات المؤقتة") { action = "cache" }.accessibilityIdentifier("clearCacheButton"); Button("مسح الكوكيز وبيانات المواقع") { action = "web" }; Button("مسح سجل التصفح") { action = "history" }; Button("مسح سجل البحث") { action = "search" }; Button("حذف التنزيلات") { action = "downloads" } }
             if context.isActive { Section { NavigationLink("المفضلة والسجل") { LibrarySheet(model: context.model) }; NavigationLink("السكربتات") { ScriptsSheet(model: context.model) } } }
-            if context.model.profile.isAdmin { Section { Button("إعادة ضبط التطبيق وكل الحسابات", role: .destructive) { action = "reset" } } }
+            if context.model.profile.isAdmin { Section { Button("إعادة ضبط التطبيق وكل الحسابات") { action = "reset" } } }
             if let result { Text(result).font(.footnote) }
         }.settingsPage("البيانات الشخصية").disabled(busy).task { await refresh() }
-            .confirmationDialog("تأكيد حذف البيانات المحددة؟ حذف بيانات المواقع يسجل خروجك منها. لا يمكن التراجع عن حذف الملفات.", isPresented: Binding(get: { action != nil }, set: { if !$0 { action = nil } }), titleVisibility: .visible) { Button("مسح", role: .destructive) { let selected = action; action = nil; Task { await perform(selected) } } }
+            .confirmationDialog("تأكيد حذف البيانات المحددة؟ حذف بيانات المواقع يسجل خروجك منها. لا يمكن التراجع عن حذف الملفات.", isPresented: Binding(get: { action != nil }, set: { if !$0 { action = nil } }), titleVisibility: .visible) { Button("مسح") { let selected = action; action = nil; Task { await perform(selected) } } }
     }
     private func refresh() async {
         let folder = context.model.profiles.folder(for: context.profile), downloads = context.model.profiles.downloads(for: context.profile)
@@ -176,6 +180,7 @@ struct StorageSettingsPage: View {
         let records: [WKWebsiteDataRecord] = await withCheckedContinuation { c in context.model.profiles.websiteDataStore(for: context.profile).fetchDataRecords(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes()) { c.resume(returning: $0) } }; sites = records.count
     }
     private func perform(_ selected: String?) async {
+        guard context.permitted else { return }
         busy = true; defer { busy = false }
         let model = context.model
         switch selected {
@@ -193,7 +198,7 @@ struct ToolSettingsPage: View {
     @ObservedObject var context: ProfileSettingsContext
     var body: some View {
         Form {
-            Section { NavigationLink("تصدير واستيراد عبر الملفات والتطبيقات") { ProfileTransferPage(context: context) } }
+            Section { NavigationLink("تصدير واستيراد عبر الملفات والتطبيقات") { ProfileTransferPage(context: context) }; NavigationLink("تصدير واستيراد عبر WLAN") { ProfileTransferPage(context: context) } }
             Section("البحث") { Picker("محرك البحث", selection: context.setting(\.searchProvider)) { ForEach(SearchProvider.allCases) { Text($0.rawValue).tag($0) } }; Toggle("فتح البحث في تبويب جديد", isOn: context.option(\.searchInNewTab)); Picker("حجم سجل البحث", selection: context.option(\.searchHistoryLimit)) { ForEach([10, 25, 50, 100], id: \.self) { Text("\($0)").tag($0) } }; NavigationLink("محركات البحث المخصصة") { SearchEnginesPage(context: context) } }
             Section("الطباعة") { Toggle("عنوان الصفحة في رأس الورقة", isOn: context.option(\.printHeader)); Toggle("ترقيم الصفحات", isOn: context.option(\.printFooter)); Picker("الهوامش", selection: context.option(\.printMargin)) { Text("بدون").tag(Double(0)); Text("ضيقة").tag(Double(12)); Text("عادية").tag(Double(24)); Text("واسعة").tag(Double(36)) } }
             Section("لقطات الشاشة") { Picker("التنسيق", selection: context.option(\.screenshotJPEG)) { Text("PNG").tag(false); Text("JPEG").tag(true) }; Slider(value: context.option(\.screenshotQuality), in: 0.5...1); Picker("الدقة", selection: context.option(\.screenshotScale)) { Text("عادية").tag(Double(1)); Text("مرتفعة").tag(Double(2)) } }

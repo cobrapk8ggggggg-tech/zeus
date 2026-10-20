@@ -30,8 +30,8 @@ struct TabsSheet: View {
             }.background { OrbitBackground(tint: model.profile.color) }.navigationTitle("التبويبات").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) { Button("تم") { dismiss() } }
-                    ToolbarItem(placement: .bottomBar) { HStack { Button("إغلاق الكل", role: .destructive) { closeAll = true }; Spacer(); Button { _ = model.newTab(); dismiss() } label: { Label("تبويب جديد", systemImage: "plus") } } }
-                }.confirmationDialog("إغلاق كل تبويبات هذه المساحة؟", isPresented: $closeAll) { Button("إغلاق الكل", role: .destructive) { model.closeAllTabs() } }
+                    ToolbarItem(placement: .bottomBar) { HStack { Button("إغلاق الكل") { closeAll = true }; Spacer(); Button { _ = model.newTab(); dismiss() } label: { Label("تبويب جديد", systemImage: "plus") } } }
+                }.confirmationDialog("إغلاق كل تبويبات هذه المساحة؟", isPresented: $closeAll) { Button("إغلاق الكل") { model.closeAllTabs() } }
         }.onAppear { model.snapshotCurrent() }
     }
 }
@@ -78,7 +78,7 @@ struct DownloadsSheet: View {
                     Button("حفظ") { if let item = renaming { service.rename(item, to: newName) }; renaming = nil }
                     Button("إلغاء", role: .cancel) { renaming = nil }
                 }
-                .confirmationDialog("حذف الملف وإيقاف تنزيله؟", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })) { Button("حذف", role: .destructive) { if let item = deleting { service.remove(item) }; deleting = nil } }
+                .confirmationDialog("حذف الملف وإيقاف تنزيله؟", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })) { Button("حذف") { if let item = deleting { service.remove(item) }; deleting = nil } }
                 .fileImporter(isPresented: $importing, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
                     switch result { case .success(let files): for file in files { Task { await service.importFile(file, profile: model.profile) } }; case .failure(let error): model.notify(error.localizedDescription) }
                 }
@@ -106,7 +106,7 @@ struct DownloadsSheet: View {
                     }
                     if item.isBusy { Button("إيقاف مؤقت", systemImage: "pause") { service.pause(item) } }
                     if item.state == .paused || item.state == .failed { Button("استئناف أو إعادة البدء", systemImage: "play") { Task { await service.resume(item, webView: model.webView) } } }
-                    Button("حذف", systemImage: "trash", role: .destructive) { deleting = item }
+                    Button("حذف", systemImage: "trash") { deleting = item }
                 } label: { Image(systemName: "ellipsis").frame(width: 38, height: 44) }.accessibilityLabel("خيارات \(item.filename)")
             }
             if item.isBusy { if let fraction = item.fraction { ProgressView(value: fraction).tint(model.profile.color) } else { ProgressView().frame(maxWidth: .infinity, alignment: .leading) } }

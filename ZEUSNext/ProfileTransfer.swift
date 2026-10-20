@@ -49,9 +49,10 @@ struct ProfileTransferPage: View {
                 do { let url = try result.get(); let scoped = url.startAccessingSecurityScopedResource(); defer { if scoped { url.stopAccessingSecurityScopedResource() } }; guard ((try url.resourceValues(forKeys: [.fileSizeKey])).fileSize ?? 0) <= 6_000_000 else { throw URLError(.dataLengthExceedsMaximum) }; backup = try JSONDecoder().decode(ProfileBackup.self, from: Data(contentsOf: url)).validated(); message = nil }
                 catch { message = "تعذر قراءة النسخة: " + error.localizedDescription }
             }
-            .sheet(item: $exported) { FileExporter(url: $0.url) }
+            .sheet(item: $exported) { item in FileExporter(url: item.url).onDisappear { try? FileManager.default.removeItem(at: item.url) } }
     }
     private func exportBytes() throws -> Data {
+        guard context.permitted else { throw AccountError.permission }
         var data = context.isActive ? context.model.data : context.model.profiles.load(context.profile)
         data.forms = []
         if !includeHistory { data.history = []; data.searches = [] }
@@ -66,6 +67,7 @@ struct ProfileTransferPage: View {
         catch { message = error.localizedDescription }
     }
     private func apply(_ backup: ProfileBackup) {
+        guard context.permitted else { message = AccountError.permission.localizedDescription; return }
         guard context.profile.role != .guest, context.profile.role != .kiosk else { message = "استيراد بيانات دائمة غير متاح في حساب الضيف أو الكشك."; return }
         var data = context.isActive ? context.model.data : context.model.profiles.load(context.profile)
         for site in backup.data.bookmarks where !data.bookmarks.contains(where: { $0.url == site.url }) { var item = site; item.id = UUID(); data.bookmarks.append(item) }

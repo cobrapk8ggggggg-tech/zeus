@@ -2,6 +2,23 @@ import SwiftUI
 import UIKit
 
 final class BrowserAppDelegate: NSObject, UIApplicationDelegate {
+    private var privacyWindows: [String: UIWindow] = [:]
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        NotificationCenter.default.addObserver(self, selector: #selector(hideAppContent), name: UIApplication.willResignActiveNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(revealAppContent), name: UIApplication.didBecomeActiveNotification, object: nil)
+        return true
+    }
+    @objc private func hideAppContent() {
+        for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
+            let key = scene.session.persistentIdentifier
+            let window = privacyWindows[key] ?? UIWindow(windowScene: scene)
+            let controller = UIViewController(); controller.view.backgroundColor = .black
+            window.rootViewController = controller; window.windowLevel = .alert + 2; window.isUserInteractionEnabled = false; window.isHidden = false
+            privacyWindows[key] = window
+        }
+    }
+    @objc private func revealAppContent() { for window in privacyWindows.values { window.isHidden = true }; privacyWindows.removeAll() }
+
     func application(_ application: UIApplication, handleEventsForBackgroundURLSession identifier: String, completionHandler: @escaping () -> Void) {
         if identifier == DownloadService.sessionIdentifier { DownloadService.backgroundCompletion = completionHandler }
         else { completionHandler() }

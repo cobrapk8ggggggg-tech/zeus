@@ -26,7 +26,7 @@ struct BrowserRoot: View {
     @ObservedObject var model: BrowserModel
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var sizeClass
-    @AppStorage("showCurrentUserAvatar") private var showCurrentUserAvatar = true
+    @AppStorage("showCurrentUserAvatar") private var showCurrentUserAvatar = false
     @State private var panel: BrowserPanel?
     @State private var toolbarVisible = false
     @State private var topTray = false
@@ -61,13 +61,9 @@ struct BrowserRoot: View {
         .fullScreenCover(item: $model.gallery) { GallerySheet(model: model, gallery: $0).tint(.white) }
         .fullScreenCover(item: $model.formDraft) { FormDraftView(model: model, draft: $0) }
         .sheet(item: $model.share) { ActivitySheet(url: $0.url) }
-        .alert("رسالة من الصفحة", isPresented: Binding(get: { model.dialog != nil }, set: { if !$0, let dialog = model.dialog { dialog.complete(nil); model.dialog = nil } })) {
-            if model.dialog?.kind == .prompt { TextField("النص", text: $dialogText) }
-            Button("موافق") { let dialog = model.dialog; model.dialog = nil; dialog?.complete(dialogText) }
-            if model.dialog?.kind != .alert { Button("إلغاء", role: .cancel) { let dialog = model.dialog; model.dialog = nil; dialog?.complete(nil) } }
-        } message: { Text(model.dialog?.text ?? "") }
-        .alert("ZEUS", isPresented: Binding(get: { model.notice != nil }, set: { if !$0 { model.notice = nil } }), presenting: model.notice) { _ in Button("حسنًا", role: .cancel) {} } message: { Text($0.text) }
-        .onChange(of: model.dialog?.id) { _, _ in dialogText = model.dialog?.initial ?? "" }
+        .onChange(of: model.dialog?.id) { _, _ in if let dialog = model.dialog { model.dialog = nil; BrowserPresentation.present(dialog) } }
+        .onChange(of: model.notice?.id) { _, _ in if let notice = model.notice { model.notice = nil; BrowserPresentation.notice(notice.text) } }
+        .onChange(of: model.requiresUnlock) { _, locked in if locked { panel = nil; model.article = nil; model.gallery = nil; model.formDraft = nil; model.share = nil; BrowserPresentation.dismissTools() } }
         .onChange(of: model.address) { _, value in if !addressFocused { draft = value } }
         .onChange(of: scenePhase) { _, phase in if phase == .background { model.backgrounded() }; if phase == .active { model.becameActive() } }
         .onReceive(model.profiles.objectWillChange) { model.changed() }
@@ -82,8 +78,8 @@ struct BrowserRoot: View {
     }
     private var addressBar: some View {
         HStack(spacing: 8) {
-            actionButton(.shield)
-            TextField("ابحث أو أدخل رابطًا", text: $draft).textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.webSearch).submitLabel(.go).focused($addressFocused).environment(\.layoutDirection, .leftToRight).multilineTextAlignment(.center).accessibilityIdentifier("addressField").onSubmit { addressFocused = false; model.open(draft) }
+            actionButton(layout == .icab ? .bookmark : .shield)
+            TextField("ابحث أو أدخل رابطًا", text: $draft).textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.webSearch).submitLabel(.go).focused($addressFocused).environment(\.layoutDirection, .leftToRight).multilineTextAlignment(layout == .icab ? .leading : .center).accessibilityIdentifier("addressField").onSubmit { addressFocused = false; model.open(draft) }
             actionButton(.reload)
         }.padding(.horizontal, 5).glassSurface(24)
     }
@@ -98,7 +94,8 @@ struct BrowserRoot: View {
                     HStack(spacing: 0) {
                         actionButton(.home)
                         ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 18) { ForEach(model.data.bookmarks) { bookmark in Button(bookmark.title) { model.open(bookmark.url) }.font(.subheadline).lineLimit(1) } } }
-                        ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 0) { ForEach([BrowserAction.reader, .scripts, .downloads, .fullScreen, .twinHorizontal, .darkPage, .settings, .tools]) { actionButton($0) } } }.frame(maxWidth: sizeClass == .regular ? 270 : 140)
+                        ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 0) { ForEach([BrowserAction.reader, .scripts, .downloads, .fullScreen, .twinHorizontal, .darkPage, .settings]) { actionButton($0) } } }.frame(maxWidth: sizeClass == .regular ? 270 : 140)
+                        actionButton(.tools)
                     }
                 }
                 if model.data.settings.advanced?.showTabsBar != false {
@@ -232,7 +229,7 @@ struct OriginalHome: View {
                 }
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4), spacing: 25) {
                     ForEach(model.data.bookmarks) { item in
-                        Button { model.open(item.url) } label: { VStack(spacing: 8) { Image(systemName: "globe").font(.system(size: 32)).frame(width: 60, height: 60).background(.white.opacity(0.08), in: Circle()); Text(item.title).font(.system(size: 12)).lineLimit(1).frame(width: 75) } }.buttonStyle(.plain).contextMenu { Button("حذف", role: .destructive) { model.data.bookmarks.removeAll { $0.id == item.id }; model.persist() } }
+                        Button { model.open(item.url) } label: { VStack(spacing: 8) { Image(systemName: "globe").font(.system(size: 32)).frame(width: 60, height: 60).background(.white.opacity(0.08), in: Circle()); Text(item.title).font(.system(size: 12)).lineLimit(1).frame(width: 75) } }.buttonStyle(.plain).contextMenu { Button("حذف") { model.data.bookmarks.removeAll { $0.id == item.id }; model.persist() } }
                     }
                     Button { adding = true } label: { VStack(spacing: 8) { Image(systemName: "plus").font(.title2).frame(width: 60, height: 60).overlay(Circle().strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [5]))); Text("إضافة").font(.system(size: 12)).frame(width: 75) } }.buttonStyle(.plain).disabled([.guest, .kiosk].contains(model.profile.role))
                 }.padding(.horizontal, 15).padding(.top, 35)

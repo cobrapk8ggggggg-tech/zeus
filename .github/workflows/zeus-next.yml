@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   verify:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
@@ -77,11 +77,34 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/ZEUSSimulator" \
             -resultBundlePath "$GITHUB_WORKSPACE/results/tests.xcresult" \
             test CODE_SIGNING_ALLOWED=NO 2>&1 | tee results/test.log
+      - name: Verify full-screen tools and settings on iPad
+        run: |
+          set -o pipefail
+          ipad_id=$(python3 - <<'PYIPAD'
+          import json, subprocess
+          runtimes=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','--json']))['devices']
+          for runtime, devices in sorted(runtimes.items(), reverse=True):
+              if 'iOS-26' in runtime:
+                  for device in devices:
+                      if 'iPad' in device['name']:
+                          print(device['udid']); raise SystemExit
+          raise SystemExit('No iPad simulator available')
+          PYIPAD
+          )
+          xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -configuration Debug \
+            -destination "platform=iOS Simulator,id=$ipad_id" \
+            -only-testing:ZEUSNextUITests -parallel-testing-enabled NO \
+            -derivedDataPath "$RUNNER_TEMP/ZEUSSimulator" \
+            -resultBundlePath "$GITHUB_WORKSPACE/results/ipad-tests.xcresult" \
+            test CODE_SIGNING_ALLOWED=NO 2>&1 | tee results/ipad-test.log
       - name: Export screenshot attachments
         if: always()
         run: |
           if [ -d results/tests.xcresult ]; then
             xcrun xcresulttool export attachments --path results/tests.xcresult --output-path results/screenshots || true
+          fi
+          if [ -d results/ipad-tests.xcresult ]; then
+            xcrun xcresulttool export attachments --path results/ipad-tests.xcresult --output-path results/screenshots-ipad || true
           fi
       - uses: actions/upload-artifact@v4
         if: always()
@@ -97,6 +120,7 @@ jobs:
           path: |
             results/ZEUS-2.0-unsigned.ipa
             results/screenshots
+            results/screenshots-ipad
             results/filter-metadata.json
             ZEUSNext/Resources/safari-rules.json
             ZEUSNext/Resources/FILTER-NOTICES.txt

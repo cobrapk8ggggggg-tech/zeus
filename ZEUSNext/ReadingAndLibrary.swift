@@ -16,14 +16,14 @@ struct LibrarySheet: View {
                     if model.data.bookmarks.isEmpty { ContentUnavailableView("صفحات تستحق العودة", systemImage: "bookmark", description: Text("أضف صفحة من صندوق الأدوات؛ تُحفظ في هذه المساحة فقط.")) }
                     ForEach(model.data.bookmarks.filter { matches($0.title, $0.url) }) { item in
                         Button { model.open(item.url); dismiss() } label: { libraryRow(item.title, url: item.url, symbol: "bookmark.fill") }.buttonStyle(.plain)
-                            .contextMenu { Button("حذف", role: .destructive) { model.data.bookmarks.removeAll { $0.id == item.id }; model.persist() } }
+                            .contextMenu { Button("حذف") { model.data.bookmarks.removeAll { $0.id == item.id }; model.persist() } }
                     }
                 } else {
                     if model.data.history.isEmpty { ContentUnavailableView("بداية نظيفة", systemImage: "clock", description: Text(model.profile.isPrivate ? "لا يُحفظ سجل في هذه المساحة الخاصة." : "ستظهر زياراتك هنا.")) }
                     ForEach(model.data.history.filter { matches($0.title, $0.url) }) { item in
                         Button { model.open(item.url); dismiss() } label: {
                             VStack(alignment: .leading, spacing: 6) { libraryRow(item.title, url: item.url, symbol: "clock"); Text(item.date, style: .date).font(.caption2).foregroundStyle(.tertiary) }
-                        }.buttonStyle(.plain).contextMenu { Button("حذف الزيارة", role: .destructive) { model.data.history.removeAll { $0.id == item.id }; model.persist() } }
+                        }.buttonStyle(.plain).contextMenu { Button("حذف الزيارة") { model.data.history.removeAll { $0.id == item.id }; model.persist() } }
                     }
                 }
             }.scrollContentBackground(.hidden).background { OrbitBackground(tint: model.profile.color) }.navigationTitle("مكتبة المساحة").navigationBarTitleDisplayMode(.inline)
@@ -67,7 +67,7 @@ struct ReaderSheet: View {
                     Button { settings = true } label: { Image(systemName: "slider.horizontal.3").padding(12) }
                     Button { UIPasteboard.general.string = article.title + "\n\n" + paragraphs.joined(separator: "\n\n"); copied = true } label: { Image(systemName: copied ? "checkmark" : "doc.on.doc").padding(12) }
                     Spacer(); Text("وضع القراءة").font(.subheadline); Spacer()
-                    Button { dismiss() } label: { Image(systemName: "xmark").padding(12) }
+                    Button { dismiss() } label: { Image(systemName: "xmark").padding(12) }.accessibilityIdentifier("closeReaderButton")
                 }.padding(.horizontal, 12).background(.black).transition(.move(edge: .top).combined(with: .opacity))
             }
             rightReveal.environment(\.layoutDirection, .leftToRight)
@@ -134,9 +134,9 @@ struct GallerySheet: View {
                 Button("إلغاء") { selecting = false; selection.removeAll() }; Spacer()
                 Button(selection.count == gallery.images.count ? "إلغاء الكل" : "تحديد الكل") { selection = selection.count == gallery.images.count ? [] : Set(gallery.images) }
             } else {
-                Button { settings = true } label: { Image(systemName: "gearshape.fill") }; Spacer(); Text("\(gallery.images.count) صور").font(.headline); Spacer()
+                Button { settings = true } label: { Image(systemName: "gearshape.fill") }; Spacer(); Text("\(gallery.images.count) صور").font(.headline).accessibilityIdentifier("galleryCount"); Spacer()
                 Button { selecting = true } label: { Image(systemName: "checkmark.circle") }
-                Button { dismiss() } label: { Image(systemName: "xmark") }.padding(.leading, 12)
+                Button { dismiss() } label: { Image(systemName: "xmark") }.padding(.leading, 12).accessibilityIdentifier("closeGalleryButton")
             }
         }.padding(18).background(.black)
     }
