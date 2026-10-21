@@ -23,6 +23,12 @@ final class TranslationDataTests: XCTestCase {
         let values = try TextTranslationService.validateAIResponse("```json\n[{\"id\":\"b\",\"text\":\"اثنان\"},{\"id\":\"a\",\"text\":\"<script>text</script>\"}]\n```", originals: items)
         XCTAssertEqual(values.map(\.id), ["a", "b"]); XCTAssertEqual(values[0].text, "<script>text</script>")
     }
+    func testGoogleQueryPreservesPlusSignsAmpersandsAndUnicode() {
+        let text = "C++ & العربية + accents é", url = TextTranslationService.googleWebURL(text: text, target: "ar")
+        let parts = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        XCTAssertTrue(parts?.percentEncodedQuery?.contains("C%2B%2B") == true)
+        XCTAssertEqual(parts?.queryItems?.first(where: { $0.name == "q" })?.value, text)
+    }
     func testUnicodeChunkingPreservesEveryCharacterAndRTL() {
         let text = String(repeating: "Hello 👨‍👩‍👦 مرحبًا. \n", count: 600)
         let chunks = TextTranslationService.split(text, limit: 1400)

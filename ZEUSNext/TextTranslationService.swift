@@ -47,9 +47,7 @@ struct TextTranslationService {
                     for item in batch { group.addTask {
                         let parts = split(item.text, limit: 1400); var translated = ""
                         for part in parts {
-                            var c = URLComponents(string: "https://translate.googleapis.com/translate_a/single")!
-                            c.queryItems = [URLQueryItem(name: "client", value: "gtx"), URLQueryItem(name: "sl", value: "auto"), URLQueryItem(name: "tl", value: preferences.target), URLQueryItem(name: "dt", value: "t"), URLQueryItem(name: "q", value: part)]
-                            let value = try await AIHTTP.object(AIHTTP.request(c.url!))
+                            let value = try await AIHTTP.object(AIHTTP.request(googleWebURL(text: part, target: preferences.target)))
                             guard let rows = AIHTTP.nested(value, [0]) as? [[Any]], !rows.isEmpty else { throw TranslationFailure.message("تعذر قراءة رد Google للويب. جرّب Google Cloud أو مزود الذكاء الاصطناعي.") }
                             let text = rows.compactMap { $0.first as? String }.joined()
                             guard !text.isEmpty else { throw TranslationFailure.message("أعاد Google نصًا فارغًا؛ بقي الأصل دون تغيير.") }
@@ -74,6 +72,13 @@ struct TextTranslationService {
             let response = try await AIProviderService.shared.generate(prompt, config: provider, secret: secret, context: context)
             return try validateAIResponse(response, originals: segments)
         }
+    }
+    static func googleWebURL(text: String, target: String) -> URL {
+        var c = URLComponents(string: "https://translate.googleapis.com/translate_a/single")!
+        c.queryItems = [URLQueryItem(name: "client", value: "gtx"), URLQueryItem(name: "sl", value: "auto"), URLQueryItem(name: "tl", value: target), URLQueryItem(name: "dt", value: "t"), URLQueryItem(name: "q", value: text)]
+        // Google parses query values as form data: a literal + must be percent escaped.
+        c.percentEncodedQuery = c.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
+        return c.url!
     }
     static func validateAIResponse(_ response: String, originals: [TranslationSegment]) throws -> [TranslationSegment] {
         var text = response.trimmingCharacters(in: .whitespacesAndNewlines)

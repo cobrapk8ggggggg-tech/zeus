@@ -112,7 +112,7 @@ struct SettingsSheet: View {
         }.settingsPage("مواقع الويب")
     }
     private var other: some View {
-        Form { ThemedSection("التطبيق") { Text("ZEUS 2.1"); Text("ألوان ومظهر مستقلان لكل حساب"); Text("SwiftUI · WebKit") }; ThemedSection("التراخيص") { NavigationLink("قوائم الحجب ومصادرها") { ScrollView { Text(Bundle.main.url(forResource: "FILTER-NOTICES", withExtension: "txt").flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? "الحجب الافتراضي هو محرك ZEUS الأصلي. إشعارات EasyList وEasyPrivacy ترافق الحزمة الاختيارية المنفصلة؛ راجع ترخيص مصدر أي قواعد تستوردها.").font(.footnote.monospaced()).textSelection(.enabled).padding() }.background(theme.backgroundColor).navigationTitle("التراخيص") } } }.settingsPage("أخرى")
+        Form { ThemedSection("التطبيق") { Text("ZEUS 2.2"); Text("ألوان ومظهر مستقلان لكل حساب"); Text("SwiftUI · WebKit") }; ThemedSection("التراخيص") { NavigationLink("قوائم الحجب ومصادرها") { ScrollView { Text(Bundle.main.url(forResource: "FILTER-NOTICES", withExtension: "txt").flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? "الحجب الافتراضي هو محرك ZEUS الأصلي. إشعارات EasyList وEasyPrivacy ترافق الحزمة الاختيارية المنفصلة؛ راجع ترخيص مصدر أي قواعد تستوردها.").font(.footnote.monospaced()).textSelection(.enabled).padding() }.background(theme.backgroundColor).navigationTitle("التراخيص") } } }.settingsPage("أخرى")
     }
     private var help: some View {
         Form {
