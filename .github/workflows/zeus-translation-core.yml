@@ -1,0 +1,115 @@
+name: ZEUS translation core on iPad
+on:
+  push:
+    branches: [feature/zeus-page-translation-20261021, codex/zeus-browser-next, fix/zeus-next-latest-build-20261020, fix/zeus-browser-stability-20261021]
+    paths: [.github/workflows/zeus-translation-core.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: zeus-translation-ipad-core-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    name: Verify browser and translation core on iPad
+    runs-on: macos-15
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [core]
+    env:
+      ZEUS_TEST_SUITE: ${{ matrix.suite }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26.3'
+      - name: Generate lightweight native project
+        run: |
+          brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+          python3 .zeus-ci/project.py
+          xcodegen generate --spec zeus-project.json
+          mkdir -p results
+      - name: Start deterministic local fixture
+        run: |
+          python3 .zeus-ci/fixture_server.py > results/fixture.log 2>&1 &
+          curl --fail --max-time 10 --retry 15 --retry-connrefused --retry-delay 1 http://127.0.0.1:8765/ > /dev/null
+      - name: Select simulator
+        run: |
+          device_id=$(python3 - <<'PYDEVICE'
+          import json, os, subprocess
+          target = 'iPad'
+          runtimes=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','--json']))['devices']
+          for runtime, devices in sorted(runtimes.items(), reverse=True):
+              if 'iOS-26' in runtime:
+                  for device in devices:
+                      if target in device['name']:
+                          print(device['udid']); raise SystemExit
+          raise SystemExit('No matching iOS 26 simulator')
+          PYDEVICE
+          )
+          echo "ZEUS_SIMULATOR_ID=$device_id" >> "$GITHUB_ENV"
+      - name: Boot simulator
+        timeout-minutes: 5
+        run: |
+          xcrun simctl boot "$ZEUS_SIMULATOR_ID" || true
+          xcrun simctl bootstatus "$ZEUS_SIMULATOR_ID" -b
+      - name: Add an album image for the avatar test
+        if: matrix.suite != 'core'
+        timeout-minutes: 3
+        run: |
+          curl --fail --max-time 10 http://127.0.0.1:8765/image.png -o "$RUNNER_TEMP/avatar-fixture.png"
+          python3 - <<'PYMEDIA'
+          import os, subprocess
+          subprocess.run(['xcrun','simctl','addmedia',os.environ['ZEUS_SIMULATOR_ID'],os.path.join(os.environ['RUNNER_TEMP'],'avatar-fixture.png')],check=True,timeout=90)
+          PYMEDIA
+      - name: Build simulator application and test bundles
+        timeout-minutes: 10
+        run: |
+          set -o pipefail
+          if [ "$ZEUS_TEST_SUITE" = core ]; then target=ZEUSNextTests; else target=ZEUSNextUITests; fi
+          xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -configuration Debug \
+            -destination "platform=iOS Simulator,id=$ZEUS_SIMULATOR_ID" \
+            -only-testing:"$target" \
+            -derivedDataPath "$RUNNER_TEMP/ZEUSSimulator" \
+            build-for-testing CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- 2>&1 | tee results/build.log
+      - name: Run native tests on the selected simulator
+        timeout-minutes: 15
+        run: |
+          set -o pipefail
+          if [ "$ZEUS_TEST_SUITE" = core ]; then target=ZEUSNextTests; else target=ZEUSNextUITests; fi
+          xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -configuration Debug \
+            -destination "platform=iOS Simulator,id=$ZEUS_SIMULATOR_ID" \
+            -only-testing:"$target" -parallel-testing-enabled NO \
+            -test-timeouts-enabled YES -default-test-execution-time-allowance 180 -maximum-test-execution-time-allowance 240 \
+            -derivedDataPath "$RUNNER_TEMP/ZEUSSimulator" \
+            -resultBundlePath "$GITHUB_WORKSPACE/results/tests.xcresult" \
+            test-without-building CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- 2>&1 | tee results/test.log
+      - name: Export results and screenshots
+        if: always()
+        run: |
+          if [ -f results/tests.xcresult/Info.plist ]; then
+            xcrun xcresulttool export attachments --path results/tests.xcresult --output-path results/screenshots || true
+            xcrun xcresulttool get test-results summary --path results/tests.xcresult > results/summary.json || true
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zeus-review-ipad-native-core
+          path: |
+            results/screenshots
+            results/summary.json
+            results/test.log
+            results/build.log
+          retention-days: 14
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: zeus-diagnostics-ipad-native-core
+          path: results
+          retention-days: 7
+          if-no-files-found: warn
