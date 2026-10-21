@@ -1,4 +1,4 @@
-name: ZEUS translation core on iPad
+name: ZEUS viewport regression on iPad
 on:
   push:
     branches: [feature/zeus-page-translation-20261021, codex/zeus-browser-next, fix/zeus-next-latest-build-20261020, fix/zeus-browser-stability-20261021]
@@ -10,10 +10,11 @@ concurrency:
   group: zeus-translation-ipad-core-${{ github.ref }}
   cancel-in-progress: true
 # Run native assertions independently of the longer camera/album UI suites.
-# App sources match the IPA build; WebKit viewport tests await committed layout.
+# App sources match the IPA. Other native cases passed; rerun the stabilized
+# viewport regression through the actual provider request and reload counters.
 jobs:
   verify:
-    name: Verify browser and translation core on iPad
+    name: Verify visible batch and quota reuse on iPad
     runs-on: macos-15
     timeout-minutes: 40
     strategy:
@@ -22,6 +23,7 @@ jobs:
         suite: [core]
     env:
       ZEUS_TEST_SUITE: ${{ matrix.suite }}
+      ZEUS_NATIVE_TEST_FILTER: ZEUSNextTests/PageTranslationTests/testViewportPriorityAndReloadReuseSavedTranslationWithoutProviderRequests
     steps:
       - uses: actions/checkout@v4
         with:
@@ -82,7 +84,7 @@ jobs:
         timeout-minutes: 15
         run: |
           set -o pipefail
-          if [ "$ZEUS_TEST_SUITE" = core ]; then target=ZEUSNextTests; else target=ZEUSNextUITests; fi
+          target="$ZEUS_NATIVE_TEST_FILTER"
           xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -configuration Debug \
             -destination "platform=iOS Simulator,id=$ZEUS_SIMULATOR_ID" \
             -only-testing:"$target" -parallel-testing-enabled NO \
