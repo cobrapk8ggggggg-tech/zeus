@@ -56,3 +56,8 @@ test('rate limited client stops before inference', async () => {
   const e = env(); e.RATE_LIMITER = { async limit() { return { success: false }; } };
   const r = await worker.fetch(req(), e); assert.equal(r.status, 429); assert.equal(e.calls.length, 0);
 });
+
+test('Llama reserves a bounded output budget within its smaller context window', () => {
+  const input = validateInput({ ...body, model: MODELS[1].id, segments: [{ id: 'long', text: 'a'.repeat(16000) }] });
+  assert.equal(modelInput(input).max_tokens, 8192);
+});

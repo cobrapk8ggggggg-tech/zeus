@@ -6,3 +6,6 @@ results/
 ZEUSNext/Resources/safari-rules.json
 ZEUSNext/Resources/filter-metadata.json
 ZEUSNext/Resources/FILTER-NOTICES.txt
+
+# Private Cloudflare device connection files never belong in source control.
+ZEUS-Cloudflare-connection*.json
