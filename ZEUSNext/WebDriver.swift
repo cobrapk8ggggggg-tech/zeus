@@ -61,7 +61,7 @@ import UIKit
         guard let model, let tab, let owner = model.profiles.profile(tab.profileID) else { download.cancel { _ in }; return }
         model.downloads.attach(download, profile: owner); tab.loading = false; model.changed(); model.notify("أُضيف الملف إلى التنزيلات.")
     }
-    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { tab?.error = nil; tab?.loading = true; model?.changed() }
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { tab?.translation?.navigationStarted(); tab?.error = nil; tab?.loading = true; model?.changed() }
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         tab?.committed = true
         if let url = webView.url { tab?.url = url.absoluteString; if model?.current?.id == tab?.id { model?.address = url.absoluteString } }
@@ -96,6 +96,7 @@ import UIKit
         view.scrollView.delegate = driver
         view.navigationDelegate = driver; view.uiDelegate = driver; view.allowsBackForwardNavigationGestures = true; view.isFindInteractionEnabled = true
         tab.webView = view; tab.driver = driver; driver.observe(view)
+        let translation = PageTranslation(model: model, tab: tab); tab.translation = translation; translation.attach(to: view, installScript: false)
         model.tabs.append(tab); model.selectedTabID = tab.id; model.persist()
         return view
     }

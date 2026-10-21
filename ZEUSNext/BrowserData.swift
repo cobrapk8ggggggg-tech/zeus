@@ -71,6 +71,8 @@ struct BrowserSettings: Codable {
     var advanced: AdvancedSettings?
     var backupFiltersEnabled: Bool?
     var theme: BrowserTheme?
+    var translation: TranslationPreferences?
+    var aiProviders: [AIProviderConfiguration]?
 }
 
 struct SavedTab: Codable, Identifiable {
@@ -256,7 +258,7 @@ enum BrowserDisk {
         guard active.isAdmin, !profile.isAdmin, profiles.count > 1 else { throw AccountError.permission }
         try await clearAndReleaseWebsiteStore(profile)
         for path in [folder(for: profile), downloads(for: profile), configurationFolder(profile)] where FileManager.default.fileExists(atPath: path.path) { try FileManager.default.removeItem(at: path) }
-        AccountVault.remove(profile.id); FormVault.remove(profileID: profile.id)
+        AccountVault.remove(profile.id); FormVault.remove(profileID: profile.id); AISecretVault.removeAll(profile: profile.id)
         profiles.removeAll { $0.id == profile.id }
         if activeID == profile.id { activeID = profiles[0].id }
         persistIndex()
@@ -266,7 +268,7 @@ enum BrowserDisk {
         let old = profiles
         for profile in old {
             try await clearAndReleaseWebsiteStore(profile)
-            AccountVault.remove(profile.id); FormVault.remove(profileID: profile.id)
+            AccountVault.remove(profile.id); FormVault.remove(profileID: profile.id); AISecretVault.removeAll(profile: profile.id)
             for path in [folder(for: profile), downloads(for: profile), configurationFolder(profile)] where FileManager.default.fileExists(atPath: path.path) { try FileManager.default.removeItem(at: path) }
         }
         stores.removeAll()

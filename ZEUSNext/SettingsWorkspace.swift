@@ -3,15 +3,15 @@ import WebKit
 import UniformTypeIdentifiers
 
 enum SettingsCategory: String, CaseIterable, Identifiable, Hashable {
-    case account, appearance, tabs, launch, privacy, personalData, websites, network, tools, services, other, help
+    case translation, ai, account, appearance, tabs, launch, privacy, personalData, websites, network, tools, services, other, help
     var id: String { rawValue }
     var title: String {
-        switch self { case .account: return "الحساب"; case .appearance: return "واجهة المستخدم والأشرطة"; case .tabs: return "التبويبات"; case .launch: return "بدء التطبيق"; case .privacy: return "الخصوصية"; case .personalData: return "البيانات الشخصية"; case .websites: return "مواقع الويب"; case .network: return "الشبكة"; case .tools: return "الأدوات"; case .services: return "الخدمات"; case .other: return "أخرى"; case .help: return "المساعدة والخصوصية" }
+        switch self { case .translation: return "ترجمة الصفحات"; case .ai: return "الذكاء الاصطناعي"; case .account: return "الحساب"; case .appearance: return "واجهة المستخدم والأشرطة"; case .tabs: return "التبويبات"; case .launch: return "بدء التطبيق"; case .privacy: return "الخصوصية"; case .personalData: return "البيانات الشخصية"; case .websites: return "مواقع الويب"; case .network: return "الشبكة"; case .tools: return "الأدوات"; case .services: return "الخدمات"; case .other: return "أخرى"; case .help: return "المساعدة والخصوصية" }
     }
     var symbol: String {
-        switch self { case .account: return "person.2"; case .appearance: return "macwindow.on.rectangle"; case .tabs: return "square.on.square"; case .launch: return "play"; case .privacy: return "hand.raised"; case .personalData: return "tray"; case .websites: return "character.book.closed"; case .network: return "antenna.radiowaves.left.and.right"; case .tools: return "wrench.and.screwdriver"; case .services: return "cloud"; case .other: return "archivebox"; case .help: return "questionmark.circle" }
+        switch self { case .translation: return "translate"; case .ai: return "sparkles"; case .account: return "person.2"; case .appearance: return "macwindow.on.rectangle"; case .tabs: return "square.on.square"; case .launch: return "play"; case .privacy: return "hand.raised"; case .personalData: return "tray"; case .websites: return "character.book.closed"; case .network: return "antenna.radiowaves.left.and.right"; case .tools: return "wrench.and.screwdriver"; case .services: return "cloud"; case .other: return "archivebox"; case .help: return "questionmark.circle" }
     }
-    var group: Int { switch self { case .account: return 0; case .appearance, .tabs, .launch: return 1; case .privacy, .personalData: return 2; case .websites, .network, .tools, .services: return 3; case .other: return 4; case .help: return 5 } }
+    var group: Int { switch self { case .account: return 0; case .appearance, .tabs, .launch: return 1; case .privacy, .personalData: return 2; case .translation, .ai, .websites, .network, .tools, .services: return 3; case .other: return 4; case .help: return 5 } }
 }
 
 struct SettingsSheet: View {
@@ -61,6 +61,8 @@ struct SettingsSheet: View {
     private func categoryLabel(_ category: SettingsCategory) -> some View { Label(category.title, systemImage: category.symbol).labelStyle(BrowserSettingsLabelStyle()).frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 8).accessibilityIdentifier("category-" + category.rawValue) }
     @ViewBuilder private func detail(_ category: SettingsCategory) -> some View {
         Group { switch category {
+        case .translation: TranslationSettingsPage(context: context)
+        case .ai: AISettingsPage(context: context)
         case .account: AccountSettingsView(model: context.model, profile: context.profile, embedded: true)
         case .appearance: appearance
         case .tabs: tabSettings

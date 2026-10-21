@@ -2,12 +2,13 @@ import SwiftUI
 import WebKit
 import Combine
 
-enum BrowserPanel: String, Identifiable { case tabs, profiles, account, downloads, settings, library, history, tools, scripts, console, forms; var id: String { rawValue } }
+enum BrowserPanel: String, Identifiable { case translation, tabs, profiles, account, downloads, settings, library, history, tools, scripts, console, forms; var id: String { rawValue } }
 enum BrowserAction: String, CaseIterable, Identifiable {
-    case back, forward, reload, home, newTab, tabs, library, history, reader, gallery, downloads, profiles, scripts, console, shield, share, settings, tools, bookmark, pinTab, twinHorizontal, twinVertical, savePage, printPage, darkPage, fullScreen, saveForm, fillForm
+    case translate, back, forward, reload, home, newTab, tabs, library, history, reader, gallery, downloads, profiles, scripts, console, shield, share, settings, tools, bookmark, pinTab, twinHorizontal, twinVertical, savePage, printPage, darkPage, fullScreen, saveForm, fillForm
     var id: String { rawValue }
     var symbol: String {
         switch self {
+        case .translate: return "translate"
         case .saveForm: return "plus.rectangle.on.rectangle"; case .fillForm: return "square.and.pencil"
         case .bookmark: return "bookmark.badge.plus"; case .pinTab: return "pin"; case .twinHorizontal: return "rectangle.split.2x1"; case .twinVertical: return "rectangle.split.1x2"; case .savePage: return "doc"; case .printPage: return "printer"; case .darkPage: return "moon"; case .fullScreen: return "arrow.up.left.and.arrow.down.right"
         case .back: return "chevron.backward"; case .forward: return "chevron.forward"; case .reload: return "arrow.clockwise"; case .home: return "house.fill"; case .newTab: return "plus"; case .tabs: return "square.on.square"; case .library: return "globe"; case .history: return "clock.arrow.circlepath"; case .reader: return "doc.plaintext"; case .gallery: return "photo.on.rectangle"; case .downloads: return "arrow.down.circle"; case .profiles: return "person.crop.circle"; case .scripts: return "curlybraces"; case .console: return "terminal"; case .shield: return "shield"; case .share: return "square.and.arrow.up"; case .settings: return "gearshape"; case .tools: return "ellipsis.circle"
@@ -15,6 +16,7 @@ enum BrowserAction: String, CaseIterable, Identifiable {
     }
     var title: String {
         switch self {
+        case .translate: return "ترجمة الصفحة"
         case .saveForm: return "حفظ النموذج"; case .fillForm: return "ملء النماذج"
         case .bookmark: return "إضافة للمفضلة"; case .pinTab: return "تثبيت التبويب"; case .twinHorizontal: return "متصفح مزدوج أفقي"; case .twinVertical: return "متصفح مزدوج عمودي"; case .savePage: return "حفظ الصفحة"; case .printPage: return "طباعة"; case .darkPage: return "تعتيم الصفحة"; case .fullScreen: return "إخفاء الأشرطة"
         case .back: return "رجوع"; case .forward: return "تقدم"; case .reload: return "تحديث"; case .home: return "الرئيسية"; case .newTab: return "تبويب جديد"; case .tabs: return "التبويبات"; case .library: return "المواقع"; case .history: return "السجل"; case .reader: return "القارئ"; case .gallery: return "معرض الصور"; case .downloads: return "التنزيلات"; case .profiles: return "البروفايلات"; case .scripts: return "السكربتات"; case .console: return "أدوات المطور"; case .shield: return "حماية الموقع"; case .share: return "مشاركة"; case .settings: return "الإعدادات"; case .tools: return "أدوات الصفحة"
@@ -65,7 +67,9 @@ struct BrowserRoot: View {
         .fullScreenCover(item: $panel) { item in panelContent(item).browserTheme(theme).environment(\.layoutDirection, .rightToLeft) }
         .overlay { if profilePicker { ProfilePickerPopover(model: model, close: { profilePicker = false }, manage: { profilePicker = false; panel = .profiles }).browserTheme(theme) } }
         .overlay(alignment: .top) { if model.current?.loading == true { ProgressView(value: max(0.05, model.current?.progress ?? 0)).progressViewStyle(.linear).tint(theme.accentColor).frame(height: 2).allowsHitTesting(false) } }
+        .overlay(alignment: .top) { if !model.requiresUnlock, let page = model.current?.translation { TranslationCard(page: page, settings: { panel = .translation }).id(model.current?.id).animation(.spring(response: 0.45, dampingFraction: 0.82), value: page.offered) } }
         .browserTheme(theme)
+        .onChange(of: model.current?.id) { _, _ in model.current?.translation?.becameVisible() }
         .fullScreenCover(item: $model.article) { ReaderSheet(model: model, article: $0).tint(theme.buttonTextColor) }
         .fullScreenCover(item: $model.gallery) { GallerySheet(model: model, gallery: $0).tint(theme.buttonTextColor) }
         .fullScreenCover(item: $model.formDraft) { FormDraftView(model: model, draft: $0) }
@@ -116,7 +120,7 @@ struct BrowserRoot: View {
                         }
                     }
                 }
-            } else { HStack { actionButton(.profiles); Spacer(); Text(model.profile.name).font(.subheadline); Spacer(); Button { panel = .account } label: { Image(systemName: "gearshape").font(.system(size: 19)).foregroundStyle(theme.iconColor).frame(width: 44, height: 40).background(theme.buttonBackgroundColor, in: RoundedRectangle(cornerRadius: 12)) }.buttonStyle(.plain).accessibilityIdentifier("accountSettingsButton").accessibilityLabel("إعدادات البروفايل") } }
+            } else { HStack { actionButton(.profiles); Spacer(); Text(model.profile.name).font(.subheadline); Spacer(); Button { panel = .account } label: { Image(systemName: "gearshape").font(.system(size: 19)).foregroundStyle(theme.iconColor).frame(width: 44, height: 40).background(theme.buttonBackgroundColor, in: RoundedRectangle(cornerRadius: theme.radius(12))) }.buttonStyle(.plain).accessibilityIdentifier("accountSettingsButton").accessibilityLabel("إعدادات البروفايل") } }
             if model.current?.loading == true { ProgressView(value: model.current?.progress ?? 0).tint(theme.buttonTextColor).frame(height: 2) }
         }.padding(.horizontal, layout == .icab ? 4 : 12).padding(.vertical, 5).background(theme.backgroundColor).environment(\.layoutDirection, .leftToRight)
     }
@@ -168,7 +172,7 @@ struct BrowserRoot: View {
                                 Button { model.selectTab(tab); withAnimation { topTray = false } } label: {
                                     VStack(spacing: 10) { FirstPartyFavicon(site: Bookmark(title: tab.title, url: tab.url)).frame(width: 40, height: 40); Text(tab.title).font(.caption.bold()).lineLimit(2).multilineTextAlignment(.center).padding(.horizontal, 5) }.frame(width: 140, height: 180).foregroundStyle(model.current?.id == tab.id ? theme.selectionTextColor : theme.textColor).background(model.current?.id == tab.id ? theme.selectionColor : theme.backgroundColor.opacity(0.3), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(model.current?.id == tab.id ? theme.accentColor : theme.borderColor.opacity(0.3), lineWidth: 2))
                                 }.contextMenu { Button("إضافة للمفضلة", systemImage: "star") { if model.profile.role != .guest && !tab.isHome { model.data.bookmarks.append(Bookmark(title: tab.title, url: tab.url)); model.persist() } } }
-                                Button { model.closeTab(tab) } label: { Image(systemName: "xmark.circle.fill").padding(8) }
+                                Button { model.closeTab(tab) } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(model.current?.id == tab.id ? theme.selectionTextColor.opacity(0.6) : theme.iconColor).padding(8) }.buttonStyle(.plain)
                             }.scaleEffect(model.current?.id == tab.id ? 1.05 : 1)
                         }
                         Button { _ = model.newTab(); withAnimation { topTray = false } } label: { Image(systemName: "plus").font(.system(size: 30)).frame(width: 140, height: 180).background(theme.textColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [5])).foregroundStyle(theme.textColor.opacity(0.3))) }
@@ -186,8 +190,8 @@ struct BrowserRoot: View {
                     Menu { ForEach(group.actions) { item in Button(item.title, systemImage: item.symbol) { perform(item) }.accessibilityIdentifier("menu-" + item.identifier) } } label: { Label(group.title, systemImage: group.symbol) }.accessibilityIdentifier("group-" + group.rawValue)
                 }
                 Menu("الحفظ والتصدير", systemImage: "square.and.arrow.up") { Button("خيارات اللقطات وPDF والقراءة") { panel = .tools } }
-            } label: { Image(systemName: action.symbol).font(.system(size: 19)).foregroundStyle(theme.iconColor).frame(width: 44, height: 40).background(theme.buttonBackgroundColor, in: RoundedRectangle(cornerRadius: 12)) }.accessibilityIdentifier(action.identifier).accessibilityLabel(action.title)
-        } else { Button { perform(action) } label: { Group { if action == .profiles { AccountAvatar(profile: model.profile, store: model.profiles, size: 28) } else { Image(systemName: action.symbol).font(.system(size: 19)) } }.foregroundStyle(theme.iconColor).frame(width: 44, height: 40).background(theme.buttonBackgroundColor, in: RoundedRectangle(cornerRadius: 12)).overlay(alignment: .topTrailing) { if action == .tabs { Text("\(model.tabs.count)").font(.system(size: 9)).padding(2).background(theme.backgroundColor, in: Circle()) } } }
+            } label: { Image(systemName: action.symbol).font(.system(size: 19)).foregroundStyle(theme.iconColor).frame(width: 44, height: 40).background(theme.buttonBackgroundColor, in: RoundedRectangle(cornerRadius: theme.radius(12))) }.accessibilityIdentifier(action.identifier).accessibilityLabel(action.title)
+        } else { Button { perform(action) } label: { Group { if action == .profiles { AccountAvatar(profile: model.profile, store: model.profiles, size: 28) } else { Image(systemName: action.symbol).font(.system(size: 19)) } }.foregroundStyle(theme.iconColor).frame(width: 44, height: 40).background(theme.buttonBackgroundColor, in: RoundedRectangle(cornerRadius: theme.radius(12))).overlay(alignment: .topTrailing) { if action == .tabs { Text("\(model.tabs.count)").font(.system(size: 9)).padding(2).background(theme.backgroundColor, in: Circle()) } } }
             .buttonStyle(.plain).accessibilityLabel(action.title).accessibilityIdentifier(action.identifier)
             .disabled(action == .back && model.webView?.canGoBack != true || action == .forward && model.webView?.canGoForward != true)
     }
@@ -196,6 +200,7 @@ struct BrowserRoot: View {
         addressFocused = false
         withAnimation { toolbarVisible = false; topTray = false }
         switch action {
+        case .translate: model.current?.translation?.translate()
         case .back: model.webView?.goBack(); case .forward: model.webView?.goForward(); case .reload: model.reload(); case .home: model.home(); case .newTab: _ = model.newTab(); topTray = false
         case .tabs: if layout == .original { withAnimation { topTray.toggle() } } else { panel = .tabs }
         case .library: panel = .library; case .history: panel = .history
@@ -216,6 +221,6 @@ struct BrowserRoot: View {
     }
     private var restrictedPanel: some View { VStack(spacing: 20) { Image(systemName: "lock"); Text("هذه الأداة مقيدة لهذا الحساب"); Button("رجوع") { panel = nil } }.frame(maxWidth: .infinity, maxHeight: .infinity).background(theme.backgroundColor) }
     @ViewBuilder private func panelContent(_ panel: BrowserPanel) -> some View {
-        switch panel { case .forms: SavedFormsPage(model: model); case .tabs: TabsSheet(model: model); case .account: SettingsSheet(model: model, profile: model.profile); case .profiles: ProfilesSheet(model: model); case .downloads: DownloadsSheet(model: model); case .settings: if model.profile.account?.allowSettings != false { SettingsSheet(model: model) } else { restrictedPanel }; case .library: LibrarySheet(model: model); case .history: LibrarySheet(model: model, initialSection: 1); case .tools: ToolsSheet(model: model); case .scripts: if model.profile.account?.allowScripts != false { ScriptsSheet(model: model) } else { restrictedPanel }; case .console: if model.profile.account?.allowDeveloperTools != false { ConsoleSheet(model: model) } else { restrictedPanel } }
+        switch panel { case .translation: TranslationSettingsSheet(model: model); case .forms: SavedFormsPage(model: model); case .tabs: TabsSheet(model: model); case .account: SettingsSheet(model: model, profile: model.profile); case .profiles: ProfilesSheet(model: model); case .downloads: DownloadsSheet(model: model); case .settings: if model.profile.account?.allowSettings != false { SettingsSheet(model: model) } else { restrictedPanel }; case .library: LibrarySheet(model: model); case .history: LibrarySheet(model: model, initialSection: 1); case .tools: ToolsSheet(model: model); case .scripts: if model.profile.account?.allowScripts != false { ScriptsSheet(model: model) } else { restrictedPanel }; case .console: if model.profile.account?.allowDeveloperTools != false { ConsoleSheet(model: model) } else { restrictedPanel } }
     }
 }

@@ -8,7 +8,7 @@ enum BrowserActionGroup: String, CaseIterable, Identifiable {
     var actions: [BrowserAction] {
         switch self {
         case .navigation: return [.back,.forward,.reload,.home,.newTab,.tabs,.pinTab,.fullScreen]
-        case .reading: return [.reader,.gallery,.darkPage,.twinHorizontal,.twinVertical]
+        case .reading: return [.reader,.gallery,.translate,.darkPage,.twinHorizontal,.twinVertical]
         case .library: return [.library,.history,.downloads,.bookmark,.savePage,.printPage,.share]
         case .automation: return [.scripts,.console,.saveForm,.fillForm]
         case .account: return [.profiles,.settings,.shield]

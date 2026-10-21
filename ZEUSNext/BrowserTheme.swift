@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 
 enum BrowserSurfaceStyle: String, Codable, CaseIterable { case solid, glass; var title: String { self == .solid ? "سادة" : "زجاجي بلونين" } }
+enum BrowserControlShape: String, Codable, CaseIterable { case rounded, capsule, square; var title: String { switch self { case .rounded: return "مستدير"; case .capsule: return "كبسولة"; case .square: return "زوايا خفيفة" } } }
 struct BrowserTheme: Codable, Equatable {
     var name = "أسود وأبيض"
     var background = "000000"
@@ -19,6 +20,8 @@ struct BrowserTheme: Codable, Equatable {
     var selectionText = "111111"
     var style: BrowserSurfaceStyle = .glass
     var light = false
+    var controlShape: BrowserControlShape? = nil
+    func radius(_ preferred: CGFloat) -> CGFloat { switch controlShape ?? .rounded { case .rounded: return preferred; case .capsule: return 100; case .square: return 6 } }
     static let standard = BrowserTheme()
     static var presets: [BrowserTheme] {
         [standard,
@@ -88,7 +91,7 @@ struct ThemeEditor: View {
                     Button { context.settings.theme = preset; context.save() } label: { VStack(spacing: 7) { HStack(spacing: 0) { preset.backgroundColor; preset.surfaceColor; preset.accentColor }.frame(width: 100, height: 46).clipShape(RoundedRectangle(cornerRadius: 12)); Text(preset.name).font(.caption).foregroundStyle(theme.textColor) } }.buttonStyle(.borderless).accessibilityIdentifier("theme-" + preset.name)
                 } }.padding(.vertical, 5) }
             }
-            Section("أسلوب الأسطح") { Picker("المظهر", selection: setting(\.style)) { ForEach(BrowserSurfaceStyle.allCases, id: \.self) { Text($0.title).tag($0) } }.pickerStyle(.segmented); Toggle("مظهر نظام فاتح", isOn: setting(\.light)) }
+            Section("أسلوب الأسطح") { Picker("شكل الأزرار والأسطح", selection: Binding(get: { theme.controlShape ?? .rounded }, set: { setting(\.controlShape).wrappedValue = $0 })) { ForEach(BrowserControlShape.allCases, id: \.self) { Text($0.title).tag($0) } }; Picker("المظهر", selection: setting(\.style)) { ForEach(BrowserSurfaceStyle.allCases, id: \.self) { Text($0.title).tag($0) } }.pickerStyle(.segmented); Toggle("مظهر نظام فاتح", isOn: setting(\.light)) }
             Section("ألوان مخصصة") {
                 color("الخلفية العامة", \.background); color("السطح واللون الزجاجي الأول", \.surface); color("اللون الزجاجي الثاني", \.surfaceSecondary)
                 color("النص الرئيسي", \.text); color("النص الثانوي", \.secondaryText); color("الأيقونات", \.icon)
@@ -105,7 +108,7 @@ struct ThemeEditor: View {
 struct BrowserTextButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var enabled
     let theme: BrowserTheme
-    func makeBody(configuration: Configuration) -> some View { configuration.label.foregroundStyle(theme.buttonTextColor).background(theme.buttonBackgroundColor, in: RoundedRectangle(cornerRadius: 10)).opacity(enabled ? (configuration.isPressed ? 0.6 : 1) : 0.35) }
+    func makeBody(configuration: Configuration) -> some View { configuration.label.foregroundStyle(theme.buttonTextColor).background(theme.buttonBackgroundColor, in: RoundedRectangle(cornerRadius: theme.radius(10))).opacity(enabled ? (configuration.isPressed ? 0.6 : 1) : 0.35) }
 }
 struct ThemedSection<Content: View>: View {
     @Environment(\.browserTheme) private var theme

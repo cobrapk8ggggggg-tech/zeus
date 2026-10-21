@@ -67,7 +67,9 @@ struct FilterRules {
             for domain in OriginalShield.domains.sorted() { rules.append(["trigger": ["url-filter": FilterRules.regex(for: domain)], "action": ["type": "block"]]) }
             for domain in OriginalShield.allowedDomains.sorted() { rules.append(["trigger": ["url-filter": FilterRules.regex(for: domain)], "action": ["type": "ignore-previous-rules"]]) }
             if settings.cosmeticFiltering { for selector in OriginalShield.cssSelectors { rules.append(["trigger": ["url-filter": ".*"], "action": ["type": "css-display-none", "selector": selector]]) } }
-            rules.append(["trigger": ["url-filter": ".*(ad|ads|preroll|midroll).*mp4", "resource-type": ["media"]], "action": ["type": "block"]])
+            // WebKit content filters reject regex disjunctions (a|b). Keep
+            // the original media matching as separate supported rules.
+            for marker in ["ad", "ads", "preroll", "midroll"] { rules.append(["trigger": ["url-filter": ".*" + marker + ".*mp4", "resource-type": ["media"]], "action": ["type": "block"]]) }
         }
         for host in settings.siteExceptions.filter(FilterRules.validDomain) { rules.append(["trigger": ["url-filter": ".*", "if-top-url": [FilterRules.regex(for: host)]], "action": ["type": "ignore-previous-rules"]]) }
         if !options.showImages { rules.append(["trigger": ["url-filter": ".*", "resource-type": ["image"]], "action": ["type": "block"]]) }

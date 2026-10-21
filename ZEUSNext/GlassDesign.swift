@@ -8,7 +8,7 @@ struct GlassSurface: ViewModifier {
     @Environment(\.browserTheme) private var theme
     var radius: CGFloat
     func body(content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: theme.radius(radius), style: .continuous)
         let gradient = LinearGradient(colors: [theme.surfaceColor, theme.secondSurfaceColor], startPoint: .topLeading, endPoint: .bottomTrailing)
         if theme.style == .solid {
             content.background(theme.surfaceColor, in: shape).overlay(shape.stroke(theme.borderColor.opacity(0.45), lineWidth: 0.7))

@@ -15,12 +15,15 @@ import LocalAuthentication
     var error: String?
     var snapshot: UIImage?
     var filterTask: Task<Void, Never>?
+    var translation: PageTranslation?
     var lastUsed = Date()
     var pinned = false
     init(saved: SavedTab, profileID: UUID) { id = saved.id; title = saved.title; url = saved.url; self.profileID = profileID; pinned = saved.pinned ?? false }
     var saved: SavedTab { SavedTab(id: id, title: title, url: url, pinned: pinned) }
     var isHome: Bool { url == "zeus://home" }
     func dispose() {
+        translation?.stop(); translation = nil
+        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "zeusTranslation", contentWorld: PageTranslation.world)
         filterTask?.cancel(); filterTask = nil
         webView?.stopLoading()
         webView?.configuration.userContentController.removeScriptMessageHandler(forName: "zeusConsole")
@@ -133,6 +136,7 @@ struct WebDialog: Identifiable {
             controller.addUserScript(WKUserScript(source: BrowserTools.consoleScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
         tab.webView = view; tab.driver = driver; driver.observe(view)
+        let translation = PageTranslation(model: self, tab: tab); tab.translation = translation; translation.attach(to: view)
         // Page creation and tab selection never wait for a rule compiler or disk.
         tab.filterTask = Task { [weak self, weak tab, weak view] in
             guard let self else { return }

@@ -43,22 +43,26 @@ struct ReaderSheet: View {
     @ObservedObject var model: BrowserModel
     let article: ReaderArticle
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var translation = ReaderTranslation()
     @State private var settings = false
     @State private var controls = true
     @State private var anchor: CGFloat = 0
     @State private var forbidden = ""
     @State private var copied = false
     private var prefs: ReadingPreferences { model.data.settings.reading ?? ReadingPreferences() }
-    private var paragraphs: [String] { article.paragraphs.filter { text in !prefs.blockedWords.contains { text.localizedCaseInsensitiveContains($0) } } }
+    private var paragraphs: [String] { (translation.paragraphs ?? article.paragraphs).filter { text in !prefs.blockedWords.contains { text.localizedCaseInsensitiveContains($0) } } }
     var body: some View {
         ZStack(alignment: .top) {
             theme.backgroundColor.ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .trailing, spacing: 25) {
                     Spacer().frame(height: 65)
-                    Text(article.title).font(.system(size: prefs.fontSize + 6, weight: .bold, design: .serif)).multilineTextAlignment(.center).frame(maxWidth: .infinity).textSelection(.enabled)
+                    Text(translation.title ?? article.title).font(.system(size: prefs.fontSize + 6, weight: .bold, design: .serif)).multilineTextAlignment(.center).frame(maxWidth: .infinity).textSelection(.enabled)
+                    if translation.suggested { HStack { Text("هل تريد ترجمة هذا الفصل؟"); Button("ترجمة") { translation.translate(article: article, model: model) }; Button("إخفاء") { translation.suggested = false } }.font(.subheadline).padding(12).glassSurface(16).environment(\.layoutDirection, .rightToLeft) }
+                    if translation.running { HStack { ProgressView(); Text("جارٍ الترجمة · \(translation.completed) مقطع"); Button("إيقاف") { translation.cancel() } }.font(.caption) }
+                    if let error = translation.error { Text(error).font(.footnote).textSelection(.enabled) }
                     Divider().overlay(theme.textColor.opacity(0.3))
-                    ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, paragraph in Text(paragraph).font(.system(size: prefs.fontSize, design: .serif)).opacity(prefs.textOpacity).lineSpacing(10).multilineTextAlignment(.trailing).frame(maxWidth: .infinity, alignment: .trailing).textSelection(.enabled) }
+                    ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, paragraph in Text(paragraph).font(.system(size: prefs.fontSize, design: .serif)).opacity(prefs.textOpacity).lineSpacing(10).multilineTextAlignment(readerRTL ? .trailing : .leading).frame(maxWidth: .infinity, alignment: readerRTL ? .trailing : .leading).environment(\.layoutDirection, readerRTL ? .rightToLeft : .leftToRight).textSelection(.enabled) }
                 }.padding(25).padding(.bottom, 60)
             }.onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y } action: { _, value in
                 if value < 10 { controls = true; anchor = value }
@@ -67,13 +71,15 @@ struct ReaderSheet: View {
             if controls {
                 HStack {
                     Button { settings = true } label: { Image(systemName: "slider.horizontal.3").padding(12) }
-                    Button { UIPasteboard.general.string = article.title + "\n\n" + paragraphs.joined(separator: "\n\n"); copied = true } label: { Image(systemName: copied ? "checkmark" : "doc.on.doc").padding(12) }
+                    Button { UIPasteboard.general.string = (translation.title ?? article.title) + "\n\n" + paragraphs.joined(separator: "\n\n"); copied = true } label: { Image(systemName: copied ? "checkmark" : "doc.on.doc").padding(12) }
+                    Menu { Button("ترجمة الفصل") { translation.translate(article: article, model: model) }; Button("عرض الأصل") { translation.restore() }; if translation.running { Button("إيقاف الترجمة") { translation.cancel() } } } label: { Image(systemName: "translate").padding(12) }.accessibilityIdentifier("readerTranslateButton")
                     Spacer(); Text("وضع القراءة").font(.subheadline); Spacer()
                     Button { dismiss() } label: { Image(systemName: "xmark").padding(12) }.accessibilityIdentifier("closeReaderButton")
                 }.padding(.horizontal, 12).background(theme.backgroundColor).transition(.move(edge: .top).combined(with: .opacity))
             }
             rightReveal.environment(\.layoutDirection, .leftToRight)
         }.foregroundStyle(theme.textColor).tint(theme.buttonTextColor).statusBarHidden().environment(\.layoutDirection, .leftToRight)
+            .task { translation.prepare(article: article, model: model) }.onDisappear { translation.cancel() }
             .fullScreenCover(isPresented: $settings) {
                 NavigationStack { Form {
                     ThemedSection("النص") { Text("حجم الخط \(Int(prefs.fontSize))"); Slider(value: preference(\.fontSize), in: 14...40, step: 1); Text("شفافية النص"); Slider(value: preference(\.textOpacity), in: 0.1...1) }
@@ -81,6 +87,7 @@ struct ReaderSheet: View {
                 }.scrollContentBackground(.hidden).background(theme.backgroundColor).navigationTitle("إعدادات القارئ").toolbar { Button("تم") { settings = false } } }.tint(theme.buttonTextColor).preferredColorScheme(theme.light ? .light : .dark)
             }
     }
+    private var readerRTL: Bool { if translation.paragraphs != nil { return TranslationPreferences.rtl((model.data.settings.translation ?? TranslationPreferences()).target) }; return TranslationPreferences.rtl(PageTranslation.detect(sample: article.paragraphs.prefix(4).joined(), hint: "")) }
     private var rightReveal: some View {
         HStack { Spacer(); Color.clear.frame(width: 24).contentShape(Rectangle()).gesture(DragGesture().onEnded { if $0.translation.width < -10 { withAnimation { controls = true } }; if $0.translation.width > 10 { withAnimation { controls = false } } }) }.frame(maxHeight: .infinity)
     }
