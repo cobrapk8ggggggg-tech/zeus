@@ -3,21 +3,34 @@
   const documentID = typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Array.from(crypto.getRandomValues(new Uint32Array(4)), v => v.toString(16)).join('-');
   const nodes = new Map(), ids = new WeakMap(), styles = new Map();
   let serial = 0, active = false, timer, applying = false, target = 'ar', rootState = null;
-  const skip = 'script,style,noscript,pre,code,kbd,samp,svg,math,textarea,input,select,option,[contenteditable]:not([contenteditable="false"]),[translate="no"],.notranslate';
+  const skip = 'script,style,noscript,pre,code,kbd,samp,svg,math,textarea,input,select,option,[contenteditable]:not([contenteditable="false"]),[translate="no"],.notranslate,[aria-hidden="true"],[hidden]';
   function eligible(node) {
     const parent = node.parentElement;
-    if (!parent || parent.closest(skip) || !node.nodeValue.trim() || !/\p{L}/u.test(node.nodeValue)) return false;
+    if (!parent || parent.closest(skip) || !node.nodeValue.trim() || /^(https?:\/\/|www\.)\S+$/i.test(node.nodeValue.trim()) || !/\p{L}/u.test(node.nodeValue)) return false;
     const style = getComputedStyle(parent);
     return style.display !== 'none' && style.visibility !== 'hidden' && parent.getClientRects().length > 0;
   }
+  const observedRoots = new WeakSet();
+  function* textNodes(root) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+    let node;
+    while (node = walker.nextNode()) {
+      if (node.nodeType === Node.TEXT_NODE) yield node;
+      else if (node.shadowRoot) {
+        if (!observedRoots.has(node.shadowRoot)) { observer.observe(node.shadowRoot,{childList:true,subtree:true,characterData:true}); observedRoots.add(node.shadowRoot); }
+        yield* textNodes(node.shadowRoot);
+      }
+    }
+  }
   function notify(kind) {
-    try { webkit.messageHandlers.zeusTranslation.postMessage({kind, documentID, lang: document.documentElement.lang || '', sample: (document.body?.innerText || '').slice(0,3500)}); } catch (_) {}
+    let sample = '';
+    for (const node of textNodes(document.body || document.documentElement)) { if (eligible(node)) sample += node.nodeValue + ' '; if (sample.length >= 3500) break; }
+    try { webkit.messageHandlers.zeusTranslation.postMessage({kind, documentID, lang: document.documentElement.lang || '', sample: sample.slice(0,3500)}); } catch (_) {}
   }
   function detect() { notify('ready'); }
   function collect() {
-    const result = [], walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
-    let node, length = 0;
-    while (node = walker.nextNode()) {
+    const result = []; let length = 0;
+    for (const node of textNodes(document.body || document.documentElement)) {
       if (!eligible(node)) continue;
       let id = ids.get(node), entry = id && nodes.get(id);
       if (entry && node.nodeValue === entry.translated) continue;

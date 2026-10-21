@@ -111,7 +111,10 @@ struct AISettingsPage: View {
     private func remove(_ provider: AIProviderConfiguration) {
         guard context.permitted else { return }
         try? AISecretVault.save("", profile: context.profileID, provider: provider.id.uuidString)
-        context.settings.aiProviders?.removeAll { $0.id == provider.id }; context.save()
+        context.settings.aiProviders?.removeAll { $0.id == provider.id }
+        if context.settings.translation?.providerID == provider.id { context.settings.translation?.providerID = nil }
+        if context.isActive { for tab in context.model.tabs { tab.translation?.pause() } }
+        Task { await AIProviderService.shared.clearRuntime() }; context.save()
     }
 }
 
@@ -135,6 +138,10 @@ struct AIProviderEditor: View {
                 Picker("النوع", selection: $config.kind) { ForEach(AIProviderKind.allCases, id: \.self) { Text($0.title).tag($0) } }.disabled(original.lastChecked != nil)
                 if config.kind == .openAICompatible { TextField("Base URL مثل https://api.openai.com/v1", text: $config.baseURL).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled().environment(\.layoutDirection, .leftToRight) }
                 SecureField(config.kind == .geminiAccount ? "Cookie لحساب Google" : config.kind == .chatGPTAccount ? "ChatGPT Access Token" : "API Key", text: $secret).textInputAutocapitalization(.never).autocorrectionDisabled().environment(\.layoutDirection, .leftToRight).accessibilityIdentifier("aiProviderSecret")
+                if config.kind.account {
+                    Button("استخدام جلسة الموقع داخل هذا البروفايل") { importBrowserSession() }.disabled(connecting || !context.permitted)
+                    Text("يمكن تسجيل الدخول إلى chatgpt.com أو gemini.google.com داخل ZEUS، ثم استيراد الجلسة هنا. أو الصق رمز حسابك أعلاه؛ لن تحتاج إدخال معرفات المشاريع والمحادثات.").font(.footnote)
+                }
                 if config.kind == .geminiAccount {
                     Stepper("رقم حساب Google: \(config.googleAccountIndex)", value: $config.googleAccountIndex, in: 0...9)
                     Text("ترويسة Cookie كاملة من جلستك. الحساب الأول رقمه 0؛ يطابق /u/0/ في موقع Gemini.").font(.footnote)
@@ -167,6 +174,22 @@ struct AIProviderEditor: View {
             .onChange(of: config.projectID) { _, _ in config.conversationID = nil }
             .onDisappear { connectionTask?.cancel() }
     }
+    private func importBrowserSession() {
+        guard context.permitted else { return }
+        Task {
+            let cookies: [HTTPCookie] = await withCheckedContinuation { c in context.model.profiles.websiteDataStore(for: context.profile).httpCookieStore.getAllCookies { c.resume(returning: $0) } }
+            let address = config.kind == .geminiAccount ? "https://gemini.google.com/u/\(config.googleAccountIndex)/app" : "https://chatgpt.com/api/auth/session"
+            guard let url = URL(string: address), let cookie = DownloadFiles.cookieHeaders(cookies, for: url)["Cookie"], !cookie.isEmpty else { message = "لم توجد جلسة لهذا الموقع في البروفايل الحالي. سجّل الدخول إليه داخل ZEUS أولًا."; return }
+            do {
+                if config.kind == .geminiAccount { secret = cookie }
+                else {
+                    let response = try await AIHTTP.object(AIHTTP.request(url, headers: ["Cookie": cookie])) as? [String: Any]
+                    guard let token = response?["accessToken"] as? String, !token.isEmpty else { throw TranslationFailure.message("لم يُرجع الموقع رمز جلسة. أعد تسجيل الدخول إلى ChatGPT داخل ZEUS.") }; secret = token
+                }
+                message = "استُوردت الجلسة؛ جارٍ جلب خيارات الحساب."
+            } catch { message = error.localizedDescription }
+        }
+    }
     private func schedule() {
         connectionTask?.cancel()
         connectionTask = Task { try? await Task.sleep(for: .seconds(1.5)); guard !Task.isCancelled else { return }; await discover() }
@@ -182,6 +205,14 @@ struct AIProviderEditor: View {
             config = discovered
             if config.name.isEmpty { config.name = config.kind.title }
             message = "اتصل الحساب: \(config.models.count) نموذج، \(config.chats.count) محادثة، \(config.projects.count) مشروع."
+            if config.kind == .openAICompatible {
+                let testContext = UUID()
+                do {
+                    let answer = try await AIProviderService.shared.generate("Reply with exactly OK.", config: discovered, secret: token, context: testContext)
+                    if !Task.isCancelled { message += "\nاختبار توليد حقيقي: " + String(answer.prefix(80)) }
+                } catch { if !Task.isCancelled { message += "\nجُلبت النماذج، لكن اختبار التوليد فشل: " + error.localizedDescription } }
+                await AIProviderService.shared.end(testContext)
+            }
         } catch { if !Task.isCancelled { message = error.localizedDescription } }
         if !Task.isCancelled { connecting = false }
     }

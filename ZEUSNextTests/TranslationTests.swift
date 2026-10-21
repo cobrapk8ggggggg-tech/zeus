@@ -109,12 +109,30 @@ final class TranslationDataTests: XCTestCase {
         let language = try await view.evaluateJavaScript("document.documentElement.lang") as? String
         XCTAssertEqual(language, "en")
     }
-    func testDetectionAutomaticTranslationAndNavigationCancel() async throws {
+    func testDetectionAutomaticTranslationReaderAndNavigationReset() async throws {
         XCTAssertEqual(PageTranslation.detect(sample: "هذه فقرة عربية طويلة بما يكفي لاكتشاف اللغة بصورة صحيحة ودقيقة دون إرسالها إلى أي خادم.", hint: "en"), "ar")
-        let reader = ReaderTranslation(); reader.cancel(); XCTAssertFalse(reader.running)
-        let model = BrowserModel(useBackgroundDownloads: false)
-        let tab = try XCTUnwrap(model.current), page = PageTranslation(model: model, tab: try XCTUnwrap(model.current))
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let model = BrowserModel(profiles: ProfileStore(root: root, downloadsRoot: root.appendingPathComponent("Downloads")), useBackgroundDownloads: false)
+        model.data.settings.shieldsEnabled = false
+        var provider = AIProviderConfiguration(); provider.baseURL = "http://127.0.0.1:8765/v1"; provider.model = "fixture-translator"; model.data.settings.aiProviders = [provider]
+        var prefs = TranslationPreferences(); prefs.engine = .ai; prefs.providerID = provider.id; prefs.automatic = true; model.data.settings.translation = prefs
+        let tab = try XCTUnwrap(model.current); tab.url = "http://127.0.0.1:8765/translate-fixture"
+        let prepared = await model.prepare(tab); let view = try XCTUnwrap(prepared); let window = try window(view)
+        defer { tab.dispose(); window.isHidden = true; try? FileManager.default.removeItem(at: root) }
+        view.load(URLRequest(url: URL(string: tab.url)!))
+        let page = try XCTUnwrap(tab.translation)
+        try await until { page.translated && !page.running }; XCTAssertNil(page.error)
+        // Switching off automatic translation must ask on the following document.
+        prefs.automatic = false; model.data.settings.translation = prefs
+        view.load(URLRequest(url: URL(string: tab.url + "?next")!))
+        try await until { view.url?.query == "next" && page.offered && !page.running && !page.translated }
+        XCTAssertEqual(page.completed, 0)
+        let reader = ReaderTranslation(), article = ReaderArticle(title: "A new story", paragraphs: ["A traveler opened the ancient book and started reading another fascinating chapter.", "The stars shone brightly above the quiet village."])
+        reader.prepare(article: article, model: model); XCTAssertTrue(reader.suggested)
+        reader.translate(article: article, model: model)
+        try await until { reader.paragraphs?.count == 2 && !reader.running }; XCTAssertNil(reader.error)
+        XCTAssertTrue(reader.title?.hasPrefix("ترجمة:") == true); XCTAssertTrue(reader.paragraphs?.allSatisfy { $0.hasPrefix("ترجمة:") } == true)
+        reader.restore(); XCTAssertNil(reader.paragraphs); XCTAssertNil(reader.title)
         page.navigationStarted(); XCTAssertFalse(page.offered); XCTAssertFalse(page.running); XCTAssertFalse(page.translated)
-        tab.dispose()
     }
 }

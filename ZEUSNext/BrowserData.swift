@@ -195,7 +195,7 @@ enum BrowserDisk {
             migrateLegacy(into: initial)
         }
         ensureSpecialAccounts()
-        for profile in profiles where profile.isPrivate { try? FileManager.default.removeItem(at: folder(for: profile)) }
+        for profile in profiles where profile.isPrivate { AISecretVault.removeAll(profile: profile.id); try? FileManager.default.removeItem(at: folder(for: profile)) }
         Task { [weak self] in await self?.retryRemovedWebsiteStores() }
     }
     private func ensureSpecialAccounts() {
@@ -249,6 +249,7 @@ enum BrowserDisk {
     }
     func clearEphemeral(_ profile: BrowserProfile) async {
         guard profile.isPrivate else { return }
+        AISecretVault.removeAll(profile: profile.id)
         let store = websiteDataStore(for: profile)
         await store.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
         stores.removeValue(forKey: profile.id)

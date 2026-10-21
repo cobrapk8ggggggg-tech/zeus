@@ -12,7 +12,11 @@ struct TextTranslationService {
         var translated: [String: String] = [:], batch: [TranslationSegment] = [], size = 0
         func perform(_ values: [TranslationSegment]) async throws {
             let result = try await translateBatch(values, preferences: preferences, provider: provider, secret: secret, context: context)
-            for value in result { translated[value.id] = value.text }
+            let sources = Dictionary(uniqueKeysWithValues: values.map { ($0.id, $0.text) })
+            for value in result {
+                let source = sources[value.id] ?? "", leading = String(source.prefix(while: { $0.isWhitespace })), trailing = String(source.reversed().prefix(while: { $0.isWhitespace }).reversed())
+                translated[value.id] = leading + value.text.trimmingCharacters(in: .whitespacesAndNewlines) + trailing
+            }
         }
         for part in flattened {
             if !batch.isEmpty && (size + part.text.count > 5000 || batch.count >= 32) { try await perform(batch); batch = []; size = 0 }
@@ -32,7 +36,7 @@ struct TextTranslationService {
             let object = try await AIHTTP.object(request) as? [String: Any]
             let rows = (object?["data"] as? [String: Any])?["translations"] as? [[String: Any]] ?? []
             guard rows.count == segments.count else { throw TranslationFailure.message("استجابة Google لا تطابق عدد النصوص؛ لم تُطبّق هذه الدفعة.") }
-            return try zip(segments, rows).map { item, row in guard let translated = row["translatedText"] as? String else { throw TranslationFailure.message("ترجمة Google ناقصة.") }; return TranslationSegment(id: item.id, text: decodeEntities(translated)) }
+            return try zip(segments, rows).map { item, row in guard let translated = row["translatedText"] as? String, !translated.isEmpty else { throw TranslationFailure.message("ترجمة Google ناقصة.") }; return TranslationSegment(id: item.id, text: decodeEntities(translated)) }
         case .googleWeb:
             // Public consumer endpoint: no scraped API keys, no cookies, no browser impersonation.
             // Three requests at a time; callers submit bounded batches and keep a page-local cache.
@@ -47,7 +51,9 @@ struct TextTranslationService {
                             c.queryItems = [URLQueryItem(name: "client", value: "gtx"), URLQueryItem(name: "sl", value: "auto"), URLQueryItem(name: "tl", value: preferences.target), URLQueryItem(name: "dt", value: "t"), URLQueryItem(name: "q", value: part)]
                             let value = try await AIHTTP.object(AIHTTP.request(c.url!))
                             guard let rows = AIHTTP.nested(value, [0]) as? [[Any]], !rows.isEmpty else { throw TranslationFailure.message("تعذر قراءة رد Google للويب. جرّب Google Cloud أو مزود الذكاء الاصطناعي.") }
-                            translated += rows.compactMap { $0.first as? String }.joined()
+                            let text = rows.compactMap { $0.first as? String }.joined()
+                            guard !text.isEmpty else { throw TranslationFailure.message("أعاد Google نصًا فارغًا؛ بقي الأصل دون تغيير.") }
+                            translated += text
                         }
                         return TranslationSegment(id: item.id, text: translated)
                     } }

@@ -30,6 +30,7 @@ import NaturalLanguage
     private var pending = false
     private var sessionPreferences: TranslationPreferences?
     private var dismissed = false
+    private var autoAttempted = false
     init(model: BrowserModel, tab: BrowserTab) { self.model = model; self.tab = tab }
     var preferences: TranslationPreferences { model?.data.settings.translation ?? TranslationPreferences() }
     func attach(to view: WKWebView, installScript: Bool = true) {
@@ -40,15 +41,16 @@ import NaturalLanguage
         if installScript { controller.addUserScript(WKUserScript(source: Self.script, injectionTime: .atDocumentEnd, forMainFrameOnly: false, in: Self.world)) }
     }
     func navigationStarted() {
-        stop(); frames.removeAll(); mainDocument = ""; sourceLanguage = ""; offered = false; translated = false; completed = 0; error = nil; cache.removeAll(); dismissed = false; sessionPreferences = nil
+        stop(); frames.removeAll(); mainDocument = ""; sourceLanguage = ""; offered = false; translated = false; completed = 0; error = nil; cache.removeAll(); dismissed = false; autoAttempted = false; sessionPreferences = nil
     }
     func stop() { epoch = UUID(); work?.cancel(); work = nil; running = false; pending = false; let old = context; context = UUID(); Task { await AIProviderService.shared.end(old) } }
     func pause() { stop(); error = "أُوقفت الترجمة. يمكنك المتابعة أو عرض الأصل." }
     func dismiss() { offered = false; dismissed = true }
-    func becameVisible() { if offered && !translated && preferences.automatic { translate() } }
+    func becameVisible() { if offered && !translated && !autoAttempted && preferences.automatic { translate() } }
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let model, let tab, model.profile.id == tab.profileID, !model.requiresUnlock, message.webView === tab.webView,
               let body = message.body as? [String: String], let id = body["documentID"], let kind = body["kind"], id.count < 80 else { return }
+        if frames.count >= 64, frames[id] == nil, let old = frames.keys.first(where: { $0 != mainDocument }) { frames.removeValue(forKey: old) }
         frames[id] = message.frameInfo
         if message.frameInfo.isMainFrame {
             if mainDocument != id { mainDocument = id }
@@ -57,10 +59,10 @@ import NaturalLanguage
                 let target = preferences.target.components(separatedBy: "-")[0]
                 let excluded = preferences.excludedHosts.contains { BrowserURL.hostMatches(tab.webView?.url?.host ?? "", domain: $0) }
                 offered = !sourceLanguage.isEmpty && sourceLanguage != target && !excluded && (preferences.suggest || preferences.automatic)
-                if offered && preferences.automatic && model.current?.id == tab.id { translate() }
+                if offered && preferences.automatic && !autoAttempted && model.current?.id == tab.id { translate() }
             }
         }
-        if (kind == "changed" || kind == "ready") && translated && sessionPreferences?.dynamicContent == true {
+        if (kind == "changed" || kind == "ready") && translated && error == nil && sessionPreferences?.dynamicContent == true {
             if running { pending = true } else { translate(continuing: true) }
         }
     }
@@ -72,17 +74,17 @@ import NaturalLanguage
     }
     private func call(_ script: String, arguments: [String: Any] = [:], frame: WKFrameInfo?) async throws -> Any {
         guard let view = tab?.webView else { throw CancellationError() }
-        return try await view.callAsyncJavaScript(script, arguments: arguments, in: frame, contentWorld: Self.world)
+        return try await view.callAsyncJavaScript(script, arguments: arguments, in: frame, contentWorld: Self.world) ?? NSNull()
     }
     func translate(continuing: Bool = false) {
         guard !running, let model, let tab, !tab.isHome, !model.requiresUnlock, model.profile.id == tab.profileID else { return }
-        if !continuing, translated { Task { await restore() }; return }
+        if !continuing, translated { offered = true; return }
         let prefs = continuing ? sessionPreferences ?? preferences : preferences
         sessionPreferences = prefs
         let provider = model.data.settings.aiProviders?.first { $0.id == prefs.providerID }
         let secret = AISecretVault.read(profile: tab.profileID, provider: prefs.engine == .googleCloud ? "google-cloud" : provider?.id.uuidString ?? "")
         let ticket = epoch
-        running = true; offered = true; error = nil
+        running = true; autoAttempted = true; if !continuing { offered = true }; error = nil
         work = Task { [weak self] in
             guard let self else { return }
             do {
@@ -100,13 +102,14 @@ import NaturalLanguage
                         while true {
                             let raw: Any
                             do { raw = try await call("return zeusTranslate.collect()", frame: frame) }
-                            catch { if frame.isMainFrame { throw error } else { break } }
-                            guard let value = raw as? [String: Any], value["documentID"] as? String == documentID, let array = value["segments"] as? [[String: String]], !array.isEmpty else { break }
+                            catch { if frame.isMainFrame { throw error } else { frames.removeValue(forKey: documentID); break } }
+                            guard let value = raw as? [String: Any], value["documentID"] as? String == documentID else { frames.removeValue(forKey: documentID); break }
+                            guard let array = value["segments"] as? [[String: String]], !array.isEmpty else { break }
                             let segments = array.compactMap { m -> TranslationSegment? in guard let id = m["id"], let text = m["text"] else { return nil }; return TranslationSegment(id: id, text: text) }
                             processedCharacters += segments.reduce(0) { $0 + $1.text.count }
                             guard processedCharacters < 500_000 else { throw TranslationFailure.message("توقفت الدفعة بعد نص طويل جدًا لتقليل الاستهلاك. اضغط متابعة لإكمال بقية الصفحة.") }
-                            var results = segments.compactMap { s in cache[s.text].map { TranslationSegment(id: s.id, text: $0) } }
-                            let missing = segments.filter { cache[$0.text] == nil }
+                            var results = segments.compactMap { s in self.cache[s.text].map { TranslationSegment(id: s.id, text: $0) } }
+                            let missing = segments.filter { self.cache[$0.text] == nil }
                             if !missing.isEmpty {
                                 let fresh = try await TextTranslationService.translate(missing, preferences: prefs, provider: provider, secret: secret, context: context)
                                 try Task.checkCancellation(); guard ticket == epoch else { throw CancellationError() }

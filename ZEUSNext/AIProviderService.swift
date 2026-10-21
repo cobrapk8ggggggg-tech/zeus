@@ -8,6 +8,7 @@ actor AIProviderService {
     private var parents: [UUID: (String, String)] = [:]
     private struct GeminiSession { var at: String; var sid: String; var build: String; var cookie: String }
     private var googleSessions: [String: GeminiSession] = [:]
+    func clearRuntime() { threads.removeAll(); parents.removeAll(); googleSessions.removeAll() }
     func end(_ context: UUID) { threads.removeValue(forKey: context); parents.removeValue(forKey: context) }
     func discover(_ input: AIProviderConfiguration, secret: String, chatLimit: Int = 50) async throws -> AIProviderConfiguration {
         var config = input; config.discoveryNotice = nil
@@ -179,7 +180,13 @@ actor AIProviderService {
     private func gemini(_ prompt: String, config: AIProviderConfiguration, secret: String, context: UUID, attachments: [AIAttachment]) async throws -> String {
         let session = try await geminiSession(config, secret: secret)
         var history = threads[context] ?? ["", "", "", NSNull(), NSNull(), NSNull(), NSNull(), NSNull(), NSNull(), ""]
-        if threads[context] == nil, let cid = config.conversationID { history[0] = cid }
+        if threads[context] == nil, let cid = config.conversationID {
+            let turns = try await geminiRPC(config, session: session, id: "hNvQHb", payload: [cid, 1, NSNull(), 1, [1], [4], NSNull(), 1])
+            guard let turn = turns.first.flatMap({ AIHTTP.nested($0, [0,0]) }),
+                  let rid = AIHTTP.nested(turn, [0,1]) as? String,
+                  let rcid = AIHTTP.nested(turn, [3,0,0,0]) as? String else { throw TranslationFailure.message("تعذر جلب سياق محادثة Gemini المختارة؛ اختر محادثة جديدة أو حدّث القائمة.") }
+            history[0] = cid; history[1] = rid; history[2] = rcid
+        }
         var uploaded: [Any] = []
         for attachment in attachments { let uri = try await geminiUpload(attachment, cookie: secret); uploaded.append([[uri, 1], attachment.name]) }
         let content: [Any] = [[prompt, 0, NSNull(), uploaded, NSNull(), NSNull(), 0], ["ar"], history, NSNull(), NSNull(), NSNull(), [], 0, [], [], 1, 0]

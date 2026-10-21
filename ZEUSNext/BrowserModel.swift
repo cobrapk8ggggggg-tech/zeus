@@ -280,6 +280,7 @@ struct WebDialog: Identifiable {
         do { try await profiles.delete(target) } catch { notify(error.localizedDescription) }
     }
     private func cleanOnExit(_ owner: BrowserProfile) {
+        Task { await AIProviderService.shared.clearRuntime() }
         let options = data.settings.advanced ?? AdvancedSettings()
         if options.clearHistoryOnExit {
             data.history = []; persist()

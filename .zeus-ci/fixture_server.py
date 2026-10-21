@@ -34,6 +34,9 @@ class Handler(BaseHTTPRequestHandler):
         if self.path.startswith('/v1/models'):
             body = b'{"data":[{"id":"fixture-translator","name":"Fixture translator"},{"id":"broken-json"}]}'
             self.send_response(200); self.send_header('Content-Type', 'application/json'); self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body); return
+        if self.path.startswith('/translate-frame'):
+            body = b'<html lang="en"><body><p id="frame-paragraph">This independent frame contains a chapter that should be translated too.</p></body></html>'
+            self.send_response(200); self.send_header('Content-Type', 'text/html; charset=utf-8'); self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body); return
         if self.path.startswith('/translate-fixture'):
             body = b'''<!doctype html><html lang="en"><head><title>Translation Novel</title></head><body>
             <h1 id="heading">A journey beyond the mountains</h1>
@@ -42,7 +45,7 @@ class Handler(BaseHTTPRequestHandler):
             <pre id="code">let untouched = "Hello";</pre><input id="secret" type="password" value="never-translate">
             <p translate="no" id="keep">Leave this sentence untouched.</p>
             <button onclick="const p=document.createElement('p');p.id='dynamic';p.textContent='Another chapter arrives after the initial translation.';document.body.append(p)">Add paragraph</button>
-            <a href="/translate-fixture?next">Next page</a></body></html>'''
+            <a href="/translate-fixture?next">Next page</a><iframe src="/translate-frame" width="500" height="80"></iframe></body></html>'''
             self.send_response(200); self.send_header('Content-Type', 'text/html; charset=utf-8'); self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body); return
         if self.path.startswith('/image.png'):
             self.send_response(200); self.send_header('Content-Type', 'image/png'); self.send_header('Content-Length', str(len(IMAGE))); self.end_headers(); self.wfile.write(IMAGE)
