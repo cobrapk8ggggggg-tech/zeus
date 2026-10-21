@@ -18,11 +18,14 @@ import CoreGraphics
     private var cache: [String: String] = [:]
     private var cacheNamespace = ""
     private(set) var targetLanguage = "ar"
-    func observe(index: Int, rect: CGRect, height: CGFloat) { rectangles[index] = rect; viewportHeight = max(1, height) }
+    private(set) var sourceRTL = false
+    func observe(index: Int, rect: CGRect) { rectangles[index] = rect }
+    func viewport(height: CGFloat) { viewportHeight = max(1, height) }
     func isTranslated(_ index: Int) -> Bool { results[index] != nil }
     func prepare(article: ReaderArticle, model: BrowserModel) {
         let p = model.data.settings.translation ?? TranslationPreferences()
         let language = PageTranslation.detect(sample: article.paragraphs.prefix(8).joined(separator: "\n"), hint: "")
+        sourceRTL = TranslationPreferences.rtl(language)
         suggested = p.suggest && !language.isEmpty && language != p.target.components(separatedBy: "-")[0]
         if p.automatic && !language.isEmpty && language != p.target.components(separatedBy: "-")[0] { translate(article: article, model: model) }
     }

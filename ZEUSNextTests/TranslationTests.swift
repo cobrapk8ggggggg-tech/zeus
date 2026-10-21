@@ -239,6 +239,29 @@ final class TranslationDataTests: XCTestCase {
         let source = try await view.evaluateJavaScript("document.querySelector('#new-content').textContent") as? String
         XCTAssertTrue(source?.hasPrefix("ترجمة:") == true)
     }
+    func testReaderUsesVisibleBatchAndANewReaderReusesPaidTranslationsFromDisk() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let model = BrowserModel(profiles: ProfileStore(root: root, downloadsRoot: root.appendingPathComponent("Downloads")), useBackgroundDownloads: false)
+        defer { try? FileManager.default.removeItem(at: root) }
+        var provider = AIProviderConfiguration(); provider.baseURL = "http://127.0.0.1:8765/v1"; provider.model = "reader-memory-" + UUID().uuidString; model.data.settings.aiProviders = [provider]
+        var prefs = TranslationPreferences(); prefs.engine = .ai; prefs.providerID = provider.id; model.data.settings.translation = prefs
+        var paragraphs = (0..<40).map { "Paragraph \($0) tells the story of a traveler returning to the ancient city with a new book." }
+        paragraphs[16] = "Visible first: " + String(repeating: "A traveler reads a long chapter. ", count: 180)
+        paragraphs[17] = "Visible second: " + String(repeating: "The ancient city wakes up again. ", count: 180)
+        let article = ReaderArticle(title: "A new story", paragraphs: paragraphs, sourceURL: "https://example.com/reader-chapter")
+        let reader = ReaderTranslation(); reader.prepare(article: article, model: model); reader.viewport(height: 1300)
+        for index in 0...paragraphs.count { reader.observe(index: index, rect: CGRect(x: 0, y: CGFloat(4000 + index * 1000), width: 700, height: 300)) }
+        reader.observe(index: 17, rect: CGRect(x: 0, y: 100, width: 700, height: 300)); reader.observe(index: 18, rect: CGRect(x: 0, y: 500, width: 700, height: 300))
+        reader.translate(article: article, model: model); try await until { reader.completed == 41 && !reader.running }; XCTAssertNil(reader.error)
+        let endpoint = URL(string: "http://127.0.0.1:8765/translation-requests?model=" + provider.model)!
+        let (data, _) = try await URLSession.shared.data(from: endpoint), before = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [[String]])
+        XCTAssertEqual(before.first?.count, 2, "All visible text, including more than 5000 characters, must share one AI request")
+        XCTAssertTrue(before.first?.first?.hasPrefix("Visible first:") == true); XCTAssertTrue(before.first?.last?.hasPrefix("Visible second:") == true)
+        let reopened = ReaderTranslation(); reopened.prepare(article: article, model: model); reopened.translate(article: article, model: model)
+        try await until { reopened.completed == 41 && !reopened.running }; XCTAssertNil(reopened.error); XCTAssertEqual(reopened.reused, 41)
+        let (afterData, _) = try await URLSession.shared.data(from: endpoint), after = try XCTUnwrap(JSONSerialization.jsonObject(with: afterData) as? [[String]])
+        XCTAssertEqual(after.count, before.count, "A new reader instance must restore disk results without spending provider quota")
+    }
     func testDetectionAutomaticTranslationReaderAndNavigationReset() async throws {
         XCTAssertEqual(PageTranslation.detect(sample: "هذه فقرة عربية طويلة بما يكفي لاكتشاف اللغة بصورة صحيحة ودقيقة دون إرسالها إلى أي خادم.", hint: "en"), "ar")
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

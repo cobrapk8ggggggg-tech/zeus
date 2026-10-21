@@ -70,8 +70,10 @@ jobs:
         timeout-minutes: 10
         run: |
           set -o pipefail
+          if [ "$ZEUS_TEST_SUITE" = core ]; then target=ZEUSNextTests; else target=ZEUSNextUITests; fi
           xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -configuration Debug \
             -destination "platform=iOS Simulator,id=$ZEUS_SIMULATOR_ID" \
+            -only-testing:"$target" \
             -derivedDataPath "$RUNNER_TEMP/ZEUSSimulator" \
             build-for-testing CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- 2>&1 | tee results/build.log
       - name: Run native tests on the selected simulator

@@ -46,13 +46,16 @@ actor TranslationMemory {
         guard sqlite3_prepare_v2(db, "SELECT text FROM translations WHERE key=?", -1, &query, nil) == SQLITE_OK else { return [:] }
         defer { sqlite3_finalize(query); sqlite3_finalize(touch) }
         sqlite3_prepare_v2(db, "UPDATE translations SET used=? WHERE key=?", -1, &touch, nil)
+        // Update LRU timestamps in one transaction, not one disk sync per paragraph.
+        let transaction = sqlite3_exec(db, "BEGIN", nil, nil, nil) == SQLITE_OK
+        defer { if transaction { sqlite3_exec(db, "COMMIT", nil, nil, nil) } }
         var result: [String: String] = [:]
         for segment in segments {
             let key = Self.key(segment.text, namespace: namespace)
             sqlite3_bind_text(query, 1, key, -1, transient)
             if sqlite3_step(query) == SQLITE_ROW, let value = sqlite3_column_text(query, 0) {
                 result[segment.text] = String(cString: value)
-                if let touch { sqlite3_bind_double(touch, 1, Date().timeIntervalSince1970); sqlite3_bind_text(touch, 2, key, -1, transient); sqlite3_step(touch); sqlite3_reset(touch) }
+                if transaction, let touch { sqlite3_bind_double(touch, 1, Date().timeIntervalSince1970); sqlite3_bind_text(touch, 2, key, -1, transient); sqlite3_step(touch); sqlite3_reset(touch) }
             }
             sqlite3_reset(query)
         }

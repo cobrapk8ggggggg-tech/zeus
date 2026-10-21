@@ -6,9 +6,10 @@ final class BrowserJourneyTests: XCTestCase {
         XCTAssertTrue(app.textFields["homeSearchField"].waitForExistence(timeout: 15)); capture("original-home")
         openToolbar(app); app.buttons["toolsButton"].tap()
         XCTAssertTrue(app.buttons["group-navigation"].waitForExistence(timeout: 5)); XCTAssertTrue(app.buttons["group-account"].exists); capture("grouped-tools")
-        app.tapCoordinate(0.2, 0.6)
-        let edge = app.otherElements["tabsEdge"]; XCTAssertTrue(edge.waitForExistence(timeout: 5))
-        edge.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75)).press(forDuration: 0.15, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4)))
+        // Open the same original tray through its existing navigation action.
+        // A drag from y=0 invokes the iPad system menu/Notification Center.
+        app.buttons["group-navigation"].tap()
+        let tabs = app.buttons["التبويبات"]; XCTAssertTrue(tabs.waitForExistence(timeout: 5)); tabs.tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "originalTabsTray").firstMatch.waitForExistence(timeout: 5))
         capture("original-gray-tab-tray")
     }
@@ -28,8 +29,8 @@ final class BrowserJourneyTests: XCTestCase {
         XCTAssertTrue(photo.waitForExistence(timeout: 20))
         let loaded = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: photo)
         wait(for: [loaded], timeout: 30); photo.tap()
-        let add = app.buttons.matching(NSPredicate(format: "label == 'Add' OR label == 'إضافة'")).firstMatch
-        if add.waitForExistence(timeout: 2) { add.tap() }
+        // PHPicker's single-selection mode completes on the photo tap.
+        // An offscreen Arabic Add button can belong to the underlying settings.
         XCTAssertTrue(app.buttons["إزالة الصورة"].waitForExistence(timeout: 12))
         let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.otherElements["avatarAlbumPicker"])
         wait(for: [dismissed], timeout: 8); capture("saved-device-photo-avatar")

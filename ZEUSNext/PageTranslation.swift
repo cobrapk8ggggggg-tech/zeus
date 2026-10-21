@@ -160,6 +160,9 @@ import NaturalLanguage
                                 let items = results.map { ["id": $0.id, "text": $0.text] }
                                 let applied = try await call("return zeusTranslate.apply(items, expected)", arguments: ["items": items, "expected": documentID], frame: frame) as? Int ?? 0
                                 if applied > 0 { completed += applied; translated = true }
+                                // Long-lived/infinite pages must not grow the in-memory
+                                // dictionary indefinitely; durable results remain on disk.
+                                if cache.count > 8000 || cache.reduce(0, { $0 + $1.key.utf8.count + $1.value.utf8.count }) > 8_000_000 { cache.removeAll(keepingCapacity: false) }
                             }
                         } catch is FrameUnavailable {
                             frames.removeValue(forKey: documentID)
