@@ -3,9 +3,10 @@ import WebKit
 import UIKit
 
 enum BrowserTools {
-    static let darkPage = """
-    (()=>{const s=document.createElement('style');s.textContent='html,body{background:#000!important;color:#fff!important;color-scheme:dark} input,textarea,select{color-scheme:dark}';document.documentElement.appendChild(s)})();
-    """
+    static let darkPage: String = {
+        guard let url = Bundle.main.url(forResource: "dark-page", withExtension: "js"), let source = try? String(contentsOf: url, encoding: .utf8) else { return "" }
+        return source
+    }()
     static let consoleScript = """
     (()=>{for(const kind of ['log','warn','error','info']){const original=console[kind];console[kind]=function(...args){try{window.webkit.messageHandlers.zeusConsole.postMessage({type:kind,message:args.map(a=>{try{return typeof a==='string'?a:JSON.stringify(a)}catch{return String(a)}}).join(' ').slice(0,4000)})}catch{};original.apply(console,args)}}})();
     """

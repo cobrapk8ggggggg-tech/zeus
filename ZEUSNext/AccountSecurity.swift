@@ -86,6 +86,9 @@ struct ReadingPreferences: Codable {
     var blockedWords: [String] = []
     var imageScale: Double = 1
     var scrollDistance: Double = 300
+    var fontName: String?
+    var backgroundHex: String?
+    var textHex: String?
 }
 
 extension ProfileStore {

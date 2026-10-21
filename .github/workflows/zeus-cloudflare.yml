@@ -1,7 +1,7 @@
 name: ZEUS Cloudflare translation verification
 on:
   push:
-    branches: [feature/zeus-cloudflare-translation-20261021, feature/zeus-page-translation-20261021, codex/zeus-browser-next, fix/zeus-next-latest-build-20261020, fix/zeus-browser-stability-20261021]
+    branches: [feature/zeus-tabs-reader-polish-20261021, feature/zeus-cloudflare-translation-20261021, feature/zeus-page-translation-20261021, codex/zeus-browser-next, fix/zeus-next-latest-build-20261020, fix/zeus-browser-stability-20261021]
     paths: [ZEUSNext/**, ZEUSNextTests/**, .zeus-ci/**, cloudflare/**, .github/workflows/zeus-cloudflare.yml]
   workflow_dispatch:
 permissions:
@@ -33,7 +33,7 @@ jobs:
         suite: [core, interface]
     env:
       ZEUS_TEST_SUITE: ${{ matrix.suite }}
-      ZEUS_NATIVE_TEST_FILTER: ${{ matrix.suite == 'core' && 'ZEUSNextTests' || 'ZEUSNextUITests/TranslationJourneyTests/testCloudflareSettingsRequirePrivateConnectionAndDoNotExposeAnAccountKey' }}
+      ZEUS_NATIVE_TEST_FILTER: ${{ matrix.suite == 'core' && 'ZEUSNextTests' || 'ZEUSNextUITests/BrowserPolishJourneyTests' }}
     steps:
       - uses: actions/checkout@v4
         with:

@@ -39,7 +39,7 @@ struct BrowserRoot: View {
     @FocusState private var addressFocused: Bool
     private var layout: ChromeLayout { model.data.settings.chromeLayout ?? .original }
     private var theme: BrowserTheme { model.data.settings.theme ?? .standard }
-    private var barsVisible: Bool { !model.chromeHidden || addressFocused || model.current?.isHome != false }
+    private var barsVisible: Bool { !(layout == .icab && model.chromeManuallyHidden) && (!model.chromeHidden || addressFocused || model.current?.isHome != false) }
     var body: some View {
         ZStack {
             theme.backgroundColor.ignoresSafeArea()
@@ -115,7 +115,7 @@ struct BrowserRoot: View {
                 if model.data.settings.advanced?.showTabsBar != false {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 1) {
-                            ForEach(model.tabs) { tab in HStack(spacing: 10) { Button { model.closeTab(tab) } label: { Image(systemName: "xmark").font(.caption) }; Button { model.selectTab(tab) } label: { Text(tab.title).font(.caption).lineLimit(1).frame(minWidth: 75, maxWidth: 170) } }.padding(.horizontal, 12).frame(height: 34).background(model.current?.id == tab.id ? theme.textColor.opacity(0.12) : theme.backgroundColor).overlay(Rectangle().stroke(theme.textColor.opacity(0.12), lineWidth: 0.5)) }
+                            BrowserTabCollection(model: model, compact: true)
                             actionButton(.newTab)
                         }
                     }
@@ -158,7 +158,7 @@ struct BrowserRoot: View {
         VStack { Spacer(); HStack { Button("الحسابات") { model.logout(); panel = .profiles }; Spacer(); Button("الرئيسية") { model.open(model.profile.account?.homePage ?? "zeus://home") }; Button("رجوع") { model.webView?.goBack() } }.font(.caption).padding(12).background(theme.backgroundColor) }
     }
     private var edgeReveal: some View {
-        HStack { Spacer(); Button { model.chromeHidden = false } label: { Image(systemName: "chevron.left").font(.caption).padding(8).glassSurface(12) }.accessibilityLabel("إظهار الأشرطة") }.frame(maxHeight: .infinity, alignment: .center).environment(\.layoutDirection, .leftToRight)
+        HStack { Spacer(); Button { model.chromeManuallyHidden = false; model.chromeHidden = false } label: { Image(systemName: "chevron.left").font(.caption).padding(8).glassSurface(12) }.accessibilityLabel("إظهار الأشرطة") }.frame(maxHeight: .infinity, alignment: .center).environment(\.layoutDirection, .leftToRight)
     }
     private var tabsTray: some View {
         ZStack(alignment: .top) {
@@ -167,14 +167,7 @@ struct BrowserRoot: View {
                 Capsule().fill(theme.textColor.opacity(0.4)).frame(width: 40, height: 5).padding(.top, 10).padding(.bottom, 20)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 15) {
-                        ForEach(model.tabs) { tab in
-                            ZStack(alignment: .topTrailing) {
-                                Button { model.selectTab(tab); withAnimation { topTray = false } } label: {
-                                    VStack(spacing: 10) { FirstPartyFavicon(site: Bookmark(title: tab.title, url: tab.url)).frame(width: 40, height: 40); Text(tab.title).font(.caption.bold()).lineLimit(2).multilineTextAlignment(.center).padding(.horizontal, 5) }.frame(width: 140, height: 180).foregroundStyle(model.current?.id == tab.id ? theme.selectionTextColor : theme.textColor).background(model.current?.id == tab.id ? theme.selectionColor : theme.backgroundColor.opacity(0.3), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(model.current?.id == tab.id ? theme.accentColor : theme.borderColor.opacity(0.3), lineWidth: 2))
-                                }.contextMenu { Button("إضافة للمفضلة", systemImage: "star") { if model.profile.role != .guest && !tab.isHome { model.data.bookmarks.append(Bookmark(title: tab.title, url: tab.url)); model.persist() } } }
-                                Button { model.closeTab(tab) } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(model.current?.id == tab.id ? theme.selectionTextColor.opacity(0.6) : theme.iconColor).padding(8) }.buttonStyle(.plain)
-                            }.scaleEffect(model.current?.id == tab.id ? 1.05 : 1)
-                        }
+                        BrowserTabCollection(model: model, selected: { withAnimation { topTray = false } })
                         Button { _ = model.newTab(); withAnimation { topTray = false } } label: { Image(systemName: "plus").font(.system(size: 30)).frame(width: 140, height: 180).background(theme.textColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [5])).foregroundStyle(theme.textColor.opacity(0.3))) }
                     }.padding(.horizontal, 20)
                 }.frame(height: 200)
@@ -212,7 +205,7 @@ struct BrowserRoot: View {
         case .twinHorizontal: model.toggleTwin(vertical: false); case .twinVertical: model.toggleTwin(vertical: true)
         case .savePage: model.saveWebArchive(); case .printPage: model.printPage()
         case .darkPage: var options = model.data.settings.advanced ?? AdvancedSettings(); options.forceDarkWebPages.toggle(); model.data.settings.advanced = options; model.applySettings()
-        case .fullScreen: model.chromeHidden.toggle()
+        case .fullScreen: model.chromeHidden.toggle(); if layout == .icab { model.chromeManuallyHidden = model.chromeHidden }
         case .share: if let url = model.webView?.url { model.share = ShareItem(url: url) }
         }
     }

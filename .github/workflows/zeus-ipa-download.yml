@@ -1,7 +1,7 @@
 name: ZEUS Next IPA download
 on:
   push:
-    branches: [feature/zeus-cloudflare-translation-20261021, feature/zeus-page-translation-20261021, fix/zeus-next-latest-build-20261020, fix/zeus-browser-stability-20261021]
+    branches: [feature/zeus-tabs-reader-polish-20261021, feature/zeus-cloudflare-translation-20261021, feature/zeus-page-translation-20261021, fix/zeus-next-latest-build-20261020, fix/zeus-browser-stability-20261021]
     paths:
       - .github/workflows/zeus-ipa-download.yml
       - ZEUSNext/**

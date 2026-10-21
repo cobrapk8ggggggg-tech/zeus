@@ -8,15 +8,20 @@ import ImageIO
 }
 struct FirstPartyFavicon: View {
     let site: Bookmark
+    var size: CGFloat = 32
+    var monochrome = true
+    var iconURL: String?
     @State private var image: UIImage?
     var body: some View {
         Group {
-            if let image { Image(uiImage: image).resizable().scaledToFit().saturation(0).frame(width: 32, height: 32).clipShape(Circle()) }
-            else { Text(String(site.title.prefix(1)).uppercased()).font(.title2) }
-        }.task(id: site.url) {
+            if let image { Image(uiImage: image).resizable().scaledToFit().saturation(monochrome ? 0 : 1).frame(width: size, height: size).clipShape(RoundedRectangle(cornerRadius: 4)) }
+            else { Image(systemName: site.url == "zeus://home" ? "bolt.fill" : "globe").font(.system(size: size * 0.65)) }
+        }.task(id: site.url + (iconURL ?? "")) {
+            image = nil
             guard let url = URL(string: site.url), BrowserURL.isWeb(url), var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
             parts.path = "/favicon.ico"; parts.query = nil; parts.fragment = nil; parts.user = nil; parts.password = nil
-            guard let favicon = parts.url else { return }
+            let discovered = iconURL.flatMap(URL.init(string:)).flatMap { BrowserURL.isWeb($0) ? $0 : nil }
+            guard let favicon = discovered ?? parts.url else { return }
             if let cached = FaviconMemory.images.object(forKey: favicon.absoluteString as NSString) { image = cached; return }
             let config = URLSessionConfiguration.ephemeral; config.httpCookieStorage = nil; config.httpShouldSetCookies = false; config.urlCache = nil; config.timeoutIntervalForResource = 12
             let session = URLSession(configuration: config, delegate: ThumbnailRedirects(cookies: []), delegateQueue: nil); defer { session.invalidateAndCancel() }

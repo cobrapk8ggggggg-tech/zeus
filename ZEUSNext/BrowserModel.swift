@@ -14,12 +14,14 @@ import LocalAuthentication
     var committed = false
     var error: String?
     var snapshot: UIImage?
+    var faviconURL: String?
     var filterTask: Task<Void, Never>?
     var translation: PageTranslation?
     var lastUsed = Date()
     var pinned = false
-    init(saved: SavedTab, profileID: UUID) { id = saved.id; title = saved.title; url = saved.url; self.profileID = profileID; pinned = saved.pinned ?? false }
-    var saved: SavedTab { SavedTab(id: id, title: title, url: url, pinned: pinned) }
+    var groupID: UUID?
+    init(saved: SavedTab, profileID: UUID) { id = saved.id; title = saved.title; url = saved.url; self.profileID = profileID; pinned = saved.pinned ?? false; groupID = saved.groupID }
+    var saved: SavedTab { SavedTab(id: id, title: title, url: url, pinned: pinned, groupID: groupID) }
     var isHome: Bool { url == "zeus://home" }
     func dispose() {
         translation?.stop(); translation = nil
@@ -63,6 +65,7 @@ struct WebDialog: Identifiable {
     @Published var address = ""
     @Published var blockedNavigations = 0
     @Published var chromeHidden = false
+    @Published var chromeManuallyHidden = false
     @Published var twinTabID: UUID?
     @Published var twinVertical = false
     @Published var twinFocused = false

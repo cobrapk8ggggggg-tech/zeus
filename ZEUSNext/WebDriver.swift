@@ -9,6 +9,7 @@ import UIKit
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) { scrollAnchor = scrollView.contentOffset.y }
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         guard scrollView.isDragging || scrollView.isDecelerating, let model, model.data.settings.advanced?.hideChromeOnScroll != false, tab?.id == model.current?.id else { return }
+        guard !(model.data.settings.chromeLayout == .icab && model.chromeManuallyHidden) else { return }
         let y = scrollView.contentOffset.y
         guard y >= -scrollView.adjustedContentInset.top, y <= max(0, scrollView.contentSize.height - scrollView.bounds.height) else { return }
         let delta = y - scrollAnchor
@@ -70,6 +71,11 @@ import UIKit
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         guard let model, let tab else { return }
         tab.url = webView.url?.absoluteString ?? tab.url; tab.title = webView.title.flatMap { $0.isEmpty ? nil : $0 } ?? BrowserURL.displayHost(tab.url)
+        let pageURL = tab.url
+        webView.evaluateJavaScript("document.querySelector('link[rel~=icon]')?.href || document.querySelector('link[rel=apple-touch-icon]')?.href || ''") { [weak model, weak tab] value, _ in
+            guard let tab, tab.url == pageURL else { return }
+            tab.faviconURL = value as? String; model?.changed()
+        }
         tab.loading = false; tab.error = nil
         if model.current?.id == tab.id { model.address = tab.url }
         model.addVisit(tab: tab); model.persist(); model.changed()

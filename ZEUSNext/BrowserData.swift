@@ -80,6 +80,7 @@ struct SavedTab: Codable, Identifiable {
     var title = "بداية جديدة"
     var url = "zeus://home"
     var pinned: Bool?
+    var groupID: UUID?
 }
 
 struct ProfileData: Codable {
@@ -91,6 +92,7 @@ struct ProfileData: Codable {
     var settings = BrowserSettings()
     var searches: [String]?
     var forms: [SavedForm]?
+    var tabGroups: [TabGroup]?
 }
 
 enum BrowserURL {

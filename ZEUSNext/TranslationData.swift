@@ -14,6 +14,8 @@ struct TranslationPreferences: Codable, Equatable {
     var providerID: UUID?
     var cloudflare: CloudflareTranslationConfiguration?
     var retainTranslations: Bool?
+    var suggestionDuration: Double?
+    var suggestionSeconds: Double { min(30, max(0, suggestionDuration ?? 1.5)) }
     var keepsTranslations: Bool { retainTranslations ?? true }
     var usesAIBatches: Bool { engine == .ai || engine == .cloudflare }
     func secretKey(provider: AIProviderConfiguration?) -> String {

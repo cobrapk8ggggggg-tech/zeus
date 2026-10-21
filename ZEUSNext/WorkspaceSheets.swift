@@ -14,19 +14,7 @@ struct TabsSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     PanelHeader(title: "نوافذ على عالمك", caption: "\(model.tabs.count) تبويب في \(model.profile.name)")
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                        ForEach(model.tabs) { tab in
-                            Button { model.selectTab(tab); dismiss() } label: {
-                                VStack(alignment: .leading, spacing: 0) {
-                                    ZStack {
-                                        if let snapshot = tab.snapshot { Image(uiImage: snapshot).resizable().scaledToFill() }
-                                        else { LinearGradient(colors: [theme.accentColor.opacity(0.15), theme.backgroundColor.opacity(0.2)], startPoint: .topTrailing, endPoint: .bottomLeading); Image(systemName: tab.isHome ? "sparkles" : "globe").font(.system(size: 34, weight: .ultraLight)).foregroundStyle(theme.accentColor) }
-                                    }.frame(height: 155).clipped()
-                                    HStack { Text(tab.title).font(.caption.weight(.semibold)).lineLimit(1); Spacer(minLength: 0); Button { model.closeTab(tab) } label: { Image(systemName: "xmark").padding(8) }.accessibilityLabel("إغلاق \(tab.title)") }.padding(10)
-                                }.glassSurface(23).clipShape(RoundedRectangle(cornerRadius: 23)).overlay(RoundedRectangle(cornerRadius: 23).stroke(model.current?.id == tab.id ? theme.accentColor : .clear, lineWidth: 2))
-                            }.buttonStyle(.plain)
-                        }
-                    }
+                    BrowserTabCollection(model: model, grid: true, selected: { dismiss() })
                 }.padding(22)
             }.background { OrbitBackground(tint: theme.accentColor) }.navigationTitle("التبويبات").navigationBarTitleDisplayMode(.inline)
                 .toolbar {

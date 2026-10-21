@@ -37,8 +37,13 @@ final class BrowserAppDelegate: NSObject, UIApplicationDelegate {
             if CommandLine.arguments.contains("--translation-fixture") {
                 var provider = AIProviderConfiguration(); provider.name = "مزود الاختبار المحلي"; provider.baseURL = "http://127.0.0.1:8765/v1"; provider.model = "fixture-translator"
                 model.data.settings.aiProviders = [provider]
-                var prefs = TranslationPreferences(); prefs.engine = .ai; prefs.providerID = provider.id; prefs.automatic = CommandLine.arguments.contains("--automatic-translation")
+                var prefs = TranslationPreferences(); prefs.suggestionDuration = 0; prefs.engine = .ai; prefs.providerID = provider.id; prefs.automatic = CommandLine.arguments.contains("--automatic-translation")
                 model.data.settings.translation = prefs
+            }
+            if CommandLine.arguments.contains("--tabs-polish-fixture") {
+                model.current?.title = "التبويب الأول — عنوان طويل لا يخفي أيقونة الموقع"
+                _ = model.newTab(); model.current?.title = "التبويب الثاني"
+                _ = model.newTab(); model.current?.title = "التبويب الثالث"
             }
             _browser = StateObject(wrappedValue: model)
         } else { _browser = StateObject(wrappedValue: BrowserModel()) }

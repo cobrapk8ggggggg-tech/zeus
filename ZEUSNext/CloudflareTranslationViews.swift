@@ -18,7 +18,6 @@ struct CloudflareTranslationSettings: View {
         Form {
             ThemedSection("اتصال Cloudflare لهذا البروفايل") {
                 Button { importing = true } label: { Label("استيراد ملف ربط Cloudflare", systemImage: "square.and.arrow.down") }.accessibilityIdentifier("importCloudflareConnection")
-                Text("استورد ملف الربط الخاص بك مرة واحدة. يُحفظ رمز الترجمة في Keychain لهذا البروفايل، ولا يُضمّن في نسخ البروفايلات أو التطبيق. أبقِ الملف خاصًا؛ يسمح باستخدام حصة الترجمة في حسابك.").font(.footnote)
                 TextField("عنوان خدمة الترجمة", text: $config.endpoint).textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL).environment(\.layoutDirection, .leftToRight).accessibilityIdentifier("cloudflareEndpoint")
                 SecureField("رمز اتصال ZEUS", text: $secret).textInputAutocapitalization(.never).autocorrectionDisabled().environment(\.layoutDirection, .leftToRight).accessibilityIdentifier("cloudflareConnectionKey")
                 Button(checking ? "جارٍ الاتصال والاختبار…" : "اتصال وجلب النماذج واختبار الترجمة") { connect() }.disabled(checking || secret.isEmpty || !context.permitted).accessibilityIdentifier("testCloudflareConnection")
@@ -29,20 +28,16 @@ struct CloudflareTranslationSettings: View {
             if !config.models.isEmpty {
                 ThemedSection("نموذج الترجمة") {
                     Picker("النموذج المفعّل في خادمك", selection: $config.model) { ForEach(config.models) { Text($0.name).tag($0.id) } }.accessibilityIdentifier("cloudflareTranslationModel")
-                    Text("تأتي الخيارات من خادمك على Cloudflare. تغيير النموذج يتطلب اختبارًا جديدًا وينشئ حفظ ترجمة مستقلًا. سرعة الترجمة تعتمد على النموذج وطول النص وحالة الخدمة.").font(.footnote)
                     TextField("توجيه أسلوبي اختياري للترجمة", text: $config.instruction, axis: .vertical).lineLimit(2...5)
                 }
             }
             ThemedSection("الاستخدام والحفظ") {
-                Text("تُرسل النصوص الظاهرة كدفعة أولى، ثم النصوص القريبة والبقية في الخلفية ضمن حدود النموذج. تستعيد الصفحة والقارئ الترجمة المحفوظة دون طلب جديد؛ لا تُرسل كلمات المرور أو حقول الكتابة أو ملفات الصفحة.").font(.footnote)
-                Text("يوفر Workers AI حصة مجانية قدرها 10,000 Neurons يوميًا، وليست عددًا ثابتًا من الصفحات أو الكلمات. تتجدد عند 00:00 UTC. الاستخدام الإضافي في الخطة المدفوعة يُحاسب عليه Cloudflare؛ ZEUS لا يغيّر خطتك.").font(.footnote)
                 Link("متابعة الحصة في لوحة Cloudflare", destination: URL(string: "https://dash.cloudflare.com/?to=/:account/ai/workers-ai")!)
                 Link("الأسعار الرسمية لـ Workers AI", destination: URL(string: "https://developers.cloudflare.com/workers-ai/platform/pricing/")!)
             }
             ThemedSection {
                 Button("حفظ الاتصال واستخدام Cloudflare") { save() }.fontWeight(.bold).disabled(!verified || checking || !context.permitted).accessibilityIdentifier("saveCloudflareConnection")
                 Button("إزالة اتصال هذا البروفايل", role: .destructive) { disconnect() }.disabled(checking || !context.permitted)
-                Text("إزالة الاتصال من الجهاز لا تلغي الرمز على الخادم ولا تحذف الترجمات السابقة. يمكن إلغاء الرمز باستبداله في الخدمة الخاصة بك.").font(.footnote)
             }
         }.settingsPage("ترجمة Cloudflare")
             .onAppear {

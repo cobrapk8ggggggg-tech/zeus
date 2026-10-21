@@ -9,38 +9,30 @@ struct TranslationCard: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
         Group { if page.offered {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 12) {
-                    Image(systemName: "translate").font(.title2).foregroundStyle(theme.accentColor)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(page.running ? "جارٍ ترجمة الصفحة…" : page.translated ? "تمت ترجمة الصفحة" : "هل تريد ترجمة هذه الصفحة؟").font(.subheadline.bold())
-                        Text(page.running || page.translated ? "\(page.completed) مقطع · \(page.preferences.engine.title)" : "\(Locale.current.localizedString(forLanguageCode: page.sourceLanguage) ?? page.sourceLanguage) ← \(Locale.current.localizedString(forLanguageCode: page.preferences.target) ?? page.preferences.target)").font(.caption).foregroundStyle(theme.secondaryTextColor)
-                    }
-                    Spacer(minLength: 0)
-                    Button { page.dismiss() } label: { Image(systemName: "xmark").padding(8) }.accessibilityLabel("إخفاء بطاقة الترجمة")
-                }
-                if page.reused > 0 { Text("\(page.reused) مقطع من الحفظ المحلي · بلا طلب جديد للمزوّد").font(.caption2).foregroundStyle(theme.secondaryTextColor) }
-                if let notice = page.storageNotice { Text(notice).font(.caption).textSelection(.enabled) }
-                if let error = page.error { Text(error).font(.caption).textSelection(.enabled).accessibilityIdentifier("translationError") }
-                HStack {
-                    if page.running {
-                        ProgressView().controlSize(.small); Button("إيقاف") { page.pause() }
-                    } else if page.translated {
-                        Button("عرض الأصل") { Task { await page.restore() } }.accessibilityIdentifier("restoreTranslationButton")
-                        if page.error != nil { Button("متابعة") { page.resume() } }
-                    } else { Button("ترجمة") { page.translate() }.accessibilityIdentifier("confirmTranslationButton").fontWeight(.bold) }
-                    Spacer()
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 9) {
+                    Image(systemName: "translate").font(.title3)
+                    Text(page.running ? "جارٍ الترجمة…" : page.translated ? "تمت الترجمة" : "ترجمة الصفحة؟").font(.subheadline.weight(.semibold)).lineLimit(1)
+                    Spacer(minLength: 4)
+                    if page.running { ProgressView().controlSize(.small); Button("إيقاف") { page.pause() } }
+                    else if page.translated { Button("الأصل") { Task { await page.restore() } }.accessibilityIdentifier("restoreTranslationButton"); if page.error != nil { Button("متابعة") { page.resume() } } }
+                    else { Button("ترجمة") { page.translate() }.fontWeight(.bold).accessibilityIdentifier("confirmTranslationButton") }
                     Menu {
                         Button("إعدادات الترجمة", systemImage: "gearshape") { settings() }
-                        Button("عدم الترجمة لهذا الموقع", systemImage: "globe.badge.chevron.backward") { page.excludeSite() }
-                        if page.translated {
-                            Button("استعادة الأصل") { Task { await page.restore() } }
-                            Button("إعادة الترجمة بالإعدادات الحالية") { Task { await page.restore(); page.translate() } }
-                        }
-                    } label: { Image(systemName: "ellipsis.circle").padding(6) }.accessibilityLabel("خيارات الترجمة")
+                        Button("عدم الترجمة لهذا الموقع") { page.excludeSite() }
+                        if page.translated { Button("إعادة الترجمة") { Task { await page.restore(); page.translate() } } }
+                    } label: { Image(systemName: "ellipsis.circle").frame(width: 30, height: 36) }.accessibilityLabel("خيارات الترجمة")
+                    Button { page.dismiss() } label: { Image(systemName: "xmark").font(.caption).frame(width: 30, height: 36) }.accessibilityLabel("إخفاء بطاقة الترجمة")
                 }.font(.subheadline).buttonStyle(.borderless)
-                if !page.running && !page.translated { Text("تُرسل نصوص الصفحة إلى الخدمة المختارة عند الترجمة.").font(.caption2).foregroundStyle(theme.secondaryTextColor) }
-            }.padding(15).glassSurface(22).padding(.horizontal, 14).padding(.top, 40)
+                if let error = page.error { Text(error).font(.caption).textSelection(.enabled).accessibilityIdentifier("translationError") }
+                if let notice = page.storageNotice { Text(notice).font(.caption) }
+            }.padding(.horizontal, 12).padding(.vertical, 5).glassSurface(16).frame(maxWidth: 540).padding(.horizontal, 12).padding(.top, 12)
+                .task(id: "\(page.offered)-\(page.running)-\(page.translated)-\(page.error ?? "")") {
+                    guard page.offered, !page.running, !page.translated, page.error == nil else { return }
+                    let seconds = page.preferences.suggestionSeconds
+                    guard seconds > 0 else { return }
+                    do { try await Task.sleep(for: .seconds(seconds)); guard !Task.isCancelled, !page.running, !page.translated, page.error == nil else { return }; withAnimation { page.dismiss() } } catch { }
+                }
                 .environment(\.layoutDirection, .rightToLeft).accessibilityElement(children: .contain).accessibilityIdentifier("translationSuggestionCard")
                 .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
                 .animation(reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.82), value: page.running)
@@ -60,21 +52,18 @@ struct TranslationSettingsPage: View {
             ThemedSection("لغة الصفحة") {
                 Picker("الترجمة إلى", selection: binding(\.target)) { ForEach(TranslationPreferences.languages, id: \.0) { code, name in Text(name).tag(code) } }
                 Toggle("اقتراح ترجمة الصفحات الأجنبية", isOn: binding(\.suggest))
+                Picker("مدة ظهور الاقتراح", selection: Binding(get: { prefs.suggestionSeconds }, set: { var p = prefs; p.suggestionDuration = $0; context.settings.translation = p; context.save() })) { Text("ثانية ونصف").tag(1.5); Text("3 ثوانٍ").tag(3.0); Text("5 ثوانٍ").tag(5.0); Text("10 ثوانٍ").tag(10.0); Text("حتى أغلقها").tag(0.0) }
                 Toggle("الترجمة التلقائية دون سؤال", isOn: binding(\.automatic)).accessibilityIdentifier("automaticPageTranslation")
                 Toggle("ترجمة المحتوى الذي يظهر لاحقًا", isOn: binding(\.dynamicContent))
-                Text("يُكتشف اختلاف لغة الصفحة على الجهاز. عند إيقاف الترجمة التلقائية تظهر البطاقة في كل صفحة أجنبية جديدة. العربية والفارسية والعبرية والأردية تُعرض باتجاه من اليمين إلى اليسار.").font(.footnote)
             }
             ThemedSection("محرك الترجمة") {
                 Picker("الخدمة", selection: binding(\.engine)) { ForEach(TranslationEngine.allCases, id: \.self) { Text($0.title).tag($0) } }.accessibilityIdentifier("translationEngine")
-                if prefs.engine == .googleWeb { Text("خدمة Google العامة دون مفتاح. غير رسمية وقد ترفض الطلبات أو تتغير؛ يمكن اختيار Cloud أو الذكاء الاصطناعي عند الحاجة.").font(.footnote) }
                 if prefs.engine == .googleCloud {
                     SecureField("مفتاح Cloud Translation API", text: $cloudKey).textInputAutocapitalization(.never).autocorrectionDisabled()
                     Button("حفظ المفتاح في Keychain") { do { try AISecretVault.save(cloudKey, profile: context.profileID, provider: "google-cloud"); message = "حُفظ المفتاح." } catch { message = error.localizedDescription } }
-                    Text("واجهة Google الرسمية. يلزم تفعيل Cloud Translation API وفوترة حسابك؛ تُحتسب تكلفة النصوص لدى Google.").font(.footnote)
                 }
                 if prefs.engine == .cloudflare {
                     NavigationLink { CloudflareTranslationSettings(context: context) } label: { Label("ربط وإعداد Cloudflare", systemImage: "cloud") }.accessibilityIdentifier("cloudflareTranslationSettings")
-                    Text("Workers AI: ترجمة بدفعات عبر خدمتك الخاصة في Cloudflare، مع استعادة النتائج المحفوظة تلقائيًا في الصفحة والقارئ.").font(.footnote)
                 }
                 if prefs.engine == .ai {
                     Picker("المزود", selection: binding(\.providerID)) {
@@ -82,7 +71,6 @@ struct TranslationSettingsPage: View {
                         ForEach(context.settings.aiProviders ?? []) { p in Text(p.name).tag(Optional(p.id)) }
                     }
                     NavigationLink { AISettingsPage(context: context) } label: { Label("إدارة مزودي الذكاء الاصطناعي", systemImage: "sparkles") }
-                    Text("تُرسل النصوص على دفعات مع الحفاظ على ترتيبها. الحسابات المرتبطة قد تحفظ طلبات الترجمة في المحادثة المختارة؛ اختيار «محادثة جديدة» ينشئ سياقًا مستقلًا للصفحة.").font(.footnote)
                 }
                 if let message { Text(message).font(.footnote) }
             }
@@ -92,10 +80,8 @@ struct TranslationSettingsPage: View {
                 }
             }
             ThemedSection("حفظ الترجمة على الجهاز") {
+                Text("\(savedCount) مقطع · " + ByteCountFormatter.string(fromByteCount: savedBytes, countStyle: .file)).font(.caption).accessibilityIdentifier("translationMemoryUsage")
                 Toggle("الاحتفاظ بالترجمة لتقليل استهلاك الحصة", isOn: Binding(get: { prefs.keepsTranslations }, set: { var value = prefs; value.retainTranslations = $0; context.settings.translation = value; context.save() })).accessibilityIdentifier("retainPageTranslations")
-                Text("\(savedCount) مقطع محفوظ · " + ByteCountFormatter.string(fromByteCount: savedBytes, countStyle: .file)).font(.footnote).accessibilityIdentifier("translationMemoryUsage")
-                Text("تُترجم النصوص الظاهرة أولًا كدفعة، ثم ما يقترب من الشاشة والبقية في الخلفية. عند التحديث أو إعادة فتح التطبيق تُستعاد ترجمة النص نفسه دون إرسال جديد. تغيير اللغة أو المزوّد أو النموذج أو التعليمات ينشئ حفظًا مستقلًا؛ النص المتغير وحده يُرسل مجددًا.").font(.footnote)
-                Text("حفظ مستقل لكل بروفايل، بحد 32 MB، دون انتهاء زمني. عند بلوغ الحد تُزال أقدم النتائج استخدامًا. التصفح الخاص يحتفظ بالنتيجة في الذاكرة فقط. إيقاف الحفظ لا يحذف النتائج السابقة.").font(.footnote)
                 Button("مسح الترجمات المحفوظة لهذا البروفايل", role: .destructive) {
                     if context.isActive { for tab in context.model.tabs { tab.translation?.clearSessionCache() } }
                     let folder = context.model.profiles.folder(for: context.profile)
@@ -103,7 +89,6 @@ struct TranslationSettingsPage: View {
                 }.accessibilityIdentifier("clearTranslationMemory")
                 if let message { Text(message).font(.footnote) }
             }
-            ThemedSection("في الصفحة والقارئ") { Text("افتح «القراءة والعرض ← ترجمة الصفحة» من أدوات المتصفح. زر الترجمة موجود أيضًا داخل قارئ الروايات. يمكنك إيقاف العملية أو استعادة الأصل في أي وقت؛ لا تُترجم كلمات المرور أو حقول الكتابة أو الأكواد.").font(.footnote) }
         }.settingsPage("ترجمة الصفحات").onAppear { cloudKey = AISecretVault.read(profile: context.profileID, provider: "google-cloud") }.task { await refreshMemory() }
     }
     private func refreshMemory() async {
@@ -130,8 +115,6 @@ struct AISettingsPage: View {
             }
             ThemedSection("مساحة الذكاء الاصطناعي") {
                 NavigationLink { AIWorkspace(context: context) } label: { Label("اختبار ومحادثة مع المزود", systemImage: "bubble.left.and.bubble.right") }
-                Text("يمكن إضافة عدة حسابات من كل نوع. تُجلب النماذج والمحادثات والمشاريع المتاحة من الخدمة؛ لا تحتاج كتابة معرّفاتها. المفاتيح والجلسات محفوظة في Keychain لهذا البروفايل، وتُستثنى من النسخ المصدرة.").font(.footnote)
-                Text("تكامل حسابي ChatGPT وGemini تجريبي ويعتمد على واجهات خاصة قد تتغير. واجهتا OpenAI المتوافقة وGemini API هما البديل الرسمي. لا يتم تعطيل فحص شهادات TLS.").font(.footnote)
             }
         }.settingsPage("الذكاء الاصطناعي")
     }
@@ -167,11 +150,9 @@ struct AIProviderEditor: View {
                 SecureField(config.kind == .geminiAccount ? "Cookie لحساب Google" : config.kind == .chatGPTAccount ? "ChatGPT Access Token" : "API Key", text: $secret).textInputAutocapitalization(.never).autocorrectionDisabled().environment(\.layoutDirection, .leftToRight).accessibilityIdentifier("aiProviderSecret")
                 if config.kind.account {
                     Button("استخدام جلسة الموقع داخل هذا البروفايل") { importBrowserSession() }.disabled(connecting || !context.permitted)
-                    Text("يمكن تسجيل الدخول إلى chatgpt.com أو gemini.google.com داخل ZEUS، ثم استيراد الجلسة هنا. أو الصق رمز حسابك أعلاه؛ لن تحتاج إدخال معرفات المشاريع والمحادثات.").font(.footnote)
                 }
                 if config.kind == .geminiAccount {
                     Stepper("رقم حساب Google: \(config.googleAccountIndex)", value: $config.googleAccountIndex, in: 0...9)
-                    Text("ترويسة Cookie كاملة من جلستك. الحساب الأول رقمه 0؛ يطابق /u/0/ في موقع Gemini.").font(.footnote)
                 }
                 Button { connect() } label: { HStack { if connecting { ProgressView() }; Text(connecting ? "جارٍ جلب خيارات الحساب…" : "اتصال وجلب النماذج والخيارات") } }.disabled(connecting || !context.permitted).accessibilityIdentifier("discoverAIProvider")
                 if !message.isEmpty { Text(message).font(.footnote).textSelection(.enabled) }
@@ -187,7 +168,6 @@ struct AIProviderEditor: View {
                     }
                     Picker("المحادثة", selection: $config.conversationID) { Text("محادثة جديدة لكل صفحة").tag(nil as String?); ForEach(availableChats) { Text($0.name).tag(Optional($0.id)) } }
                     Button("جلب محادثات أكثر (حتى \(min(chatLimit + 50, 500)))") { chatLimit = min(chatLimit + 50, 500); connect() }.disabled(connecting || chatLimit >= 500)
-                    if config.kind == .geminiAccount { Text("يسترجع Gemini المحادثات الحديثة والمثبّتة. لا يوفّر مشاريع ChatGPT. تبقى معرّفات سياق الخادم داخليًا دون كتابتها يدويًا.").font(.footnote) }
                 }
             }
             ThemedSection("الترجمة") { TextField("توجيه أسلوبي اختياري، مثل: أسلوب روائي سلس", text: $config.instruction, axis: .vertical).lineLimit(3...6) }
