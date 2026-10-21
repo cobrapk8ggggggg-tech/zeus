@@ -32,5 +32,13 @@ final class BrowserPolishJourneyTests: XCTestCase {
         app.swipeUp()
         let black = app.buttons["أسود"]; XCTAssertTrue(black.waitForExistence(timeout: 5)); black.tap(); capture("reader-black-theme")
     }
+    func testCompactTranslationOfferDismissesWithoutStartingTranslation() {
+        let app = XCUIApplication(); app.launchArguments = ["--uitesting", "--layout=dualBars", "--translation-fixture", "--timed-translation-suggestion"]; app.launch()
+        let search = app.textFields["homeSearchField"]; XCTAssertTrue(search.waitForExistence(timeout: 15)); search.tap(); search.typeText("http://127.0.0.1:8765/translate-fixture\n")
+        let translate = app.buttons["confirmTranslationButton"]; XCTAssertTrue(translate.waitForExistence(timeout: 20)); capture("compact-translation-offer")
+        let vanished = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: translate)
+        XCTAssertEqual(XCTWaiter.wait(for: [vanished], timeout: 5), .completed)
+        XCTAssertFalse(app.buttons["restoreTranslationButton"].exists)
+    }
     private func capture(_ name: String) { let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment) }
 }

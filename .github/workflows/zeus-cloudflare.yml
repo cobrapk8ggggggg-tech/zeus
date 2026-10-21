@@ -1,8 +1,8 @@
-name: ZEUS Cloudflare translation verification
+name: ZEUS browser verification
 on:
   push:
     branches: [feature/zeus-tabs-reader-polish-20261021, feature/zeus-cloudflare-translation-20261021, feature/zeus-page-translation-20261021, codex/zeus-browser-next, fix/zeus-next-latest-build-20261020, fix/zeus-browser-stability-20261021]
-    paths: [ZEUSNext/**, ZEUSNextTests/**, .zeus-ci/**, cloudflare/**, .github/workflows/zeus-cloudflare.yml]
+    paths: [ZEUSNext/**, ZEUSNextTests/**, ZEUSNextUITests/**, .zeus-ci/**, cloudflare/**, .github/workflows/zeus-cloudflare.yml]
   workflow_dispatch:
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
           node-version: '22'
       - run: node --test cloudflare/translation/worker.test.mjs
   verify:
-    name: Verify Cloudflare ${{ matrix.suite }} on iPad
+    name: Verify browser ${{ matrix.suite }} on iPad
     runs-on: macos-15
     timeout-minutes: 40
     strategy:

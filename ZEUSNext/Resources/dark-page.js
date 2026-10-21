@@ -2,6 +2,10 @@
   'use strict';
   if (window.__zeusDarkPage) return;
   window.__zeusDarkPage = true;
+  // Direct style properties also cover documents whose CSP rejects style tags.
+  document.documentElement.style.setProperty('background-color', '#101114', 'important');
+  document.documentElement.style.setProperty('color', '#e5e7eb', 'important');
+  document.documentElement.style.setProperty('color-scheme', 'dark', 'important');
   const css = `
     :root, html, body { color-scheme: dark !important; background-color:#101114 !important; color:#e5e7eb !important; }
     *:not(img):not(video):not(canvas):not(svg):not(svg *):not(picture):not(source) {
