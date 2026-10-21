@@ -5,6 +5,7 @@ import Photos
 import ImageIO
 
 struct TabsSheet: View {
+    @Environment(\.browserTheme) private var theme
     @ObservedObject var model: BrowserModel
     @Environment(\.dismiss) private var dismiss
     @State private var closeAll = false
@@ -19,15 +20,15 @@ struct TabsSheet: View {
                                 VStack(alignment: .leading, spacing: 0) {
                                     ZStack {
                                         if let snapshot = tab.snapshot { Image(uiImage: snapshot).resizable().scaledToFill() }
-                                        else { LinearGradient(colors: [model.profile.color.opacity(0.15), .black.opacity(0.2)], startPoint: .topTrailing, endPoint: .bottomLeading); Image(systemName: tab.isHome ? "sparkles" : "globe").font(.system(size: 34, weight: .ultraLight)).foregroundStyle(model.profile.color) }
+                                        else { LinearGradient(colors: [theme.accentColor.opacity(0.15), theme.backgroundColor.opacity(0.2)], startPoint: .topTrailing, endPoint: .bottomLeading); Image(systemName: tab.isHome ? "sparkles" : "globe").font(.system(size: 34, weight: .ultraLight)).foregroundStyle(theme.accentColor) }
                                     }.frame(height: 155).clipped()
                                     HStack { Text(tab.title).font(.caption.weight(.semibold)).lineLimit(1); Spacer(minLength: 0); Button { model.closeTab(tab) } label: { Image(systemName: "xmark").padding(8) }.accessibilityLabel("إغلاق \(tab.title)") }.padding(10)
-                                }.glassSurface(23).clipShape(RoundedRectangle(cornerRadius: 23)).overlay(RoundedRectangle(cornerRadius: 23).stroke(model.current?.id == tab.id ? model.profile.color : .clear, lineWidth: 2))
+                                }.glassSurface(23).clipShape(RoundedRectangle(cornerRadius: 23)).overlay(RoundedRectangle(cornerRadius: 23).stroke(model.current?.id == tab.id ? theme.accentColor : .clear, lineWidth: 2))
                             }.buttonStyle(.plain)
                         }
                     }
                 }.padding(22)
-            }.background { OrbitBackground(tint: model.profile.color) }.navigationTitle("التبويبات").navigationBarTitleDisplayMode(.inline)
+            }.background { OrbitBackground(tint: theme.accentColor) }.navigationTitle("التبويبات").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) { Button("تم") { dismiss() } }
                     ToolbarItem(placement: .bottomBar) { HStack { Button("إغلاق الكل") { closeAll = true }; Spacer(); Button { _ = model.newTab(); dismiss() } label: { Label("تبويب جديد", systemImage: "plus") } } }
@@ -37,6 +38,7 @@ struct TabsSheet: View {
 }
 
 struct DownloadsSheet: View {
+    @Environment(\.browserTheme) private var theme
     @ObservedObject var model: BrowserModel
     @ObservedObject private var service: DownloadService
     @Environment(\.dismiss) private var dismiss
@@ -66,7 +68,7 @@ struct DownloadsSheet: View {
                     }
                     ForEach(items) { item in downloadRow(item) }
                 }.padding(22)
-            }.background { OrbitBackground(tint: model.profile.color) }.navigationTitle("مدير الملفات").navigationBarTitleDisplayMode(.inline)
+            }.background { OrbitBackground(tint: theme.accentColor) }.navigationTitle("مدير الملفات").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("تم") { dismiss() } } }
                 .alert("تنزيل من رابط", isPresented: $adding) {
                     TextField("https://…", text: $link).textInputAutocapitalization(.never).keyboardType(.URL)
@@ -90,7 +92,7 @@ struct DownloadsSheet: View {
     private func downloadRow(_ item: BrowserDownload) -> some View {
         VStack(alignment: .leading, spacing: 13) {
             HStack(spacing: 13) {
-                Image(systemName: item.state == .completed ? "doc.fill" : item.state == .failed ? "exclamationmark.arrow.trianglehead.2.clockwise.rotate.90" : "arrow.down").font(.system(size: 24, weight: .light)).foregroundStyle(item.state == .failed ? .white : model.profile.color).frame(width: 44, height: 48)
+                Image(systemName: item.state == .completed ? "doc.fill" : item.state == .failed ? "exclamationmark.arrow.trianglehead.2.clockwise.rotate.90" : "arrow.down").font(.system(size: 24, weight: .light)).foregroundStyle(item.state == .failed ? theme.textColor : theme.accentColor).frame(width: 44, height: 48)
                 VStack(alignment: .leading, spacing: 6) {
                     Text(item.filename).font(.subheadline.weight(.semibold)).lineLimit(2)
                     Text(status(item)).font(.caption).foregroundStyle(.secondary)
@@ -109,8 +111,8 @@ struct DownloadsSheet: View {
                     Button("حذف", systemImage: "trash") { deleting = item }
                 } label: { Image(systemName: "ellipsis").frame(width: 38, height: 44) }.accessibilityLabel("خيارات \(item.filename)")
             }
-            if item.isBusy { if let fraction = item.fraction { ProgressView(value: fraction).tint(model.profile.color) } else { ProgressView().frame(maxWidth: .infinity, alignment: .leading) } }
-            if let error = item.error { Text(error).font(.caption).foregroundStyle(.white).fixedSize(horizontal: false, vertical: true) }
+            if item.isBusy { if let fraction = item.fraction { ProgressView(value: fraction).tint(theme.accentColor) } else { ProgressView().frame(maxWidth: .infinity, alignment: .leading) } }
+            if let error = item.error { Text(error).font(.caption).foregroundStyle(theme.textColor).fixedSize(horizontal: false, vertical: true) }
             HStack {
                 Text(item.engine == .backgroundSession ? "تنزيل نظام · يدعم الخلفية" : "تنزيل الصفحة · أبقِ التطبيق مفتوحًا").font(.system(size: 10)).foregroundStyle(.tertiary)
                 Spacer()

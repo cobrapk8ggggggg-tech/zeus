@@ -19,7 +19,7 @@ enum FormVault {
         let q = query(profileID: profileID, id: id); var add = q
         add[kSecValueData as String] = try JSONEncoder().encode(fields); add[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         let status = SecItemAdd(add as CFDictionary, nil)
-        guard status == errSecSuccess else { throw AccountError.keychain }
+        guard status == errSecSuccess else { throw AccountError.keychainStatus(status) }
     }
     static func load(profileID: UUID, id: UUID) -> [SavedFormField]? {
         var q = query(profileID: profileID, id: id); q[kSecReturnData as String] = true
@@ -65,6 +65,7 @@ extension BrowserModel {
     func deleteForm(_ form: SavedForm) { FormVault.remove(profileID: profile.id, id: form.id); temporaryFormValues.removeValue(forKey: form.id); data.forms?.removeAll { $0.id == form.id }; persist() }
 }
 struct FormDraftView: View {
+    @Environment(\.browserTheme) private var theme
     @ObservedObject var model: BrowserModel
     @State var draft: FormDraft
     @Environment(\.dismiss) private var dismiss
@@ -77,16 +78,17 @@ struct FormDraftView: View {
             Text("تُحفظ القيم داخل سلسلة مفاتيح الجهاز، وتُملأ فقط في مصدر الموقع نفسه. في الحساب الخاص تبقى في الذاكرة وتُحذف عند الخروج.").font(.footnote)
             Button("حفظ النموذج") { do { try model.storeForm(draft, includePasswords: includePasswords); dismiss() } catch { issue = error.localizedDescription } }
             if let issue { Text(issue) }
-        }.settingsPage("حفظ النموذج").toolbar { Button("إلغاء") { dismiss() } } }.tint(.white).preferredColorScheme(.dark)
+        }.settingsPage("حفظ النموذج").toolbar { Button("إلغاء") { dismiss() } } }.tint(theme.buttonTextColor).preferredColorScheme(theme.light ? .light : .dark)
     }
 }
 struct SavedFormsPage: View {
+    @Environment(\.browserTheme) private var theme
     @ObservedObject var model: BrowserModel
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         NavigationStack { List {
             ForEach(model.data.forms ?? []) { form in Button { model.fillForm(form); dismiss() } label: { VStack(alignment: .leading, spacing: 6) { Text(form.title); Text(form.origin).font(.caption).foregroundStyle(.secondary); Text("\(form.fieldCount) حقل").font(.caption2) } }.buttonStyle(.plain).contextMenu { Button("حذف") { model.deleteForm(form) } } }
             if (model.data.forms ?? []).isEmpty { Text("لا توجد نماذج محفوظة لهذا الحساب.") }
-        }.settingsPage("ملء النماذج").toolbar { Button("تم") { dismiss() } } }.tint(.white).preferredColorScheme(.dark)
+        }.settingsPage("ملء النماذج").toolbar { Button("تم") { dismiss() } } }.tint(theme.buttonTextColor).preferredColorScheme(theme.light ? .light : .dark)
     }
 }

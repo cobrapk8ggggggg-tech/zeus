@@ -32,7 +32,9 @@ final class BrowserAppDelegate: NSObject, UIApplicationDelegate {
         if CommandLine.arguments.contains("--uitesting") {
             let root = FileManager.default.temporaryDirectory.appendingPathComponent("ZEUS-UITesting")
             try? FileManager.default.removeItem(at: root)
-            _browser = StateObject(wrappedValue: BrowserModel(profiles: ProfileStore(root: root, downloadsRoot: root.appendingPathComponent("Downloads")), useBackgroundDownloads: false))
+            let model = BrowserModel(profiles: ProfileStore(root: root, downloadsRoot: root.appendingPathComponent("Downloads")), useBackgroundDownloads: false)
+            if let argument = CommandLine.arguments.first(where: { $0.hasPrefix("--layout=") }), let layout = ChromeLayout(rawValue: String(argument.dropFirst(9))) { model.data.settings.chromeLayout = layout }
+            _browser = StateObject(wrappedValue: model)
         } else { _browser = StateObject(wrappedValue: BrowserModel()) }
     }
     var body: some Scene {

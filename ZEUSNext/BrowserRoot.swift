@@ -2,7 +2,7 @@ import SwiftUI
 import WebKit
 import Combine
 
-enum BrowserPanel: String, Identifiable { case tabs, profiles, downloads, settings, library, history, tools, scripts, console, forms; var id: String { rawValue } }
+enum BrowserPanel: String, Identifiable { case tabs, profiles, account, downloads, settings, library, history, tools, scripts, console, forms; var id: String { rawValue } }
 enum BrowserAction: String, CaseIterable, Identifiable {
     case back, forward, reload, home, newTab, tabs, library, history, reader, gallery, downloads, profiles, scripts, console, shield, share, settings, tools, bookmark, pinTab, twinHorizontal, twinVertical, savePage, printPage, darkPage, fullScreen, saveForm, fillForm
     var id: String { rawValue }
@@ -29,16 +29,18 @@ struct BrowserRoot: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @AppStorage("showCurrentUserAvatar") private var showCurrentUserAvatar = false
     @State private var panel: BrowserPanel?
+    @State private var profilePicker = false
     @State private var toolbarVisible = false
     @State private var topTray = false
     @State private var draft = ""
     @State private var dialogText = ""
     @FocusState private var addressFocused: Bool
     private var layout: ChromeLayout { model.data.settings.chromeLayout ?? .original }
+    private var theme: BrowserTheme { model.data.settings.theme ?? .standard }
     private var barsVisible: Bool { !model.chromeHidden || addressFocused || model.current?.isHome != false }
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            theme.backgroundColor.ignoresSafeArea()
             if model.requiresUnlock { lockedView }
             else {
                 VStack(spacing: 0) {
@@ -54,23 +56,26 @@ struct BrowserRoot: View {
                 }
                 if topTray { tabsTray.transition(.move(edge: .top)).zIndex(10) }
             }
-            if scenePhase != .active { Color.black.ignoresSafeArea().overlay(Image(systemName: "lock").font(.largeTitle)).accessibilityHidden(true) }
+            if scenePhase != .active { theme.backgroundColor.ignoresSafeArea().overlay(Image(systemName: "lock").font(.largeTitle)).accessibilityHidden(true) }
         }
-        .foregroundStyle(.white).tint(.white).background(.black)
+        .foregroundStyle(theme.textColor).tint(theme.accentColor).background(theme.backgroundColor)
         .statusBarHidden(layout == .original)
         .ignoresSafeArea(.container, edges: layout == .original ? .all : [])
         .animation(.spring(response: 0.34, dampingFraction: 0.86), value: model.chromeHidden)
-        .fullScreenCover(item: $panel) { item in panelContent(item).tint(.white).preferredColorScheme(.dark).environment(\.layoutDirection, .rightToLeft) }
-        .fullScreenCover(item: $model.article) { ReaderSheet(model: model, article: $0).tint(.white) }
-        .fullScreenCover(item: $model.gallery) { GallerySheet(model: model, gallery: $0).tint(.white) }
+        .fullScreenCover(item: $panel) { item in panelContent(item).browserTheme(theme).environment(\.layoutDirection, .rightToLeft) }
+        .overlay { if profilePicker { ProfilePickerPopover(model: model, close: { profilePicker = false }, manage: { profilePicker = false; panel = .profiles }).browserTheme(theme) } }
+        .overlay(alignment: .top) { if model.current?.loading == true { ProgressView(value: max(0.05, model.current?.progress ?? 0)).progressViewStyle(.linear).tint(theme.accentColor).frame(height: 2).allowsHitTesting(false) } }
+        .browserTheme(theme)
+        .fullScreenCover(item: $model.article) { ReaderSheet(model: model, article: $0).tint(theme.buttonTextColor) }
+        .fullScreenCover(item: $model.gallery) { GallerySheet(model: model, gallery: $0).tint(theme.buttonTextColor) }
         .fullScreenCover(item: $model.formDraft) { FormDraftView(model: model, draft: $0) }
         .sheet(item: $model.share) { ActivitySheet(url: $0.url) }
         .onChange(of: model.dialog?.id) { _, _ in if let dialog = model.dialog { model.dialog = nil; BrowserPresentation.present(dialog) } }
         .onChange(of: model.notice?.id) { _, _ in if let notice = model.notice { model.notice = nil; BrowserPresentation.notice(notice.text) } }
-        .onChange(of: model.requiresUnlock) { _, locked in if locked { panel = nil; model.article = nil; model.gallery = nil; model.formDraft = nil; model.share = nil; BrowserPresentation.dismissTools() } }
+        .onChange(of: model.requiresUnlock) { _, locked in if locked { profilePicker = false; panel = nil; model.article = nil; model.gallery = nil; model.formDraft = nil; model.share = nil; BrowserPresentation.dismissTools() } }
         .onChange(of: model.address) { _, value in if !addressFocused { draft = value } }
         .onChange(of: scenePhase) { _, phase in if phase == .background { model.backgrounded() }; if phase == .active { model.becameActive() } }
-        .onReceive(model.profiles.$activeID.dropFirst()) { _ in panel = nil; model.article = nil; model.gallery = nil; model.formDraft = nil; model.share = nil; BrowserPresentation.dismissTools() }
+        .onReceive(model.profiles.$activeID.dropFirst()) { _ in profilePicker = false; panel = nil; model.article = nil; model.gallery = nil; model.formDraft = nil; model.share = nil; BrowserPresentation.dismissTools() }
         .onReceive(model.profiles.objectWillChange) { model.changed() }
         .onReceive(model.downloads.objectWillChange) { model.changed() }
         .onReceive(model.downloads.$message) { if let text = $0 { model.downloads.message = nil; model.notify(text) } }
@@ -106,14 +111,14 @@ struct BrowserRoot: View {
                 if model.data.settings.advanced?.showTabsBar != false {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 1) {
-                            ForEach(model.tabs) { tab in HStack(spacing: 10) { Button { model.closeTab(tab) } label: { Image(systemName: "xmark").font(.caption) }; Button { model.selectTab(tab) } label: { Text(tab.title).font(.caption).lineLimit(1).frame(minWidth: 75, maxWidth: 170) } }.padding(.horizontal, 12).frame(height: 34).background(model.current?.id == tab.id ? .white.opacity(0.12) : .black).overlay(Rectangle().stroke(.white.opacity(0.12), lineWidth: 0.5)) }
+                            ForEach(model.tabs) { tab in HStack(spacing: 10) { Button { model.closeTab(tab) } label: { Image(systemName: "xmark").font(.caption) }; Button { model.selectTab(tab) } label: { Text(tab.title).font(.caption).lineLimit(1).frame(minWidth: 75, maxWidth: 170) } }.padding(.horizontal, 12).frame(height: 34).background(model.current?.id == tab.id ? theme.textColor.opacity(0.12) : theme.backgroundColor).overlay(Rectangle().stroke(theme.textColor.opacity(0.12), lineWidth: 0.5)) }
                             actionButton(.newTab)
                         }
                     }
                 }
-            } else { HStack { actionButton(.profiles); Spacer(); Text(model.profile.name).font(.subheadline); Spacer(); actionButton(.tools) } }
-            if model.current?.loading == true { ProgressView(value: model.current?.progress ?? 0).tint(.white).frame(height: 2) }
-        }.padding(.horizontal, layout == .icab ? 4 : 12).padding(.vertical, 5).background(.black).environment(\.layoutDirection, .leftToRight)
+            } else { HStack { actionButton(.profiles); Spacer(); Text(model.profile.name).font(.subheadline); Spacer(); Button { panel = .account } label: { Image(systemName: "gearshape").font(.system(size: 19)).foregroundStyle(theme.iconColor).frame(width: 44, height: 40).background(theme.buttonBackgroundColor, in: RoundedRectangle(cornerRadius: 12)) }.buttonStyle(.plain).accessibilityIdentifier("accountSettingsButton").accessibilityLabel("إعدادات البروفايل") } }
+            if model.current?.loading == true { ProgressView(value: model.current?.progress ?? 0).tint(theme.buttonTextColor).frame(height: 2) }
+        }.padding(.horizontal, layout == .icab ? 4 : 12).padding(.vertical, 5).background(theme.backgroundColor).environment(\.layoutDirection, .leftToRight)
     }
     private var bottomBar: some View {
         VStack(spacing: 4) {
@@ -122,14 +127,14 @@ struct BrowserRoot: View {
             HStack {
                 ForEach(layout == .icab ? [BrowserAction.library, .downloads, .profiles, .tabs, .settings, .tools] : [.back, .forward, .library, .downloads, .tabs, .tools]) { item in actionButton(item).frame(maxWidth: .infinity) }
             }
-        }.padding(.horizontal, 12).padding(.bottom, 3).background(.black)
+        }.padding(.horizontal, 12).padding(.bottom, 3).background(theme.backgroundColor)
     }
     private var originalControls: some View {
         ZStack(alignment: .trailing) {
             if toolbarVisible {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 9) {
-                        ForEach([BrowserAction.back, .forward, .reload, .home, .newTab, .library, .history, .reader, .gallery, .console, .scripts, .darkPage, .tools]) { item in actionButton(item); if [.home, .gallery, .profiles].contains(item) { Divider().frame(width: 30).overlay(.white.opacity(0.3)) } }
+                        ForEach([BrowserAction.back, .forward, .reload, .home, .newTab, .library, .history, .reader, .gallery, .console, .scripts, .darkPage, .tools]) { item in actionButton(item); if [.home, .gallery, .profiles].contains(item) { Divider().frame(width: 30).overlay(theme.textColor.opacity(0.3)) } }
                     }.padding(.vertical, 14).padding(.horizontal, 8)
                 }.frame(width: 64).frame(maxHeight: 680).glassSurface(20)
                     .transition(.move(edge: .trailing)).padding(.vertical, 24)
@@ -146,7 +151,7 @@ struct BrowserRoot: View {
             }
     }
     private var kioskControls: some View {
-        VStack { Spacer(); HStack { Button("الحسابات") { model.logout(); panel = .profiles }; Spacer(); Button("الرئيسية") { model.open(model.profile.account?.homePage ?? "zeus://home") }; Button("رجوع") { model.webView?.goBack() } }.font(.caption).padding(12).background(.black) }
+        VStack { Spacer(); HStack { Button("الحسابات") { model.logout(); panel = .profiles }; Spacer(); Button("الرئيسية") { model.open(model.profile.account?.homePage ?? "zeus://home") }; Button("رجوع") { model.webView?.goBack() } }.font(.caption).padding(12).background(theme.backgroundColor) }
     }
     private var edgeReveal: some View {
         HStack { Spacer(); Button { model.chromeHidden = false } label: { Image(systemName: "chevron.left").font(.caption).padding(8).glassSurface(12) }.accessibilityLabel("إظهار الأشرطة") }.frame(maxHeight: .infinity, alignment: .center).environment(\.layoutDirection, .leftToRight)
@@ -155,32 +160,34 @@ struct BrowserRoot: View {
         ZStack(alignment: .top) {
             Color.black.opacity(0.5).ignoresSafeArea().onTapGesture { withAnimation { topTray = false } }
             VStack(spacing: 0) {
-                Capsule().fill(.white.opacity(0.4)).frame(width: 40, height: 5).padding(.top, 10).padding(.bottom, 20)
+                Capsule().fill(theme.textColor.opacity(0.4)).frame(width: 40, height: 5).padding(.top, 10).padding(.bottom, 20)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 15) {
                         ForEach(model.tabs) { tab in
                             ZStack(alignment: .topTrailing) {
                                 Button { model.selectTab(tab); withAnimation { topTray = false } } label: {
-                                    VStack(spacing: 10) { Image(systemName: tab.isHome ? "house.fill" : "globe").font(.system(size: 32)).frame(width: 40, height: 40); Text(tab.title).font(.caption.bold()).lineLimit(2).multilineTextAlignment(.center).padding(.horizontal, 5) }.frame(width: 140, height: 180).background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(.white.opacity(model.current?.id == tab.id ? 1 : 0.2), lineWidth: 2))
+                                    VStack(spacing: 10) { FirstPartyFavicon(site: Bookmark(title: tab.title, url: tab.url)).frame(width: 40, height: 40); Text(tab.title).font(.caption.bold()).lineLimit(2).multilineTextAlignment(.center).padding(.horizontal, 5) }.frame(width: 140, height: 180).foregroundStyle(model.current?.id == tab.id ? theme.selectionTextColor : theme.textColor).background(model.current?.id == tab.id ? theme.selectionColor : theme.backgroundColor.opacity(0.3), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(theme.textColor.opacity(model.current?.id == tab.id ? 1 : 0.2), lineWidth: 2))
                                 }.contextMenu { Button("إضافة للمفضلة", systemImage: "star") { if model.profile.role != .guest && !tab.isHome { model.data.bookmarks.append(Bookmark(title: tab.title, url: tab.url)); model.persist() } } }
                                 Button { model.closeTab(tab) } label: { Image(systemName: "xmark.circle.fill").padding(8) }
                             }.scaleEffect(model.current?.id == tab.id ? 1.05 : 1)
                         }
-                        Button { _ = model.newTab(); withAnimation { topTray = false } } label: { Image(systemName: "plus").font(.system(size: 30)).frame(width: 140, height: 180).background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [5])).foregroundStyle(.white.opacity(0.3))) }
+                        Button { _ = model.newTab(); withAnimation { topTray = false } } label: { Image(systemName: "plus").font(.system(size: 30)).frame(width: 140, height: 180).background(theme.textColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [5])).foregroundStyle(theme.textColor.opacity(0.3))) }
                     }.padding(.horizontal, 20)
                 }.frame(height: 200)
-                HStack { actionButton(.profiles); actionButton(.downloads); actionButton(.library); actionButton(.settings); actionButton(.tools) }.padding(.top, 10)
-            }.frame(height: 300).frame(maxWidth: .infinity).background(.ultraThinMaterial).background(.black.opacity(0.8)).clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 30, bottomTrailingRadius: 30))
+                Spacer()
+            }.accessibilityIdentifier("originalTabsTray").frame(height: 300).frame(maxWidth: .infinity).background(.ultraThinMaterial).clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 30, bottomTrailingRadius: 30))
 
         }
     }
     @ViewBuilder private func actionButton(_ action: BrowserAction) -> some View {
         if action == .tools {
             Menu {
-                ForEach(BrowserAction.allCases.filter { $0 != .tools }) { item in Button(item.title, systemImage: item.symbol) { perform(item) }.accessibilityIdentifier(item.identifier) }
-                Button("أدوات الصفحة وحفظها", systemImage: "slider.horizontal.3") { panel = .tools }
-            } label: { Image(systemName: action.symbol).font(.system(size: 19)).frame(width: 44, height: 40) }.accessibilityIdentifier(action.identifier).accessibilityLabel(action.title)
-        } else { Button { perform(action) } label: { Group { if action == .profiles && showCurrentUserAvatar { AccountAvatar(profile: model.profile, store: model.profiles, size: 28) } else { Image(systemName: action.symbol).font(.system(size: 19)) } }.frame(width: 44, height: 40).overlay(alignment: .topTrailing) { if action == .tabs { Text("\(model.tabs.count)").font(.system(size: 9)).padding(2).background(.black, in: Circle()) } } }
+                ForEach(BrowserActionGroup.allCases) { group in
+                    Menu { ForEach(group.actions) { item in Button(item.title, systemImage: item.symbol) { perform(item) }.accessibilityIdentifier("menu-" + item.identifier) } } label: { Label(group.title, systemImage: group.symbol) }.accessibilityIdentifier("group-" + group.rawValue)
+                }
+                Menu("الحفظ والتصدير", systemImage: "square.and.arrow.up") { Button("خيارات اللقطات وPDF والقراءة") { panel = .tools } }
+            } label: { Image(systemName: action.symbol).font(.system(size: 19)).foregroundStyle(theme.iconColor).frame(width: 44, height: 40).background(theme.buttonBackgroundColor, in: RoundedRectangle(cornerRadius: 12)) }.accessibilityIdentifier(action.identifier).accessibilityLabel(action.title)
+        } else { Button { perform(action) } label: { Group { if action == .profiles { AccountAvatar(profile: model.profile, store: model.profiles, size: 28) } else { Image(systemName: action.symbol).font(.system(size: 19)) } }.foregroundStyle(theme.iconColor).frame(width: 44, height: 40).background(theme.buttonBackgroundColor, in: RoundedRectangle(cornerRadius: 12)).overlay(alignment: .topTrailing) { if action == .tabs { Text("\(model.tabs.count)").font(.system(size: 9)).padding(2).background(theme.backgroundColor, in: Circle()) } } }
             .buttonStyle(.plain).accessibilityLabel(action.title).accessibilityIdentifier(action.identifier)
             .disabled(action == .back && model.webView?.canGoBack != true || action == .forward && model.webView?.canGoForward != true)
     }
@@ -192,7 +199,7 @@ struct BrowserRoot: View {
         case .tabs: if layout == .original { withAnimation { topTray.toggle() } } else { panel = .tabs }
         case .library: panel = .library; case .history: panel = .history
         case .reader: model.readerMode(); case .gallery: model.galleryMode()
-        case .downloads: panel = .downloads; case .profiles: panel = .profiles; case .scripts: panel = .scripts; case .console: panel = .console
+        case .downloads: panel = .downloads; case .profiles: profilePicker = true; case .scripts: panel = .scripts; case .console: panel = .console
         case .shield: model.toggleCompatibility(); case .settings: panel = .settings; case .tools: panel = .tools
         case .saveForm: model.extractForm(); case .fillForm: panel = .forms
         case .bookmark: model.bookmarkCurrent(); case .pinTab: model.pinCurrent()
@@ -204,10 +211,10 @@ struct BrowserRoot: View {
         }
     }
     private var lockedView: some View {
-        VStack(spacing: 24) { Image(systemName: "lock.shield").font(.system(size: 58)); Text("تسجيل الدخول").font(.title2); Button("اختيار الحساب") { panel = .profiles }.buttonStyle(.bordered) }.frame(maxWidth: .infinity, maxHeight: .infinity)
+        VStack(spacing: 24) { Image(systemName: "lock.shield").font(.system(size: 58)); Text("تسجيل الدخول").font(.title2); Button("اختيار الحساب") { profilePicker = true }.buttonStyle(.bordered) }.frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-    private var restrictedPanel: some View { VStack(spacing: 20) { Image(systemName: "lock"); Text("هذه الأداة مقيدة لهذا الحساب"); Button("رجوع") { panel = nil } }.frame(maxWidth: .infinity, maxHeight: .infinity).background(.black) }
+    private var restrictedPanel: some View { VStack(spacing: 20) { Image(systemName: "lock"); Text("هذه الأداة مقيدة لهذا الحساب"); Button("رجوع") { panel = nil } }.frame(maxWidth: .infinity, maxHeight: .infinity).background(theme.backgroundColor) }
     @ViewBuilder private func panelContent(_ panel: BrowserPanel) -> some View {
-        switch panel { case .forms: SavedFormsPage(model: model); case .tabs: TabsSheet(model: model); case .profiles: ProfilesSheet(model: model); case .downloads: DownloadsSheet(model: model); case .settings: if model.profile.account?.allowSettings != false { SettingsSheet(model: model) } else { restrictedPanel }; case .library: LibrarySheet(model: model); case .history: LibrarySheet(model: model, initialSection: 1); case .tools: ToolsSheet(model: model); case .scripts: if model.profile.account?.allowScripts != false { ScriptsSheet(model: model) } else { restrictedPanel }; case .console: if model.profile.account?.allowDeveloperTools != false { ConsoleSheet(model: model) } else { restrictedPanel } }
+        switch panel { case .forms: SavedFormsPage(model: model); case .tabs: TabsSheet(model: model); case .account: SettingsSheet(model: model, profile: model.profile); case .profiles: ProfilesSheet(model: model); case .downloads: DownloadsSheet(model: model); case .settings: if model.profile.account?.allowSettings != false { SettingsSheet(model: model) } else { restrictedPanel }; case .library: LibrarySheet(model: model); case .history: LibrarySheet(model: model, initialSection: 1); case .tools: ToolsSheet(model: model); case .scripts: if model.profile.account?.allowScripts != false { ScriptsSheet(model: model) } else { restrictedPanel }; case .console: if model.profile.account?.allowDeveloperTools != false { ConsoleSheet(model: model) } else { restrictedPanel } }
     }
 }

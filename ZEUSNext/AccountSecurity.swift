@@ -24,8 +24,9 @@ struct AccountOptions: Codable, Equatable {
 }
 enum AccountError: LocalizedError {
     case permission, password, keychain
+    case keychainStatus(Int32)
     var errorDescription: String? {
-        switch self { case .permission: return "هذا الإجراء متاح للحساب الرئيسي فقط."; case .password: return "كلمة المرور غير صحيحة."; case .keychain: return "تعذر حفظ كلمة المرور في سلسلة مفاتيح الجهاز." }
+        switch self { case .permission: return "هذا الإجراء متاح للحساب الرئيسي فقط."; case .password: return "كلمة المرور غير صحيحة."; case .keychain: return "تعذر حفظ كلمة المرور في سلسلة مفاتيح الجهاز."; case .keychainStatus(let code): return "تعذر الوصول إلى سلسلة مفاتيح الجهاز (\(code)). تحقق من قفل الجهاز وتوقيع التطبيق وصلاحية Keychain." }
     }
 }
 enum AccountVault {
@@ -67,8 +68,9 @@ enum AccountVault {
         var q = query(id); q[kSecValueData as String] = data; q[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         let status = SecItemAdd(q as CFDictionary, nil)
         if status == errSecDuplicateItem {
-            guard SecItemUpdate(query(id) as CFDictionary, [kSecValueData as String: data] as CFDictionary) == errSecSuccess else { throw AccountError.keychain }
-        } else if status != errSecSuccess { throw AccountError.keychain }
+            let updated = SecItemUpdate(query(id) as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+            guard updated == errSecSuccess else { throw AccountError.keychainStatus(updated) }
+        } else if status != errSecSuccess { throw AccountError.keychainStatus(status) }
     }
     static func remove(_ id: UUID) { SecItemDelete(query(id) as CFDictionary) }
 }

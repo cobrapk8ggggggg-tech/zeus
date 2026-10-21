@@ -63,6 +63,7 @@ import UIKit
     }
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { tab?.error = nil; tab?.loading = true; model?.changed() }
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        tab?.committed = true
         if let url = webView.url { tab?.url = url.absoluteString; if model?.current?.id == tab?.id { model?.address = url.absoluteString } }
         model?.changed()
     }

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ScriptsSheet: View {
+    @Environment(\.browserTheme) private var theme
     @ObservedObject var model: BrowserModel
     @Environment(\.dismiss) private var dismiss
     @State private var editing: BrowserScript?
@@ -10,7 +11,7 @@ struct ScriptsSheet: View {
                 Button { dismiss() } label: { Image(systemName: "xmark").font(.title2) }
                 Spacer(); Text("مدير السكربتات").font(.headline); Spacer()
                 Button { editing = BrowserScript(name: "سكربت جديد", domain: "*", code: "// اكتب كود جافا سكربت هنا\n") } label: { Image(systemName: "plus").font(.title2) }
-            }.padding().background(.black)
+            }.padding().background(theme.backgroundColor)
             if model.data.scripts.isEmpty {
                 VStack { Spacer(); Image(systemName: "curlybraces").font(.system(size: 60)).opacity(0.5); Text("لا توجد سكربتات مضافة").opacity(0.5).padding(); Spacer() }.frame(maxWidth: .infinity)
             } else {
@@ -22,16 +23,17 @@ struct ScriptsSheet: View {
                             Toggle("تشغيل", isOn: Binding(get: { model.data.scripts.first { $0.id == script.id }?.isActive ?? false }, set: { value in if let index = model.data.scripts.firstIndex(where: { $0.id == script.id }) { model.data.scripts[index].isActive = value; model.applySettings() } })).labelsHidden()
                             Button { editing = script } label: { Image(systemName: "pencil") }.buttonStyle(.borderless).padding(.leading, 10)
                             Button { model.data.scripts.removeAll { $0.id == script.id }; model.applySettings() } label: { Image(systemName: "trash") }.buttonStyle(.borderless).padding(.leading, 10)
-                        }.listRowBackground(Color.black)
+                        }.listRowBackground(theme.backgroundColor)
                     }
                 }.listStyle(.plain).scrollContentBackground(.hidden)
             }
-        }.background(.black).foregroundStyle(.white).tint(.white).disabled(model.profile.account?.allowScripts == false)
+        }.background(theme.backgroundColor).foregroundStyle(theme.textColor).tint(theme.buttonTextColor).disabled(model.profile.account?.allowScripts == false)
             .fullScreenCover(item: $editing) { script in ScriptEditor(script: script) { changed in if let index = model.data.scripts.firstIndex(where: { $0.id == changed.id }) { model.data.scripts[index] = changed } else { model.data.scripts.append(changed) }; model.applySettings() } }
     }
 }
 
 struct ScriptEditor: View {
+    @Environment(\.browserTheme) private var theme
     @State var script: BrowserScript
     var save: (BrowserScript) -> Void
     @Environment(\.dismiss) private var dismiss
@@ -52,6 +54,7 @@ struct ScriptEditor: View {
 }
 
 struct ConsoleSheet: View {
+    @Environment(\.browserTheme) private var theme
     @ObservedObject var model: BrowserModel
     @Environment(\.dismiss) private var dismiss
     @State private var command = ""
@@ -63,7 +66,7 @@ struct ConsoleSheet: View {
                 } else {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 12) {
-                            ForEach(model.console) { entry in Text(entry.text).font(.system(.caption, design: .monospaced)).foregroundStyle(entry.kind == "error" ? .white : entry.kind == "warn" ? .white : .white.opacity(0.85)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).padding(10).background(.white.opacity(0.03), in: RoundedRectangle(cornerRadius: 10)) }
+                            ForEach(model.console) { entry in Text(entry.text).font(.system(.caption, design: .monospaced)).foregroundStyle(entry.kind == "error" ? theme.textColor : entry.kind == "warn" ? theme.textColor : theme.textColor.opacity(0.85)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).padding(10).background(theme.textColor.opacity(0.03), in: RoundedRectangle(cornerRadius: 10)) }
                         }.padding(15)
                     }.environment(\.layoutDirection, .leftToRight)
                     HStack {
@@ -71,7 +74,7 @@ struct ConsoleSheet: View {
                         Button { execute() } label: { Image(systemName: "arrow.up.circle.fill").font(.title2) }
                     }.environment(\.layoutDirection, .leftToRight).padding(17).glassSurface(22).padding(12)
                 }
-            }.background { OrbitBackground(tint: .white) }.navigationTitle("الكونسول")
+            }.background { OrbitBackground(tint: theme.textColor) }.navigationTitle("الكونسول")
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("تم") { dismiss() } }; ToolbarItem(placement: .topBarLeading) { Button("مسح") { model.console.removeAll() } } }
         }
     }

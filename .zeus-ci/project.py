@@ -8,13 +8,14 @@ settings = {
     'CODE_SIGNING_REQUIRED': 'NO', 'TARGETED_DEVICE_FAMILY': '1,2',
     'ASSETCATALOG_COMPILER_APPICON_NAME': 'AppIcon',
     'MARKETING_VERSION': '2.0.0', 'CURRENT_PROJECT_VERSION': '2',
+    'CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]': '.zeus-ci/Simulator.entitlements',
 }
 spec = {
     'name': 'ZEUSNext', 'options': {'deploymentTarget': {'iOS': '18.1'}, 'developmentLanguage': 'ar'},
     'settings': {'base': {'SWIFT_VERSION': '5.0', 'CODE_SIGNING_ALLOWED': 'NO'}},
     'targets': {
         'ZEUSNext': {
-            'type': 'application', 'platform': 'iOS', 'sources': ['ZEUSNext'],
+            'type': 'application', 'platform': 'iOS', 'sources': [{'path': 'ZEUSNext', 'excludes': ['Resources/safari-rules.json', 'Resources/filter-metadata.json']}],
             'settings': {'base': settings},
             'info': {'path': '.zeus-ci/Generated-Info.plist', 'properties': {
                 'CFBundleDisplayName': 'ZEUS', 'UILaunchScreen': {},

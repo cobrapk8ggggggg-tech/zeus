@@ -11,18 +11,21 @@ import LocalAuthentication
     var driver: WebDriver?
     var loading = false
     var progress: Double = 0
+    var committed = false
     var error: String?
     var snapshot: UIImage?
+    var filterTask: Task<Void, Never>?
     var lastUsed = Date()
     var pinned = false
     init(saved: SavedTab, profileID: UUID) { id = saved.id; title = saved.title; url = saved.url; self.profileID = profileID; pinned = saved.pinned ?? false }
     var saved: SavedTab { SavedTab(id: id, title: title, url: url, pinned: pinned) }
     var isHome: Bool { url == "zeus://home" }
     func dispose() {
+        filterTask?.cancel(); filterTask = nil
         webView?.stopLoading()
         webView?.configuration.userContentController.removeScriptMessageHandler(forName: "zeusConsole")
         webView?.navigationDelegate = nil; webView?.uiDelegate = nil
-        driver?.observations.removeAll(); driver = nil; webView = nil; loading = false
+        driver?.observations.removeAll(); driver = nil; webView = nil; loading = false; committed = false
     }
 }
 
@@ -107,9 +110,7 @@ struct WebDialog: Identifiable {
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = options.autoplayMedia ? [] : .all
         let controller = WKUserContentController(); config.userContentController = controller
-        do { if let list = try await shield.list(profile: owner, settings: settings) { controller.add(list) } }
-        catch { notify("تعذر تحميل قواعد الحجب: \(error.localizedDescription)") }
-        guard owner.id == profile.id, tabs.contains(where: { $0.id == tab.id }) else { return nil }
+        if settings.shieldsEnabled { controller.addUserScript(WKUserScript(source: OriginalShield.injection(exceptions: settings.siteExceptions), injectionTime: .atDocumentStart, forMainFrameOnly: false)) }
         for script in data.scripts where script.isActive && owner.account?.allowScripts != false {
             let domain = script.domain.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             guard domain == "*" || FilterRules.validDomain(domain) else { continue }
@@ -132,8 +133,19 @@ struct WebDialog: Identifiable {
             controller.addUserScript(WKUserScript(source: BrowserTools.consoleScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
         tab.webView = view; tab.driver = driver; driver.observe(view)
-        let keep = tabs.filter { $0.webView != nil && $0.id != tab.id }.sorted { $0.lastUsed > $1.lastUsed }
-        for old in keep.dropFirst(3) { old.dispose() }
+        // Page creation and tab selection never wait for a rule compiler or disk.
+        tab.filterTask = Task { [weak self, weak tab, weak view] in
+            guard let self else { return }
+            do {
+                let list = try await shield.list(profile: owner, settings: settings)
+                guard !Task.isCancelled, let tab, let view, tab.webView === view, owner.id == profile.id else { return }
+                if let list { view.configuration.userContentController.add(list) }
+            } catch { /* Original document-start filtering remains active. Status is shown in settings. */ }
+        }
+        let visible = Set([selectedTabID, twinTabID].compactMap { $0 })
+        let protectedCount = tabs.filter { visible.contains($0.id) && $0.webView != nil && $0.id != tab.id }.count
+        let keep = tabs.filter { $0.webView != nil && $0.id != tab.id && !visible.contains($0.id) }.sorted { $0.lastUsed > $1.lastUsed }
+        for old in keep.dropFirst(max(0, 3 - protectedCount)) { old.dispose() }
         changed(); return view
     }
     func ensureCurrentLoaded() async {

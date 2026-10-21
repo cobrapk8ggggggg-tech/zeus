@@ -69,6 +69,8 @@ struct BrowserSettings: Codable {
     var chromeLayout: ChromeLayout?
     var reading: ReadingPreferences?
     var advanced: AdvancedSettings?
+    var backupFiltersEnabled: Bool?
+    var theme: BrowserTheme?
 }
 
 struct SavedTab: Codable, Identifiable {
@@ -168,10 +170,12 @@ enum BrowserDisk {
     let root: URL
     let downloadsRoot: URL
     private var stores: [UUID: WKWebsiteDataStore] = [:]
+    private var pendingStoreRemovals: Set<UUID> = []
     private struct Index: Codable { var profiles: [BrowserProfile]; var activeID: UUID }
 
     init(root: URL = BrowserDisk.applicationRoot, downloadsRoot: URL = BrowserDisk.downloadsRoot) {
         self.root = root; self.downloadsRoot = downloadsRoot
+        pendingStoreRemovals = Set(BrowserDisk.read([UUID].self, from: root.appendingPathComponent("removed-web-stores.json")) ?? [])
         if let index = BrowserDisk.read(Index.self, from: root.appendingPathComponent("profiles.json")), !index.profiles.isEmpty {
             profiles = index.profiles
             activeID = index.profiles.contains(where: { $0.id == index.activeID }) ? index.activeID : index.profiles[0].id
@@ -190,6 +194,7 @@ enum BrowserDisk {
         }
         ensureSpecialAccounts()
         for profile in profiles where profile.isPrivate { try? FileManager.default.removeItem(at: folder(for: profile)) }
+        Task { [weak self] in await self?.retryRemovedWebsiteStores() }
     }
     private func ensureSpecialAccounts() {
         for role in [AccountRole.guest, .kiosk] where !profiles.contains(where: { $0.role == role }) {
@@ -249,16 +254,7 @@ enum BrowserDisk {
     }
     func delete(_ profile: BrowserProfile) async throws {
         guard active.isAdmin, !profile.isAdmin, profiles.count > 1 else { throw AccountError.permission }
-        let store = websiteDataStore(for: profile)
-        await store.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
-        stores.removeValue(forKey: profile.id)
-        if !profile.isPrivate && profile.legacyWebsiteStore != true {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                WKWebsiteDataStore.remove(forIdentifier: profile.id) { error in
-                    if let error { continuation.resume(throwing: error) } else { continuation.resume() }
-                }
-            }
-        }
+        try await clearAndReleaseWebsiteStore(profile)
         for path in [folder(for: profile), downloads(for: profile), configurationFolder(profile)] where FileManager.default.fileExists(atPath: path.path) { try FileManager.default.removeItem(at: path) }
         AccountVault.remove(profile.id); FormVault.remove(profileID: profile.id)
         profiles.removeAll { $0.id == profile.id }
@@ -269,10 +265,7 @@ enum BrowserDisk {
         guard active.isAdmin else { throw AccountError.permission }
         let old = profiles
         for profile in old {
-            await websiteDataStore(for: profile).removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
-            if !profile.isPrivate && profile.legacyWebsiteStore != true {
-                try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in WKWebsiteDataStore.remove(forIdentifier: profile.id) { if let error = $0 { c.resume(throwing: error) } else { c.resume() } } }
-            }
+            try await clearAndReleaseWebsiteStore(profile)
             AccountVault.remove(profile.id); FormVault.remove(profileID: profile.id)
             for path in [folder(for: profile), downloads(for: profile), configurationFolder(profile)] where FileManager.default.fileExists(atPath: path.path) { try FileManager.default.removeItem(at: path) }
         }
@@ -280,6 +273,32 @@ enum BrowserDisk {
         var initial = BrowserProfile(name: "الرئيسي"); initial.account = AccountOptions(role: .administrator)
         profiles = [initial]; activeID = initial.id; ensureSpecialAccounts()
         let filters = root.appendingPathComponent("Filters"); if FileManager.default.fileExists(atPath: filters.path) { try FileManager.default.removeItem(at: filters) }
+    }
+    private func savePendingRemovals() throws { try BrowserDisk.write(Array(pendingStoreRemovals), to: root.appendingPathComponent("removed-web-stores.json")) }
+    private func removeWebsiteStoreMetadata(_ id: UUID) async throws {
+        try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
+            WKWebsiteDataStore.remove(forIdentifier: id) { if let error = $0 { c.resume(throwing: error) } else { c.resume() } }
+        }
+    }
+    private func clearAndReleaseWebsiteStore(_ profile: BrowserProfile) async throws {
+        // Clear website data immediately. WebKit can retain an empty store in its
+        // network process after its last view is released; retry its directory
+        // metadata at the next launch rather than leave a deleted account visible.
+        await websiteDataStore(for: profile).removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
+        stores.removeValue(forKey: profile.id)
+        guard !profile.isPrivate, profile.legacyWebsiteStore != true else { return }
+        pendingStoreRemovals.insert(profile.id); try savePendingRemovals()
+        do { try await removeWebsiteStoreMetadata(profile.id); pendingStoreRemovals.remove(profile.id); try savePendingRemovals() }
+        catch {
+            let problem = error as NSError
+            if problem.domain != "WKWebSiteDataStore" || problem.code != 1 { throw error }
+        }
+    }
+    private func retryRemovedWebsiteStores() async {
+        for id in pendingStoreRemovals where !profiles.contains(where: { $0.id == id }) {
+            do { try await removeWebsiteStoreMetadata(id); pendingStoreRemovals.remove(id); try savePendingRemovals() }
+            catch { /* The durable queue remains for the next launch. */ }
+        }
     }
     private func persistIndex() {
         do { try BrowserDisk.write(Index(profiles: profiles, activeID: activeID), to: root.appendingPathComponent("profiles.json")) }

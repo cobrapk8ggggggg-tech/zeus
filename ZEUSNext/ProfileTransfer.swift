@@ -12,11 +12,13 @@ struct ProfileBackup: Codable {
         if let o = data.settings.advanced {
             guard (1...5000).contains(o.historyLimit), (1...500).contains(o.searchHistoryLimit), (1...8).contains(o.downloadsWiFiLimit), (1...5).contains(o.downloadsCellularLimit), (0.5...1).contains(o.screenshotQuality), (1...2).contains(o.screenshotScale), (0...100).contains(o.printMargin), o.userAgent.count <= 500, !o.userAgent.contains("\r"), !o.userAgent.contains("\n"), o.customSearchEngines.count <= 30 else { throw URLError(.cannotParseResponse) }
         }
+        if let theme = data.settings.theme, !theme.isValid { throw URLError(.cannotParseResponse) }
         if let r = data.settings.reading { guard (14...40).contains(r.fontSize), (0.1...1).contains(r.textOpacity), (0.2...1).contains(r.imageScale), (100...1000).contains(r.scrollDistance), r.blockedWords.count <= 1000 else { throw URLError(.cannotParseResponse) } }
         return self
     }
 }
 struct ProfileTransferPage: View {
+    @Environment(\.browserTheme) private var theme
     @ObservedObject var context: ProfileSettingsContext
     @StateObject private var lan = LANProfileTransfer()
     @Environment(\.scenePhase) private var scenePhase
@@ -29,8 +31,8 @@ struct ProfileTransferPage: View {
     @State private var message: String?
     var body: some View {
         Form {
-            Section("تصدير هذا الحساب") { Toggle("تضمين سجل التصفح والبحث", isOn: $includeHistory); Toggle("تضمين السكربتات", isOn: $includeScripts); Button("تصدير إلى الملفات أو تطبيق آخر", systemImage: "square.and.arrow.up") { export() } }
-            Section("تصدير واستيراد عبر WLAN") {
+            ThemedSection("تصدير هذا الحساب") { Toggle("تضمين سجل التصفح والبحث", isOn: $includeHistory); Toggle("تضمين السكربتات", isOn: $includeScripts); Button("تصدير إلى الملفات أو تطبيق آخر", systemImage: "square.and.arrow.up") { export() } }
+            ThemedSection("تصدير واستيراد عبر WLAN") {
                 if lan.running {
                     if let address = lan.address { Text(address).font(.footnote.monospaced()).textSelection(.enabled); Button("نسخ رابط النقل المحلي") { UIPasteboard.general.string = address } } else { ProgressView("بانتظار الشبكة المحلية…") }
                     Button("إيقاف المشاركة") { lan.stop() }
@@ -38,8 +40,8 @@ struct ProfileTransferPage: View {
                 if let error = lan.error { Text(error).font(.caption) }
                 Text("افتح الرابط من جهاز على شبكة Wi-Fi نفسها. الرابط يتغير عند كل تشغيل، والاستيراد يحتاج مراجعتك هنا. النقل المحلي عبر HTTP؛ استخدم شبكة تثق بها. تنتهي المشاركة عند مغادرة هذه الصفحة أو انتقال التطبيق للخلفية.").font(.footnote)
             }
-            Section("استيراد") { Button("اختيار نسخة من الملفات أو iCloud Drive", systemImage: "folder") { importing = true }; if let backup { LabeledContent("الحساب المصدر", value: backup.name); Text("\(backup.data.bookmarks.count) موقع · \(backup.data.scripts.count) سكربت"); Toggle("استيراد إعدادات التصفح", isOn: $importSettings); Button("دمج البيانات في هذا الحساب") { apply(backup) }; Text("السكربتات المستوردة تكون متوقفة حتى تراجعها وتفعّلها بنفسك.").font(.footnote) } }
-            Section { Text("تتضمن النسخة الإعدادات والمفضلة والتبويبات وصورة الحساب، مع السجل والسكربتات إذا اخترتهما. لا تتضمن كلمات مرور الحساب أو النماذج المحفوظة أو جلسات المواقع أو ملفات التنزيلات. يمكنك تصدير الملفات من مدير التنزيلات.").font(.footnote) }
+            ThemedSection("استيراد") { Button("اختيار نسخة من الملفات أو iCloud Drive", systemImage: "folder") { importing = true }; if let backup { LabeledContent("الحساب المصدر", value: backup.name); Text("\(backup.data.bookmarks.count) موقع · \(backup.data.scripts.count) سكربت"); Toggle("استيراد إعدادات التصفح", isOn: $importSettings); Button("دمج البيانات في هذا الحساب") { apply(backup) }; Text("السكربتات المستوردة تكون متوقفة حتى تراجعها وتفعّلها بنفسك.").font(.footnote) } }
+            ThemedSection { Text("تتضمن النسخة الإعدادات والمفضلة والتبويبات وصورة الحساب، مع السجل والسكربتات إذا اخترتهما. لا تتضمن كلمات مرور الحساب أو النماذج المحفوظة أو جلسات المواقع أو ملفات التنزيلات. يمكنك تصدير الملفات من مدير التنزيلات.").font(.footnote) }
             if let message { Text(message).font(.footnote) }
         }.settingsPage("تصدير واستيراد")
             .onDisappear { lan.stop() }

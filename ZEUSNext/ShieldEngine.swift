@@ -1,5 +1,6 @@
 import Foundation
 import WebKit
+import CryptoKit
 
 struct FilterRules {
     var domains = Set<String>()
@@ -33,74 +34,110 @@ struct FilterRules {
 }
 
 @MainActor final class ShieldEngine: ObservableObject {
-    @Published private(set) var domains: Set<String> = []
+    @Published private(set) var domains = OriginalShield.domains
     @Published private(set) var updating = false
-    @Published var status = "قواعد محلية جاهزة"
-    private var allowed: Set<String> = []
-    private var nativeRules: [[String: Any]] = []
-    private var compiled: [UUID: WKContentRuleList] = [:]
-    private let updatesURL: URL
+    @Published var status = "حجب ZEUS الأصلي جاهز؛ الحزمة الكبيرة اختيارية"
+    private let root: URL
+    private var compiled: [String: WKContentRuleList] = [:]
+    private var pending: [String: Task<WKContentRuleList, Error>] = [:]
     init(root: URL = BrowserDisk.applicationRoot) {
-        updatesURL = root.appendingPathComponent("Filters/easylist.txt")
-        let bundled = Bundle.main.url(forResource: "block-domains", withExtension: "txt").flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? "doubleclick.net\ngooglesyndication.com\npopads.net\n"
-        domains = FilterRules.parse(bundled).domains
-        if let path = Bundle.main.url(forResource: "safari-rules", withExtension: "json"), let bytes = try? Data(contentsOf: path), let rules = try? JSONSerialization.jsonObject(with: bytes) as? [[String: Any]] { nativeRules = rules; status = "\(rules.count) قاعدة WebKit من EasyList وEasyPrivacy" }
-        if let update = try? String(contentsOf: updatesURL, encoding: .utf8) { merge(update) }
+        self.root = root
+        // Earlier versions compiled a large bundle automatically. Remove only
+        // that obsolete cache; account cookies and website data are untouched.
+        WKContentRuleListStore.default().getAvailableContentRuleListIdentifiers { identifiers in
+            for id in identifiers ?? [] where id.hasPrefix("zeus-v2-") { WKContentRuleListStore.default().removeContentRuleList(forIdentifier: id) { _ in } }
+        }
+        try? FileManager.default.removeItem(at: root.appendingPathComponent("Filters/easylist.txt"))
     }
-    private func merge(_ text: String) {
-        let parsed = FilterRules.parse(text)
-        domains.formUnion(parsed.domains); allowed.formUnion(parsed.allowed)
-        status = "\(nativeRules.count) قاعدة WebKit · \(domains.count) نطاق إضافي؛ تحديث النطاقات لا يغيّر لقطة القواعد المرفقة"
-        compiled.removeAll()
+    private func backupURL(_ profile: BrowserProfile) -> URL {
+        let folder = profile.isPrivate ? FileManager.default.temporaryDirectory.appendingPathComponent("ZEUS-Private-" + profile.id.uuidString) : root.appendingPathComponent("Profiles").appendingPathComponent(profile.id.uuidString)
+        return folder.appendingPathComponent("backup-rules.json")
     }
+    func hasBackup(_ profile: BrowserProfile) -> Bool { FileManager.default.fileExists(atPath: backupURL(profile).path) }
+    func backupBytes(_ profile: BrowserProfile) -> Int64 { Int64((try? backupURL(profile).resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0) }
     func blocks(_ host: String) -> Bool {
-        if allowed.contains(where: { BrowserURL.hostMatches(host, domain: $0) }) { return false }
+        if OriginalShield.allowedDomains.contains(where: { BrowserURL.hostMatches(host, domain: $0) }) { return false }
         return domains.contains(where: { BrowserURL.hostMatches(host, domain: $0) })
     }
-    func list(profile: BrowserProfile, settings: BrowserSettings) async throws -> WKContentRuleList? {
+    static func originalRules(settings: BrowserSettings) -> [[String: Any]] {
         let options = settings.advanced ?? AdvancedSettings()
-        guard settings.shieldsEnabled || !options.showImages || options.blockThirdPartyCookies else { return nil }
-        if let cached = compiled[profile.id] { return cached }
-        let exceptions = settings.siteExceptions.filter(FilterRules.validDomain)
-        var rules: [[String: Any]] = (settings.shieldsEnabled ? domains.sorted() : []).prefix(28000).map { domain in
-            var trigger: [String: Any] = ["url-filter": FilterRules.regex(for: domain)]
-            if !exceptions.isEmpty { trigger["unless-top-url"] = exceptions.map(FilterRules.regex(for:)) }
-            return ["trigger": trigger, "action": ["type": "block"]]
+        var rules: [[String: Any]] = []
+        if settings.shieldsEnabled {
+            for domain in OriginalShield.domains.sorted() { rules.append(["trigger": ["url-filter": FilterRules.regex(for: domain)], "action": ["type": "block"]]) }
+            for domain in OriginalShield.allowedDomains.sorted() { rules.append(["trigger": ["url-filter": FilterRules.regex(for: domain)], "action": ["type": "ignore-previous-rules"]]) }
+            if settings.cosmeticFiltering { for selector in OriginalShield.cssSelectors { rules.append(["trigger": ["url-filter": ".*"], "action": ["type": "css-display-none", "selector": selector]]) } }
+            rules.append(["trigger": ["url-filter": ".*(ad|ads|preroll|midroll).*mp4", "resource-type": ["media"]], "action": ["type": "block"]])
         }
-        for host in (settings.shieldsEnabled ? allowed.sorted() : []).prefix(2000) {
-            rules.append(["trigger": ["url-filter": FilterRules.regex(for: host)], "action": ["type": "ignore-previous-rules"]])
-        }
-        if settings.shieldsEnabled && settings.cosmeticFiltering {
-            var trigger: [String: Any] = ["url-filter": ".*"]
-            if !exceptions.isEmpty { trigger["unless-top-url"] = exceptions.map(FilterRules.regex(for:)) }
-            rules.append(["trigger": trigger, "action": ["type": "css-display-none", "selector": ".adsbygoogle,[id^='google_ads_'],[data-ad-slot],iframe[src*='doubleclick.net']"]])
-        }
-        let converted = settings.cosmeticFiltering ? nativeRules : nativeRules.filter { ($0["action"] as? [String: Any])?["type"] as? String != "css-display-none" }
-        rules = (settings.shieldsEnabled ? converted : []) + rules
-        // Applied after every blocking rule so compatibility overrides all lists.
-        for host in exceptions { rules.append(["trigger": ["url-filter": ".*", "if-top-url": [FilterRules.regex(for: host)]], "action": ["type": "ignore-previous-rules"]]) }
+        for host in settings.siteExceptions.filter(FilterRules.validDomain) { rules.append(["trigger": ["url-filter": ".*", "if-top-url": [FilterRules.regex(for: host)]], "action": ["type": "ignore-previous-rules"]]) }
         if !options.showImages { rules.append(["trigger": ["url-filter": ".*", "resource-type": ["image"]], "action": ["type": "block"]]) }
         if options.blockThirdPartyCookies { rules.append(["trigger": ["url-filter": ".*", "load-type": ["third-party"]], "action": ["type": "block-cookies"]]) }
-        guard let json = String(data: try JSONSerialization.data(withJSONObject: rules), encoding: .utf8) else { return nil }
-        let value: WKContentRuleList = try await withCheckedThrowingContinuation { continuation in
-            WKContentRuleListStore.default().compileContentRuleList(forIdentifier: "zeus-v2-" + profile.id.uuidString, encodedContentRuleList: json) { list, error in
-                if let list { continuation.resume(returning: list) }
-                else { continuation.resume(throwing: error ?? URLError(.cannotParseResponse)) }
+        return rules
+    }
+    func list(profile: BrowserProfile, settings: BrowserSettings) async throws -> WKContentRuleList? {
+        var rules = Self.originalRules(settings: settings)
+        if settings.shieldsEnabled && settings.backupFiltersEnabled == true {
+            guard hasBackup(profile) else { status = "استورد حزمة احتياطية أولًا. الحجب الأصلي مستمر."; return try await originalList(profile: profile, settings: settings) }
+            let path = backupURL(profile)
+            let backup = try await Task.detached(priority: .utility) { try Self.validatedBackup(Data(contentsOf: path)) }.value
+            rules = (settings.cosmeticFiltering ? backup : backup.filter { ($0["action"] as? [String: Any])?["type"] as? String != "css-display-none" }) + rules
+        }
+        guard !rules.isEmpty else { return nil }
+        do { let result = try await compile(rules, profile: profile, backup: settings.backupFiltersEnabled == true); status = settings.backupFiltersEnabled == true ? "الحجب الأصلي والحزمة الاحتياطية مفعّلان" : "حجب ZEUS الأصلي مفعّل"; return result }
+        catch { status = "تعذر تجهيز الحزمة الاختيارية؛ الحجب الأصلي مستمر. \(error.localizedDescription)"; if settings.backupFiltersEnabled == true { return try await originalList(profile: profile, settings: settings) }; throw error }
+    }
+    private func originalList(profile: BrowserProfile, settings: BrowserSettings) async throws -> WKContentRuleList? {
+        let rules = Self.originalRules(settings: settings); return rules.isEmpty ? nil : try await compile(rules, profile: profile, backup: false)
+    }
+    private func compile(_ rules: [[String: Any]], profile: BrowserProfile, backup: Bool) async throws -> WKContentRuleList {
+        let bytes = try JSONSerialization.data(withJSONObject: rules, options: [.sortedKeys])
+        let digest = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+        let identifier = "zeus-v4-" + profile.id.uuidString + "-" + digest
+        if let cached = compiled[identifier] { return cached }
+        if let existing = pending[identifier] { return try await existing.value }
+        let operation = Task { @MainActor () throws -> WKContentRuleList in
+            let saved: WKContentRuleList? = await withCheckedContinuation { c in WKContentRuleListStore.default().lookUpContentRuleList(forIdentifier: identifier) { list, _ in c.resume(returning: list) } }
+            if let saved { return saved }
+            return try await withCheckedThrowingContinuation { c in
+                let gate = RuleCompilerGate(c)
+                DispatchQueue.main.asyncAfter(deadline: .now() + (backup ? 60 : 8)) { gate.finish(nil, URLError(.timedOut)) }
+                WKContentRuleListStore.default().compileContentRuleList(forIdentifier: identifier, encodedContentRuleList: String(decoding: bytes, as: UTF8.self)) { list, error in
+                    Task { @MainActor in
+                        if !gate.finish(list, error), list != nil { WKContentRuleListStore.default().removeContentRuleList(forIdentifier: identifier) { _ in } }
+                    }
+                }
             }
         }
-        compiled[profile.id] = value; return value
+        pending[identifier] = operation
+        defer { pending.removeValue(forKey: identifier) }
+        let result = try await operation.value; compiled[identifier] = result; return result
     }
-    func erase(_ profile: UUID) { compiled.removeValue(forKey: profile); WKContentRuleListStore.default().removeContentRuleList(forIdentifier: "zeus-v2-" + profile.uuidString) { _ in } }
-    func invalidate(_ profile: UUID) { compiled.removeValue(forKey: profile) }
-    func update() async {
-        guard !updating else { return }; updating = true; defer { updating = false }
-        do {
-            let config = URLSessionConfiguration.ephemeral; config.httpCookieStorage = nil; config.httpShouldSetCookies = false
-            let session = URLSession(configuration: config); defer { session.invalidateAndCancel() }
-            let (bytes, response) = try await session.data(from: URL(string: "https://easylist-downloads.adblockplus.org/easylist.txt")!)
-            guard (response as? HTTPURLResponse)?.statusCode == 200, bytes.count <= 12_000_000, let text = String(data: bytes, encoding: .utf8), FilterRules.parse(text).domains.count > 100 else { throw URLError(.cannotParseResponse) }
-            try BrowserDisk.ensure(updatesURL.deletingLastPathComponent()); try bytes.write(to: updatesURL, options: .atomic)
-            merge(text)
-        } catch { status = "لم يكتمل التحديث: \(error.localizedDescription)" }
+    nonisolated static func validatedBackup(_ data: Data) throws -> [[String: Any]] {
+        guard data.count <= 20_000_000, let rows = try JSONSerialization.jsonObject(with: data) as? [[String: Any]], !rows.isEmpty, rows.count <= 140_000,
+              rows.allSatisfy({ row in guard let trigger = row["trigger"] as? [String: Any], let pattern = trigger["url-filter"] as? String, pattern.count <= 10_000, let action = row["action"] as? [String: Any], let type = action["type"] as? String else { return false }; return ["block", "block-cookies", "css-display-none", "ignore-previous-rules", "make-https"].contains(type) }) else { throw URLError(.cannotParseResponse) }
+        return rows
+    }
+    func importBackup(_ source: URL, profile: BrowserProfile) async throws {
+        let scoped = source.startAccessingSecurityScopedResource(); defer { if scoped { source.stopAccessingSecurityScopedResource() } }
+        let target = backupURL(profile)
+        try await Task.detached(priority: .utility) {
+            guard ((try source.resourceValues(forKeys: [.fileSizeKey])).fileSize ?? 0) <= 20_000_000 else { throw URLError(.dataLengthExceedsMaximum) }
+            let data = try Data(contentsOf: source); _ = try Self.validatedBackup(data)
+            try BrowserDisk.ensure(target.deletingLastPathComponent()); try data.write(to: target, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        }.value
+        status = "استُوردت الحزمة. تفعيلها اختياري من المفتاح أدناه."
+    }
+    func removeBackup(_ profile: BrowserProfile) { try? FileManager.default.removeItem(at: backupURL(profile)); erase(profile.id); status = "حُذفت الحزمة وكاش قواعدها؛ حجب ZEUS الأصلي مستمر" }
+    func erase(_ profile: UUID) { compiled = compiled.filter { !$0.key.contains(profile.uuidString) }; removeCachedRules { $0.contains(profile.uuidString) && ($0.hasPrefix("zeus-v2-") || $0.hasPrefix("zeus-v4-")) } }
+    func invalidate(_ profile: UUID) { compiled = compiled.filter { !$0.key.contains(profile.uuidString) } }
+    private func removeCachedRules(matching: @escaping (String) -> Bool) { WKContentRuleListStore.default().getAvailableContentRuleListIdentifiers { ids in for id in ids ?? [] where matching(id) { WKContentRuleListStore.default().removeContentRuleList(forIdentifier: id) { _ in } } } }
+    func update() async { status = "الحجب الأصلي محلي ولا ينزّل قوائم تلقائيًا. يمكنك استيراد حزمة Safari JSON اختيارية." }
+}
+
+@MainActor private final class RuleCompilerGate {
+    private var continuation: CheckedContinuation<WKContentRuleList, Error>?
+    init(_ continuation: CheckedContinuation<WKContentRuleList, Error>) { self.continuation = continuation }
+    @discardableResult func finish(_ value: WKContentRuleList?, _ error: Error?) -> Bool {
+        guard let continuation else { return false }; self.continuation = nil
+        if let value { continuation.resume(returning: value) } else { continuation.resume(throwing: error ?? URLError(.cannotParseResponse)) }; return true
     }
 }

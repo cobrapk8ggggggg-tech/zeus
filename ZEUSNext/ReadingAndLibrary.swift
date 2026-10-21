@@ -3,6 +3,7 @@ import WebKit
 import ImageIO
 
 struct LibrarySheet: View {
+    @Environment(\.browserTheme) private var theme
     @ObservedObject var model: BrowserModel
     @Environment(\.dismiss) private var dismiss
     @State private var section = 0
@@ -26,18 +27,19 @@ struct LibrarySheet: View {
                         }.buttonStyle(.plain).contextMenu { Button("حذف الزيارة") { model.data.history.removeAll { $0.id == item.id }; model.persist() } }
                     }
                 }
-            }.scrollContentBackground(.hidden).background { OrbitBackground(tint: model.profile.color) }.navigationTitle("مكتبة المساحة").navigationBarTitleDisplayMode(.inline)
+            }.scrollContentBackground(.hidden).background { OrbitBackground(tint: theme.accentColor) }.navigationTitle("مكتبة المساحة").navigationBarTitleDisplayMode(.inline)
                 .searchable(text: $search, prompt: "بحث في العناوين والروابط")
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("تم") { dismiss() } } }
         }
     }
     private func matches(_ title: String, _ url: String) -> Bool { search.isEmpty || title.localizedCaseInsensitiveContains(search) || url.localizedCaseInsensitiveContains(search) }
     private func libraryRow(_ title: String, url: String, symbol: String) -> some View {
-        HStack(spacing: 13) { Image(systemName: symbol).foregroundStyle(model.profile.color).frame(width: 26); VStack(alignment: .leading, spacing: 5) { Text(title).font(.subheadline.weight(.medium)).lineLimit(2); Text(url).font(.caption).foregroundStyle(.secondary).lineLimit(1).environment(\.layoutDirection, .leftToRight) } }.padding(.vertical, 5)
+        HStack(spacing: 13) { Image(systemName: symbol).foregroundStyle(theme.accentColor).frame(width: 26); VStack(alignment: .leading, spacing: 5) { Text(title).font(.subheadline.weight(.medium)).lineLimit(2); Text(url).font(.caption).foregroundStyle(.secondary).lineLimit(1).environment(\.layoutDirection, .leftToRight) } }.padding(.vertical, 5)
     }
 }
 
 struct ReaderSheet: View {
+    @Environment(\.browserTheme) private var theme
     @ObservedObject var model: BrowserModel
     let article: ReaderArticle
     @Environment(\.dismiss) private var dismiss
@@ -50,12 +52,12 @@ struct ReaderSheet: View {
     private var paragraphs: [String] { article.paragraphs.filter { text in !prefs.blockedWords.contains { text.localizedCaseInsensitiveContains($0) } } }
     var body: some View {
         ZStack(alignment: .top) {
-            Color.black.ignoresSafeArea()
+            theme.backgroundColor.ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .trailing, spacing: 25) {
                     Spacer().frame(height: 65)
                     Text(article.title).font(.system(size: prefs.fontSize + 6, weight: .bold, design: .serif)).multilineTextAlignment(.center).frame(maxWidth: .infinity).textSelection(.enabled)
-                    Divider().overlay(.white.opacity(0.3))
+                    Divider().overlay(theme.textColor.opacity(0.3))
                     ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, paragraph in Text(paragraph).font(.system(size: prefs.fontSize, design: .serif)).opacity(prefs.textOpacity).lineSpacing(10).multilineTextAlignment(.trailing).frame(maxWidth: .infinity, alignment: .trailing).textSelection(.enabled) }
                 }.padding(25).padding(.bottom, 60)
             }.onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y } action: { _, value in
@@ -68,15 +70,15 @@ struct ReaderSheet: View {
                     Button { UIPasteboard.general.string = article.title + "\n\n" + paragraphs.joined(separator: "\n\n"); copied = true } label: { Image(systemName: copied ? "checkmark" : "doc.on.doc").padding(12) }
                     Spacer(); Text("وضع القراءة").font(.subheadline); Spacer()
                     Button { dismiss() } label: { Image(systemName: "xmark").padding(12) }.accessibilityIdentifier("closeReaderButton")
-                }.padding(.horizontal, 12).background(.black).transition(.move(edge: .top).combined(with: .opacity))
+                }.padding(.horizontal, 12).background(theme.backgroundColor).transition(.move(edge: .top).combined(with: .opacity))
             }
             rightReveal.environment(\.layoutDirection, .leftToRight)
-        }.foregroundStyle(.white).tint(.white).statusBarHidden().environment(\.layoutDirection, .leftToRight)
+        }.foregroundStyle(theme.textColor).tint(theme.buttonTextColor).statusBarHidden().environment(\.layoutDirection, .leftToRight)
             .fullScreenCover(isPresented: $settings) {
                 NavigationStack { Form {
-                    Section("النص") { Text("حجم الخط \(Int(prefs.fontSize))"); Slider(value: preference(\.fontSize), in: 14...40, step: 1); Text("شفافية النص"); Slider(value: preference(\.textOpacity), in: 0.1...1) }
-                    Section("القائمة السوداء") { HStack { TextField("كلمة أو جملة لحظرها", text: $forbidden); Button("إضافة") { let text = forbidden.trimmingCharacters(in: .whitespacesAndNewlines); if !text.isEmpty { var p = prefs; if !p.blockedWords.contains(text) { p.blockedWords.append(text) }; model.data.settings.reading = p; model.persist(); forbidden = "" } } }; ForEach(prefs.blockedWords, id: \.self) { word in HStack { Text(word); Spacer(); Button { var p = prefs; p.blockedWords.removeAll { $0 == word }; model.data.settings.reading = p; model.persist() } label: { Image(systemName: "xmark.circle") } } } }
-                }.scrollContentBackground(.hidden).background(.black).navigationTitle("إعدادات القارئ").toolbar { Button("تم") { settings = false } } }.tint(.white).preferredColorScheme(.dark)
+                    ThemedSection("النص") { Text("حجم الخط \(Int(prefs.fontSize))"); Slider(value: preference(\.fontSize), in: 14...40, step: 1); Text("شفافية النص"); Slider(value: preference(\.textOpacity), in: 0.1...1) }
+                    ThemedSection("القائمة السوداء") { HStack { TextField("كلمة أو جملة لحظرها", text: $forbidden); Button("إضافة") { let text = forbidden.trimmingCharacters(in: .whitespacesAndNewlines); if !text.isEmpty { var p = prefs; if !p.blockedWords.contains(text) { p.blockedWords.append(text) }; model.data.settings.reading = p; model.persist(); forbidden = "" } } }; ForEach(prefs.blockedWords, id: \.self) { word in HStack { Text(word); Spacer(); Button { var p = prefs; p.blockedWords.removeAll { $0 == word }; model.data.settings.reading = p; model.persist() } label: { Image(systemName: "xmark.circle") } } } }
+                }.scrollContentBackground(.hidden).background(theme.backgroundColor).navigationTitle("إعدادات القارئ").toolbar { Button("تم") { settings = false } } }.tint(theme.buttonTextColor).preferredColorScheme(theme.light ? .light : .dark)
             }
     }
     private var rightReveal: some View {
@@ -86,6 +88,7 @@ struct ReaderSheet: View {
 }
 
 struct GallerySheet: View {
+    @Environment(\.browserTheme) private var theme
     @ObservedObject var model: BrowserModel
     let gallery: GalleryArticle
     @Environment(\.dismiss) private var dismiss
@@ -102,7 +105,7 @@ struct GallerySheet: View {
     private var prefs: ReadingPreferences { model.data.settings.reading ?? ReadingPreferences() }
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            theme.backgroundColor.ignoresSafeArea()
             VStack(spacing: 0) {
                 galleryHeader
                 ScrollView {
@@ -116,16 +119,16 @@ struct GallerySheet: View {
                         }
                     }.padding(.horizontal, 2)
                 }
-                if selecting { HStack { Text(saving ? photoProgress : "\(selection.count) صورة"); Spacer(); Menu("حفظ المحدد", systemImage: "arrow.down.circle") { Button("حفظ في ألبوم الصور") { saveToPhotos() }; Button("تنزيل إلى ملفات المتصفح") { downloadSelection() } }.disabled(selection.isEmpty || saving) }.padding(16).background(.black) }
+                if selecting { HStack { Text(saving ? photoProgress : "\(selection.count) صورة"); Spacer(); Menu("حفظ المحدد", systemImage: "arrow.down.circle") { Button("حفظ في ألبوم الصور") { saveToPhotos() }; Button("تنزيل إلى ملفات المتصفح") { downloadSelection() } }.disabled(selection.isEmpty || saving) }.padding(16).background(theme.backgroundColor) }
             }
             if let index = selectedIndex { imageReader(start: index).transition(.move(edge: .bottom)) }
-        }.foregroundStyle(.white).tint(.white).statusBarHidden(selectedIndex != nil).environment(\.layoutDirection, .leftToRight)
+        }.foregroundStyle(theme.textColor).tint(theme.buttonTextColor).statusBarHidden(selectedIndex != nil).environment(\.layoutDirection, .leftToRight)
             .alert("حفظ الصور", isPresented: Binding(get: { photoMessage != nil }, set: { if !$0 { photoMessage = nil } })) { Button("حسنًا") { photoMessage = nil } } message: { Text(photoMessage ?? "") }
             .fullScreenCover(isPresented: $settings) {
                 NavigationStack { Form {
-                    Section("وضع قراءة الصور") { Text("عرض الصورة \(Int(prefs.imageScale * 100))٪"); Slider(value: preference(\.imageScale), in: 0.2...1, step: 0.05); Text("مسافة التمرير \(Int(prefs.scrollDistance)) نقطة"); Slider(value: preference(\.scrollDistance), in: 100...1000, step: 50) }
+                    ThemedSection("وضع قراءة الصور") { Text("عرض الصورة \(Int(prefs.imageScale * 100))٪"); Slider(value: preference(\.imageScale), in: 0.2...1, step: 0.05); Text("مسافة التمرير \(Int(prefs.scrollDistance)) نقطة"); Slider(value: preference(\.scrollDistance), in: 100...1000, step: 50) }
                     Text("انقر النصف العلوي للرجوع أو السفلي للتقدم. اسحب من اليمين لإظهار أدوات القراءة.").font(.footnote)
-                }.scrollContentBackground(.hidden).background(.black).navigationTitle("إعدادات العرض").toolbar { Button("تم") { settings = false } } }.tint(.white).preferredColorScheme(.dark)
+                }.scrollContentBackground(.hidden).background(theme.backgroundColor).navigationTitle("إعدادات العرض").toolbar { Button("تم") { settings = false } } }.tint(theme.buttonTextColor).preferredColorScheme(theme.light ? .light : .dark)
             }
     }
     private var galleryHeader: some View {
@@ -138,12 +141,12 @@ struct GallerySheet: View {
                 Button { selecting = true } label: { Image(systemName: "checkmark.circle") }
                 Button { dismiss() } label: { Image(systemName: "xmark") }.padding(.leading, 12).accessibilityIdentifier("closeGalleryButton")
             }
-        }.padding(18).background(.black)
+        }.padding(18).background(theme.backgroundColor)
     }
     private func imageReader(start: Int) -> some View {
         GeometryReader { geometry in
             ZStack(alignment: .trailing) {
-                Color.black.ignoresSafeArea()
+                theme.backgroundColor.ignoresSafeArea()
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: 0) {
@@ -168,7 +171,7 @@ struct GallerySheet: View {
                     Color.clear.frame(width: 25).contentShape(Rectangle()).gesture(DragGesture().onEnded { if $0.translation.width < -10 { withAnimation { controls = true } } })
                 }
             }
-        }.background(.black).environment(\.layoutDirection, .leftToRight)
+        }.background(theme.backgroundColor).environment(\.layoutDirection, .leftToRight)
     }
     private func scroll(_ direction: CGFloat) { guard let view = scrollView else { return }; let value = min(max(0, view.contentOffset.y + direction * prefs.scrollDistance), max(0, view.contentSize.height-view.bounds.height)); view.setContentOffset(CGPoint(x: 0, y: value), animated: true) }
     private func toggle(_ address: String) { if selection.contains(address) { selection.remove(address) } else { selection.insert(address) } }
@@ -210,6 +213,7 @@ final class ThumbnailRedirects: NSObject, URLSessionTaskDelegate {
     }
 }
 struct ProfileThumbnail: View {
+    @Environment(\.browserTheme) private var theme
     let address: String
     let store: WKWebsiteDataStore
     var source: WKWebView?
@@ -221,7 +225,7 @@ struct ProfileThumbnail: View {
             if let image {
                 if fit { Image(uiImage: image).resizable().scaledToFit() }
                 else { Image(uiImage: image).resizable().scaledToFill() }
-            } else { ZStack { Color.white.opacity(0.04); if failed { Image(systemName: "photo").font(.largeTitle) } else { ProgressView() } }.frame(minHeight: fit ? 220 : 0) }
+            } else { ZStack { theme.textColor.opacity(0.04); if failed { Image(systemName: "photo").font(.largeTitle) } else { ProgressView() } }.frame(minHeight: fit ? 220 : 0) }
         }.task(id: address) { failed = false; await load() }.onDisappear { image = nil }
     }
     private func load() async {

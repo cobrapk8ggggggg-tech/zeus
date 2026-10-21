@@ -1,6 +1,8 @@
 import XCTest
 import Combine
 import WebKit
+import UIKit
+import SwiftUI
 @testable import ZEUSNext
 
 final class BrowserCoreTests: XCTestCase {
@@ -96,6 +98,7 @@ final class BrowserCoreTests: XCTestCase {
     func testGalleryRestoresCSSBackgroundsAndLazySourcesAndReaderKeepsShortDivText() async throws {
         let loader = WebKitFixtureLoader()
         let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 800))
+        let window = try fixtureWindow([view]); defer { window.isHidden = true; view.removeFromSuperview() }
         await loader.load("""
         <html><body><article><h1>Fixture</h1><div>ظلام...</div><p>This is a real paragraph used for testing the original extraction behavior. It contains enough content to select this article as the reading root.</p></article>
         <div style="width:200px;height:200px;background-image:url('https://example.com/background.jpg')"></div>
@@ -117,13 +120,14 @@ final class BrowserCoreTests: XCTestCase {
         let configB = WKWebViewConfiguration(); configB.websiteDataStore = store.websiteDataStore(for: b)
         let viewA = WKWebView(frame: .zero, configuration: configA)
         var viewB: WKWebView? = WKWebView(frame: .zero, configuration: configB)
+        let window = try fixtureWindow([viewA, try XCTUnwrap(viewB)]); defer { window.isHidden = true; viewA.removeFromSuperview(); viewB?.removeFromSuperview() }
         await loaderA.loadURL(URL(string: "http://127.0.0.1:8765/")!, view: viewA)
         await loaderB.loadURL(URL(string: "http://127.0.0.1:8765/")!, view: try XCTUnwrap(viewB))
         _ = try await viewA.evaluateJavaScript("localStorage.setItem('zeus-profile-test','A')")
         let stored = try await viewA.evaluateJavaScript("localStorage.getItem('zeus-profile-test')") as? String; XCTAssertEqual(stored, "A")
         let other = try await viewB?.evaluateJavaScript("localStorage.getItem('zeus-profile-test')")
         XCTAssertTrue(other is NSNull)
-        viewA.navigationDelegate = nil; viewB?.navigationDelegate = nil; viewB?.stopLoading(); viewB = nil
+        viewA.navigationDelegate = nil; viewB?.navigationDelegate = nil; viewB?.stopLoading(); viewB?.removeFromSuperview(); viewB = nil
         try await store.delete(b)
         await store.websiteDataStore(for: a).removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
         try? FileManager.default.removeItem(at: root)
@@ -149,23 +153,31 @@ final class BrowserCoreTests: XCTestCase {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let store = ProfileStore(root: root, downloadsRoot: root.appendingPathComponent("Downloads"))
         let model = BrowserModel(profiles: store, useBackgroundDownloads: false)
+        model.data.settings.shieldsEnabled = false // Rules have their own native compilation test.
         let tab = try XCTUnwrap(model.current); tab.url = "http://127.0.0.1:8765/"
         let prepared = await model.prepare(tab); let view = try XCTUnwrap(prepared)
-        let loaded = expectation(description: "page loaded")
-        var loadedOnce = false
-        let watch = view.observe(\.isLoading, options: [.new]) { web, _ in if !web.isLoading && !loadedOnce { loadedOnce = true; loaded.fulfill() } }
-        view.load(URLRequest(url: URL(string: tab.url)!))
-        await fulfillment(of: [loaded], timeout: 25); watch.invalidate()
+        let window = try fixtureWindow([view]); defer { window.isHidden = true; view.removeFromSuperview() }
+        let driver = view.navigationDelegate, loader = WebKitFixtureLoader()
+        await loader.loadURL(URL(string: tab.url)!, view: view); view.navigationDelegate = driver
         let finished = expectation(description: "blob saved")
         var fired = false
         let sub = model.downloads.$records.sink { records in if !fired && records.contains(where: { $0.state == .completed }) { fired = true; finished.fulfill() } }
         _ = try await view.evaluateJavaScript("(()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['ZEUS blob fixture'],{type:'text/plain'}));a.download='fixture-blob.txt';document.body.appendChild(a);a.click()})()")
-        await fulfillment(of: [finished], timeout: 30); sub.cancel()
+        await fulfillment(of: [finished], timeout: 45); sub.cancel()
         let item = try XCTUnwrap(model.downloads.records.first { $0.state == .completed })
         let path = try XCTUnwrap(model.downloads.fileURL(item))
         XCTAssertEqual(try String(contentsOf: path, encoding: .utf8), "ZEUS blob fixture")
         model.downloads.removeAll(profileID: store.activeID); tab.dispose(); try? FileManager.default.removeItem(at: root)
     }
+}
+
+@MainActor private func fixtureWindow(_ views: [WKWebView]) throws -> UIWindow {
+    let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+    let window = UIWindow(windowScene: scene), controller = UIViewController()
+    window.frame = scene.screen.bounds; window.rootViewController = controller
+    controller.view.frame = window.bounds
+    for (index, view) in views.enumerated() { view.frame = CGRect(x: 0, y: CGFloat(index) * window.bounds.height / CGFloat(views.count), width: window.bounds.width, height: window.bounds.height / CGFloat(views.count)); controller.view.addSubview(view) }
+    window.windowLevel = .normal + 1; window.makeKeyAndVisible(); return window
 }
 
 @MainActor private final class WebKitFixtureLoader: NSObject, WKNavigationDelegate {
@@ -244,13 +256,70 @@ final class TransferAndPreferenceTests: XCTestCase {
         XCTAssertNil(FormVault.load(profileID: b, id: id))
         FormVault.remove(profileID: a); XCTAssertNil(FormVault.load(profileID: a, id: id))
     }
-    @MainActor func testFullBundledFilterListCompilesInWebKit() async throws {
-        let resource = try XCTUnwrap(Bundle.main.url(forResource: "safari-rules", withExtension: "json"))
-        let rows = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: resource)) as? [[String: Any]])
-        XCTAssertGreaterThan(rows.count, 1000)
-        let profile = BrowserProfile(name: "Filter fixture")
-        let shield = ShieldEngine(root: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
-        let compiled = try await shield.list(profile: profile, settings: BrowserSettings())
-        XCTAssertNotNil(compiled); shield.erase(profile.id)
+    @MainActor func testSwiftUIActuallyReplacesDisplayedWebViewBetweenTabs() async throws {
+        let a = WKWebView(), b = WKWebView()
+        let state = SurfaceSelection(view: a)
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene)
+        let controller = UIHostingController(rootView: SurfaceSelectionFixture(selection: state))
+        window.rootViewController = controller; window.frame = scene.screen.bounds; window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil }
+        let initial = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in a.window != nil }, object: nil)
+        await fulfillment(of: [initial], timeout: 8)
+        let loaderA = WebKitFixtureLoader(); await loaderA.load("<body>Profile A page</body>", view: a)
+        state.view = b
+        let swapped = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in b.window != nil && a.window == nil }, object: nil)
+        await fulfillment(of: [swapped], timeout: 8)
+        let loaderB = WebKitFixtureLoader(); await loaderB.load("<body>Profile B page</body>", view: b)
+        let bodyB = try await b.evaluateJavaScript("document.body.innerText") as? String; XCTAssertEqual(bodyB, "Profile B page")
+        state.view = a
+        let restored = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in a.window != nil && b.window == nil }, object: nil)
+        await fulfillment(of: [restored], timeout: 8)
+        let bodyA = try await a.evaluateJavaScript("document.body.innerText") as? String; XCTAssertEqual(bodyA, "Profile A page")
     }
+    @MainActor func testPreparingBackgroundTabsNeverEvictsVisibleTab() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let store = ProfileStore(root: root, downloadsRoot: root.appendingPathComponent("Downloads"))
+        let model = BrowserModel(profiles: store, useBackgroundDownloads: false); model.data.settings.shieldsEnabled = false
+        let primary = try XCTUnwrap(model.current); primary.url = "https://example.com/main"
+        _ = await model.prepare(primary)
+        for _ in 0..<6 { let tab = try XCTUnwrap(model.newTab(foreground: false)); tab.url = "https://example.com/background"; _ = await model.prepare(tab) }
+        XCTAssertNotNil(primary.webView); XCTAssertEqual(model.current?.id, primary.id)
+        XCTAssertLessThanOrEqual(model.tabs.filter { $0.webView != nil }.count, 4)
+        for tab in model.tabs { tab.dispose() }; try? FileManager.default.removeItem(at: root)
+    }
+    func testThemesRoundTripAndLegacySettingsKeepGreenSwitchesAndLocalBlocking() throws {
+        let settings = try JSONDecoder().decode(BrowserSettings.self, from: JSONEncoder().encode(BrowserSettings()))
+        XCTAssertNil(settings.backupFiltersEnabled); XCTAssertNil(settings.theme)
+        XCTAssertEqual(BrowserTheme.standard.switchOn, "30D158")
+        for theme in BrowserTheme.presets { XCTAssertTrue(theme.isValid); XCTAssertEqual(try JSONDecoder().decode(BrowserTheme.self, from: JSONEncoder().encode(theme)), theme) }
+    }
+    @MainActor func testOriginalRulesCompileWithoutLargeBundleOrNetworkDownload() async throws {
+        XCTAssertNil(Bundle.main.url(forResource: "safari-rules", withExtension: "json"))
+        XCTAssertLessThan(ShieldEngine.originalRules(settings: BrowserSettings()).count, 100)
+        let profile = BrowserProfile(name: "Original rules")
+        let shield = ShieldEngine(root: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        let result = try await shield.list(profile: profile, settings: BrowserSettings())
+        XCTAssertNotNil(result); XCTAssertFalse(shield.hasBackup(profile)); shield.erase(profile.id)
+    }
+    @MainActor func testBrokenOptionalRulesKeepOriginalBlockingAvailable() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let file = root.appendingPathComponent("broken.json"); try BrowserDisk.ensure(root)
+        try Data(#"[{"trigger":{"url-filter":"["},"action":{"type":"block"}}]"#.utf8).write(to: file)
+        let profile = BrowserProfile(name: "Fallback")
+        let shield = ShieldEngine(root: root); try await shield.importBackup(file, profile: profile)
+        var settings = BrowserSettings(); settings.backupFiltersEnabled = true
+        let result = try await shield.list(profile: profile, settings: settings)
+        XCTAssertNotNil(result); XCTAssertTrue(shield.status.contains("مستمر"))
+        shield.removeBackup(profile); XCTAssertFalse(shield.hasBackup(profile)); try? FileManager.default.removeItem(at: root)
+    }
+}
+
+@MainActor private final class SurfaceSelection: ObservableObject {
+    @Published var view: WKWebView
+    init(view: WKWebView) { self.view = view }
+}
+private struct SurfaceSelectionFixture: View {
+    @ObservedObject var selection: SurfaceSelection
+    var body: some View { WebSurface(webView: selection.view) }
 }

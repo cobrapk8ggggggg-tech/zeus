@@ -1,7 +1,7 @@
 name: ZEUS Next build and verification
 on:
   push:
-    branches: [codex/zeus-browser-next, fix/zeus-next-latest-build-20261020]
+    branches: [codex/zeus-browser-next, fix/zeus-next-latest-build-20261020, fix/zeus-browser-stability-20261021]
     paths: [ZEUSNext/**, ZEUSNextTests/**, ZEUSNextUITests/**, .zeus-ci/**, .github/workflows/zeus-next.yml]
   workflow_dispatch:
 permissions:
@@ -26,22 +26,8 @@ jobs:
           python3 .zeus-ci/project.py
           xcodegen generate --spec zeus-project.json
           mkdir -p results
-      - uses: actions/cache/restore@v4
-        id: converter-cache
-        with:
-          path: ~/.cache/zeus-filter-converter
-          key: zeus-converter-resources-v2-1cfdcaf042880a5e0027a8fc6f7ebf9ee667acc9-${{ runner.arch }}
-      - name: Convert EasyList and EasyPrivacy to native WebKit rules
-        id: filters
-        run: |
-          python3 .zeus-ci/filters.py
-          xcodegen generate --spec zeus-project.json
-      - uses: actions/cache/save@v4
-        if: steps.converter-cache.outputs.cache-hit != 'true' && steps.filters.outcome == 'success'
-        with:
-          path: ~/.cache/zeus-filter-converter
-          key: zeus-converter-resources-v2-1cfdcaf042880a5e0027a8fc6f7ebf9ee667acc9-${{ runner.arch }}
       - name: Build unsigned iPhone and iPad application
+        id: device
         run: |
           set -o pipefail
           xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -configuration Release \
@@ -76,11 +62,13 @@ jobs:
           retention-days: 14
           if-no-files-found: error
       - name: Start local deterministic download fixture
+        id: fixture
         run: |
           python3 .zeus-ci/fixture_server.py > results/fixture.log 2>&1 &
           echo $! > "$RUNNER_TEMP/zeus-fixture.pid"
           curl --fail --retry 15 --retry-connrefused --retry-delay 1 http://127.0.0.1:8765/ > /dev/null
       - name: Run core, WebKit isolation, download and UI tests
+        timeout-minutes: 20
         run: |
           set -o pipefail
           device_id=$(python3 - <<'PY'
@@ -100,8 +88,10 @@ jobs:
             -test-timeouts-enabled YES -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 180 \
             -derivedDataPath "$RUNNER_TEMP/ZEUSSimulator" \
             -resultBundlePath "$GITHUB_WORKSPACE/results/tests.xcresult" \
-            test CODE_SIGNING_ALLOWED=NO 2>&1 | tee results/test.log
+            test CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- 2>&1 | tee results/test.log
       - name: Verify full-screen tools and settings on iPad
+        if: always() && !cancelled() && steps.device.outcome == 'success' && steps.fixture.outcome == 'success'
+        timeout-minutes: 15
         run: |
           set -o pipefail
           ipad_id=$(python3 - <<'PYIPAD'
@@ -121,7 +111,7 @@ jobs:
             -test-timeouts-enabled YES -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 180 \
             -derivedDataPath "$RUNNER_TEMP/ZEUSSimulator" \
             -resultBundlePath "$GITHUB_WORKSPACE/results/ipad-tests.xcresult" \
-            test CODE_SIGNING_ALLOWED=NO 2>&1 | tee results/ipad-test.log
+            test CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- 2>&1 | tee results/ipad-test.log
       - name: Export screenshot attachments
         if: always()
         run: |
@@ -147,7 +137,6 @@ jobs:
             results/screenshots
             results/screenshots-ipad
             results/filter-metadata.json
-            ZEUSNext/Resources/safari-rules.json
             ZEUSNext/Resources/FILTER-NOTICES.txt
           retention-days: 14
           if-no-files-found: warn
