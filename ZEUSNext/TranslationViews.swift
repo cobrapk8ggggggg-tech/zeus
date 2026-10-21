@@ -1,5 +1,6 @@
 import SwiftUI
 import WebKit
+import UniformTypeIdentifiers
 
 struct TranslationCard: View {
     @ObservedObject var page: PageTranslation
@@ -7,7 +8,7 @@ struct TranslationCard: View {
     @Environment(\.browserTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
-        if page.offered {
+        Group { if page.offered {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 12) {
                     Image(systemName: "translate").font(.title2).foregroundStyle(theme.accentColor)
@@ -21,7 +22,7 @@ struct TranslationCard: View {
                 if let error = page.error { Text(error).font(.caption).textSelection(.enabled).accessibilityIdentifier("translationError") }
                 HStack {
                     if page.running {
-                        ProgressView().controlSize(.small); Button("إيقاف") { page.stop() }
+                        ProgressView().controlSize(.small); Button("إيقاف") { page.pause() }
                     } else if page.translated {
                         Button("عرض الأصل") { Task { await page.restore() } }.accessibilityIdentifier("restoreTranslationButton")
                         if page.error != nil { Button("متابعة") { page.resume() } }
@@ -38,7 +39,7 @@ struct TranslationCard: View {
                 .environment(\.layoutDirection, .rightToLeft).accessibilityIdentifier("translationSuggestionCard")
                 .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
                 .animation(reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.82), value: page.running)
-        }
+        } }.animation(reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.82), value: page.offered)
     }
 }
 
@@ -211,6 +212,8 @@ struct AIWorkspace: View {
     @State private var prompt = ""
     @State private var response = ""
     @State private var busy = false
+    @State private var attachments: [AIAttachment] = []
+    @State private var selectingFiles = false
     @State private var thread = UUID()
     @State private var task: Task<Void, Never>?
     var body: some View {
@@ -218,18 +221,24 @@ struct AIWorkspace: View {
             ThemedSection("المزود") { Picker("الحساب", selection: $selected) { Text("اختر مزودًا").tag(nil as UUID?); ForEach(context.settings.aiProviders ?? []) { Text($0.name).tag(Optional($0.id)) } }; Button("محادثة جديدة") { reset() } }
             ThemedSection("رسالتك") {
                 TextField("اكتب رسالتك", text: $prompt, axis: .vertical).lineLimit(4...12)
+                Button("إرفاق صور أو ملفات", systemImage: "paperclip") { selectingFiles = true }.disabled(busy)
+                ForEach(attachments) { item in HStack { Image(systemName: item.isImage ? "photo" : "doc"); Text(item.name).lineLimit(1); Spacer(); Button { attachments.removeAll { $0.id == item.id } } label: { Image(systemName: "xmark.circle") } }.font(.caption) }
                 Button(busy ? "إيقاف" : "إرسال") { if busy { task?.cancel(); busy = false } else { send() } }.disabled(selected == nil || prompt.isEmpty)
             }
             if !response.isEmpty { ThemedSection("الرد") { Text(response).textSelection(.enabled) } }
-        }.settingsPage("مساحة الذكاء الاصطناعي").onAppear { selected = context.settings.translation?.providerID }
+        }.settingsPage("مساحة الذكاء الاصطناعي")
+            .fileImporter(isPresented: $selectingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
+                do { let urls = try result.get(); let items = try urls.map { try AIAttachment.load($0) }; guard (attachments + items).reduce(0, { $0 + $1.data.count }) <= 20_000_000 else { throw TranslationFailure.message("مجموع المرفقات يتجاوز 20 ميجابايت.") }; attachments += items }
+                catch { response = error.localizedDescription }
+            }.onAppear { selected = context.settings.translation?.providerID }
             .onChange(of: selected) { _, _ in reset() }.onDisappear { reset() }
     }
-    private func reset() { task?.cancel(); busy = false; let old = thread; thread = UUID(); response = ""; Task { await AIProviderService.shared.end(old) } }
+    private func reset() { task?.cancel(); busy = false; let old = thread; thread = UUID(); response = ""; attachments = []; Task { await AIProviderService.shared.end(old) } }
     private func send() {
         guard let config = context.settings.aiProviders?.first(where: { $0.id == selected }), context.permitted else { return }
         let secret = AISecretVault.read(profile: context.profileID, provider: config.id.uuidString), id = thread
         busy = true; response = ""
-        task = Task { do { let value = try await AIProviderService.shared.generate(prompt, config: config, secret: secret, context: id); if !Task.isCancelled { response = value } } catch { if !Task.isCancelled { response = error.localizedDescription } }; if id == thread { busy = false } }
+        task = Task { do { let value = try await AIProviderService.shared.generate(prompt, config: config, secret: secret, context: id, attachments: attachments); if !Task.isCancelled { response = value; attachments = [] } } catch { if !Task.isCancelled { response = error.localizedDescription } }; if id == thread { busy = false } }
     }
 }
 

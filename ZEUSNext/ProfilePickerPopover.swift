@@ -47,7 +47,7 @@ struct ProfilePickerPopover: View {
                     .background(theme.surfaceColor).clipShape(RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(theme.borderColor.opacity(0.45))).shadow(color: .black.opacity(0.5), radius: 30)
                     .disabled(busy).overlay { if busy { ProgressView().padding(20).background(theme.surfaceColor, in: RoundedRectangle(cornerRadius: 16)) } }
             }.frame(width: geometry.size.width, height: geometry.size.height)
-        }.environment(\.layoutDirection, .rightToLeft).accessibilityIdentifier("profilePickerWindow")
+        }.environment(\.layoutDirection, .rightToLeft).accessibilityElement(children: .contain).accessibilityIdentifier("profilePickerWindow")
             .alert("دخول \(target?.name ?? "")", isPresented: Binding(get: { target != nil }, set: { if !$0 { target = nil } })) {
                 SecureField("كلمة المرور", text: $password)
                 Button("دخول") { if let account = target { attempt(account, password: password) }; password = ""; target = nil }

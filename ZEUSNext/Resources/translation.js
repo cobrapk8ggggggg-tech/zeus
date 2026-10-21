@@ -1,6 +1,7 @@
 (() => {
   if (globalThis.zeusTranslate) return;
-  const documentID = crypto.randomUUID(), nodes = new Map(), ids = new WeakMap(), styles = new Map();
+  const documentID = typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Array.from(crypto.getRandomValues(new Uint32Array(4)), v => v.toString(16)).join('-');
+  const nodes = new Map(), ids = new WeakMap(), styles = new Map();
   let serial = 0, active = false, timer, applying = false, target = 'ar', rootState = null;
   const skip = 'script,style,noscript,pre,code,kbd,samp,svg,math,textarea,input,select,option,[contenteditable]:not([contenteditable="false"]),[translate="no"],.notranslate';
   function eligible(node) {

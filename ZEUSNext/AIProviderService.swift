@@ -95,34 +95,49 @@ actor AIProviderService {
     private func accountGet(_ path: String, headers: [String: String]) async throws -> Any {
         try await AIHTTP.object(AIHTTP.request(URL(string: "https://android.chat.openai.com/backend-api/" + path)!, headers: headers))
     }
-    func generate(_ prompt: String, config: AIProviderConfiguration, secret: String, context: UUID) async throws -> String {
+    func generate(_ prompt: String, config: AIProviderConfiguration, secret: String, context: UUID, attachments: [AIAttachment] = []) async throws -> String {
+        guard attachments.reduce(0, { $0 + $1.data.count }) <= 20_000_000 else { throw TranslationFailure.message("قلل مجموع المرفقات إلى 20 ميجابايت.") }
         guard !config.model.isEmpty else { throw TranslationFailure.message("اختر نموذجًا بعد اختبار اتصال المزود في الإعدادات.") }
         switch config.kind {
         case .openAICompatible:
-            let body: [String: Any] = ["model": config.model, "messages": [["role": "user", "content": prompt]], "stream": false]
+            var parts: [[String: Any]] = [["type": "text", "text": prompt]]
+            for attachment in attachments {
+                if attachment.isImage { parts.append(["type": "image_url", "image_url": ["url": attachment.dataURL]]) }
+                else if attachment.mime == "application/pdf" { parts.append(["type": "file", "file": ["filename": attachment.name, "file_data": attachment.dataURL]]) }
+                else if let text = String(data: attachment.data, encoding: .utf8) { parts.append(["type": "text", "text": "Attachment: " + attachment.name + "\n" + text]) }
+                else { throw TranslationFailure.message("هذا الملف غير مدعوم في chat/completions. اختر صورة أو PDF أو ملفًا نصيًا؛ يعتمد قبول المرفقات على المزود والنموذج.") }
+            }
+            let message: [String: Any] = ["role": "user", "content": attachments.isEmpty ? prompt as Any : parts as Any]
+            let body: [String: Any] = ["model": config.model, "messages": [message], "stream": false]
             let value = try await AIHTTP.object(AIHTTP.request(AIHTTP.endpoint(config.baseURL, path: "chat/completions"), method: "POST", body: body, headers: bearer(secret))) as? [String: Any]
             guard let choice = (value?["choices"] as? [[String: Any]])?.first, let message = choice["message"] as? [String: Any], let text = message["content"] as? String, !text.isEmpty else { throw TranslationFailure.message("لم يُرجع المزود نصًا من chat/completions.") }; return text
         case .geminiAPI:
             guard config.model.range(of: #"^[A-Za-z0-9._-]+$"#, options: .regularExpression) != nil else { throw TranslationFailure.message("معرّف النموذج غير صالح.") }
             let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/" + config.model + ":generateContent")!
-            let value = try await AIHTTP.object(AIHTTP.request(url, method: "POST", body: ["contents": [["role": "user", "parts": [["text": prompt]]]]], headers: ["x-goog-api-key": secret])) as? [String: Any]
+            var parts: [[String: Any]] = [["text": prompt]]
+            parts += attachments.map { ["inline_data": ["mime_type": $0.mime, "data": $0.data.base64EncodedString()]] }
+            let value = try await AIHTTP.object(AIHTTP.request(url, method: "POST", body: ["contents": [["role": "user", "parts": parts]]], headers: ["x-goog-api-key": secret])) as? [String: Any]
             let text = ((value?["candidates"] as? [[String: Any]])?.first?["content"] as? [String: Any])?["parts"] as? [[String: Any]] ?? []
             let result = text.compactMap { $0["text"] as? String }.joined(); guard !result.isEmpty else { throw TranslationFailure.message("لم يُرجع Gemini نصًا؛ قد يكون المحتوى مرفوضًا أو الحد مستنفدًا.") }; return result
-        case .chatGPTAccount: return try await chatGPT(prompt, config: config, secret: secret, context: context)
-        case .geminiAccount: return try await gemini(prompt, config: config, secret: secret, context: context)
+        case .chatGPTAccount: return try await chatGPT(prompt, config: config, secret: secret, context: context, attachments: attachments)
+        case .geminiAccount: return try await gemini(prompt, config: config, secret: secret, context: context, attachments: attachments)
         }
     }
-    private func chatGPT(_ prompt: String, config: AIProviderConfiguration, secret: String, context: UUID) async throws -> String {
+    private func chatGPT(_ prompt: String, config: AIProviderConfiguration, secret: String, context: UUID, attachments: [AIAttachment]) async throws -> String {
         let headers = try chatGPTHeaders(secret)
         var conversation = parents[context]?.0 ?? config.conversationID
         var parent = parents[context]?.1 ?? UUID().uuidString
         if parents[context] == nil, let conversation {
             let value = try await accountGet("conversation/" + conversation, headers: headers) as? [String: Any]; parent = value?["current_node"] as? String ?? parent
         }
+        var uploaded: [[String: Any]] = [], imageParts: [[String: Any]] = []
+        for attachment in attachments { let result = try await chatGPTUpload(attachment, secret: secret); uploaded.append(result.metadata); if let image = result.image { imageParts.append(image) } }
         var message: [String: Any] = ["id": UUID().uuidString, "author": ["role": "user"], "content": ["content_type": "text", "parts": [prompt]], "status": "finished_successfully", "recipient": "all", "metadata": [:]]
+        if !uploaded.isEmpty { message["metadata"] = ["attachments": uploaded] }
+        if !imageParts.isEmpty { message["content"] = ["content_type": "multimodal_text", "parts": imageParts.map { $0 as Any } + [prompt]] }
         var q: [String: Any] = ["action": "next", "messages": [message], "parent_message_id": parent, "model": config.model, "timezone": TimeZone.current.identifier, "timezone_offset_min": TimeZone.current.secondsFromGMT() / 60, "history_and_training_disabled": false, "force_use_sse": true, "stream": true, "websocket_request_id": UUID().uuidString]
         if let conversation { q["conversation_id"] = conversation }
-        if let project = config.projectID { message["metadata"] = ["gizmo_id": project]; q["messages"] = [message]; q["conversation_mode"] = ["kind": "gizmo_interaction", "gizmo_id": project]; q["conversation_origin"] = "tpp" }
+        if let project = config.projectID { var metadata = message["metadata"] as? [String: Any] ?? [:]; metadata["gizmo_id"] = project; message["metadata"] = metadata; q["messages"] = [message]; q["conversation_mode"] = ["kind": "gizmo_interaction", "gizmo_id": project]; q["conversation_origin"] = "tpp" }
         var request = try AIHTTP.request(URL(string: "https://android.chat.openai.com/backend-api/conversation")!, method: "POST", body: q, headers: headers)
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         let data = try await AIHTTP.data(request); var answer = "", node = parent
@@ -161,11 +176,13 @@ actor AIProviderService {
         request.httpBody = AIHTTP.form(["at": session.at, "f.req": try AIHTTP.string([[[id, AIHTTP.string(payload), NSNull(), "generic"]]] )]); request.setValue("application/x-www-form-urlencoded;charset=utf-8", forHTTPHeaderField: "Content-Type")
         return AIHTTP.rpc(try await AIHTTP.data(request), id: id)
     }
-    private func gemini(_ prompt: String, config: AIProviderConfiguration, secret: String, context: UUID) async throws -> String {
+    private func gemini(_ prompt: String, config: AIProviderConfiguration, secret: String, context: UUID, attachments: [AIAttachment]) async throws -> String {
         let session = try await geminiSession(config, secret: secret)
         var history = threads[context] ?? ["", "", "", NSNull(), NSNull(), NSNull(), NSNull(), NSNull(), NSNull(), ""]
         if threads[context] == nil, let cid = config.conversationID { history[0] = cid }
-        let content: [Any] = [[prompt, 0, NSNull(), [], NSNull(), NSNull(), 0], ["ar"], history, NSNull(), NSNull(), NSNull(), [], 0, [], [], 1, 0]
+        var uploaded: [Any] = []
+        for attachment in attachments { let uri = try await geminiUpload(attachment, cookie: secret); uploaded.append([[uri, 1], attachment.name]) }
+        let content: [Any] = [[prompt, 0, NSNull(), uploaded, NSNull(), NSNull(), 0], ["ar"], history, NSNull(), NSNull(), NSNull(), [], 0, [], [], 1, 0]
         var c = URLComponents(string: "https://gemini.google.com/u/\(config.googleAccountIndex)/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate")!
         c.queryItems = [URLQueryItem(name: "bl", value: session.build), URLQueryItem(name: "hl", value: "ar"), URLQueryItem(name: "f.sid", value: session.sid), URLQueryItem(name: "rt", value: "c"), URLQueryItem(name: "_reqid", value: String(Int.random(in: 10000...99999)))]
         var headers = ["Cookie": secret, "Origin": "https://gemini.google.com", "Referer": "https://gemini.google.com/", "X-Same-Domain": "1"]
@@ -173,7 +190,6 @@ actor AIProviderService {
         var request = try AIHTTP.request(c.url!, method: "POST", headers: headers)
         request.httpBody = AIHTTP.form(["at": session.at, "f.req": try AIHTTP.string([NSNull(), AIHTTP.string(content)])]); request.setValue("application/x-www-form-urlencoded;charset=utf-8", forHTTPHeaderField: "Content-Type")
         let data = try await AIHTTP.data(request); var result = ""
-        for body in AIHTTP.rpc(data, id: "") { _ = body } // StreamGenerate has a different envelope than batchexecute.
         for line in String(decoding: data, as: UTF8.self).components(separatedBy: .newlines) {
             guard let outer = try? AIHTTP.json(Data(line.utf8)), let s = AIHTTP.nested(outer, [0,2]) as? String, let inner = try? AIHTTP.json(Data(s.utf8)) else { continue }
             if let text = AIHTTP.nested(inner, [4,0,1,0]) as? String, !text.isEmpty { result = text }

@@ -2,6 +2,14 @@ import Foundation
 import WebKit
 import NaturalLanguage
 
+@MainActor private final class TranslationMessageRouter: NSObject, WKScriptMessageHandler {
+    static let shared = TranslationMessageRouter()
+    let pages = NSMapTable<WKWebView, PageTranslation>.weakToWeakObjects()
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        if let view = message.webView, let page = pages.object(forKey: view) { page.userContentController(controller, didReceive: message) }
+    }
+}
+
 @MainActor final class PageTranslation: NSObject, ObservableObject, WKScriptMessageHandler {
     static let world = WKContentWorld.world(name: "ZEUS.Translation")
     static let script = Bundle.main.url(forResource: "translation", withExtension: "js").flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
@@ -27,15 +35,17 @@ import NaturalLanguage
     func attach(to view: WKWebView, installScript: Bool = true) {
         let controller = view.configuration.userContentController
         controller.removeScriptMessageHandler(forName: "zeusTranslation", contentWorld: Self.world)
-        controller.add(self, contentWorld: Self.world, name: "zeusTranslation")
+        TranslationMessageRouter.shared.pages.setObject(self, forKey: view)
+        controller.add(TranslationMessageRouter.shared, contentWorld: Self.world, name: "zeusTranslation")
         if installScript { controller.addUserScript(WKUserScript(source: Self.script, injectionTime: .atDocumentEnd, forMainFrameOnly: false, in: Self.world)) }
     }
     func navigationStarted() {
         stop(); frames.removeAll(); mainDocument = ""; sourceLanguage = ""; offered = false; translated = false; completed = 0; error = nil; cache.removeAll(); dismissed = false; sessionPreferences = nil
     }
     func stop() { epoch = UUID(); work?.cancel(); work = nil; running = false; pending = false; let old = context; context = UUID(); Task { await AIProviderService.shared.end(old) } }
+    func pause() { stop(); error = "أُوقفت الترجمة. يمكنك المتابعة أو عرض الأصل." }
     func dismiss() { offered = false; dismissed = true }
-    func becameVisible() { if offered && preferences.automatic { translate() } }
+    func becameVisible() { if offered && !translated && preferences.automatic { translate() } }
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let model, let tab, model.profile.id == tab.profileID, !model.requiresUnlock, message.webView === tab.webView,
               let body = message.body as? [String: String], let id = body["documentID"], let kind = body["kind"], id.count < 80 else { return }

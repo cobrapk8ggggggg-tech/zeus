@@ -1,5 +1,7 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import time
+import json
+from urllib.parse import urlparse
 import struct
 import zlib
 
@@ -13,7 +15,35 @@ IMAGE = b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', 200, 400, 
 
 
 class Handler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        try:
+            body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', '0'))))
+            prompt = body.get('messages', [{}])[-1].get('content', '')
+            if isinstance(prompt, list): prompt = next((p['text'] for p in prompt if p.get('type') == 'text'), '')
+            if 'INPUT_JSON:' in prompt:
+                items = json.loads(prompt.split('INPUT_JSON:', 1)[1])
+                text = json.dumps([{'id': x['id'], 'text': 'ترجمة: ' + x['text']} for x in items], ensure_ascii=False)
+            else: text = 'OK'
+            if body.get('model') == 'broken-json': text = '[{"id":"wrong","text":"wrong"}]'
+            result = json.dumps({'choices': [{'message': {'content': text}}]}, ensure_ascii=False).encode()
+            self.send_response(200); self.send_header('Content-Type', 'application/json'); self.send_header('Content-Length', str(len(result))); self.end_headers(); self.wfile.write(result)
+        except Exception:
+            self.send_response(400); self.end_headers()
+
     def do_GET(self):
+        if self.path.startswith('/v1/models'):
+            body = b'{"data":[{"id":"fixture-translator","name":"Fixture translator"},{"id":"broken-json"}]}'
+            self.send_response(200); self.send_header('Content-Type', 'application/json'); self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body); return
+        if self.path.startswith('/translate-fixture'):
+            body = b'''<!doctype html><html lang="en"><head><title>Translation Novel</title></head><body>
+            <h1 id="heading">A journey beyond the mountains</h1>
+            <article><p id="paragraph">The reader opened the old book and discovered an unexpected adventure. This chapter tells the story of a traveler who returned home.</p>
+            <p>She walked along the river and watched the stars reflected in the water.</p></article>
+            <pre id="code">let untouched = "Hello";</pre><input id="secret" type="password" value="never-translate">
+            <p translate="no" id="keep">Leave this sentence untouched.</p>
+            <button onclick="const p=document.createElement('p');p.id='dynamic';p.textContent='Another chapter arrives after the initial translation.';document.body.append(p)">Add paragraph</button>
+            <a href="/translate-fixture?next">Next page</a></body></html>'''
+            self.send_response(200); self.send_header('Content-Type', 'text/html; charset=utf-8'); self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body); return
         if self.path.startswith('/image.png'):
             self.send_response(200); self.send_header('Content-Type', 'image/png'); self.send_header('Content-Length', str(len(IMAGE))); self.end_headers(); self.wfile.write(IMAGE)
         elif self.path.startswith('/attachment'):

@@ -23,7 +23,6 @@ import LocalAuthentication
     var isHome: Bool { url == "zeus://home" }
     func dispose() {
         translation?.stop(); translation = nil
-        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "zeusTranslation", contentWorld: PageTranslation.world)
         filterTask?.cancel(); filterTask = nil
         webView?.stopLoading()
         webView?.configuration.userContentController.removeScriptMessageHandler(forName: "zeusConsole")

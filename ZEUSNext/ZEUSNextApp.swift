@@ -34,6 +34,12 @@ final class BrowserAppDelegate: NSObject, UIApplicationDelegate {
             try? FileManager.default.removeItem(at: root)
             let model = BrowserModel(profiles: ProfileStore(root: root, downloadsRoot: root.appendingPathComponent("Downloads")), useBackgroundDownloads: false)
             if let argument = CommandLine.arguments.first(where: { $0.hasPrefix("--layout=") }), let layout = ChromeLayout(rawValue: String(argument.dropFirst(9))) { model.data.settings.chromeLayout = layout }
+            if CommandLine.arguments.contains("--translation-fixture") {
+                var provider = AIProviderConfiguration(); provider.name = "مزود الاختبار المحلي"; provider.baseURL = "http://127.0.0.1:8765/v1"; provider.model = "fixture-translator"
+                model.data.settings.aiProviders = [provider]
+                var prefs = TranslationPreferences(); prefs.engine = .ai; prefs.providerID = provider.id; prefs.automatic = CommandLine.arguments.contains("--automatic-translation")
+                model.data.settings.translation = prefs
+            }
             _browser = StateObject(wrappedValue: model)
         } else { _browser = StateObject(wrappedValue: BrowserModel()) }
     }

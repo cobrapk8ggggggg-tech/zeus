@@ -179,7 +179,7 @@ struct BrowserRoot: View {
                     }.padding(.horizontal, 20)
                 }.frame(height: 200)
                 Spacer()
-            }.accessibilityIdentifier("originalTabsTray").frame(height: 300).frame(maxWidth: .infinity).background { if theme.style == .glass { Rectangle().fill(.ultraThinMaterial) } else { theme.surfaceColor } }.clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 30, bottomTrailingRadius: 30))
+            }.accessibilityElement(children: .contain).accessibilityIdentifier("originalTabsTray").frame(height: 300).frame(maxWidth: .infinity).background { if theme.style == .glass { Rectangle().fill(.ultraThinMaterial) } else { theme.surfaceColor } }.clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 30, bottomTrailingRadius: 30))
 
         }
     }
