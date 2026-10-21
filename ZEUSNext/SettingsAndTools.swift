@@ -30,12 +30,12 @@ struct ToolsSheet: View {
                     Button("طباعة", systemImage: "printer") { afterDismiss { model.printPage() } }
                     Button("تنزيل الرابط الحالي", systemImage: "arrow.down.circle") { if let url = model.webView?.url { Task { await model.downloads.start(url: url, profile: model.profile, webView: model.webView) } } }
                 }.disabled(model.current?.isHome != false)
-                ThemedSection {
+                Section {
                     Button(model.siteCompatible ? "إعادة الحماية لهذا الموقع" : "وضع توافق الموقع", systemImage: "shield.lefthalf.filled") { afterDismiss { model.toggleCompatibility() } }.disabled(model.currentHost.isEmpty)
                     Button("فتح في متصفح النظام", systemImage: "safari") { if let url = model.webView?.url, BrowserURL.isWeb(url) { UIApplication.shared.open(url) } }
                     Button("عرض باستخدام Safari داخل التطبيق", systemImage: "rectangle.on.rectangle") { if let url = model.webView?.url, BrowserURL.isWeb(url) { systemURL = ShareItem(url: url) } }
                     if model.blockedNavigations > 0 { Text("\(model.blockedNavigations) تنقّل أو نافذة أوقفها الحاجب في هذه الجلسة").font(.caption).foregroundStyle(.secondary) }
-                } header: { Text("التوافق والحماية") } footer: { Text("بعض المواقع ترفض المتصفحات المدمجة. جلسة متصفح النظام مستقلة ولا تُنقل كوكيزها إلى البروفايل. يتيح وضع التوافق إكمال التحقق يدويًا دون تدخل الحاجب.") }
+                } header: { Text("التوافق والحماية") } footer: { Text("بعض المواقع ترفض المتصفحات المدمجة. جلسة متصفح النظام مستقلة ولا تُنقل كوكيزها إلى البروفايل. يتيح وضع التوافق إكمال التحقق يدويًا دون تدخل الحاجب.") }.listRowBackground(BrowserRowBackground(theme: theme))
                 ThemedSection("أدوات متقدمة") {
                     Button("سكربتات هذه المساحة", systemImage: "curlybraces") { scripts = true }
                     Button("الكونسول", systemImage: "terminal") { console = true }

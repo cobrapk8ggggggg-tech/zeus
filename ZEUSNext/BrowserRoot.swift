@@ -193,6 +193,7 @@ struct BrowserRoot: View {
     }
     }
     private func perform(_ action: BrowserAction) {
+        addressFocused = false
         withAnimation { toolbarVisible = false; topTray = false }
         switch action {
         case .back: model.webView?.goBack(); case .forward: model.webView?.goForward(); case .reload: model.reload(); case .home: model.home(); case .newTab: _ = model.newTab(); topTray = false

@@ -99,7 +99,7 @@ struct WebDialog: Identifiable {
     func notify(_ text: String) { notice = BrowserNotice(text: text) }
     func prepare(_ tab: BrowserTab, supplied: WKWebViewConfiguration? = nil) async -> WKWebView? {
         if let view = tab.webView { return view }
-        guard tab.profileID == profile.id, !requiresUnlock else { return nil }
+        guard tab.profileID == profile.id, !requiresUnlock, !switching else { return nil }
         let owner = profile, settings = data.settings
         let options = settings.advanced ?? AdvancedSettings()
         let config = supplied ?? WKWebViewConfiguration()
@@ -149,7 +149,7 @@ struct WebDialog: Identifiable {
         changed(); return view
     }
     func ensureCurrentLoaded() async {
-        guard let tab = current, !tab.isHome, tab.webView == nil, let url = URL(string: tab.url), let view = await prepare(tab) else { return }
+        guard !switching, let tab = current, !tab.isHome, tab.webView == nil, let url = URL(string: tab.url), let view = await prepare(tab) else { return }
         view.load(URLRequest(url: url))
     }
     func open(_ text: String) {

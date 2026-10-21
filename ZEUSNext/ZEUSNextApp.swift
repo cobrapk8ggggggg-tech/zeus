@@ -40,7 +40,7 @@ final class BrowserAppDelegate: NSObject, UIApplicationDelegate {
     var body: some Scene {
         WindowGroup {
             BrowserRoot(model: browser)
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(browser.data.settings.theme?.light == true ? .light : .dark)
                 .environment(\.layoutDirection, .rightToLeft)
         }
     }

@@ -77,7 +77,7 @@ struct SettingsSheet: View {
     }
     private var appearance: some View {
         Form {
-            ThemedSection { NavigationLink("الألوان والمظهر", systemImage: "paintpalette") { ThemeEditor(context: context) }.accessibilityIdentifier("themeEditorButton") }
+            ThemedSection { NavigationLink { ThemeEditor(context: context) } label: { Label("الألوان والمظهر", systemImage: "paintpalette") }.accessibilityIdentifier("themeEditorButton") }
             ThemedSection("توزيع الأشرطة") {
                 ForEach(ChromeLayout.allCases) { layout in Button { context.settings.chromeLayout = layout; context.save(); context.model.chromeHidden = false } label: { HStack { Text(layout.title); Spacer(); if (context.settings.chromeLayout ?? .original) == layout { Image(systemName: "checkmark") } } }.accessibilityIdentifier("layout-" + layout.rawValue) }
             }
