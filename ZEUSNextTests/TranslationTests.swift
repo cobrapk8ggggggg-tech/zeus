@@ -23,11 +23,54 @@ final class TranslationDataTests: XCTestCase {
         let values = try TextTranslationService.validateAIResponse("```json\n[{\"id\":\"b\",\"text\":\"اثنان\"},{\"id\":\"a\",\"text\":\"<script>text</script>\"}]\n```", originals: items)
         XCTAssertEqual(values.map(\.id), ["a", "b"]); XCTAssertEqual(values[0].text, "<script>text</script>")
     }
-    func testGoogleQueryPreservesPlusSignsAmpersandsAndUnicode() {
-        let text = "C++ & العربية + accents é", url = TextTranslationService.googleWebURL(text: text, target: "ar")
-        let parts = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        XCTAssertTrue(parts?.percentEncodedQuery?.contains("C%2B%2B") == true)
-        XCTAssertEqual(parts?.queryItems?.first(where: { $0.name == "q" })?.value, text)
+    func testGoogleBatchPreservesPlusSignsOrderingAndRejectsPartialResults() throws {
+        let texts = ["C++ & العربية + accents é", "A chapter."]
+        let request = TextTranslationService.googleBatchRequest(texts, target: "ar")
+        XCTAssertEqual(request.httpMethod, "POST")
+        let body = String(decoding: try XCTUnwrap(request.httpBody), as: UTF8.self)
+        XCTAssertTrue(body.contains("C%2B%2B"))
+        let decoded = URLComponents(string: "https://example.com/?" + body)?.queryItems?.map(\.value)
+        XCTAssertEqual(decoded?.compactMap { $0 }, texts)
+        let items = texts.enumerated().map { TranslationSegment(id: String($0.offset), text: $0.element) }
+        let result = try TextTranslationService.parseGoogleBatch([["الأول", "en"], ["الثاني", "en"]], originals: items)
+        XCTAssertEqual(result.map(\.id), ["0", "1"]); XCTAssertEqual(result.map(\.text), ["الأول", "الثاني"])
+        XCTAssertThrowsError(try TextTranslationService.parseGoogleBatch(["ناقص"], originals: items))
+    }
+    func testHundredParagraphsUseTwoGoogleHTTPBatchesAndPreserveOriginalOrder() async throws {
+        GoogleBatchProtocol.reset()
+        let configuration = URLSessionConfiguration.ephemeral; configuration.protocolClasses = [GoogleBatchProtocol.self]
+        let session = URLSession(configuration: configuration); defer { session.invalidateAndCancel() }
+        let originals = (0..<100).map { TranslationSegment(id: String($0), text: "  Paragraph \($0) tells the story of a traveler.  ") }
+        let result = try await TextTranslationService.translate(originals, preferences: TranslationPreferences(), provider: nil, secret: "", context: UUID(), session: session)
+        XCTAssertEqual(GoogleBatchProtocol.count, 2, "Google must receive arrays, never a request for every paragraph")
+        XCTAssertEqual(result.map(\.id), originals.map(\.id))
+        for (index, value) in result.enumerated() { XCTAssertTrue(value.text.contains("Paragraph \(index) ")); XCTAssertTrue(value.text.hasPrefix("  ترجمة:")); XCTAssertTrue(value.text.hasSuffix("  ")) }
+    }
+    func testPersistentMemorySurvivesNewStoreAndSeparatesPageProviderLanguageAndChangedText() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString), other = root.appendingPathComponent("other")
+        defer { try? FileManager.default.removeItem(at: root) }
+        var prefs = TranslationPreferences(); prefs.engine = .ai
+        var provider = AIProviderConfiguration(); provider.model = "one"
+        let namespace = TranslationMemory.namespace(page: "https://example.com/chapter?part=1#old", preferences: prefs, provider: provider)
+        XCTAssertEqual(namespace, TranslationMemory.namespace(page: "https://example.com/chapter?part=1#new", preferences: prefs, provider: provider))
+        let first = TranslationMemory()
+        let saved = await first.save(["A story": "قصة", "An unchanged paragraph": "فقرة ثابتة"], namespace: namespace, folder: root)
+        XCTAssertTrue(saved)
+        let reopened = TranslationMemory()
+        let items = [TranslationSegment(id: "new-dom-id", text: "A story"), TranslationSegment(id: "changed", text: "An updated story")]
+        let hits = await reopened.lookup(items, namespace: namespace, folder: root)
+        XCTAssertEqual(hits["A story"], "قصة"); XCTAssertNil(hits["An updated story"])
+        let otherProfile = await reopened.lookup(items, namespace: namespace, folder: other); XCTAssertTrue(otherProfile.isEmpty)
+        provider.model = "two"
+        let changedModel = TranslationMemory.namespace(page: "https://example.com/chapter?part=1", preferences: prefs, provider: provider)
+        XCTAssertNotEqual(namespace, changedModel)
+        let otherModel = await reopened.lookup(items, namespace: changedModel, folder: root); XCTAssertTrue(otherModel.isEmpty)
+        prefs.target = "fr"
+        XCTAssertNotEqual(namespace, TranslationMemory.namespace(page: "https://example.com/chapter?part=1", preferences: prefs, provider: provider))
+        XCTAssertNotEqual(namespace, TranslationMemory.namespace(page: "https://example.com/other", preferences: prefs, provider: provider))
+        let stats = await reopened.stats(folder: root); XCTAssertEqual(stats.entries, 2); XCTAssertLessThan(stats.bytes, TranslationMemory.maximumBytes)
+        try await reopened.clear(folder: root)
+        let cleared = await reopened.lookup(items, namespace: namespace, folder: root); XCTAssertTrue(cleared.isEmpty)
     }
     func testUnicodeChunkingPreservesEveryCharacterAndRTL() {
         let text = String(repeating: "Hello 👨‍👩‍👦 مرحبًا. \n", count: 600)
@@ -125,6 +168,77 @@ final class TranslationDataTests: XCTestCase {
         let language = try await view.evaluateJavaScript("document.documentElement.lang") as? String
         XCTAssertEqual(language, "en")
     }
+    func testRemovedAdFramesBeforeStartAndDuringApplyNeverAbortArticleTranslation() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let model = BrowserModel(profiles: ProfileStore(root: root, downloadsRoot: root.appendingPathComponent("Downloads")), useBackgroundDownloads: false)
+        model.data.settings.shieldsEnabled = false
+        var provider = AIProviderConfiguration(); provider.baseURL = "http://127.0.0.1:8765/v1"; provider.model = "fixture-translator"; model.data.settings.aiProviders = [provider]
+        var prefs = TranslationPreferences(); prefs.engine = .ai; prefs.providerID = provider.id; model.data.settings.translation = prefs
+        let tab = try XCTUnwrap(model.current); tab.url = "http://127.0.0.1:8765/translate-fixture"
+        let prepared = await model.prepare(tab), view = try XCTUnwrap(prepared); let window = try window(view)
+        defer { tab.dispose(); window.isHidden = true; try? FileManager.default.removeItem(at: root) }
+        view.load(URLRequest(url: URL(string: tab.url)!)); let page = try XCTUnwrap(tab.translation)
+        try await until { page.offered && page.observedFrameCount >= 2 }
+        _ = try await view.evaluateJavaScript("const ad=document.createElement('iframe');ad.id='temporary-ad';ad.src='/translate-frame?ad';document.body.append(ad)")
+        try await until { page.observedFrameCount >= 3 }
+        _ = try await view.evaluateJavaScript("document.querySelector('#temporary-ad').remove()")
+        page.translate(); try await until { page.translated && !page.running }
+        XCTAssertNil(page.error, "A removed frame at start must not abort the article")
+        let text = try await view.evaluateJavaScript("document.querySelector('#heading').textContent") as? String
+        XCTAssertTrue(text?.hasPrefix("ترجمة:") == true)
+        XCTAssertEqual(page.observedFrameCount, 2, "Dead frame metadata must be discarded")
+        await page.restore()
+        model.data.settings.aiProviders?[0].model = "slow-translator"
+        page.translate()
+        try await until { page.completed >= 5 && page.running }
+        _ = try await view.evaluateJavaScript("document.querySelectorAll('iframe').forEach(frame=>frame.remove())")
+        try await until { !page.running }
+        XCTAssertNil(page.error, "A frame removed while awaiting its provider response must not abort main content")
+        let direction = try await view.evaluateJavaScript("getComputedStyle(document.querySelector('#paragraph')).direction") as? String
+        XCTAssertEqual(direction, "rtl")
+        await page.restore()
+        let original = try await view.evaluateJavaScript("document.querySelector('#heading').textContent") as? String
+        XCTAssertEqual(original, "A journey beyond the mountains")
+    }
+    func testViewportPriorityAndReloadReuseSavedTranslationWithoutProviderRequests() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let model = BrowserModel(profiles: ProfileStore(root: root, downloadsRoot: root.appendingPathComponent("Downloads")), useBackgroundDownloads: false)
+        model.data.settings.shieldsEnabled = false
+        var provider = AIProviderConfiguration(); provider.baseURL = "http://127.0.0.1:8765/v1"; provider.model = "memory-" + UUID().uuidString; model.data.settings.aiProviders = [provider]
+        var prefs = TranslationPreferences(); prefs.engine = .ai; prefs.providerID = provider.id; model.data.settings.translation = prefs
+        let tab = try XCTUnwrap(model.current); tab.url = "http://127.0.0.1:8765/translate-fixture"
+        let prepared = await model.prepare(tab), view = try XCTUnwrap(prepared), window = try window(view)
+        defer { tab.dispose(); window.isHidden = true; try? FileManager.default.removeItem(at: root) }
+        view.load(URLRequest(url: URL(string: tab.url)!)); let page = try XCTUnwrap(tab.translation)
+        try await until { page.offered }
+        // The visible section is deliberately AFTER a long region in DOM order.
+        _ = try await view.evaluateJavaScript("document.body.innerHTML='<p id=before>Earlier offscreen chapter text should wait for the visible text to finish translating.</p><div style=height:3000px></div><p id=visible>Visible chapter first paragraph with enough words to detect English correctly.</p><p id=visible2>Visible chapter second paragraph belongs to the same request.</p><div style=height:3000px></div><p id=after>Later offscreen chapter text should be prefetched after the visible paragraphs.</p>';document.querySelector('#visible').scrollIntoView()")
+        let collection = try await view.callAsyncJavaScript("return zeusTranslate.collect(10000,64,true)", arguments: [:], in: nil, contentWorld: PageTranslation.world) as? [String: Any]
+        let visible = collection?["segments"] as? [[String: String]]
+        XCTAssertTrue(visible?.contains { $0["text"]?.hasPrefix("Visible chapter first") == true } == true)
+        XCTAssertTrue(visible?.contains { $0["text"]?.hasPrefix("Visible chapter second") == true } == true)
+        XCTAssertFalse(visible?.contains { $0["text"]?.hasPrefix("Earlier offscreen") == true } == true)
+        page.translate(); try await until { page.translated && !page.running }; XCTAssertNil(page.error)
+        let endpoint = URL(string: "http://127.0.0.1:8765/translation-requests?model=" + provider.model)!
+        let (beforeData, _) = try await URLSession.shared.data(from: endpoint)
+        let before = try XCTUnwrap(JSONSerialization.jsonObject(with: beforeData) as? [[String]])
+        XCTAssertTrue(before.first?.contains { $0.hasPrefix("Visible chapter first") } == true)
+        XCTAssertTrue(before.first?.contains { $0.hasPrefix("Visible chapter second") } == true)
+        // Reload the same content under a fresh document ID, with one new paragraph.
+        view.reload(); try await until { page.offered && !page.running && !page.translated && !view.isLoading }
+        _ = try await view.evaluateJavaScript("document.body.innerHTML='<p>Earlier offscreen chapter text should wait for the visible text to finish translating.</p><p>Visible chapter first paragraph with enough words to detect English correctly.</p><p>Visible chapter second paragraph belongs to the same request.</p><p>Later offscreen chapter text should be prefetched after the visible paragraphs.</p>'")
+        page.translate(); try await until { page.translated && !page.running }; XCTAssertNil(page.error); XCTAssertEqual(page.reused, 4)
+        let (afterData, _) = try await URLSession.shared.data(from: endpoint)
+        let after = try XCTUnwrap(JSONSerialization.jsonObject(with: afterData) as? [[String]])
+        XCTAssertEqual(after.count, before.count, "Reloaded text must not spend another provider request")
+        _ = try await view.evaluateJavaScript("const p=document.createElement('p');p.id='new-content';p.textContent='Only this changed paragraph may spend another request.';document.body.append(p)")
+        try await until { page.completed == 5 && !page.running }
+        let (changedData, _) = try await URLSession.shared.data(from: endpoint)
+        let changed = try XCTUnwrap(JSONSerialization.jsonObject(with: changedData) as? [[String]])
+        XCTAssertEqual(changed.count, before.count + 1); XCTAssertEqual(changed.last?.count, 1)
+        let source = try await view.evaluateJavaScript("document.querySelector('#new-content').textContent") as? String
+        XCTAssertTrue(source?.hasPrefix("ترجمة:") == true)
+    }
     func testDetectionAutomaticTranslationReaderAndNavigationReset() async throws {
         XCTAssertEqual(PageTranslation.detect(sample: "هذه فقرة عربية طويلة بما يكفي لاكتشاف اللغة بصورة صحيحة ودقيقة دون إرسالها إلى أي خادم.", hint: "en"), "ar")
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -155,4 +269,30 @@ final class TranslationDataTests: XCTestCase {
         reader.restore(); XCTAssertNil(reader.paragraphs); XCTAssertNil(reader.title)
         page.navigationStarted(); XCTAssertFalse(page.offered); XCTAssertFalse(page.running); XCTAssertFalse(page.translated)
     }
+}
+
+private final class GoogleBatchProtocol: URLProtocol {
+    private static let lock = NSLock()
+    private static var requests = 0
+    static var count: Int { lock.lock(); defer { lock.unlock() }; return requests }
+    static func reset() { lock.lock(); requests = 0; lock.unlock() }
+    override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "translate.googleapis.com" }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        Self.lock.lock(); Self.requests += 1; Self.lock.unlock()
+        do {
+            var body = request.httpBody ?? Data()
+            if body.isEmpty, let stream = request.httpBodyStream {
+                stream.open(); defer { stream.close() }; var buffer = [UInt8](repeating: 0, count: 4096)
+                while stream.hasBytesAvailable { let count = stream.read(&buffer, maxLength: buffer.count); if count <= 0 { break }; body.append(contentsOf: buffer.prefix(count)) }
+            }
+            let query = String(decoding: body, as: UTF8.self)
+            let texts = URLComponents(string: "https://example.com/?" + query)?.queryItems?.filter { $0.name == "q" }.compactMap(\.value) ?? []
+            guard request.httpMethod == "POST", request.url?.path == "/translate_a/t", !texts.isEmpty else { throw TranslationFailure.message("Invalid Google batch request") }
+            let data = try JSONSerialization.data(withJSONObject: texts.map { ["ترجمة: " + $0, "en"] })
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed); client?.urlProtocol(self, didLoad: data); client?.urlProtocolDidFinishLoading(self)
+        } catch { client?.urlProtocol(self, didFailWithError: error) }
+    }
+    override func stopLoading() { }
 }

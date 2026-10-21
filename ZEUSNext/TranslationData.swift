@@ -12,6 +12,8 @@ struct TranslationPreferences: Codable, Equatable {
     var dynamicContent = true
     var excludedHosts: [String] = []
     var providerID: UUID?
+    var retainTranslations: Bool?
+    var keepsTranslations: Bool { retainTranslations ?? true }
     static let languages = [("ar", "العربية"), ("en", "English"), ("fr", "Français"), ("es", "Español"), ("de", "Deutsch"), ("tr", "Türkçe"), ("fa", "فارسی"), ("ur", "اردو"), ("he", "עברית"), ("ru", "Русский"), ("ja", "日本語"), ("ko", "한국어"), ("zh-CN", "中文"), ("pt", "Português"), ("it", "Italiano"), ("id", "Indonesia")]
     static func rtl(_ language: String) -> Bool { ["ar", "fa", "ur", "he", "ps", "yi"].contains(language.components(separatedBy: "-")[0]) }
 }

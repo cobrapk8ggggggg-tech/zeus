@@ -1,66 +1,71 @@
 import Foundation
 
 struct TextTranslationService {
-    static func translate(_ segments: [TranslationSegment], preferences: TranslationPreferences, provider: AIProviderConfiguration?, secret: String, context: UUID) async throws -> [TranslationSegment] {
+    static func translate(_ segments: [TranslationSegment], preferences: TranslationPreferences, provider: AIProviderConfiguration?, secret: String, context: UUID, session: URLSession = AIHTTP.shared) async throws -> [TranslationSegment] {
         var flattened: [TranslationSegment] = [], keys: [String: [String]] = [:]
         for item in segments {
-            for (index, part) in split(item.text, limit: 1800).enumerated() {
+            for (index, part) in split(item.text, limit: preferences.engine == .ai ? 24000 : 1800).enumerated() {
                 let key = item.id + "_" + String(index); keys[item.id, default: []].append(key)
                 flattened.append(TranslationSegment(id: key, text: part))
             }
         }
-        var translated: [String: String] = [:], batch: [TranslationSegment] = [], size = 0
-        func perform(_ values: [TranslationSegment]) async throws {
-            let result = try await translateBatch(values, preferences: preferences, provider: provider, secret: secret, context: context)
-            let sources = Dictionary(uniqueKeysWithValues: values.map { ($0.id, $0.text) })
-            for value in result {
-                let source = sources[value.id] ?? "", leading = String(source.prefix(while: { $0.isWhitespace })), trailing = String(source.reversed().prefix(while: { $0.isWhitespace }).reversed())
-                translated[value.id] = leading + value.text.trimmingCharacters(in: .whitespacesAndNewlines) + trailing
-            }
-        }
+        let characterLimit = preferences.engine == .ai ? 24_000 : preferences.engine == .googleWeb ? 12_000 : 5000
+        let itemLimit = preferences.engine == .ai ? 256 : preferences.engine == .googleWeb ? 96 : 32
+        var batches: [[TranslationSegment]] = [], batch: [TranslationSegment] = [], size = 0
         for part in flattened {
-            if !batch.isEmpty && (size + part.text.count > 5000 || batch.count >= 32) { try await perform(batch); batch = []; size = 0 }
+            if !batch.isEmpty && (size + part.text.count > characterLimit || batch.count >= itemLimit) { batches.append(batch); batch = []; size = 0 }
             batch.append(part); size += part.text.count
         }
-        if !batch.isEmpty { try await perform(batch) }
-        return segments.map { item in TranslationSegment(id: item.id, text: (keys[item.id] ?? []).compactMap { translated[$0] }.joined()) }
+        if !batch.isEmpty { batches.append(batch) }
+        var output: [TranslationSegment] = []
+        if preferences.engine == .ai {
+            // Account chat contexts must advance in sequence.
+            for batch in batches { output += try await translateBatch(batch, preferences: preferences, provider: provider, secret: secret, context: context, session: session) }
+        } else {
+            // Google accepts an array per request. Three bounded batches can be in
+            // flight; the page receives a single complete result in its original order.
+            output = try await withThrowingTaskGroup(of: [TranslationSegment].self) { group in
+                var next = 0, values: [TranslationSegment] = []
+                while next < min(3, batches.count) {
+                    let batch = batches[next]; next += 1
+                    group.addTask { try await translateBatch(batch, preferences: preferences, provider: provider, secret: secret, context: context, session: session) }
+                }
+                while let result = try await group.next() {
+                    values += result
+                    if next < batches.count {
+                        let batch = batches[next]; next += 1
+                        group.addTask { try await translateBatch(batch, preferences: preferences, provider: provider, secret: secret, context: context, session: session) }
+                    }
+                }
+                return values
+            }
+        }
+        let translated = Dictionary(uniqueKeysWithValues: output.map { ($0.id, $0.text) })
+        let sources = Dictionary(uniqueKeysWithValues: flattened.map { ($0.id, $0.text) })
+        return segments.map { item in
+            let text = (keys[item.id] ?? []).map { key -> String in
+                let source = sources[key] ?? "", leading = String(source.prefix(while: { $0.isWhitespace })), trailing = String(source.reversed().prefix(while: { $0.isWhitespace }).reversed())
+                return leading + (translated[key] ?? "").trimmingCharacters(in: .whitespacesAndNewlines) + trailing
+            }.joined()
+            return TranslationSegment(id: item.id, text: text)
+        }
     }
 
-    private static func translateBatch(_ segments: [TranslationSegment], preferences: TranslationPreferences, provider: AIProviderConfiguration?, secret: String, context: UUID) async throws -> [TranslationSegment] {
+    private static func translateBatch(_ segments: [TranslationSegment], preferences: TranslationPreferences, provider: AIProviderConfiguration?, secret: String, context: UUID, session: URLSession) async throws -> [TranslationSegment] {
         guard !segments.isEmpty else { return [] }
         try Task.checkCancellation()
         switch preferences.engine {
         case .googleCloud:
             guard !secret.isEmpty else { throw TranslationFailure.message("أضف مفتاح Google Cloud Translation في إعدادات الترجمة، أو اختر خدمة Google للويب.") }
             let request = try AIHTTP.request(URL(string: "https://translation.googleapis.com/language/translate/v2")!, method: "POST", body: ["q": segments.map(\.text), "target": preferences.target, "format": "text"], headers: ["x-goog-api-key": secret])
-            let object = try await AIHTTP.object(request) as? [String: Any]
+            let object = try await AIHTTP.object(request, session: session) as? [String: Any]
             let rows = (object?["data"] as? [String: Any])?["translations"] as? [[String: Any]] ?? []
             guard rows.count == segments.count else { throw TranslationFailure.message("استجابة Google لا تطابق عدد النصوص؛ لم تُطبّق هذه الدفعة.") }
             return try zip(segments, rows).map { item, row in guard let translated = row["translatedText"] as? String, !translated.isEmpty else { throw TranslationFailure.message("ترجمة Google ناقصة.") }; return TranslationSegment(id: item.id, text: decodeEntities(translated)) }
         case .googleWeb:
-            // Public consumer endpoint: no scraped API keys, no cookies, no browser impersonation.
-            // Three requests at a time; callers submit bounded batches and keep a page-local cache.
-            var output: [TranslationSegment] = []
-            for start in stride(from: 0, to: segments.count, by: 3) {
-                let batch = Array(segments[start..<min(start + 3, segments.count)])
-                let values = try await withThrowingTaskGroup(of: TranslationSegment.self) { group in
-                    for item in batch { group.addTask {
-                        let parts = split(item.text, limit: 1400); var translated = ""
-                        for part in parts {
-                            let value = try await AIHTTP.object(AIHTTP.request(googleWebURL(text: part, target: preferences.target)))
-                            guard let rows = AIHTTP.nested(value, [0]) as? [[Any]], !rows.isEmpty else { throw TranslationFailure.message("تعذر قراءة رد Google للويب. جرّب Google Cloud أو مزود الذكاء الاصطناعي.") }
-                            let text = rows.compactMap { $0.first as? String }.joined()
-                            guard !text.isEmpty else { throw TranslationFailure.message("أعاد Google نصًا فارغًا؛ بقي الأصل دون تغيير.") }
-                            translated += text
-                        }
-                        return TranslationSegment(id: item.id, text: translated)
-                    } }
-                    var out: [TranslationSegment] = []; for try await item in group { out.append(item) }; return out
-                }
-                output += values
-            }
-            let table = Dictionary(uniqueKeysWithValues: output.map { ($0.id, $0.text) })
-            return segments.map { TranslationSegment(id: $0.id, text: table[$0.id] ?? $0.text) }
+            let request = googleBatchRequest(segments.map(\.text), target: preferences.target)
+            let response = try await AIHTTP.object(request, session: session)
+            return try parseGoogleBatch(response, originals: segments)
         case .ai:
             guard let provider else { throw TranslationFailure.message("أضف مزود ذكاء اصطناعي واختَره في إعدادات الترجمة أولًا.") }
             let payload = try AIHTTP.string(segments.map { ["id": $0.id, "text": $0.text] })
@@ -73,12 +78,23 @@ struct TextTranslationService {
             return try validateAIResponse(response, originals: segments)
         }
     }
-    static func googleWebURL(text: String, target: String) -> URL {
-        var c = URLComponents(string: "https://translate.googleapis.com/translate_a/single")!
-        c.queryItems = [URLQueryItem(name: "client", value: "gtx"), URLQueryItem(name: "sl", value: "auto"), URLQueryItem(name: "tl", value: target), URLQueryItem(name: "dt", value: "t"), URLQueryItem(name: "q", value: text)]
-        // Google parses query values as form data: a literal + must be percent escaped.
-        c.percentEncodedQuery = c.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
-        return c.url!
+    static func googleBatchRequest(_ texts: [String], target: String) -> URLRequest {
+        var c = URLComponents(string: "https://translate.googleapis.com/translate_a/t")!
+        c.queryItems = [URLQueryItem(name: "client", value: "gtx"), URLQueryItem(name: "sl", value: "auto"), URLQueryItem(name: "tl", value: target)]
+        var form = URLComponents(); form.queryItems = texts.map { URLQueryItem(name: "q", value: $0) }
+        var request = URLRequest(url: c.url!); request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded;charset=UTF-8", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.httpBody = Data((form.percentEncodedQuery ?? "").replacingOccurrences(of: "+", with: "%2B").utf8)
+        return request
+    }
+    static func parseGoogleBatch(_ response: Any, originals: [TranslationSegment]) throws -> [TranslationSegment] {
+        guard let rows = response as? [Any], rows.count == originals.count else { throw TranslationFailure.message("عدد نتائج دفعة Google لا يطابق النصوص؛ بقيت الصفحة الأصلية. أعد المحاولة أو اختر مزودًا آخر.") }
+        return try zip(originals, rows).map { item, value in
+            let text = (value as? String) ?? ((value as? [Any])?.first as? String)
+            guard let text, !text.isEmpty else { throw TranslationFailure.message("أعاد Google ترجمة ناقصة؛ بقي الأصل دون تغيير.") }
+            return TranslationSegment(id: item.id, text: text)
+        }
     }
     static func validateAIResponse(_ response: String, originals: [TranslationSegment]) throws -> [TranslationSegment] {
         var text = response.trimmingCharacters(in: .whitespacesAndNewlines)

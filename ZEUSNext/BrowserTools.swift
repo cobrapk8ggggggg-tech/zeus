@@ -27,7 +27,7 @@ extension BrowserModel {
         view.evaluateJavaScript(BrowserTools.reader) { [weak self] result, error in
             guard let self, self.profile.id == owner, self.current?.id == tabID else { return }
             guard let value = result as? [String: Any], let paragraphs = value["paragraphs"] as? [String], !paragraphs.isEmpty else { self.notify(error?.localizedDescription ?? "لم يُعثر على نص مناسب لوضع القراءة."); return }
-            self.article = ReaderArticle(title: value["title"] as? String ?? "القارئ", paragraphs: paragraphs)
+            self.article = ReaderArticle(title: value["title"] as? String ?? "القارئ", paragraphs: paragraphs, sourceURL: self.current?.url)
         }
     }
     func galleryMode() {

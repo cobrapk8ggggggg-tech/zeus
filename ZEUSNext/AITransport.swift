@@ -51,7 +51,7 @@ struct AIHTTP {
         for try await byte in bytes { try Task.checkCancellation(); data.append(byte); if data.count > 8_000_000 { throw TranslationFailure.message("رد المزود أكبر من الحد المسموح.") } }
         return data
     }
-    static func object(_ request: URLRequest) async throws -> Any { try json(await data(request)) }
+    static func object(_ request: URLRequest, session: URLSession = shared) async throws -> Any { try json(await data(request, session: session)) }
     static func form(_ values: [String: String]) -> Data {
         var components = URLComponents(); components.queryItems = values.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
         return Data((components.percentEncodedQuery ?? "").replacingOccurrences(of: "+", with: "%2B").utf8)

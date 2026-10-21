@@ -7,7 +7,7 @@ settings = {
     'GENERATE_INFOPLIST_FILE': 'YES', 'CODE_SIGNING_ALLOWED': 'NO',
     'CODE_SIGNING_REQUIRED': 'NO', 'TARGETED_DEVICE_FAMILY': '1,2',
     'ASSETCATALOG_COMPILER_APPICON_NAME': 'AppIcon',
-    'MARKETING_VERSION': '2.2.0', 'CURRENT_PROJECT_VERSION': '4',
+    'MARKETING_VERSION': '2.2.1', 'CURRENT_PROJECT_VERSION': '5',
     'CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]': '.zeus-ci/Simulator.entitlements',
 }
 spec = {

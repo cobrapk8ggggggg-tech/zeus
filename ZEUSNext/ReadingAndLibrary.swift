@@ -49,22 +49,29 @@ struct ReaderSheet: View {
     @State private var anchor: CGFloat = 0
     @State private var forbidden = ""
     @State private var copied = false
+    @State private var viewportHeight: CGFloat = 800
     private var prefs: ReadingPreferences { model.data.settings.reading ?? ReadingPreferences() }
-    private var paragraphs: [String] { (translation.paragraphs ?? article.paragraphs).filter { text in !prefs.blockedWords.contains { text.localizedCaseInsensitiveContains($0) } } }
+    private var rows: [(offset: Int, element: String)] { Array((translation.paragraphs ?? article.paragraphs).enumerated()).filter { row in !prefs.blockedWords.contains { row.element.localizedCaseInsensitiveContains($0) } } }
+    private var paragraphs: [String] { rows.map(\.element) }
     var body: some View {
         ZStack(alignment: .top) {
             theme.backgroundColor.ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .trailing, spacing: 25) {
                     Spacer().frame(height: 65)
-                    Text(translation.title ?? article.title).font(.system(size: prefs.fontSize + 6, weight: .bold, design: .serif)).multilineTextAlignment(.center).frame(maxWidth: .infinity).textSelection(.enabled)
+                    Text(translation.title ?? article.title).onGeometryChange(for: CGRect.self) { $0.frame(in: .named("readerViewport")) } action: { translation.observe(index: 0, rect: $0, height: viewportHeight) }.font(.system(size: prefs.fontSize + 6, weight: .bold, design: .serif)).multilineTextAlignment(.center).frame(maxWidth: .infinity).textSelection(.enabled)
                     if translation.suggested { HStack { Text("هل تريد ترجمة هذا الفصل؟"); Button("ترجمة") { translation.translate(article: article, model: model) }; Button("إخفاء") { translation.suggested = false } }.font(.subheadline).padding(12).glassSurface(16).environment(\.layoutDirection, .rightToLeft) }
                     if translation.running { HStack { ProgressView(); Text("جارٍ الترجمة · \(translation.completed) مقطع"); Button("إيقاف") { translation.cancel() } }.font(.caption) }
                     if let error = translation.error { Text(error).font(.footnote).textSelection(.enabled) }
+                    if let notice = translation.storageNotice { Text(notice).font(.footnote) }
                     Divider().overlay(theme.textColor.opacity(0.3))
-                    ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, paragraph in Text(paragraph).font(.system(size: prefs.fontSize, design: .serif)).opacity(prefs.textOpacity).lineSpacing(10).multilineTextAlignment(readerRTL ? .trailing : .leading).frame(maxWidth: .infinity, alignment: readerRTL ? .trailing : .leading).environment(\.layoutDirection, readerRTL ? .rightToLeft : .leftToRight).textSelection(.enabled) }
+                    ForEach(rows, id: \.offset) { index, paragraph in
+                        let rtl = translation.isTranslated(index + 1) ? TranslationPreferences.rtl(translation.targetLanguage) : TranslationPreferences.rtl(PageTranslation.detect(sample: article.paragraphs[index], hint: ""))
+                        Text(paragraph).font(.system(size: prefs.fontSize, design: .serif)).opacity(prefs.textOpacity).lineSpacing(10).multilineTextAlignment(rtl ? .trailing : .leading).frame(maxWidth: .infinity, alignment: rtl ? .trailing : .leading).environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight).textSelection(.enabled)
+                            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("readerViewport")) } action: { translation.observe(index: index + 1, rect: $0, height: viewportHeight) }
+                    }
                 }.padding(25).padding(.bottom, 60)
-            }.onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y } action: { _, value in
+            }.coordinateSpace(name: "readerViewport").onGeometryChange(for: CGFloat.self) { $0.size.height } action: { viewportHeight = $0 }.onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y } action: { _, value in
                 if value < 10 { controls = true; anchor = value }
                 else if abs(value - anchor) > 18 { withAnimation { controls = value < anchor }; anchor = value }
             }

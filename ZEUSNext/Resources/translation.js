@@ -28,8 +28,12 @@
     try { webkit.messageHandlers.zeusTranslation.postMessage({kind, documentID, lang: document.documentElement.lang || '', sample: sample.slice(0,3500)}); } catch (_) {}
   }
   function detect() { notify('ready'); }
-  function collect() {
+  function collect(maxCharacters = 10000, maxSegments = 64, prioritize = false) {
     const result = []; let length = 0;
+    const viewport = globalThis.visualViewport;
+    const top = viewport?.offsetTop || 0, left = viewport?.offsetLeft || 0;
+    const height = viewport?.height || innerHeight, width = viewport?.width || innerWidth;
+    const candidates = [];
     for (const node of textNodes(document.body || document.documentElement)) {
       if (!eligible(node)) continue;
       let id = ids.get(node), entry = id && nodes.get(id);
@@ -38,11 +42,28 @@
       const original = node.nodeValue;
       // Keep individual nodes intact in the DOM, but transport their sentence-sized chunks.
       if (!entry) { id = String(++serial); ids.set(node,id); entry = {node,original,translated:null}; nodes.set(id,entry); }
-      if (result.length && (length + original.length > 5500 || result.length >= 32)) break;
       if (original.length > 100000) continue; // One hostile/huge node must not exhaust memory.
-      result.push({id,text:original}); length += original.length;
+      let tier = 0, distance = 0;
+      if (prioritize) {
+        const range = document.createRange(); range.selectNodeContents(node);
+        const rects = Array.from(range.getClientRects());
+        const visible = rects.some(r => r.bottom > top && r.top < top + height && r.right > left && r.left < left + width);
+        const rect = range.getBoundingClientRect();
+        distance = Math.max(top - rect.bottom, rect.top - top - height, 0);
+        tier = visible ? 0 : distance < height * 2 ? 1 : 2;
+      }
+      candidates.push({id,text:original,tier,distance});
     }
-    return {documentID, segments:result};
+    const tier = candidates.reduce((best,c) => Math.min(best,c.tier), 3);
+    if (prioritize) candidates.sort((a,b) => a.tier - b.tier || a.distance - b.distance);
+    const characters = prioritize && tier === 0 ? Math.max(maxCharacters,24000) : maxCharacters;
+    const count = prioritize && tier === 0 ? Math.max(maxSegments,256) : maxSegments;
+    for (const entry of candidates) {
+      if (prioritize && entry.tier !== tier) break;
+      if (result.length && (length + entry.text.length > characters || result.length >= count)) break;
+      result.push({id:entry.id,text:entry.text}); length += entry.text.length;
+    }
+    return {documentID, segments:result, tier};
   }
   function directional(element) {
     if (!element || element.closest(skip)) return;
@@ -92,6 +113,8 @@
   globalThis.zeusTranslate = {collect,apply,start,restore,documentID};
   // WebKit may restore a translated DOM from its back/forward page cache without
   // reinjecting user scripts. Start that navigation from the original language.
+  let scrollTimer;
+  window.addEventListener('scroll', () => { if (!active) return; clearTimeout(scrollTimer); scrollTimer = setTimeout(() => notify('viewport'), 120); }, {passive:true});
   window.addEventListener('pageshow', event => { if (event.persisted) restore(); notify('ready'); });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',detect,{once:true}); else detect();
 })();

@@ -1,9 +1,13 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import time
 import json
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
+from threading import Lock
 import struct
 import zlib
+
+TRANSLATION_REQUESTS = {}
+TRANSLATION_LOCK = Lock()
 
 PAYLOAD = bytes(range(256)) * 4096
 
@@ -22,15 +26,21 @@ class Handler(BaseHTTPRequestHandler):
             if isinstance(prompt, list): prompt = next((p['text'] for p in prompt if p.get('type') == 'text'), '')
             if 'INPUT_JSON:' in prompt:
                 items = json.loads(prompt.split('INPUT_JSON:', 1)[1])
+                with TRANSLATION_LOCK: TRANSLATION_REQUESTS.setdefault(body.get('model', ''), []).append([x['text'] for x in items])
                 text = json.dumps([{'id': x['id'], 'text': 'ترجمة: ' + x['text']} for x in items], ensure_ascii=False)
             else: text = 'OK'
             if body.get('model') == 'broken-json': text = '[{"id":"wrong","text":"wrong"}]'
+            if body.get('model') == 'slow-translator': time.sleep(0.4)
             result = json.dumps({'choices': [{'message': {'content': text}}]}, ensure_ascii=False).encode()
             self.send_response(200); self.send_header('Content-Type', 'application/json'); self.send_header('Content-Length', str(len(result))); self.end_headers(); self.wfile.write(result)
         except Exception:
             self.send_response(400); self.end_headers()
 
     def do_GET(self):
+        if self.path.startswith('/translation-requests'):
+            model = parse_qs(urlparse(self.path).query).get('model', [''])[0]
+            with TRANSLATION_LOCK: body = json.dumps(TRANSLATION_REQUESTS.get(model, [])).encode()
+            self.send_response(200); self.send_header('Content-Type', 'application/json'); self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body); return
         if self.path.startswith('/v1/models'):
             body = b'{"data":[{"id":"fixture-translator","name":"Fixture translator"},{"id":"broken-json"}]}'
             self.send_response(200); self.send_header('Content-Type', 'application/json'); self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body); return

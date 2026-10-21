@@ -19,6 +19,8 @@ struct TranslationCard: View {
                     Spacer(minLength: 0)
                     Button { page.dismiss() } label: { Image(systemName: "xmark").padding(8) }.accessibilityLabel("إخفاء بطاقة الترجمة")
                 }
+                if page.reused > 0 { Text("\(page.reused) مقطع من الحفظ المحلي · بلا طلب جديد للمزوّد").font(.caption2).foregroundStyle(theme.secondaryTextColor) }
+                if let notice = page.storageNotice { Text(notice).font(.caption).textSelection(.enabled) }
                 if let error = page.error { Text(error).font(.caption).textSelection(.enabled).accessibilityIdentifier("translationError") }
                 HStack {
                     if page.running {
@@ -49,6 +51,8 @@ struct TranslationCard: View {
 struct TranslationSettingsPage: View {
     @ObservedObject var context: ProfileSettingsContext
     @State private var cloudKey = ""
+    @State private var savedCount = 0
+    @State private var savedBytes: Int64 = 0
     @State private var message: String?
     private var prefs: TranslationPreferences { context.settings.translation ?? TranslationPreferences() }
     var body: some View {
@@ -83,8 +87,24 @@ struct TranslationSettingsPage: View {
                     ForEach(prefs.excludedHosts, id: \.self) { host in HStack { Text(host); Spacer(); Button("إزالة") { var p = prefs; p.excludedHosts.removeAll { $0 == host }; context.settings.translation = p; context.save() } } }
                 }
             }
+            ThemedSection("حفظ الترجمة على الجهاز") {
+                Toggle("الاحتفاظ بالترجمة لتقليل استهلاك الحصة", isOn: Binding(get: { prefs.keepsTranslations }, set: { var value = prefs; value.retainTranslations = $0; context.settings.translation = value; context.save() })).accessibilityIdentifier("retainPageTranslations")
+                Text("\(savedCount) مقطع محفوظ · " + ByteCountFormatter.string(fromByteCount: savedBytes, countStyle: .file)).font(.footnote).accessibilityIdentifier("translationMemoryUsage")
+                Text("تُترجم النصوص الظاهرة أولًا كدفعة، ثم ما يقترب من الشاشة والبقية في الخلفية. عند التحديث أو إعادة فتح التطبيق تُستعاد ترجمة النص نفسه دون إرسال جديد. تغيير اللغة أو المزوّد أو النموذج أو التعليمات ينشئ حفظًا مستقلًا؛ النص المتغير وحده يُرسل مجددًا.").font(.footnote)
+                Text("حفظ مستقل لكل بروفايل، بحد 32 MB، دون انتهاء زمني. عند بلوغ الحد تُزال أقدم النتائج استخدامًا. التصفح الخاص يحتفظ بالنتيجة في الذاكرة فقط. إيقاف الحفظ لا يحذف النتائج السابقة.").font(.footnote)
+                Button("مسح الترجمات المحفوظة لهذا البروفايل", role: .destructive) {
+                    if context.isActive { for tab in context.model.tabs { tab.translation?.clearSessionCache() } }
+                    let folder = context.model.profiles.folder(for: context.profile)
+                    Task { do { try await TranslationMemory.shared.clear(folder: folder); message = "مُسحت الترجمات المحفوظة. ترجمة هذه النصوص لاحقًا ستستهلك طلبات جديدة." } catch { message = error.localizedDescription }; await refreshMemory() }
+                }.accessibilityIdentifier("clearTranslationMemory")
+                if let message { Text(message).font(.footnote) }
+            }
             ThemedSection("في الصفحة والقارئ") { Text("افتح «القراءة والعرض ← ترجمة الصفحة» من أدوات المتصفح. زر الترجمة موجود أيضًا داخل قارئ الروايات. يمكنك إيقاف العملية أو استعادة الأصل في أي وقت؛ لا تُترجم كلمات المرور أو حقول الكتابة أو الأكواد.").font(.footnote) }
-        }.settingsPage("ترجمة الصفحات").onAppear { cloudKey = AISecretVault.read(profile: context.profileID, provider: "google-cloud") }
+        }.settingsPage("ترجمة الصفحات").onAppear { cloudKey = AISecretVault.read(profile: context.profileID, provider: "google-cloud") }.task { await refreshMemory() }
+    }
+    private func refreshMemory() async {
+        let stats = await TranslationMemory.shared.stats(folder: context.model.profiles.folder(for: context.profile))
+        savedCount = stats.entries; savedBytes = stats.bytes
     }
     private func binding<T>(_ key: WritableKeyPath<TranslationPreferences,T>) -> Binding<T> {
         Binding(get: { prefs[keyPath: key] }, set: { var value = prefs; value[keyPath: key] = $0; context.settings.translation = value; context.save() })

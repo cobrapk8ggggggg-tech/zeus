@@ -31,7 +31,12 @@ final class TranslationJourneyTests: XCTestCase {
 }
 private extension XCUIElement {
     func clearAndEnter(_ text: String) {
-        tap(); let current = value as? String ?? ""
-        typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count) + text + "\n")
+        tap()
+        // The first tap can put the caret in the middle of a long URL. Moving to
+        // its trailing edge before deleting avoids leaving an invisible suffix.
+        coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.5)).tap()
+        let current = value as? String ?? ""
+        typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count + 10) + text + "\n")
+        XCTAssertEqual(value as? String, text)
     }
 }

@@ -32,7 +32,7 @@ import LocalAuthentication
 }
 
 struct BrowserNotice: Identifiable { let id = UUID(); var text: String }
-struct ReaderArticle: Identifiable { let id = UUID(); var title: String; var paragraphs: [String] }
+struct ReaderArticle: Identifiable { let id = UUID(); var title: String; var paragraphs: [String]; var sourceURL: String? = nil }
 struct GalleryArticle: Identifiable { let id = UUID(); var images: [String] }
 struct ConsoleEntry: Identifiable { let id = UUID(); var text: String; var kind: String; let date = Date() }
 struct ShareItem: Identifiable { let id = UUID(); var url: URL }

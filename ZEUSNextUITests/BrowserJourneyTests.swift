@@ -7,7 +7,8 @@ final class BrowserJourneyTests: XCTestCase {
         openToolbar(app); app.buttons["toolsButton"].tap()
         XCTAssertTrue(app.buttons["group-navigation"].waitForExistence(timeout: 5)); XCTAssertTrue(app.buttons["group-account"].exists); capture("grouped-tools")
         app.tapCoordinate(0.2, 0.6)
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.01)).press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4)))
+        let edge = app.otherElements["tabsEdge"]; XCTAssertTrue(edge.waitForExistence(timeout: 5))
+        edge.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75)).press(forDuration: 0.15, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4)))
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "originalTabsTray").firstMatch.waitForExistence(timeout: 5))
         capture("original-gray-tab-tray")
     }
@@ -24,7 +25,9 @@ final class BrowserJourneyTests: XCTestCase {
         app.buttons["avatarAlbumButton"].tap()
         XCTAssertTrue(app.otherElements["avatarAlbumPicker"].waitForExistence(timeout: 10)); XCTAssertFalse(app.navigationBars["الصور الرمزية"].exists); capture("device-album-picker")
         let photo = app.images.matching(NSPredicate(format: "label BEGINSWITH[c] 'Photo' OR label CONTAINS 'صورة'")).firstMatch
-        XCTAssertTrue(photo.waitForExistence(timeout: 10)); photo.tap()
+        XCTAssertTrue(photo.waitForExistence(timeout: 20))
+        let loaded = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: photo)
+        wait(for: [loaded], timeout: 30); photo.tap()
         let add = app.buttons.matching(NSPredicate(format: "label == 'Add' OR label == 'إضافة'")).firstMatch
         if add.waitForExistence(timeout: 2) { add.tap() }
         XCTAssertTrue(app.buttons["إزالة الصورة"].waitForExistence(timeout: 12))
