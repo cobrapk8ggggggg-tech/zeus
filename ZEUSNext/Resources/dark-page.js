@@ -2,66 +2,76 @@
   'use strict';
   if (window.__zeusDarkPage) return;
   window.__zeusDarkPage = true;
-  // Direct style properties also cover documents whose CSP rejects style tags.
-  document.documentElement.style.setProperty('background-color', '#101114', 'important');
-  document.documentElement.style.setProperty('color', '#e5e7eb', 'important');
-  document.documentElement.style.setProperty('color-scheme', 'dark', 'important');
-  const css = `
-    :root, html, body { color-scheme: dark !important; background-color:#101114 !important; color:#e5e7eb !important; }
-    *:not(img):not(video):not(canvas):not(svg):not(svg *):not(picture):not(source) {
-      background-color:#101114 !important; color:#e5e7eb !important;
-      border-color:#42464e !important; text-shadow:none !important; box-shadow:none !important;
-      -webkit-text-fill-color:currentColor !important;
+  const excluded = new Set(['IMG','VIDEO','CANVAS','SVG','PICTURE','SOURCE','STYLE','SCRIPT','LINK','IFRAME']);
+  const roots = new WeakSet(), signatures = new WeakMap();
+  const clamp = value => Math.max(0, Math.min(1, value));
+  const color = value => {
+    if (!value || value === 'transparent') return null;
+    const match = value.match(/rgba?\(([^)]+)\)/i); if (!match) return null;
+    const n = match[1].split(/[, ]+/).filter(Boolean).map(Number);
+    if (n.length < 3 || (n.length > 3 && n[3] === 0)) return null;
+    return {r:n[0], g:n[1], b:n[2], a:n[3] ?? 1};
+  };
+  const luminance = rgb => {
+    if (!rgb) return null;
+    const c = value => { value /= 255; return value <= .04045 ? value / 12.92 : Math.pow((value + .055) / 1.055, 2.4); };
+    return .2126*c(rgb.r)+.7152*c(rgb.g)+.0722*c(rgb.b);
+  };
+  const contrast = (a,b) => (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+  const rgbToHsl = rgb => {
+    const r=rgb.r/255,g=rgb.g/255,b=rgb.b/255,max=Math.max(r,g,b),min=Math.min(r,g,b),d=max-min;
+    let h=0,s=0; const l=(max+min)/2;
+    if (d) { s=d/(1-Math.abs(2*l-1)); if(max===r)h=60*(((g-b)/d)%6);else if(max===g)h=60*((b-r)/d+2);else h=60*((r-g)/d+4); }
+    return {h:h<0?h+360:h,s,l};
+  };
+  const cssColor = (h,s,l) => `hsl(${Math.round(h)} ${Math.round(clamp(s)*100)}% ${Math.round(clamp(l)*100)}%)`;
+  function pageIsAlreadyDark() {
+    const candidates=[document.documentElement,document.body,...document.querySelectorAll('main,article,section,header,nav,footer,div')];
+    let dark=0,light=0,inspected=0;
+    for(const element of candidates){
+      if(!element||inspected>=120)break; const rect=element.getBoundingClientRect();
+      if(rect.width<120||rect.height<40||rect.bottom<0||rect.top>innerHeight*1.5)continue;
+      const value=luminance(color(getComputedStyle(element).backgroundColor)); if(value==null)continue;
+      const weight=Math.min(innerWidth*innerHeight,rect.width*rect.height);
+      if(value<.22)dark+=weight;else if(value>.55)light+=weight; inspected++;
     }
-    a, a * { color:#9dc7ff !important; }
-    input, textarea, select, button, [role="button"] { background-color:#24272e !important; color:#f1f3f5 !important; color-scheme:dark !important; }
-    ::placeholder { color:#a6abb5 !important; opacity:1 !important; }
-    *::before, *::after { background-color:#101114 !important; color:inherit !important; border-color:#42464e !important; text-shadow:none !important; }
-    ::selection { background:#3c577a !important; color:white !important; }
-  `;
-  const roots = new WeakSet();
-  function inspect(element) {
-    if (!(element instanceof Element)) return;
-    // CSS image gradients can otherwise cover the forced dark background.
-    // Preserve photographs, SVG, canvas and video; never invert the page.
-    if (!['IMG','VIDEO','CANVAS','SVG','PICTURE','SOURCE','STYLE','SCRIPT','LINK'].includes(element.tagName) && !element.closest('svg')) {
-      const computed = getComputedStyle(element);
-      const luminance = value => { const numbers = value.match(/[\d.]+/g)?.map(Number); return numbers && numbers.length >= 3 ? (numbers[0]*0.2126 + numbers[1]*0.7152 + numbers[2]*0.0722)/255 : 0; };
-      // Inline !important and highly specific site rules can beat the stylesheet.
-      if (luminance(computed.backgroundColor) > 0.18) element.style.setProperty('background-color', '#101114', 'important');
-      if (luminance(computed.color) < 0.55) element.style.setProperty('color', '#e5e7eb', 'important');
-      if (computed.backgroundImage.includes('gradient(') && !computed.backgroundImage.includes('url(')) element.style.setProperty('background-image', 'none', 'important');
-    }
-    if (element.shadowRoot) install(element.shadowRoot);
+    const root=luminance(color(getComputedStyle(document.body||document.documentElement).backgroundColor));
+    return (root!=null&&root<.18)||(dark>light*1.35&&dark>innerWidth*innerHeight*.45);
   }
-  const queue = new Map(); let pending = false;
-  function schedule(node, descendants = true) {
-    if (node.nodeType !== 1) return;
-    queue.set(node, descendants || queue.get(node) === true);
-    if (pending) return;
-    pending = true;
-    requestAnimationFrame(() => {
-      pending = false;
-      for (const [node, descendants] of queue) { inspect(node); if (descendants) for (const child of node.querySelectorAll('*')) inspect(child); }
-      queue.clear();
-    });
+  const nativeDark=pageIsAlreadyDark();
+  document.documentElement.dataset.zeusDarkMode=nativeDark?'native':'converted';
+  document.documentElement.style.setProperty('color-scheme','dark','important');
+  if(nativeDark)return;
+  function nearestBackground(element){
+    for(let node=element;node;node=node.parentElement){const value=luminance(color(getComputedStyle(node).backgroundColor));if(value!=null)return value;}
+    return .02;
   }
-  function install(root) {
-    if (roots.has(root)) return;
-    roots.add(root);
-    const style = document.createElement('style'); style.dataset.zeusDark = 'true'; style.textContent = css;
-    (root === document ? document.documentElement : root).appendChild(style);
-    const observer = new MutationObserver(records => {
-      if (!style.parentNode) (root === document ? document.documentElement : root).appendChild(style);
-      for (const record of records) {
-        if (record.type === 'attributes') schedule(record.target, false);
-        else for (const node of record.addedNodes) schedule(node);
-      }
-    });
-    observer.observe(root, { childList:true, subtree:true, attributes:true, attributeFilter:['style', 'class'] });
-    for (const element of root.querySelectorAll('*')) inspect(element);
+  function transform(element){
+    if(!(element instanceof Element)||excluded.has(element.tagName)||element.closest('svg'))return;
+    const before=`${element.className}|${element.getAttribute('style')||''}`; if(signatures.get(element)===before)return;
+    const computed=getComputedStyle(element),background=color(computed.backgroundColor),foreground=color(computed.color);
+    if(background){const hsl=rgbToHsl(background);if(hsl.l>.28)element.style.setProperty('background-color',cssColor(hsl.h,Math.min(hsl.s*.55,.38),.055+(1-hsl.l)*.16),'important');}
+    const bgLum=nearestBackground(element);
+    if(foreground){const fgLum=luminance(foreground);if(contrast(fgLum,bgLum)<4.6||fgLum<.42){const hsl=rgbToHsl(foreground);element.style.setProperty('color',cssColor(hsl.h,Math.min(hsl.s,.65),Math.max(.78,1-hsl.l*.20)),'important');element.style.setProperty('-webkit-text-fill-color','currentColor','important');}}
+    const border=color(computed.borderTopColor);if(border&&luminance(border)>.32)element.style.setProperty('border-color','hsl(220 10% 30%)','important');
+    if(computed.backgroundImage.includes('gradient(')&&!computed.backgroundImage.includes('url('))element.style.setProperty('background-image','none','important');
+    if(element.shadowRoot)install(element.shadowRoot);
+    signatures.set(element,`${element.className}|${element.getAttribute('style')||''}`);
+  }
+  let pending=false;const queue=new Set();
+  function schedule(node){
+    if(!(node instanceof Element))return;queue.add(node);if(pending)return;pending=true;
+    requestAnimationFrame(()=>{pending=false;for(const element of queue){transform(element);for(const child of element.querySelectorAll('*'))transform(child);}queue.clear();});
+  }
+  function install(root){
+    if(roots.has(root))return;roots.add(root);
+    const observer=new MutationObserver(records=>{for(const record of records){if(record.type==='attributes')schedule(record.target);else for(const node of record.addedNodes)schedule(node);}});
+    observer.observe(root,{childList:true,subtree:true,attributes:true,attributeFilter:['style','class']});
+    for(const element of root.querySelectorAll('*'))transform(element);
   }
   install(document);
-  const original = Element.prototype.attachShadow;
-  Element.prototype.attachShadow = function(options) { const root = original.call(this, options); install(root); return root; };
+  document.documentElement.style.setProperty('background-color','#0e1014','important');
+  if(document.body)document.body.style.setProperty('background-color','#0e1014','important');
+  const originalAttachShadow=Element.prototype.attachShadow;
+  Element.prototype.attachShadow=function(options){const root=originalAttachShadow.call(this,options);install(root);return root;};
 })();

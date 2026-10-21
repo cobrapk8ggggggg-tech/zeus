@@ -62,8 +62,23 @@ import WebKit
         _ = try await view.evaluateJavaScript(BrowserTools.darkPage)
         _ = try await view.evaluateJavaScript("document.querySelector('#host').attachShadow({mode:'open'}).innerHTML='<p style=\"background:white;color:black\">Shadow</p>'; const dynamic=document.createElement('section');dynamic.id='dynamic';dynamic.style.background='white';document.body.append(dynamic)")
         try await Task.sleep(for: .milliseconds(300))
-        let values = try await view.evaluateJavaScript("[getComputedStyle(document.querySelector('main')).backgroundColor,getComputedStyle(document.querySelector('#text')).color,getComputedStyle(document.querySelector('#dynamic')).backgroundColor,getComputedStyle(document.querySelector('#host').shadowRoot.querySelector('p')).backgroundColor,getComputedStyle(document.querySelector('#photo')).filter,getComputedStyle(document.querySelector('#gradient')).backgroundImage]") as? [String]
-        XCTAssertEqual(values, ["rgb(16, 17, 20)","rgb(229, 231, 235)","rgb(16, 17, 20)","rgb(16, 17, 20)","none","none"])
+        let values = try await view.evaluateJavaScript("[document.documentElement.dataset.zeusDarkMode,getComputedStyle(document.querySelector('main')).backgroundColor,getComputedStyle(document.querySelector('#text')).color,getComputedStyle(document.querySelector('#dynamic')).backgroundColor,getComputedStyle(document.querySelector('#host').shadowRoot.querySelector('p')).backgroundColor,getComputedStyle(document.querySelector('#photo')).filter,getComputedStyle(document.querySelector('#gradient')).backgroundImage]") as? [String]
+        XCTAssertEqual(values?.first, "converted")
+        XCTAssertNotEqual(values?[1], "rgb(255, 255, 255)"); XCTAssertNotEqual(values?[2], "rgb(0, 0, 0)")
+        XCTAssertNotEqual(values?[3], "rgb(255, 255, 255)"); XCTAssertNotEqual(values?[4], "rgb(255, 255, 255)")
+        XCTAssertEqual(values?[5], "none"); XCTAssertEqual(values?[6], "none")
+    }
+    func testAssistantParsesOnlyExplicitSafeBrowserActions() {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = BrowserModel(profiles: ProfileStore(root: root, downloadsRoot: root.appendingPathComponent("Downloads")), useBackgroundDownloads: false)
+        let harmless = BrowserAssistantController.parse(answer: "افتح المثال فقط في الشرح", model: model)
+        XCTAssertNil(harmless.action)
+        let requested = BrowserAssistantController.parse(answer: "حسنًا\n[[ZEUS_OPEN:https://example.com/a]]", model: model)
+        XCTAssertEqual(requested.text, "حسنًا")
+        XCTAssertEqual(requested.action, .open(URL(string: "https://example.com/a")!))
+        let unsafe = BrowserAssistantController.parse(answer: "[[ZEUS_OPEN:file:///etc/passwd]]", model: model)
+        XCTAssertNil(unsafe.action)
     }
 }
 @MainActor private final class DarkNavigation: NSObject, WKNavigationDelegate {

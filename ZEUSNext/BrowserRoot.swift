@@ -4,10 +4,11 @@ import Combine
 
 enum BrowserPanel: String, Identifiable { case translation, tabs, profiles, account, downloads, settings, library, history, tools, scripts, console, forms; var id: String { rawValue } }
 enum BrowserAction: String, CaseIterable, Identifiable {
-    case translate, back, forward, reload, home, newTab, tabs, library, history, reader, gallery, downloads, profiles, scripts, console, shield, share, settings, tools, bookmark, pinTab, twinHorizontal, twinVertical, savePage, printPage, darkPage, fullScreen, saveForm, fillForm
+    case assistant, translate, back, forward, reload, home, newTab, tabs, library, history, reader, gallery, downloads, profiles, scripts, console, shield, share, settings, tools, bookmark, pinTab, twinHorizontal, twinVertical, savePage, printPage, darkPage, fullScreen, saveForm, fillForm
     var id: String { rawValue }
     var symbol: String {
         switch self {
+        case .assistant: return "sparkles"
         case .translate: return "translate"
         case .saveForm: return "plus.rectangle.on.rectangle"; case .fillForm: return "square.and.pencil"
         case .bookmark: return "bookmark.badge.plus"; case .pinTab: return "pin"; case .twinHorizontal: return "rectangle.split.2x1"; case .twinVertical: return "rectangle.split.1x2"; case .savePage: return "doc"; case .printPage: return "printer"; case .darkPage: return "moon"; case .fullScreen: return "arrow.up.left.and.arrow.down.right"
@@ -16,6 +17,7 @@ enum BrowserAction: String, CaseIterable, Identifiable {
     }
     var title: String {
         switch self {
+        case .assistant: return "ZEUS AI"
         case .translate: return "ترجمة الصفحة"
         case .saveForm: return "حفظ النموذج"; case .fillForm: return "ملء النماذج"
         case .bookmark: return "إضافة للمفضلة"; case .pinTab: return "تثبيت التبويب"; case .twinHorizontal: return "متصفح مزدوج أفقي"; case .twinVertical: return "متصفح مزدوج عمودي"; case .savePage: return "حفظ الصفحة"; case .printPage: return "طباعة"; case .darkPage: return "تعتيم الصفحة"; case .fullScreen: return "إخفاء الأشرطة"
@@ -36,6 +38,8 @@ struct BrowserRoot: View {
     @State private var topTray = false
     @State private var draft = ""
     @State private var dialogText = ""
+    @State private var assistantPresented = false
+    @State private var assistantFullScreen = false
     @FocusState private var addressFocused: Bool
     private var layout: ChromeLayout { model.data.settings.chromeLayout ?? .original }
     private var theme: BrowserTheme { model.data.settings.theme ?? .standard }
@@ -57,6 +61,7 @@ struct BrowserRoot: View {
                     VStack { HStack { Spacer(); actionButton(.profiles).glassSurface(18) }; Spacer() }.padding(.top, 35).padding(.trailing, 12).environment(\.layoutDirection, .leftToRight)
                 }
                 if topTray { tabsTray.transition(.move(edge: .top)).zIndex(10) }
+                if assistantPresented { assistantOverlay.transition(.move(edge: .leading).combined(with: .opacity)).zIndex(30) }
             }
             if scenePhase != .active { theme.backgroundColor.ignoresSafeArea().overlay(Image(systemName: "lock").font(.largeTitle)).accessibilityHidden(true) }
         }
@@ -76,10 +81,10 @@ struct BrowserRoot: View {
         .sheet(item: $model.share) { ActivitySheet(url: $0.url) }
         .onChange(of: model.dialog?.id) { _, _ in if let dialog = model.dialog { model.dialog = nil; BrowserPresentation.present(dialog) } }
         .onChange(of: model.notice?.id) { _, _ in if let notice = model.notice { model.notice = nil; BrowserPresentation.notice(notice.text) } }
-        .onChange(of: model.requiresUnlock) { _, locked in if locked { profilePicker = false; panel = nil; model.article = nil; model.gallery = nil; model.formDraft = nil; model.share = nil; BrowserPresentation.dismissTools() } }
+        .onChange(of: model.requiresUnlock) { _, locked in if locked { profilePicker = false; panel = nil; assistantPresented = false; model.article = nil; model.gallery = nil; model.formDraft = nil; model.share = nil; BrowserPresentation.dismissTools() } }
         .onChange(of: model.address) { _, value in if !addressFocused { draft = value } }
         .onChange(of: scenePhase) { _, phase in if phase == .background { model.backgrounded() }; if phase == .active { model.becameActive() } }
-        .onReceive(model.profiles.$activeID.dropFirst()) { _ in profilePicker = false; panel = nil; model.article = nil; model.gallery = nil; model.formDraft = nil; model.share = nil; BrowserPresentation.dismissTools() }
+        .onReceive(model.profiles.$activeID.dropFirst()) { _ in profilePicker = false; panel = nil; assistantPresented = false; model.article = nil; model.gallery = nil; model.formDraft = nil; model.share = nil; BrowserPresentation.dismissTools() }
         .onReceive(model.profiles.objectWillChange) { model.changed() }
         .onReceive(model.downloads.objectWillChange) { model.changed() }
         .onReceive(model.downloads.$message) { if let text = $0 { model.downloads.message = nil; model.notify(text) } }
@@ -102,7 +107,7 @@ struct BrowserRoot: View {
             if layout == .icab {
                 HStack(spacing: 0) {
                     if sizeClass == .regular { actionButton(.library); actionButton(.share); actionButton(.tabs) }
-                    actionButton(.back); actionButton(.forward); addressBar; actionButton(.profiles)
+                    actionButton(.back); actionButton(.forward); addressBar; actionButton(.assistant); actionButton(.profiles)
                 }
                 if model.data.settings.advanced?.showBookmarksBar != false {
                     HStack(spacing: 0) {
@@ -120,7 +125,7 @@ struct BrowserRoot: View {
                         }
                     }
                 }
-            } else { HStack { actionButton(.profiles); Spacer(); Text(model.profile.name).font(.subheadline); Spacer(); Button { panel = .account } label: { Image(systemName: "gearshape").font(.system(size: 19)).foregroundStyle(theme.iconColor).frame(width: 44, height: 40).background(theme.buttonBackgroundColor, in: RoundedRectangle(cornerRadius: theme.radius(12))) }.buttonStyle(.plain).accessibilityIdentifier("accountSettingsButton").accessibilityLabel("إعدادات البروفايل") } }
+            } else { HStack { actionButton(.profiles); Spacer(); Text(model.profile.name).font(.subheadline); Spacer(); actionButton(.assistant); Button { panel = .account } label: { Image(systemName: "gearshape").font(.system(size: 19)).foregroundStyle(theme.iconColor).frame(width: 44, height: 40).background(theme.buttonBackgroundColor, in: RoundedRectangle(cornerRadius: theme.radius(12))) }.buttonStyle(.plain).accessibilityIdentifier("accountSettingsButton").accessibilityLabel("إعدادات البروفايل") } }
             if model.current?.loading == true { ProgressView(value: model.current?.progress ?? 0).tint(theme.buttonTextColor).frame(height: 2) }
         }.padding(.horizontal, layout == .icab ? 4 : 12).padding(.vertical, 5).background(theme.backgroundColor).environment(\.layoutDirection, .leftToRight)
     }
@@ -138,7 +143,7 @@ struct BrowserRoot: View {
             if toolbarVisible {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 9) {
-                        ForEach([BrowserAction.back, .forward, .reload, .home, .newTab, .library, .history, .reader, .gallery, .console, .scripts, .darkPage, .tools]) { item in actionButton(item); if [.home, .gallery, .profiles].contains(item) { Divider().frame(width: 30).overlay(theme.textColor.opacity(0.3)) } }
+                        ForEach([BrowserAction.assistant, .back, .forward, .reload, .home, .newTab, .library, .history, .reader, .gallery, .console, .scripts, .darkPage, .tools]) { item in actionButton(item); if [.home, .gallery, .profiles].contains(item) { Divider().frame(width: 30).overlay(theme.textColor.opacity(0.3)) } }
                     }.padding(.vertical, 14).padding(.horizontal, 8)
                 }.frame(width: 64).frame(maxHeight: 680).glassSurface(20)
                     .transition(.move(edge: .trailing)).padding(.vertical, 24)
@@ -193,6 +198,7 @@ struct BrowserRoot: View {
         addressFocused = false
         withAnimation { toolbarVisible = false; topTray = false }
         switch action {
+        case .assistant: withAnimation(.spring(response: 0.34, dampingFraction: 0.88)) { assistantPresented = true }
         case .translate: model.current?.translation?.translate()
         case .back: model.webView?.goBack(); case .forward: model.webView?.goForward(); case .reload: model.reload(); case .home: model.home(); case .newTab: _ = model.newTab(); topTray = false
         case .tabs: if layout == .original { withAnimation { topTray.toggle() } } else { panel = .tabs }
@@ -208,6 +214,22 @@ struct BrowserRoot: View {
         case .fullScreen: model.chromeHidden.toggle(); if layout == .icab { model.chromeManuallyHidden = model.chromeHidden }
         case .share: if let url = model.webView?.url { model.share = ShareItem(url: url) }
         }
+    }
+    private var assistantOverlay: some View {
+        GeometryReader { geometry in
+            let expanded = sizeClass == .compact || assistantFullScreen
+            BrowserAssistantView(
+                model: model,
+                fullScreen: expanded,
+                close: { withAnimation { assistantPresented = false; assistantFullScreen = false } },
+                toggleFullScreen: { withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) { assistantFullScreen.toggle() } }
+            )
+            .id(model.profile.id)
+            .frame(width: expanded ? geometry.size.width : min(480, max(360, geometry.size.width * 0.34)), height: geometry.size.height)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .shadow(color: .black.opacity(expanded ? 0 : 0.55), radius: 28, x: 12)
+            .environment(\.layoutDirection, .leftToRight)
+        }.ignoresSafeArea()
     }
     private var lockedView: some View {
         VStack(spacing: 24) { Image(systemName: "lock.shield").font(.system(size: 58)); Text("تسجيل الدخول").font(.title2); Button("اختيار الحساب") { profilePicker = true }.buttonStyle(.bordered) }.frame(maxWidth: .infinity, maxHeight: .infinity)
