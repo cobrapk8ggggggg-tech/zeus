@@ -16,13 +16,11 @@
     ::selection { background:#3c577a !important; color:white !important; }
   `;
   const roots = new WeakSet();
-  const styled = new WeakSet();
   function inspect(element) {
     if (!(element instanceof Element)) return;
     // CSS image gradients can otherwise cover the forced dark background.
     // Preserve photographs, SVG, canvas and video; never invert the page.
-    if (!styled.has(element) && !['IMG','VIDEO','CANVAS','SVG','PICTURE','SOURCE','STYLE','SCRIPT','LINK'].includes(element.tagName) && !element.closest('svg')) {
-      styled.add(element);
+    if (!['IMG','VIDEO','CANVAS','SVG','PICTURE','SOURCE','STYLE','SCRIPT','LINK'].includes(element.tagName) && !element.closest('svg')) {
       const computed = getComputedStyle(element);
       const luminance = value => { const numbers = value.match(/[\d.]+/g)?.map(Number); return numbers && numbers.length >= 3 ? (numbers[0]*0.2126 + numbers[1]*0.7152 + numbers[2]*0.0722)/255 : 0; };
       // Inline !important and highly specific site rules can beat the stylesheet.
@@ -32,15 +30,15 @@
     }
     if (element.shadowRoot) install(element.shadowRoot);
   }
-  const queue = new Set(); let pending = false;
-  function schedule(node) {
+  const queue = new Map(); let pending = false;
+  function schedule(node, descendants = true) {
     if (node.nodeType !== 1) return;
-    queue.add(node);
+    queue.set(node, descendants || queue.get(node) === true);
     if (pending) return;
     pending = true;
     requestAnimationFrame(() => {
       pending = false;
-      for (const node of queue) { inspect(node); for (const child of node.querySelectorAll('*')) inspect(child); }
+      for (const [node, descendants] of queue) { inspect(node); if (descendants) for (const child of node.querySelectorAll('*')) inspect(child); }
       queue.clear();
     });
   }
@@ -51,9 +49,12 @@
     (root === document ? document.documentElement : root).appendChild(style);
     const observer = new MutationObserver(records => {
       if (!style.parentNode) (root === document ? document.documentElement : root).appendChild(style);
-      for (const record of records) for (const node of record.addedNodes) schedule(node);
+      for (const record of records) {
+        if (record.type === 'attributes') schedule(record.target, false);
+        else for (const node of record.addedNodes) schedule(node);
+      }
     });
-    observer.observe(root, { childList:true, subtree:true });
+    observer.observe(root, { childList:true, subtree:true, attributes:true, attributeFilter:['style', 'class'] });
     for (const element of root.querySelectorAll('*')) inspect(element);
   }
   install(document);

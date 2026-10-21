@@ -39,6 +39,7 @@ struct TranslationCard: View {
                 .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
                 .animation(reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.82), value: page.running)
         } }.animation(reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.82), value: page.offered)
+            .onChange(of: page.offered) { _, offered in if offered { interacted = false } }
     }
 }
 

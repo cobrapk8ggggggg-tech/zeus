@@ -86,6 +86,7 @@ struct BrowserTabCollection: View {
             if grid { LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 18) { cells } }
             else { HStack(alignment: .center, spacing: compact ? 5 : 14) { cells } }
         }
+        .padding(.vertical, 5)
         .overlayPreferenceValue(TabAnchorKey.self) { anchors in
             GeometryReader { geometry in
                 Color.clear.preference(key: TabFrameKey.self, value: anchors.mapValues { geometry[$0] })

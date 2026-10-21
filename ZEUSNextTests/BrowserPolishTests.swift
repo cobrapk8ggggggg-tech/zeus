@@ -26,6 +26,19 @@ import WebKit
         model.removeGroup(group)
         XCTAssertTrue(model.tabs.allSatisfy { $0.groupID == nil }); XCTAssertEqual(model.tabs.count, 3)
     }
+    func testManualICabHidingIgnoresScrollingAndOtherLayoutsStillReveal() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = BrowserModel(profiles: ProfileStore(root: root, downloadsRoot: root.appendingPathComponent("Downloads")), useBackgroundDownloads: false)
+        let tab = try XCTUnwrap(model.current), driver = WebDriver(model: model, tab: tab)
+        let scroll = DraggingScrollView(frame: CGRect(x: 0, y: 0, width: 400, height: 400)); scroll.contentSize = CGSize(width: 400, height: 2000)
+        model.data.settings.chromeLayout = .icab; model.chromeHidden = true; model.chromeManuallyHidden = true
+        scroll.contentOffset.y = 0; driver.scrollViewDidScroll(scroll); XCTAssertTrue(model.chromeHidden)
+        scroll.contentOffset.y = 500; driver.scrollViewDidScroll(scroll); XCTAssertTrue(model.chromeHidden)
+        model.chromeManuallyHidden = false; scroll.contentOffset.y = 0; driver.scrollViewDidScroll(scroll); XCTAssertFalse(model.chromeHidden)
+        model.data.settings.chromeLayout = .dualBars; model.chromeHidden = true; model.chromeManuallyHidden = true
+        driver.scrollViewDidScroll(scroll); XCTAssertFalse(model.chromeHidden)
+    }
     func testNewPreferencesDecodeOlderProfileAndRoundTrip() throws {
         let old = Data(#"{"fontSize":20,"textOpacity":1,"blockedWords":[],"imageScale":1,"scrollDistance":300}"#.utf8)
         var reader = try JSONDecoder().decode(ReadingPreferences.self, from: old)
@@ -57,3 +70,5 @@ import WebKit
     var done = false
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { done = true }
 }
+
+@MainActor private final class DraggingScrollView: UIScrollView { override var isDragging: Bool { true } }
