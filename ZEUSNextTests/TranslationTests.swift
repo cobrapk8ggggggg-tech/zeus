@@ -213,14 +213,10 @@ final class TranslationDataTests: XCTestCase {
         try await until { page.offered && !view.isLoading }
         // The visible section is deliberately AFTER a long region in DOM order.
         _ = try await view.evaluateJavaScript("document.body.innerHTML='<p id=before>Earlier offscreen chapter text should wait for the visible text to finish translating.</p><div style=height:3000px></div><p id=visible>Visible chapter first paragraph with enough words to detect English correctly.</p><p id=visible2>Visible chapter second paragraph belongs to the same request.</p><div style=height:3000px></div><p id=after>Later offscreen chapter text should be prefetched after the visible paragraphs.</p>';document.querySelector('#visible').scrollIntoView()")
-        // WebKit commits scrollIntoView after this JavaScript turn. Wait for
-        // layout/scroll restoration before asserting which text is on screen.
-        let geometry = try await view.callAsyncJavaScript("document.querySelector('#visible').scrollIntoView();await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));return {scroll:scrollY,top:document.querySelector('#visible').getBoundingClientRect().top,height:innerHeight}", arguments: [:], in: nil, contentWorld: .page)
-        let collection = try await view.callAsyncJavaScript("return zeusTranslate.collect(10000,64,true)", arguments: [:], in: nil, contentWorld: PageTranslation.world) as? [String: Any]
-        let visible = collection?["segments"] as? [[String: String]]
-        XCTAssertTrue(visible?.contains { $0["text"]?.hasPrefix("Visible chapter first") == true } == true, "Viewport: \(String(describing: geometry))")
-        XCTAssertTrue(visible?.contains { $0["text"]?.hasPrefix("Visible chapter second") == true } == true)
-        XCTAssertFalse(visible?.contains { $0["text"]?.hasPrefix("Earlier offscreen") == true } == true)
+        // Let native scroll/layout commit without requestAnimationFrame, which
+        // WebKit can suspend in a headless XCTest host. Assert the real provider
+        // payload below, rather than a second call mirroring collect().
+        try await Task.sleep(for: .milliseconds(150))
         page.translate(); try await until { page.translated && !page.running }; XCTAssertNil(page.error)
         let endpoint = URL(string: "http://127.0.0.1:8765/translation-requests?model=" + provider.model)!
         let (beforeData, _) = try await URLSession.shared.data(from: endpoint)
