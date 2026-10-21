@@ -65,12 +65,16 @@ struct TranslationSettingsPage: View {
                 Text("يُكتشف اختلاف لغة الصفحة على الجهاز. عند إيقاف الترجمة التلقائية تظهر البطاقة في كل صفحة أجنبية جديدة. العربية والفارسية والعبرية والأردية تُعرض باتجاه من اليمين إلى اليسار.").font(.footnote)
             }
             ThemedSection("محرك الترجمة") {
-                Picker("الخدمة", selection: binding(\.engine)) { ForEach(TranslationEngine.allCases, id: \.self) { Text($0.title).tag($0) } }
+                Picker("الخدمة", selection: binding(\.engine)) { ForEach(TranslationEngine.allCases, id: \.self) { Text($0.title).tag($0) } }.accessibilityIdentifier("translationEngine")
                 if prefs.engine == .googleWeb { Text("خدمة Google العامة دون مفتاح. غير رسمية وقد ترفض الطلبات أو تتغير؛ يمكن اختيار Cloud أو الذكاء الاصطناعي عند الحاجة.").font(.footnote) }
                 if prefs.engine == .googleCloud {
                     SecureField("مفتاح Cloud Translation API", text: $cloudKey).textInputAutocapitalization(.never).autocorrectionDisabled()
                     Button("حفظ المفتاح في Keychain") { do { try AISecretVault.save(cloudKey, profile: context.profileID, provider: "google-cloud"); message = "حُفظ المفتاح." } catch { message = error.localizedDescription } }
                     Text("واجهة Google الرسمية. يلزم تفعيل Cloud Translation API وفوترة حسابك؛ تُحتسب تكلفة النصوص لدى Google.").font(.footnote)
+                }
+                if prefs.engine == .cloudflare {
+                    NavigationLink { CloudflareTranslationSettings(context: context) } label: { Label("ربط وإعداد Cloudflare", systemImage: "cloud") }.accessibilityIdentifier("cloudflareTranslationSettings")
+                    Text("Workers AI: ترجمة بدفعات عبر خدمتك الخاصة في Cloudflare، مع استعادة النتائج المحفوظة تلقائيًا في الصفحة والقارئ.").font(.footnote)
                 }
                 if prefs.engine == .ai {
                     Picker("المزود", selection: binding(\.providerID)) {

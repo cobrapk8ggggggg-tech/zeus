@@ -12,13 +12,19 @@ actor TranslationMemory {
     struct Stats { var entries: Int; var bytes: Int64 }
     nonisolated static func namespace(page: String, preferences: TranslationPreferences, provider: AIProviderConfiguration?) -> String {
         var url = URLComponents(string: page); url?.fragment = nil
-        let identity = ["v2", url?.string ?? page, preferences.engine.rawValue, preferences.target,
+        var identity = ["v2", url?.string ?? page, preferences.engine.rawValue, preferences.target,
                         preferences.engine == .ai ? provider?.id.uuidString ?? "" : "",
                         preferences.engine == .ai ? provider?.baseURL ?? "" : "",
                         preferences.engine == .ai ? provider?.model ?? "" : "",
                         preferences.engine == .ai ? provider?.instruction ?? "" : "",
                         preferences.engine == .ai ? provider?.projectID ?? "" : "",
                         preferences.engine == .ai ? provider?.conversationID ?? "" : ""]
+        // Preserve existing Google/AI cache keys. Cloudflare account/model/style
+        // changes must never reuse another connection's paid translations.
+        if preferences.engine == .cloudflare {
+            let config = preferences.cloudflare ?? CloudflareTranslationConfiguration()
+            identity += [config.endpoint, config.accountID, config.model, config.instruction]
+        }
         return digest((try? JSONEncoder().encode(identity)) ?? Data())
     }
     nonisolated private static func digest(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }

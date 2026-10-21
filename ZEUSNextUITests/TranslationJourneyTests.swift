@@ -23,6 +23,19 @@ final class TranslationJourneyTests: XCTestCase {
         app.buttons["discoverAIProvider"].tap()
         XCTAssertTrue(app.buttons["اختبار توليد رد حقيقي"].waitForExistence(timeout: 15)); capture("ai-provider-discovered-models")
     }
+    func testCloudflareSettingsRequirePrivateConnectionAndDoNotExposeAnAccountKey() {
+        let app = launch(automatic: true)
+        let search = app.textFields["homeSearchField"]; XCTAssertTrue(search.waitForExistence(timeout: 15)); search.tap(); search.typeText("http://127.0.0.1:8765/translate-fixture\n")
+        XCTAssertTrue(app.buttons["restoreTranslationButton"].waitForExistence(timeout: 45))
+        app.buttons["خيارات الترجمة"].tap(); app.buttons["إعدادات الترجمة"].tap()
+        let engine = app.buttons["translationEngine"]; XCTAssertTrue(engine.waitForExistence(timeout: 10)); engine.tap()
+        app.buttons["Cloudflare Workers AI"].tap()
+        let settings = app.buttons["cloudflareTranslationSettings"]; XCTAssertTrue(settings.waitForExistence(timeout: 10)); settings.tap()
+        XCTAssertTrue(app.buttons["importCloudflareConnection"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.secureTextFields["cloudflareConnectionKey"].exists)
+        XCTAssertFalse(app.buttons["testCloudflareConnection"].isEnabled)
+        capture("cloudflare-private-profile-connection-rtl")
+    }
     private func launch(automatic: Bool = false) -> XCUIApplication {
         let app = XCUIApplication(); app.launchArguments = ["--uitesting", "--layout=dualBars", "--translation-fixture"]
         if automatic { app.launchArguments.append("--automatic-translation") }; app.launch(); return app

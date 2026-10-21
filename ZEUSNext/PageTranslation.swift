@@ -97,7 +97,7 @@ import NaturalLanguage
         let prefs = continuing ? sessionPreferences ?? preferences : preferences
         sessionPreferences = prefs
         let provider = model.data.settings.aiProviders?.first { $0.id == prefs.providerID }
-        let secret = AISecretVault.read(profile: tab.profileID, provider: prefs.engine == .googleCloud ? "google-cloud" : provider?.id.uuidString ?? "")
+        let secret = AISecretVault.read(profile: tab.profileID, provider: prefs.secretKey(provider: provider))
         let namespace = TranslationMemory.namespace(page: tab.webView?.url?.absoluteString ?? tab.url, preferences: prefs, provider: provider)
         let folder: URL? = prefs.keepsTranslations && !model.profile.isPrivate ? model.profiles.folder(for: model.profile) : nil
         if cacheNamespace != namespace { cache.removeAll(); cacheNamespace = namespace }

@@ -4,21 +4,22 @@ struct TextTranslationService {
     static func translate(_ segments: [TranslationSegment], preferences: TranslationPreferences, provider: AIProviderConfiguration?, secret: String, context: UUID, session: URLSession = AIHTTP.shared) async throws -> [TranslationSegment] {
         var flattened: [TranslationSegment] = [], keys: [String: [String]] = [:]
         for item in segments {
-            for (index, part) in split(item.text, limit: preferences.engine == .ai ? 24000 : 1800).enumerated() {
+            let parts = preferences.engine == .cloudflare ? splitCloudflare(item.text, limit: preferences.cloudflare?.model.contains("llama-3.3") == true ? 16000 : 24000) : split(item.text, limit: preferences.usesAIBatches ? 24000 : 1800)
+            for (index, part) in parts.enumerated() {
                 let key = item.id + "_" + String(index); keys[item.id, default: []].append(key)
                 flattened.append(TranslationSegment(id: key, text: part))
             }
         }
-        let characterLimit = preferences.engine == .ai ? 24_000 : preferences.engine == .googleWeb ? 12_000 : 5000
-        let itemLimit = preferences.engine == .ai ? 256 : preferences.engine == .googleWeb ? 96 : 32
+        let characterLimit = preferences.engine == .cloudflare && preferences.cloudflare?.model.contains("llama-3.3") == true ? 16_000 : preferences.usesAIBatches ? 24_000 : preferences.engine == .googleWeb ? 12_000 : 5000
+        let itemLimit = preferences.usesAIBatches ? 256 : preferences.engine == .googleWeb ? 96 : 32
         var batches: [[TranslationSegment]] = [], batch: [TranslationSegment] = [], size = 0
         for part in flattened {
-            if !batch.isEmpty && (size + part.text.count > characterLimit || batch.count >= itemLimit) { batches.append(batch); batch = []; size = 0 }
-            batch.append(part); size += part.text.count
+            if !batch.isEmpty && (size + units(part.text, preferences: preferences) > characterLimit || batch.count >= itemLimit) { batches.append(batch); batch = []; size = 0 }
+            batch.append(part); size += units(part.text, preferences: preferences)
         }
         if !batch.isEmpty { batches.append(batch) }
         var output: [TranslationSegment] = []
-        if preferences.engine == .ai {
+        if preferences.usesAIBatches {
             // Account chat contexts must advance in sequence.
             for batch in batches { output += try await translateBatch(batch, preferences: preferences, provider: provider, secret: secret, context: context, session: session) }
         } else {
@@ -51,10 +52,24 @@ struct TextTranslationService {
         }
     }
 
+    static func splitCloudflare(_ text: String, limit: Int) -> [String] {
+        guard text.utf16.count > limit else { return [text] }
+        var parts: [String] = [], buffer = "", size = 0
+        for character in text {
+            let length = String(character).utf16.count
+            if size + length > limit && !buffer.isEmpty { parts.append(buffer); buffer = ""; size = 0 }
+            buffer.append(character); size += length
+        }
+        if !buffer.isEmpty { parts.append(buffer) }; return parts
+    }
+    private static func units(_ text: String, preferences: TranslationPreferences) -> Int { preferences.engine == .cloudflare ? text.utf16.count : text.count }
+
     private static func translateBatch(_ segments: [TranslationSegment], preferences: TranslationPreferences, provider: AIProviderConfiguration?, secret: String, context: UUID, session: URLSession) async throws -> [TranslationSegment] {
         guard !segments.isEmpty else { return [] }
         try Task.checkCancellation()
         switch preferences.engine {
+        case .cloudflare:
+            return try await CloudflareTranslationService.translate(segments, target: preferences.target, config: preferences.cloudflare ?? CloudflareTranslationConfiguration(), secret: secret, session: session)
         case .googleCloud:
             guard !secret.isEmpty else { throw TranslationFailure.message("أضف مفتاح Google Cloud Translation في إعدادات الترجمة، أو اختر خدمة Google للويب.") }
             let request = try AIHTTP.request(URL(string: "https://translation.googleapis.com/language/translate/v2")!, method: "POST", body: ["q": segments.map(\.text), "target": preferences.target, "format": "text"], headers: ["x-goog-api-key": secret])

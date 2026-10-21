@@ -36,7 +36,7 @@ import CoreGraphics
         let prefs = model.data.settings.translation ?? TranslationPreferences(), owner = model.profile.id
         targetLanguage = prefs.target
         let provider = model.data.settings.aiProviders?.first { $0.id == prefs.providerID }
-        let secret = AISecretVault.read(profile: owner, provider: prefs.engine == .googleCloud ? "google-cloud" : provider?.id.uuidString ?? "")
+        let secret = AISecretVault.read(profile: owner, provider: prefs.secretKey(provider: provider))
         let namespace = TranslationMemory.namespace(page: article.sourceURL ?? model.current?.url ?? "reader:" + article.title, preferences: prefs, provider: provider)
         let folder: URL? = prefs.keepsTranslations && !model.profile.isPrivate ? model.profiles.folder(for: model.profile) : nil
         if namespace != cacheNamespace { cache.removeAll(); results.removeAll(); cacheNamespace = namespace }

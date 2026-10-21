@@ -1,8 +1,8 @@
 import Foundation
 import Security
 
-enum TranslationEngine: String, Codable, CaseIterable { case googleWeb, googleCloud, ai
-    var title: String { switch self { case .googleWeb: return "Google Translate — خدمة الويب"; case .googleCloud: return "Google Cloud Translation — رسمي"; case .ai: return "الذكاء الاصطناعي" } }
+enum TranslationEngine: String, Codable, CaseIterable { case googleWeb, googleCloud, ai, cloudflare
+    var title: String { switch self { case .googleWeb: return "Google Translate — خدمة الويب"; case .googleCloud: return "Google Cloud Translation — رسمي"; case .ai: return "الذكاء الاصطناعي"; case .cloudflare: return "Cloudflare Workers AI" } }
 }
 struct TranslationPreferences: Codable, Equatable {
     var engine: TranslationEngine = .googleWeb
@@ -12,8 +12,17 @@ struct TranslationPreferences: Codable, Equatable {
     var dynamicContent = true
     var excludedHosts: [String] = []
     var providerID: UUID?
+    var cloudflare: CloudflareTranslationConfiguration?
     var retainTranslations: Bool?
     var keepsTranslations: Bool { retainTranslations ?? true }
+    var usesAIBatches: Bool { engine == .ai || engine == .cloudflare }
+    func secretKey(provider: AIProviderConfiguration?) -> String {
+        switch engine {
+        case .googleCloud: return "google-cloud"
+        case .cloudflare: return "cloudflare-workers-ai"
+        default: return provider?.id.uuidString ?? ""
+        }
+    }
     static let languages = [("ar", "العربية"), ("en", "English"), ("fr", "Français"), ("es", "Español"), ("de", "Deutsch"), ("tr", "Türkçe"), ("fa", "فارسی"), ("ur", "اردو"), ("he", "עברית"), ("ru", "Русский"), ("ja", "日本語"), ("ko", "한국어"), ("zh-CN", "中文"), ("pt", "Português"), ("it", "Italiano"), ("id", "Indonesia")]
     static func rtl(_ language: String) -> Bool { ["ar", "fa", "ur", "he", "ps", "yi"].contains(language.components(separatedBy: "-")[0]) }
 }
@@ -64,4 +73,15 @@ enum AISecretVault {
         else if status != errSecSuccess { throw AccountError.keychainStatus(status) }
     }
     static func removeAll(profile: UUID) { SecItemDelete([kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "tools.zeus.ai." + profile.uuidString] as CFDictionary) }
+}
+
+// Public connection metadata only; the Workers AI token lives in AISecretVault.
+struct CloudflareTranslationConfiguration: Codable, Equatable {
+    var endpoint = CloudflareTranslationService.defaultEndpoint
+    var accountID = ""
+    var accountName = ""
+    var model = CloudflareTranslationService.defaultModel
+    var models: [AIChoice] = []
+    var instruction = ""
+    var lastChecked: Date?
 }

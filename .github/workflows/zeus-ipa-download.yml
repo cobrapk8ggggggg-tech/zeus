@@ -1,7 +1,7 @@
 name: ZEUS Next IPA download
 on:
   push:
-    branches: [feature/zeus-page-translation-20261021, fix/zeus-next-latest-build-20261020, fix/zeus-browser-stability-20261021]
+    branches: [feature/zeus-cloudflare-translation-20261021, feature/zeus-page-translation-20261021, fix/zeus-next-latest-build-20261020, fix/zeus-browser-stability-20261021]
     paths:
       - .github/workflows/zeus-ipa-download.yml
       - ZEUSNext/**
@@ -11,7 +11,7 @@ permissions:
   contents: read
 jobs:
   ipa:
-    runs-on: macos-15-intel
+    runs-on: macos-15
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
@@ -41,22 +41,22 @@ jobs:
           test -s "$app/ZEUSNext"
           mkdir -p results/Payload
           cp -R "$app" results/Payload/
-          (cd results && zip -qry ZEUS-2.2.1-unsigned.ipa Payload)
-          test -s results/ZEUS-2.2.1-unsigned.ipa
-          unzip -t results/ZEUS-2.2.1-unsigned.ipa > results/ipa-zip-test.txt
-          unzip -Z1 results/ZEUS-2.2.1-unsigned.ipa | grep -Fqx 'Payload/ZEUSNext.app/Info.plist'
-          unzip -Z1 results/ZEUS-2.2.1-unsigned.ipa | grep -Fqx 'Payload/ZEUSNext.app/ZEUSNext'
+          (cd results && zip -qry ZEUS-2.3.0-unsigned.ipa Payload)
+          test -s results/ZEUS-2.3.0-unsigned.ipa
+          unzip -t results/ZEUS-2.3.0-unsigned.ipa > results/ipa-zip-test.txt
+          unzip -Z1 results/ZEUS-2.3.0-unsigned.ipa | grep -Fqx 'Payload/ZEUSNext.app/Info.plist'
+          unzip -Z1 results/ZEUS-2.3.0-unsigned.ipa | grep -Fqx 'Payload/ZEUSNext.app/ZEUSNext'
           xcrun lipo -info "$app/ZEUSNext"
-          shasum -a 256 results/ZEUS-2.2.1-unsigned.ipa > results/ZEUS-2.2.1-unsigned.ipa.sha256
-          ls -lh results/ZEUS-2.2.1-unsigned.ipa
+          shasum -a 256 results/ZEUS-2.3.0-unsigned.ipa > results/ZEUS-2.3.0-unsigned.ipa.sha256
+          ls -lh results/ZEUS-2.3.0-unsigned.ipa
           rm -rf results/Payload
       - name: Publish verified IPA file
         uses: actions/upload-artifact@v4
         with:
           name: zeus-next-ipa
           path: |
-            results/ZEUS-2.2.1-unsigned.ipa
-            results/ZEUS-2.2.1-unsigned.ipa.sha256
+            results/ZEUS-2.3.0-unsigned.ipa
+            results/ZEUS-2.3.0-unsigned.ipa.sha256
             results/ipa-zip-test.txt
           retention-days: 14
           if-no-files-found: error
