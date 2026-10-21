@@ -36,7 +36,7 @@ struct TranslationCard: View {
                 }.font(.subheadline).buttonStyle(.borderless)
                 if !page.running && !page.translated { Text("تُرسل نصوص الصفحة إلى الخدمة المختارة عند الترجمة.").font(.caption2).foregroundStyle(theme.secondaryTextColor) }
             }.padding(15).glassSurface(22).padding(.horizontal, 14).padding(.top, 40)
-                .environment(\.layoutDirection, .rightToLeft).accessibilityIdentifier("translationSuggestionCard")
+                .environment(\.layoutDirection, .rightToLeft).accessibilityElement(children: .contain).accessibilityIdentifier("translationSuggestionCard")
                 .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
                 .animation(reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.82), value: page.running)
         } }.animation(reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.82), value: page.offered)

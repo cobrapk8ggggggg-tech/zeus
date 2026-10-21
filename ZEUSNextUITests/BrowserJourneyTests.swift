@@ -8,7 +8,7 @@ final class BrowserJourneyTests: XCTestCase {
         XCTAssertTrue(app.buttons["group-navigation"].waitForExistence(timeout: 5)); XCTAssertTrue(app.buttons["group-account"].exists); capture("grouped-tools")
         app.tapCoordinate(0.2, 0.6)
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.01)).press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4)))
-        XCTAssertTrue(app.otherElements["originalTabsTray"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "originalTabsTray").firstMatch.waitForExistence(timeout: 5))
         capture("original-gray-tab-tray")
     }
     func testDualBarsProfileWindowAndIndependentAvatarPickers() throws {
