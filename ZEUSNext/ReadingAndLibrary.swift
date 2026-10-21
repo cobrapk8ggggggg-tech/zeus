@@ -34,7 +34,7 @@ struct LibrarySheet: View {
     }
     private func matches(_ title: String, _ url: String) -> Bool { search.isEmpty || title.localizedCaseInsensitiveContains(search) || url.localizedCaseInsensitiveContains(search) }
     private func libraryRow(_ title: String, url: String, symbol: String) -> some View {
-        HStack(spacing: 13) { Image(systemName: symbol).foregroundStyle(theme.accentColor).frame(width: 26); VStack(alignment: .leading, spacing: 5) { Text(title).font(.subheadline.weight(.medium)).lineLimit(2); Text(url).font(.caption).foregroundStyle(.secondary).lineLimit(1).environment(\.layoutDirection, .leftToRight) } }.padding(.vertical, 5)
+        HStack(spacing: 13) { Image(systemName: symbol).foregroundStyle(theme.accentColor).frame(width: 26); VStack(alignment: .leading, spacing: 5) { Text(title).font(.subheadline.weight(.medium)).lineLimit(2); Text(url).font(.caption).foregroundStyle(theme.secondaryTextColor).lineLimit(1).environment(\.layoutDirection, .leftToRight) } }.padding(.vertical, 5)
     }
 }
 

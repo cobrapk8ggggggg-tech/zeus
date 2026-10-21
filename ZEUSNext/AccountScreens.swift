@@ -76,7 +76,7 @@ struct ProfilesSheet: View {
             Button { if profile.requiresPassword { password = ""; login = profile } else { attempt(profile, password: "") } } label: {
                 HStack(spacing: 14) {
                     AccountAvatar(profile: profile, store: store, size: 70)
-                    VStack(alignment: .leading, spacing: 5) { Text(profile.name).font(.headline); Text(profile.role.title).font(.caption).foregroundStyle(.secondary) }
+                    VStack(alignment: .leading, spacing: 5) { Text(profile.name).font(.headline); Text(profile.role.title).font(.caption).foregroundStyle(theme.secondaryTextColor) }
                     Spacer()
                     if profile.requiresPassword || profile.locked { Image(systemName: "lock") }
                     if !model.requiresUnlock && model.profile.id == profile.id { Image(systemName: "checkmark") }
@@ -175,7 +175,7 @@ struct AccountSettingsView: View {
                         Toggle("التنزيلات", isOn: option(\.allowDownloads)); Toggle("السكربتات", isOn: option(\.allowScripts)); Toggle("أدوات المطور", isOn: option(\.allowDeveloperTools)); Toggle("تغيير إعدادات التصفح", isOn: option(\.allowSettings))
                         TextField("صفحة البداية", text: option(\.homePage)).textInputAutocapitalization(.never).keyboardType(.URL)
                         TextField("المواقع المسموحة، نطاق في كل سطر", text: Binding(get: { options.allowedDomains.joined(separator: "\n") }, set: { profile.account = options; profile.account?.allowedDomains = $0.components(separatedBy: .whitespacesAndNewlines).filter { FilterRules.validDomain($0) } }), axis: .vertical).textInputAutocapitalization(.never).autocorrectionDisabled()
-                        Text("اترك قائمة المواقع فارغة للسماح بجميع النطاقات. قيد المواقع ينطبق على التنقلات؛ لا يعزل موارد المواقع الفرعية.").font(.caption).foregroundStyle(.secondary)
+                        Text("اترك قائمة المواقع فارغة للسماح بجميع النطاقات. قيد المواقع ينطبق على التنقلات؛ لا يعزل موارد المواقع الفرعية.").font(.caption).foregroundStyle(theme.secondaryTextColor)
                     }
                 }
                 if canAdminister && !profile.isAdmin { ThemedSection { Button("حذف الحساب وبياناته") { deleting = true } } }

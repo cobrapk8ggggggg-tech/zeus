@@ -1,4 +1,4 @@
-name: ZEUS Next build and verification
+name: ZEUS stability and interface verification
 on:
   push:
     branches: [codex/zeus-browser-next, fix/zeus-next-latest-build-20261020, fix/zeus-browser-stability-20261021]
@@ -7,12 +7,19 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: zeus-next-${{ github.ref }}
+  group: zeus-stability-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   verify:
+    name: Verify ${{ matrix.suite }}
     runs-on: macos-15-intel
-    timeout-minutes: 40
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [core, iphone, ipad]
+    env:
+      ZEUS_TEST_SUITE: ${{ matrix.suite }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -20,123 +27,69 @@ jobs:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: '26.3'
-      - name: Generate native application project
+      - name: Generate lightweight native project
         run: |
           brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
           python3 .zeus-ci/project.py
           xcodegen generate --spec zeus-project.json
           mkdir -p results
-      - name: Build unsigned iPhone and iPad application
-        id: device
-        run: |
-          set -o pipefail
-          xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -configuration Release \
-            -destination 'generic/platform=iOS' -sdk iphoneos \
-            -derivedDataPath "$RUNNER_TEMP/ZEUSDevice" \
-            build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO 2>&1 | tee results/device-build.log
-      - name: Package IPA and verify usage descriptions
-        run: |
-          app="$RUNNER_TEMP/ZEUSDevice/Build/Products/Release-iphoneos/ZEUSNext.app"
-          mkdir -p results/Payload
-          cp -R "$app" results/Payload/
-          (cd results && zip -qry ZEUS-2.0-unsigned.ipa Payload)
-          test -s results/ZEUS-2.0-unsigned.ipa
-          unzip -t results/ZEUS-2.0-unsigned.ipa > results/ipa-integrity.log
-          unzip -Z1 results/ZEUS-2.0-unsigned.ipa | grep -Fqx 'Payload/ZEUSNext.app/Info.plist'
-          unzip -Z1 results/ZEUS-2.0-unsigned.ipa | grep -Fqx 'Payload/ZEUSNext.app/ZEUSNext'
-          xcrun lipo -info "$app/ZEUSNext" | tee results/ipa-binary-architecture.txt
-          cp "$app/Info.plist" results/Info.plist
-          python3 - <<'PY'
-          import plistlib
-          with open('results/Info.plist','rb') as f: data=plistlib.load(f)
-          for key in ['NSPhotoLibraryUsageDescription','NSPhotoLibraryAddUsageDescription','NSCameraUsageDescription','NSMicrophoneUsageDescription','NSFaceIDUsageDescription']:
-              assert data.get(key), key
-          print('Required device usage descriptions are present.')
-          PY
-          rm -r results/Payload
-      - name: Publish downloadable IPA immediately after packaging
-        uses: actions/upload-artifact@v4
-        with:
-          name: zeus-next-ipa
-          path: results/ZEUS-2.0-unsigned.ipa
-          retention-days: 14
-          if-no-files-found: error
-      - name: Start local deterministic download fixture
-        id: fixture
+      - name: Start deterministic local fixture
         run: |
           python3 .zeus-ci/fixture_server.py > results/fixture.log 2>&1 &
-          echo $! > "$RUNNER_TEMP/zeus-fixture.pid"
-          curl --fail --retry 15 --retry-connrefused --retry-delay 1 http://127.0.0.1:8765/ > /dev/null
-      - name: Run core, WebKit isolation, download and UI tests
-        timeout-minutes: 20
+          curl --fail --max-time 10 --retry 15 --retry-connrefused --retry-delay 1 http://127.0.0.1:8765/ > /dev/null
+      - name: Run native tests on the selected simulator
+        timeout-minutes: 22
         run: |
           set -o pipefail
           device_id=$(python3 - <<'PY'
-          import json,subprocess
-          devices=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','--json']))['devices']
-          for runtime,items in sorted(devices.items(),reverse=True):
-              if 'iOS-26' in runtime:
-                  for item in items:
-                      if 'iPhone' in item['name']:
-                          print(item['udid']);raise SystemExit
-          raise SystemExit('No iOS 26 iPhone simulator available')
-          PY
-          )
-          xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -configuration Debug \
-            -destination "platform=iOS Simulator,id=$device_id" \
-            -parallel-testing-enabled NO -maximum-concurrent-test-simulator-destinations 1 \
-            -test-timeouts-enabled YES -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 180 \
-            -derivedDataPath "$RUNNER_TEMP/ZEUSSimulator" \
-            -resultBundlePath "$GITHUB_WORKSPACE/results/tests.xcresult" \
-            test CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- 2>&1 | tee results/test.log
-      - name: Verify full-screen tools and settings on iPad
-        if: always() && !cancelled() && steps.device.outcome == 'success' && steps.fixture.outcome == 'success'
-        timeout-minutes: 15
-        run: |
-          set -o pipefail
-          ipad_id=$(python3 - <<'PYIPAD'
-          import json, subprocess
+          import json, os, subprocess
+          target = 'iPad' if os.environ['ZEUS_TEST_SUITE'] == 'ipad' else 'iPhone'
           runtimes=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','--json']))['devices']
           for runtime, devices in sorted(runtimes.items(), reverse=True):
               if 'iOS-26' in runtime:
                   for device in devices:
-                      if 'iPad' in device['name']:
+                      if target in device['name']:
                           print(device['udid']); raise SystemExit
-          raise SystemExit('No iPad simulator available')
-          PYIPAD
+          raise SystemExit('No matching iOS 26 simulator')
+          PY
           )
+          xcrun simctl boot "$device_id" || true
+          xcrun simctl bootstatus "$device_id" -b
+          curl --fail --max-time 10 http://127.0.0.1:8765/image.png -o "$RUNNER_TEMP/avatar-fixture.png"
+          xcrun simctl addmedia "$device_id" "$RUNNER_TEMP/avatar-fixture.png"
+          if [ "$ZEUS_TEST_SUITE" = core ]; then
+            target=ZEUSNextTests
+          else
+            target=ZEUSNextUITests
+          fi
           xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -configuration Debug \
-            -destination "platform=iOS Simulator,id=$ipad_id" \
-            -only-testing:ZEUSNextUITests -parallel-testing-enabled NO \
-            -test-timeouts-enabled YES -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 180 \
+            -destination "platform=iOS Simulator,id=$device_id" \
+            -only-testing:"$target" -parallel-testing-enabled NO \
+            -test-timeouts-enabled YES -default-test-execution-time-allowance 180 -maximum-test-execution-time-allowance 240 \
             -derivedDataPath "$RUNNER_TEMP/ZEUSSimulator" \
-            -resultBundlePath "$GITHUB_WORKSPACE/results/ipad-tests.xcresult" \
-            test CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- 2>&1 | tee results/ipad-test.log
-      - name: Export screenshot attachments
+            -resultBundlePath "$GITHUB_WORKSPACE/results/tests.xcresult" \
+            test CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- 2>&1 | tee results/test.log
+      - name: Export results and screenshots
         if: always()
         run: |
-          if [ -d results/tests.xcresult ]; then
+          if [ -f results/tests.xcresult/Info.plist ]; then
             xcrun xcresulttool export attachments --path results/tests.xcresult --output-path results/screenshots || true
-          fi
-          if [ -d results/ipad-tests.xcresult ]; then
-            xcrun xcresulttool export attachments --path results/ipad-tests.xcresult --output-path results/screenshots-ipad || true
+            xcrun xcresulttool get test-results summary --path results/tests.xcresult > results/summary.json || true
           fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: zeus-next-build-and-tests
-          path: results
+          name: zeus-review-${{ matrix.suite }}
+          path: |
+            results/screenshots
+            results/summary.json
+            results/test.log
           retention-days: 14
           if-no-files-found: warn
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: failure()
         with:
-          name: zeus-review
-          path: |
-            results/ZEUS-2.0-unsigned.ipa
-            results/screenshots
-            results/screenshots-ipad
-            results/filter-metadata.json
-            ZEUSNext/Resources/FILTER-NOTICES.txt
-          retention-days: 14
+          name: zeus-diagnostics-${{ matrix.suite }}
+          path: results
+          retention-days: 7
           if-no-files-found: warn

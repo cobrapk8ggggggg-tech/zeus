@@ -23,7 +23,8 @@ struct BackupFiltersPage: View {
         }.settingsPage("القواعد الاحتياطية").fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in
             do {
                 let url = try result.get(); guard context.permitted else { return }; busy = true
-                Task { defer { busy = false }; do { try await shield.importBackup(url, profile: context.profile); message = "استُوردت القواعد وهي غير مفعّلة. شغّلها فقط إن احتجتها." } catch { message = error.localizedDescription } }
+                let owner = context.profile
+                Task { defer { busy = false }; do { try await shield.importBackup(url, profile: owner); guard context.permitted else { return }; context.settings.backupFiltersEnabled = false; context.save(reload: true); message = "استُوردت القواعد وهي غير مفعّلة. شغّلها فقط إن احتجتها." } catch { message = error.localizedDescription } }
             } catch { message = error.localizedDescription }
         }
     }

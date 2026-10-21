@@ -166,7 +166,7 @@ struct BrowserRoot: View {
                         ForEach(model.tabs) { tab in
                             ZStack(alignment: .topTrailing) {
                                 Button { model.selectTab(tab); withAnimation { topTray = false } } label: {
-                                    VStack(spacing: 10) { FirstPartyFavicon(site: Bookmark(title: tab.title, url: tab.url)).frame(width: 40, height: 40); Text(tab.title).font(.caption.bold()).lineLimit(2).multilineTextAlignment(.center).padding(.horizontal, 5) }.frame(width: 140, height: 180).foregroundStyle(model.current?.id == tab.id ? theme.selectionTextColor : theme.textColor).background(model.current?.id == tab.id ? theme.selectionColor : theme.backgroundColor.opacity(0.3), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(theme.textColor.opacity(model.current?.id == tab.id ? 1 : 0.2), lineWidth: 2))
+                                    VStack(spacing: 10) { FirstPartyFavicon(site: Bookmark(title: tab.title, url: tab.url)).frame(width: 40, height: 40); Text(tab.title).font(.caption.bold()).lineLimit(2).multilineTextAlignment(.center).padding(.horizontal, 5) }.frame(width: 140, height: 180).foregroundStyle(model.current?.id == tab.id ? theme.selectionTextColor : theme.textColor).background(model.current?.id == tab.id ? theme.selectionColor : theme.backgroundColor.opacity(0.3), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(model.current?.id == tab.id ? theme.accentColor : theme.borderColor.opacity(0.3), lineWidth: 2))
                                 }.contextMenu { Button("إضافة للمفضلة", systemImage: "star") { if model.profile.role != .guest && !tab.isHome { model.data.bookmarks.append(Bookmark(title: tab.title, url: tab.url)); model.persist() } } }
                                 Button { model.closeTab(tab) } label: { Image(systemName: "xmark.circle.fill").padding(8) }
                             }.scaleEffect(model.current?.id == tab.id ? 1.05 : 1)
@@ -175,7 +175,7 @@ struct BrowserRoot: View {
                     }.padding(.horizontal, 20)
                 }.frame(height: 200)
                 Spacer()
-            }.accessibilityIdentifier("originalTabsTray").frame(height: 300).frame(maxWidth: .infinity).background(.ultraThinMaterial).clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 30, bottomTrailingRadius: 30))
+            }.accessibilityIdentifier("originalTabsTray").frame(height: 300).frame(maxWidth: .infinity).background { if theme.style == .glass { Rectangle().fill(.ultraThinMaterial) } else { theme.surfaceColor } }.clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 30, bottomTrailingRadius: 30))
 
         }
     }

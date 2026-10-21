@@ -95,7 +95,7 @@ struct DownloadsSheet: View {
                 Image(systemName: item.state == .completed ? "doc.fill" : item.state == .failed ? "exclamationmark.arrow.trianglehead.2.clockwise.rotate.90" : "arrow.down").font(.system(size: 24, weight: .light)).foregroundStyle(item.state == .failed ? theme.textColor : theme.accentColor).frame(width: 44, height: 48)
                 VStack(alignment: .leading, spacing: 6) {
                     Text(item.filename).font(.subheadline.weight(.semibold)).lineLimit(2)
-                    Text(status(item)).font(.caption).foregroundStyle(.secondary)
+                    Text(status(item)).font(.caption).foregroundStyle(theme.secondaryTextColor)
                 }
                 Spacer(minLength: 0)
                 Menu {

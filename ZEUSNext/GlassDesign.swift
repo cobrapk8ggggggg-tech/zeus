@@ -96,7 +96,7 @@ struct PanelHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             Text(title).font(.system(size: 31, weight: .bold, design: .rounded))
-            Text(caption).font(.subheadline).foregroundStyle(.secondary)
+            Text(caption).font(.subheadline).foregroundStyle(theme.secondaryTextColor)
         }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 10)
     }
 }

@@ -87,7 +87,7 @@ struct SavedFormsPage: View {
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         NavigationStack { List {
-            ForEach(model.data.forms ?? []) { form in Button { model.fillForm(form); dismiss() } label: { VStack(alignment: .leading, spacing: 6) { Text(form.title); Text(form.origin).font(.caption).foregroundStyle(.secondary); Text("\(form.fieldCount) حقل").font(.caption2) } }.buttonStyle(.plain).contextMenu { Button("حذف") { model.deleteForm(form) } } }
+            ForEach(model.data.forms ?? []) { form in Button { model.fillForm(form); dismiss() } label: { VStack(alignment: .leading, spacing: 6) { Text(form.title); Text(form.origin).font(.caption).foregroundStyle(theme.secondaryTextColor); Text("\(form.fieldCount) حقل").font(.caption2) } }.buttonStyle(.plain).contextMenu { Button("حذف") { model.deleteForm(form) } } }
             if (model.data.forms ?? []).isEmpty { Text("لا توجد نماذج محفوظة لهذا الحساب.") }
         }.settingsPage("ملء النماذج").toolbar { Button("تم") { dismiss() } } }.tint(theme.buttonTextColor).preferredColorScheme(theme.light ? .light : .dark)
     }

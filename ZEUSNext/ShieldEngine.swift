@@ -40,6 +40,7 @@ struct FilterRules {
     private let root: URL
     private var compiled: [String: WKContentRuleList] = [:]
     private var pending: [String: Task<WKContentRuleList, Error>] = [:]
+    private var generations: [UUID: Int] = [:]
     init(root: URL = BrowserDisk.applicationRoot) {
         self.root = root
         // Earlier versions compiled a large bundle automatically. Remove only
@@ -89,6 +90,7 @@ struct FilterRules {
         let rules = Self.originalRules(settings: settings); return rules.isEmpty ? nil : try await compile(rules, profile: profile, backup: false)
     }
     private func compile(_ rules: [[String: Any]], profile: BrowserProfile, backup: Bool) async throws -> WKContentRuleList {
+        let generation = generations[profile.id, default: 0]
         let bytes = try JSONSerialization.data(withJSONObject: rules, options: [.sortedKeys])
         let digest = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
         let identifier = "zeus-v4-" + profile.id.uuidString + "-" + digest
@@ -109,7 +111,9 @@ struct FilterRules {
         }
         pending[identifier] = operation
         defer { pending.removeValue(forKey: identifier) }
-        let result = try await operation.value; compiled[identifier] = result; return result
+        let result = try await operation.value
+        guard generations[profile.id, default: 0] == generation else { WKContentRuleListStore.default().removeContentRuleList(forIdentifier: identifier) { _ in }; throw CancellationError() }
+        compiled[identifier] = result; return result
     }
     nonisolated static func validatedBackup(_ data: Data) throws -> [[String: Any]] {
         guard data.count <= 20_000_000, let rows = try JSONSerialization.jsonObject(with: data) as? [[String: Any]], !rows.isEmpty, rows.count <= 140_000,
@@ -127,7 +131,7 @@ struct FilterRules {
         status = "استُوردت الحزمة. تفعيلها اختياري من المفتاح أدناه."
     }
     func removeBackup(_ profile: BrowserProfile) { try? FileManager.default.removeItem(at: backupURL(profile)); erase(profile.id); status = "حُذفت الحزمة وكاش قواعدها؛ حجب ZEUS الأصلي مستمر" }
-    func erase(_ profile: UUID) { compiled = compiled.filter { !$0.key.contains(profile.uuidString) }; removeCachedRules { $0.contains(profile.uuidString) && ($0.hasPrefix("zeus-v2-") || $0.hasPrefix("zeus-v4-")) } }
+    func erase(_ profile: UUID) { generations[profile, default: 0] += 1; compiled = compiled.filter { !$0.key.contains(profile.uuidString) }; removeCachedRules { $0.contains(profile.uuidString) && ($0.hasPrefix("zeus-v2-") || $0.hasPrefix("zeus-v4-")) } }
     func invalidate(_ profile: UUID) { compiled = compiled.filter { !$0.key.contains(profile.uuidString) } }
     private func removeCachedRules(matching: @escaping (String) -> Bool) { WKContentRuleListStore.default().getAvailableContentRuleListIdentifiers { ids in for id in ids ?? [] where matching(id) { WKContentRuleListStore.default().removeContentRuleList(forIdentifier: id) { _ in } } } }
     func update() async { status = "الحجب الأصلي محلي ولا ينزّل قوائم تلقائيًا. يمكنك استيراد حزمة Safari JSON اختيارية." }

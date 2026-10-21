@@ -123,10 +123,10 @@ final class BrowserCoreTests: XCTestCase {
         let window = try fixtureWindow([viewA, try XCTUnwrap(viewB)]); defer { window.isHidden = true; viewA.removeFromSuperview(); viewB?.removeFromSuperview() }
         await loaderA.loadURL(URL(string: "http://127.0.0.1:8765/")!, view: viewA)
         await loaderB.loadURL(URL(string: "http://127.0.0.1:8765/")!, view: try XCTUnwrap(viewB))
-        _ = try await viewA.evaluateJavaScript("localStorage.setItem('zeus-profile-test','A')")
+        _ = try await viewA.evaluateJavaScript("localStorage.setItem('zeus-profile-test','A');true")
         let stored = try await viewA.evaluateJavaScript("localStorage.getItem('zeus-profile-test')") as? String; XCTAssertEqual(stored, "A")
-        let other = try await viewB?.evaluateJavaScript("localStorage.getItem('zeus-profile-test')")
-        XCTAssertTrue(other is NSNull)
+        let other = try await XCTUnwrap(viewB).evaluateJavaScript("localStorage.getItem('zeus-profile-test') === null") as? Bool
+        XCTAssertEqual(other, true)
         viewA.navigationDelegate = nil; viewB?.navigationDelegate = nil; viewB?.stopLoading(); viewB?.removeFromSuperview(); viewB = nil
         try await store.delete(b)
         await store.websiteDataStore(for: a).removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
@@ -162,7 +162,7 @@ final class BrowserCoreTests: XCTestCase {
         let finished = expectation(description: "blob saved")
         var fired = false
         let sub = model.downloads.$records.sink { records in if !fired && records.contains(where: { $0.state == .completed }) { fired = true; finished.fulfill() } }
-        _ = try await view.evaluateJavaScript("(()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['ZEUS blob fixture'],{type:'text/plain'}));a.download='fixture-blob.txt';document.body.appendChild(a);a.click()})()")
+        _ = try await view.evaluateJavaScript("(()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['ZEUS blob fixture'],{type:'text/plain'}));a.download='fixture-blob.txt';document.body.appendChild(a);a.click();return true})()")
         await fulfillment(of: [finished], timeout: 45); sub.cancel()
         let item = try XCTUnwrap(model.downloads.records.first { $0.state == .completed })
         let path = try XCTUnwrap(model.downloads.fileURL(item))

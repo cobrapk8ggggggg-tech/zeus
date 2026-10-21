@@ -50,7 +50,7 @@ struct SettingsSheet: View {
                 ThemedSection {
                     ForEach(SettingsCategory.allCases.filter { $0.group == group && (context.profile.account?.allowSettings != false || context.model.profile.isAdmin || [.account, .help].contains($0)) && (search.isEmpty || $0.title.localizedCaseInsensitiveContains(search)) }) { category in
                         if sizeClass == .regular {
-                            Button { selection = category } label: { categoryLabel(category) }.buttonStyle(.plain).listRowBackground(theme.backgroundColor).overlay(alignment: .leading) { if selection == category { Rectangle().fill(theme.textColor).frame(width: 2) } }
+                            Button { selection = category } label: { categoryLabel(category) }.buttonStyle(.plain).listRowBackground(theme.backgroundColor).overlay(alignment: .leading) { if selection == category { Rectangle().fill(theme.accentColor).frame(width: 2) } }
                         } else { NavigationLink(value: category) { categoryLabel(category) }.listRowBackground(theme.backgroundColor) }
                     }
                 }
@@ -110,7 +110,7 @@ struct SettingsSheet: View {
         }.settingsPage("مواقع الويب")
     }
     private var other: some View {
-        Form { ThemedSection("التطبيق") { Text("ZEUS 2.0"); Text("ألوان ومظهر مستقلان لكل حساب"); Text("SwiftUI · WebKit") }; ThemedSection("التراخيص") { NavigationLink("قوائم الحجب ومصادرها") { ScrollView { Text(Bundle.main.url(forResource: "FILTER-NOTICES", withExtension: "txt").flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? "تتوفر إشعارات قوائم الحجب مع النسخة المبنية.").font(.footnote.monospaced()).textSelection(.enabled).padding() }.background(theme.backgroundColor).navigationTitle("التراخيص") } } }.settingsPage("أخرى")
+        Form { ThemedSection("التطبيق") { Text("ZEUS 2.1"); Text("ألوان ومظهر مستقلان لكل حساب"); Text("SwiftUI · WebKit") }; ThemedSection("التراخيص") { NavigationLink("قوائم الحجب ومصادرها") { ScrollView { Text(Bundle.main.url(forResource: "FILTER-NOTICES", withExtension: "txt").flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? "الحجب الافتراضي هو محرك ZEUS الأصلي. إشعارات EasyList وEasyPrivacy ترافق الحزمة الاختيارية المنفصلة؛ راجع ترخيص مصدر أي قواعد تستوردها.").font(.footnote.monospaced()).textSelection(.enabled).padding() }.background(theme.backgroundColor).navigationTitle("التراخيص") } } }.settingsPage("أخرى")
     }
     private var help: some View {
         Form {
@@ -133,7 +133,7 @@ struct NetworkSettingsPage: View {
     var body: some View {
         Form {
             ThemedSection("هوية المتصفح") { Toggle("عرض سطح المكتب", isOn: context.setting(\.desktopMode, reload: true)); TextField("User-Agent مخصص، فارغ للهوية الأصلية", text: context.option(\.userAgent)).textInputAutocapitalization(.never).autocorrectionDisabled().onSubmit { context.save(reload: true) }; NavigationLink("الكوكيز") { CookieSettingsPage(context: context) }; Toggle("ترقية HTTP إلى HTTPS", isOn: context.option(\.upgradeHTTPS)) }
-            ThemedSection("ذاكرة الويب المؤقتة") { Text("الحجم الأقصى يديره iOS").foregroundStyle(.secondary); Button("مسح الملفات المؤقتة الآن") { Task { await context.model.profiles.websiteDataStore(for: context.profile).removeData(ofTypes: [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache, WKWebsiteDataTypeFetchCache], modifiedSince: .distantPast) } }.accessibilityIdentifier("clearCacheButton") }
+            ThemedSection("ذاكرة الويب المؤقتة") { Text("الحجم الأقصى يديره iOS").foregroundStyle(theme.secondaryTextColor); Button("مسح الملفات المؤقتة الآن") { Task { await context.model.profiles.websiteDataStore(for: context.profile).removeData(ofTypes: [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache, WKWebsiteDataTypeFetchCache], modifiedSince: .distantPast) } }.accessibilityIdentifier("clearCacheButton") }
             ThemedSection("التنزيلات") { Toggle("التنزيل عبر Wi-Fi فقط", isOn: context.option(\.downloadsWiFiOnly)); Picker("التنزيلات المتزامنة عبر Wi-Fi", selection: context.option(\.downloadsWiFiLimit)) { ForEach(1...8, id: \.self) { Text("\($0)").tag($0) } }; Picker("التنزيلات المتزامنة عبر الخلوي", selection: context.option(\.downloadsCellularLimit)) { ForEach(1...5, id: \.self) { Text("\($0)").tag($0) } }; Toggle("تأكيد قبل التنزيل", isOn: context.option(\.confirmDownloads)); Toggle("تضمين التنزيلات في نسخة iCloud الاحتياطية", isOn: context.option(\.downloadsInBackup)); if context.isActive { NavigationLink("الملفات والتنزيلات") { DownloadsSheet(model: context.model) } } }
             ThemedSection { Text("نظام iOS يتحقق من شهادات TLS. عدد التنزيلات المتزامنة يحدد الملفات النشطة؛ الاتصالات الداخلية وHTTP/2 يديرها WebKit وURLSession.").font(.footnote) }
         }.settingsPage("الشبكة")
@@ -155,9 +155,9 @@ struct CookieSettingsPage: View {
             ForEach(cookies.filter { search.isEmpty || $0.domain.localizedCaseInsensitiveContains(search) || $0.name.localizedCaseInsensitiveContains(search) }.map { CookieRow(cookie: $0) }) { row in
                 let cookie = row.cookie
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(cookie.name).font(.headline); Text(cookie.domain + cookie.path).font(.caption).foregroundStyle(.secondary)
+                    Text(cookie.name).font(.headline); Text(cookie.domain + cookie.path).font(.caption).foregroundStyle(theme.secondaryTextColor)
                     Text(revealed.contains(key(cookie)) ? cookie.value : "••••••••").font(.caption.monospaced()).textSelection(.enabled)
-                    HStack { Text(cookie.isHTTPOnly ? "HttpOnly" : "JavaScript"); Text(cookie.isSecure ? "Secure" : "HTTP"); if let expiry = cookie.expiresDate { Text(expiry, style: .date) } }.font(.caption2).foregroundStyle(.secondary)
+                    HStack { Text(cookie.isHTTPOnly ? "HttpOnly" : "JavaScript"); Text(cookie.isSecure ? "Secure" : "HTTP"); if let expiry = cookie.expiresDate { Text(expiry, style: .date) } }.font(.caption2).foregroundStyle(theme.secondaryTextColor)
                 }.padding(.vertical, 5).onTapGesture { if revealed.contains(key(cookie)) { revealed.remove(key(cookie)) } else { revealed.insert(key(cookie)) } }
                     .swipeActions { Button("حذف") { context.model.profiles.websiteDataStore(for: context.profile).httpCookieStore.delete(cookie) { Task { @MainActor in await reload() } } } }
             }.listRowBackground(theme.backgroundColor)

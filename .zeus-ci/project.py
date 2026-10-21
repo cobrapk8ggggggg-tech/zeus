@@ -7,7 +7,7 @@ settings = {
     'GENERATE_INFOPLIST_FILE': 'YES', 'CODE_SIGNING_ALLOWED': 'NO',
     'CODE_SIGNING_REQUIRED': 'NO', 'TARGETED_DEVICE_FAMILY': '1,2',
     'ASSETCATALOG_COMPILER_APPICON_NAME': 'AppIcon',
-    'MARKETING_VERSION': '2.0.0', 'CURRENT_PROJECT_VERSION': '2',
+    'MARKETING_VERSION': '2.1.0', 'CURRENT_PROJECT_VERSION': '3',
     'CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]': '.zeus-ci/Simulator.entitlements',
 }
 spec = {
@@ -22,9 +22,9 @@ spec = {
                 'UISupportedInterfaceOrientations': ['UIInterfaceOrientationPortrait', 'UIInterfaceOrientationLandscapeLeft', 'UIInterfaceOrientationLandscapeRight'],
                 'NSLocalNetworkUsageDescription': 'نقل نسخة الحساب عبر Wi-Fi بين أجهزتك عند تشغيلك المشاركة المحلية.',
                 'NSFaceIDUsageDescription': 'حماية المساحات التي تختار قفلها ببصمة الوجه.',
-                'NSCameraUsageDescription': 'استخدام الكاميرا عند طلبك من موقع داخل المتصفح.',
+                'NSCameraUsageDescription': 'التقاط صورة للبروفايل أو استخدام الكاميرا في موقع تختاره.',
                 'NSMicrophoneUsageDescription': 'استخدام الميكروفون عند طلبك من موقع داخل المتصفح.',
-                'NSPhotoLibraryUsageDescription': 'اختيار صور لرفعها إلى الموقع الذي تستخدمه.',
+                'NSPhotoLibraryUsageDescription': 'اختيار صورة للبروفايل أو رفع صور إلى الموقع الذي تستخدمه.',
                 'NSPhotoLibraryAddUsageDescription': 'إضافة الصور التي تختار حفظها إلى ألبوم الجهاز.',
                 'UIFileSharingEnabled': True, 'LSSupportsOpeningDocumentsInPlace': True,
                 'NSAppTransportSecurity': {'NSAllowsArbitraryLoads': True},

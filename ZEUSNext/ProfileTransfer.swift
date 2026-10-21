@@ -74,7 +74,7 @@ struct ProfileTransferPage: View {
         var data = context.isActive ? context.model.data : context.model.profiles.load(context.profile)
         for site in backup.data.bookmarks where !data.bookmarks.contains(where: { $0.url == site.url }) { var item = site; item.id = UUID(); data.bookmarks.append(item) }
         for script in backup.data.scripts { var item = script; item.id = UUID(); item.isActive = false; data.scripts.append(item) }
-        if importSettings { data.settings = backup.data.settings; context.settings = data.settings }
+        if importSettings { data.settings = backup.data.settings; data.settings.backupFiltersEnabled = false; context.settings = data.settings }
         if context.isActive { context.model.data = data; context.model.applySettings() } else { context.model.profiles.save(data, for: context.profile) }
         if let bytes = backup.avatar, let image = UIImage(data: bytes), let jpeg = image.jpegData(compressionQuality: 0.85) {
             do { let folder = context.model.profiles.configurationFolder(context.profile); try BrowserDisk.ensure(folder); try jpeg.write(to: folder.appendingPathComponent("avatar.jpg"), options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication]); var profile = context.profile; var account = profile.account ?? AccountOptions(); account.avatarFilename = "avatar.jpg"; profile.account = account; context.model.profiles.update(profile) } catch { message = error.localizedDescription; return }

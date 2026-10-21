@@ -15,7 +15,7 @@ struct ToolsSheet: View {
             List {
                 ThemedSection {
                     Label(model.current?.title ?? "بداية جديدة", systemImage: "sparkles").font(.headline).lineLimit(2)
-                    Text(model.currentHost).font(.caption).foregroundStyle(.secondary)
+                    Text(model.currentHost).font(.caption).foregroundStyle(theme.secondaryTextColor)
                 }
                 ThemedSection("الصفحة") {
                     Button("وضع القراءة", systemImage: "text.alignright") { afterDismiss { model.readerMode() } }
@@ -34,7 +34,7 @@ struct ToolsSheet: View {
                     Button(model.siteCompatible ? "إعادة الحماية لهذا الموقع" : "وضع توافق الموقع", systemImage: "shield.lefthalf.filled") { afterDismiss { model.toggleCompatibility() } }.disabled(model.currentHost.isEmpty)
                     Button("فتح في متصفح النظام", systemImage: "safari") { if let url = model.webView?.url, BrowserURL.isWeb(url) { UIApplication.shared.open(url) } }
                     Button("عرض باستخدام Safari داخل التطبيق", systemImage: "rectangle.on.rectangle") { if let url = model.webView?.url, BrowserURL.isWeb(url) { systemURL = ShareItem(url: url) } }
-                    if model.blockedNavigations > 0 { Text("\(model.blockedNavigations) تنقّل أو نافذة أوقفها الحاجب في هذه الجلسة").font(.caption).foregroundStyle(.secondary) }
+                    if model.blockedNavigations > 0 { Text("\(model.blockedNavigations) تنقّل أو نافذة أوقفها الحاجب في هذه الجلسة").font(.caption).foregroundStyle(theme.secondaryTextColor) }
                 } header: { Text("التوافق والحماية") } footer: { Text("بعض المواقع ترفض المتصفحات المدمجة. جلسة متصفح النظام مستقلة ولا تُنقل كوكيزها إلى البروفايل. يتيح وضع التوافق إكمال التحقق يدويًا دون تدخل الحاجب.") }.listRowBackground(BrowserRowBackground(theme: theme))
                 ThemedSection("أدوات متقدمة") {
                     Button("سكربتات هذه المساحة", systemImage: "curlybraces") { scripts = true }

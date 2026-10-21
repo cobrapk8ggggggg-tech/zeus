@@ -23,6 +23,13 @@ final class BrowserJourneyTests: XCTestCase {
         app.buttons["تم"].firstMatch.tap()
         app.buttons["avatarAlbumButton"].tap()
         XCTAssertTrue(app.otherElements["avatarAlbumPicker"].waitForExistence(timeout: 10)); XCTAssertFalse(app.navigationBars["الصور الرمزية"].exists); capture("device-album-picker")
+        let photo = app.images.matching(NSPredicate(format: "label BEGINSWITH[c] 'Photo' OR label CONTAINS 'صورة'")).firstMatch
+        XCTAssertTrue(photo.waitForExistence(timeout: 10)); photo.tap()
+        let add = app.buttons.matching(NSPredicate(format: "label == 'Add' OR label == 'إضافة'")).firstMatch
+        if add.waitForExistence(timeout: 2) { add.tap() }
+        XCTAssertTrue(app.buttons["إزالة الصورة"].waitForExistence(timeout: 12))
+        let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.otherElements["avatarAlbumPicker"])
+        wait(for: [dismissed], timeout: 8); capture("saved-device-photo-avatar")
     }
     func testThemesAndAllChromeLayouts() throws {
         let app = launch("dualBars")
