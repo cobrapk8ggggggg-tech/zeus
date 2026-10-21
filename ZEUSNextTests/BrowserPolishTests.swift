@@ -42,7 +42,7 @@ import WebKit
         let window = UIWindow(windowScene: scene); let controller = UIViewController(); window.rootViewController = controller; window.frame = scene.screen.bounds; view.frame = window.bounds; controller.view.addSubview(view); window.makeKeyAndVisible()
         defer { window.isHidden = true }
         let loaded = DarkNavigation(); view.navigationDelegate = loaded
-        view.loadHTMLString("<html><body><main style='background:white;color:black'><p id='text'>A bright article</p><div id='gradient' style='background:linear-gradient(white,yellow)'>Gradient</div><img id='photo'><div id='host'></div></main></body></html>", baseURL: nil)
+        view.loadHTMLString("<html><body><main style='background:white!important;color:black!important'><p id='text'>A bright article</p><div id='gradient' style='background:linear-gradient(white,yellow)'>Gradient</div><img id='photo'><div id='host'></div></main></body></html>", baseURL: nil)
         let deadline = Date().addingTimeInterval(20)
         while !loaded.done && Date() < deadline { try await Task.sleep(for: .milliseconds(100)) }
         XCTAssertTrue(loaded.done); XCTAssertFalse(BrowserTools.darkPage.isEmpty)

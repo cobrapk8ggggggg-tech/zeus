@@ -12,7 +12,7 @@
     a, a * { color:#9dc7ff !important; }
     input, textarea, select, button, [role="button"] { background-color:#24272e !important; color:#f1f3f5 !important; color-scheme:dark !important; }
     ::placeholder { color:#a6abb5 !important; opacity:1 !important; }
-    *::before, *::after { color:inherit !important; border-color:#42464e !important; text-shadow:none !important; }
+    *::before, *::after { background-color:#101114 !important; color:inherit !important; border-color:#42464e !important; text-shadow:none !important; }
     ::selection { background:#3c577a !important; color:white !important; }
   `;
   const roots = new WeakSet();
@@ -24,6 +24,10 @@
     if (!styled.has(element) && !['IMG','VIDEO','CANVAS','SVG','PICTURE','SOURCE','STYLE','SCRIPT','LINK'].includes(element.tagName) && !element.closest('svg')) {
       styled.add(element);
       const computed = getComputedStyle(element);
+      const luminance = value => { const numbers = value.match(/[\d.]+/g)?.map(Number); return numbers && numbers.length >= 3 ? (numbers[0]*0.2126 + numbers[1]*0.7152 + numbers[2]*0.0722)/255 : 0; };
+      // Inline !important and highly specific site rules can beat the stylesheet.
+      if (luminance(computed.backgroundColor) > 0.18) element.style.setProperty('background-color', '#101114', 'important');
+      if (luminance(computed.color) < 0.55) element.style.setProperty('color', '#e5e7eb', 'important');
       if (computed.backgroundImage.includes('gradient(') && !computed.backgroundImage.includes('url(')) element.style.setProperty('background-image', 'none', 'important');
     }
     if (element.shadowRoot) install(element.shadowRoot);
@@ -46,6 +50,7 @@
     const style = document.createElement('style'); style.dataset.zeusDark = 'true'; style.textContent = css;
     (root === document ? document.documentElement : root).appendChild(style);
     const observer = new MutationObserver(records => {
+      if (!style.parentNode) (root === document ? document.documentElement : root).appendChild(style);
       for (const record of records) for (const node of record.addedNodes) schedule(node);
     });
     observer.observe(root, { childList:true, subtree:true });

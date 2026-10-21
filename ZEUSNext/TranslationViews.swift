@@ -7,6 +7,7 @@ struct TranslationCard: View {
     let settings: () -> Void
     @Environment(\.browserTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var interacted = false
     var body: some View {
         Group { if page.offered {
             VStack(alignment: .leading, spacing: 4) {
@@ -27,8 +28,9 @@ struct TranslationCard: View {
                 if let error = page.error { Text(error).font(.caption).textSelection(.enabled).accessibilityIdentifier("translationError") }
                 if let notice = page.storageNotice { Text(notice).font(.caption) }
             }.padding(.horizontal, 12).padding(.vertical, 5).glassSurface(16).frame(maxWidth: 540).padding(.horizontal, 12).padding(.top, 12)
-                .task(id: "\(page.offered)-\(page.running)-\(page.translated)-\(page.error ?? "")") {
-                    guard page.offered, !page.running, !page.translated, page.error == nil else { return }
+                .simultaneousGesture(TapGesture().onEnded { interacted = true })
+                .task(id: "\(interacted)-\(page.offered)-\(page.running)-\(page.translated)-\(page.error ?? "")") {
+                    guard !interacted, page.offered, !page.running, !page.translated, page.error == nil else { return }
                     let seconds = page.preferences.suggestionSeconds
                     guard seconds > 0 else { return }
                     do { try await Task.sleep(for: .seconds(seconds)); guard !Task.isCancelled, !page.running, !page.translated, page.error == nil else { return }; withAnimation { page.dismiss() } } catch { }

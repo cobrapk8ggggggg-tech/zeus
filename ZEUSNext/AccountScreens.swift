@@ -271,7 +271,7 @@ struct AppearanceSettings: View {
     @ObservedObject var model: BrowserModel
     var body: some View {
         Form {
-            ThemedSection("توزيع الأشرطة") { ForEach(ChromeLayout.allCases) { layout in Button { model.data.settings.chromeLayout = layout; model.chromeHidden = false; model.persist() } label: { HStack { Text(layout.title); Spacer(); if (model.data.settings.chromeLayout ?? .original) == layout { Image(systemName: "checkmark") } } }.accessibilityIdentifier("layout-" + layout.rawValue) } }
+            ThemedSection("توزيع الأشرطة") { ForEach(ChromeLayout.allCases) { layout in Button { model.data.settings.chromeLayout = layout; model.chromeManuallyHidden = false; model.chromeHidden = false; model.persist() } label: { HStack { Text(layout.title); Spacer(); if (model.data.settings.chromeLayout ?? .original) == layout { Image(systemName: "checkmark") } } }.accessibilityIdentifier("layout-" + layout.rawValue) } }
             ThemedSection { Text("الأوامر نفسها في التوزيعات الثلاثة. في ZEUS الأصلي اسحب من اليمين للأدوات ومن الأعلى للتبويبات. الشريطان يختفيان عند التمرير للأسفل ويعودان عند التمرير للأعلى. قائمة الأدوات تتيح جميع الأوامر في كل توزيع.").font(.footnote) }
         }.scrollContentBackground(.hidden).background(theme.backgroundColor).navigationTitle("واجهة المستخدم")
     }

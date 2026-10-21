@@ -226,7 +226,7 @@ struct WebDialog: Identifiable {
         for tab in tabs { tab.dispose() }; console.removeAll(); pendingPopup = nil
         dialog?.complete(nil); dialog = nil; article = nil; gallery = nil; share = nil; formDraft = nil; temporaryFormValues.removeAll()
         if previous.isPrivate { shield.erase(previous.id); downloads.removeAll(profileID: previous.id); await profiles.clearEphemeral(previous) }
-        profiles.select(target.id); data = profiles.load(target); blockedNavigations = 0; requiresUnlock = false; chromeHidden = false; restoreTabs()
+        profiles.select(target.id); data = profiles.load(target); blockedNavigations = 0; requiresUnlock = false; chromeHidden = false; chromeManuallyHidden = false; restoreTabs()
         if let home = target.account?.homePage, home != "zeus://home", tabs.count == 1, current?.isHome == true { open(home) }
         Task { await ensureCurrentLoaded() }
     }

@@ -44,6 +44,10 @@ private struct TabAnchorKey: PreferenceKey {
     static var defaultValue: [String: Anchor<CGRect>] = [:]
     static func reduce(value: inout [String: Anchor<CGRect>], nextValue: () -> [String: Anchor<CGRect>]) { value.merge(nextValue()) { _, new in new } }
 }
+private struct TabFrameKey: PreferenceKey {
+    static var defaultValue: [String: CGRect] = [:]
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) { value.merge(nextValue()) { _, new in new } }
+}
 private struct TabToken: Identifiable {
     var id: String
     var tab: BrowserTab?
@@ -63,6 +67,7 @@ struct BrowserTabCollection: View {
     @State private var groupColor = "64A8FF"
     @State private var drawing: CGFloat = 1
     @State private var dragging: UUID?
+    @State private var frames: [String: CGRect] = [:]
     private var motion: Animation? { reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.86) }
     private var tokens: [TabToken] {
         var seen = Set<UUID>(), result: [TabToken] = []
@@ -78,23 +83,25 @@ struct BrowserTabCollection: View {
     }
     var body: some View {
         Group {
-            if grid { LazyVGrid(columns: [GridItem(.adaptive(minimum: 145), spacing: 14)], spacing: 18) { cells } }
+            if grid { LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 18) { cells } }
             else { HStack(alignment: .center, spacing: compact ? 5 : 14) { cells } }
         }
         .overlayPreferenceValue(TabAnchorKey.self) { anchors in
             GeometryReader { geometry in
+                Color.clear.preference(key: TabFrameKey.self, value: anchors.mapValues { geometry[$0] })
                 ForEach(model.groups.filter { !$0.collapsed }) { group in
                     connector(group, anchors: anchors, geometry: geometry)
                         .trim(from: 0, to: drawing).stroke(BrowserTheme.color(group.color), style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
                 }
             }.allowsHitTesting(false)
         }
+        .onPreferenceChange(TabFrameKey.self) { frames.merge($0) { _, new in new } }
         .animation(motion, value: tokens.map(\.id))
         .sheet(item: $creating) { tab in
             NavigationStack {
                 Form {
                     Section("المجلد") { TextField("اسم المجلد", text: $groupName).accessibilityIdentifier("tabGroupName"); ColorPicker("اللون", selection: Binding(get: { BrowserTheme.color(groupColor) }, set: { groupColor = BrowserTheme.hex($0) }), supportsOpacity: false) }
-                    Section { HStack { ForEach(["64A8FF", "BF86F5", "F0BB55", "63CE9E", "EF8097", "A0A0A0"], id: \.self) { color in Button { groupColor = color } label: { Circle().fill(BrowserTheme.color(color)).frame(width: 30, height: 30).overlay { if color == groupColor { Image(systemName: "checkmark").foregroundStyle(.black) } } } } }
+                    Section { HStack { ForEach(["64A8FF", "BF86F5", "F0BB55", "63CE9E", "EF8097", "A0A0A0"], id: \.self) { color in Button { groupColor = color } label: { Circle().fill(BrowserTheme.color(color)).frame(width: 30, height: 30).overlay { if color == groupColor { Image(systemName: "checkmark").foregroundStyle(.black) } } } } } }
                 }.navigationTitle("مجلد تبويبات جديد").navigationBarTitleDisplayMode(.inline)
                     .toolbar { ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { creating = nil } }; ToolbarItem(placement: .confirmationAction) { Button("إنشاء") { animateAssignment { _ = model.createGroup(name: groupName, color: groupColor, tab: tab) }; creating = nil }.accessibilityIdentifier("createTabGroup") } }
             }.environment(\.layoutDirection, .rightToLeft).presentationDetents([.height(310)]).presentationDragIndicator(.visible).browserTheme(theme)
@@ -106,23 +113,35 @@ struct BrowserTabCollection: View {
                 if let tab = token.tab { tabCell(tab) }
                 else if let group = token.group { groupCell(group) }
             }.anchorPreference(key: TabAnchorKey.self, value: .bounds) { [token.id: $0] }
-                .transition(reduceMotion ? .opacity : .asymmetric(insertion: .scale(scale: 0.05, anchor: .leading).combined(with: .opacity), removal: .scale(scale: 0.05, anchor: .leading).combined(with: .opacity)))
+                .transition(foldTransition(token))
         }
+    }
+    private func foldTransition(_ token: TabToken) -> AnyTransition {
+        guard !reduceMotion, let groupID = token.tab?.groupID, let destination = frames["g" + groupID.uuidString], let source = frames[token.id] else { return .opacity }
+        return .offset(x: destination.midX - source.midX, y: destination.midY - source.midY).combined(with: .scale(scale: 0.02)).combined(with: .opacity)
     }
     private func tabCell(_ tab: BrowserTab) -> some View {
         HStack(spacing: compact ? 7 : 0) {
             Button { model.selectTab(tab); selected() } label: {
                 Group {
-                    if compact {
+                    if grid {
+                        VStack(spacing: 0) {
+                            ZStack {
+                                if let image = tab.snapshot { Image(uiImage: image).resizable().scaledToFill() }
+                                else { theme.surfaceColor; icon(tab, size: 38) }
+                            }.frame(height: 155).clipped()
+                            HStack(spacing: 8) { icon(tab, size: 23); Text(tab.title).font(.caption.bold()).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading) }.padding(12)
+                        }.clipShape(RoundedRectangle(cornerRadius: 15))
+                    } else if compact {
                         HStack(spacing: 7) { icon(tab, size: 23); Text(tab.title).font(.caption).lineLimit(1).truncationMode(.tail).frame(maxWidth: .infinity, alignment: .leading) }.frame(width: 150)
                     } else {
-                        VStack(spacing: 14) { icon(tab, size: 38); Text(tab.title).font(.caption.bold()).lineLimit(2).multilineTextAlignment(.center).frame(maxWidth: .infinity) }.padding(10).frame(width: 115, height: 158)
+                        VStack(spacing: 14) { icon(tab, size: 38); Text(tab.title).font(.caption.bold()).lineLimit(2).multilineTextAlignment(.center).frame(maxWidth: .infinity) }.padding(10).frame(width: 140, height: 158)
                     }
                 }.contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityIdentifier("tab-" + tab.id.uuidString)
             if compact { close(tab) }
         }
-        .padding(.horizontal, compact ? 9 : 0).frame(height: compact ? 38 : 180)
+        .padding(.horizontal, compact ? 9 : 0).frame(height: compact ? 38 : grid ? 202 : 180)
         .foregroundStyle(model.current?.id == tab.id ? theme.selectionTextColor : theme.textColor)
         .background(model.current?.id == tab.id ? theme.selectionColor : theme.surfaceColor, in: RoundedRectangle(cornerRadius: compact ? 5 : 15))
         .overlay(alignment: .topTrailing) { if !compact { close(tab) } }

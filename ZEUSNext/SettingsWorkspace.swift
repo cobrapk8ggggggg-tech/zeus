@@ -81,7 +81,7 @@ struct SettingsSheet: View {
         Form {
             ThemedSection { NavigationLink { ThemeEditor(context: context) } label: { Label("الألوان والمظهر", systemImage: "paintpalette") }.accessibilityIdentifier("themeEditorButton") }
             ThemedSection("توزيع الأشرطة") {
-                ForEach(ChromeLayout.allCases) { layout in Button { context.settings.chromeLayout = layout; context.save(); context.model.chromeHidden = false } label: { HStack { Text(layout.title); Spacer(); if (context.settings.chromeLayout ?? .original) == layout { Image(systemName: "checkmark") } } }.accessibilityIdentifier("layout-" + layout.rawValue) }
+                ForEach(ChromeLayout.allCases) { layout in Button { context.settings.chromeLayout = layout; context.save(); context.model.chromeManuallyHidden = false; context.model.chromeHidden = false } label: { HStack { Text(layout.title); Spacer(); if (context.settings.chromeLayout ?? .original) == layout { Image(systemName: "checkmark") } } }.accessibilityIdentifier("layout-" + layout.rawValue) }
             }
             ThemedSection("الأشرطة") { Toggle("إخفاء الأشرطة عند التمرير", isOn: context.option(\.hideChromeOnScroll)); Toggle("شريط المفضلة في توزيع iCab", isOn: context.option(\.showBookmarksBar)); Toggle("شريط التبويبات في توزيع iCab", isOn: context.option(\.showTabsBar)); Toggle("السحب للتنقل بين الصفحات", isOn: context.option(\.swipeNavigation, reload: true)) }
             ThemedSection { Text("في ZEUS الأصلي: اسحب من اليمين للأدوات، ومن الأعلى للتبويبات. الأوامر نفسها متاحة في التوزيعات الثلاثة. الواجهة سوداء والأيقونات والنصوص بيضاء.").font(.footnote) }

@@ -45,6 +45,9 @@ final class BrowserAppDelegate: NSObject, UIApplicationDelegate {
                 _ = model.newTab(); model.current?.title = "التبويب الثاني"
                 _ = model.newTab(); model.current?.title = "التبويب الثالث"
             }
+            if CommandLine.arguments.contains("--reader-polish-fixture") {
+                model.article = ReaderArticle(title: "ليلة في المكتبة", paragraphs: ["في هدوء الليل تبدأ حكاية جديدة، وتظهر الكلمات بمحاذاة اليمين.", "A new story begins tonight. English paragraphs share the same right aligned reading layout."])
+            }
             _browser = StateObject(wrappedValue: model)
         } else { _browser = StateObject(wrappedValue: BrowserModel()) }
     }

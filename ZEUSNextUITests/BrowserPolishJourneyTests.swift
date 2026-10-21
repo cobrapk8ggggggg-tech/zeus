@@ -17,5 +17,13 @@ final class BrowserPolishJourneyTests: XCTestCase {
         tabs.element(boundBy: 0).press(forDuration: 0.6, thenDragTo: tabs.element(boundBy: 2))
         XCTAssertEqual(tabs.count, 3); capture("icab-tab-drag")
     }
+    func testReaderAppearancePanel() {
+        let app = XCUIApplication(); app.launchArguments = ["--uitesting", "--reader-polish-fixture"]; app.launch()
+        let settings = app.buttons["readerAppearanceButton"]; XCTAssertTrue(settings.waitForExistence(timeout: 15)); capture("reader-right-aligned")
+        settings.tap()
+        XCTAssertTrue(app.buttons["readerFontPicker"].waitForExistence(timeout: 5)); capture("reader-appearance-sheet")
+        app.swipeUp()
+        let black = app.buttons["أسود"]; XCTAssertTrue(black.waitForExistence(timeout: 5)); black.tap(); capture("reader-black-theme")
+    }
     private func capture(_ name: String) { let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment) }
 }

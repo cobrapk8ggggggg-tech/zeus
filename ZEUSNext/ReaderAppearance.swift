@@ -29,7 +29,7 @@ struct ReaderAppearanceSheet: View {
                             .font(prefs.readerFont(size: prefs.fontSize)).opacity(prefs.textOpacity).multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading)
                     }.foregroundStyle(prefs.readerText).padding(22).background(prefs.readerBackground, in: RoundedRectangle(cornerRadius: 22)).overlay(RoundedRectangle(cornerRadius: 22).stroke(.white.opacity(0.12)))
                     card("الخط والنص", "textformat") {
-                        Picker("الخط", selection: Binding(get: { prefs.fontName ?? "system" }, set: { update { $0.fontName = $1 }($0) })) {
+                        Picker("الخط", selection: Binding(get: { prefs.fontName ?? "system" }, set: { var p = prefs; p.fontName = $0; save(p) })) {
                             Text("خط النظام").tag("system"); Text("جيزة — عربي").tag("GeezaPro"); Text("دمشق — عربي").tag("Damascus"); Text("Arial").tag("Arial"); Text("Serif").tag("serif")
                         }.accessibilityIdentifier("readerFontPicker")
                         HStack { Text("حجم الخط"); Spacer(); Text("\(Int(prefs.fontSize))").monospacedDigit() }
@@ -65,5 +65,4 @@ struct ReaderAppearanceSheet: View {
     private func save(_ p: ReadingPreferences) { model.data.settings.reading = p; model.persist() }
     private func number(_ key: WritableKeyPath<ReadingPreferences, Double>) -> Binding<Double> { Binding(get: { prefs[keyPath: key] }, set: { var p = prefs; p[keyPath: key] = $0; save(p) }) }
     private func color(_ key: WritableKeyPath<ReadingPreferences, String?>, fallback: String) -> Binding<Color> { Binding(get: { BrowserTheme.color(prefs[keyPath: key] ?? fallback) }, set: { var p = prefs; p[keyPath: key] = BrowserTheme.hex($0); save(p) }) }
-    private func update(_ change: @escaping (inout ReadingPreferences, String) -> Void) -> (String) -> Void { { value in var p = prefs; change(&p, value); save(p) } }
 }
