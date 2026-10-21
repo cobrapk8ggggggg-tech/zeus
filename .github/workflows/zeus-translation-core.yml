@@ -9,6 +9,8 @@ permissions:
 concurrency:
   group: zeus-translation-ipad-core-${{ github.ref }}
   cancel-in-progress: true
+# Run native assertions independently of the longer camera/album UI suites.
+# App sources match the IPA build; WebKit viewport tests await committed layout.
 jobs:
   verify:
     name: Verify browser and translation core on iPad
