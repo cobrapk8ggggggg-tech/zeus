@@ -31,7 +31,10 @@ struct TranslationCard: View {
                     Menu {
                         Button("إعدادات الترجمة", systemImage: "gearshape") { settings() }
                         Button("عدم الترجمة لهذا الموقع", systemImage: "globe.badge.chevron.backward") { page.excludeSite() }
-                        if page.translated { Button("استعادة الأصل") { Task { await page.restore() } } }
+                        if page.translated {
+                            Button("استعادة الأصل") { Task { await page.restore() } }
+                            Button("إعادة الترجمة بالإعدادات الحالية") { Task { await page.restore(); page.translate() } }
+                        }
                     } label: { Image(systemName: "ellipsis.circle").padding(6) }.accessibilityLabel("خيارات الترجمة")
                 }.font(.subheadline).buttonStyle(.borderless)
                 if !page.running && !page.translated { Text("تُرسل نصوص الصفحة إلى الخدمة المختارة عند الترجمة.").font(.caption2).foregroundStyle(theme.secondaryTextColor) }

@@ -90,5 +90,8 @@
   });
   observer.observe(document.documentElement,{childList:true,subtree:true,characterData:true});
   globalThis.zeusTranslate = {collect,apply,start,restore,documentID};
+  // WebKit may restore a translated DOM from its back/forward page cache without
+  // reinjecting user scripts. Start that navigation from the original language.
+  window.addEventListener('pageshow', event => { if (event.persisted) restore(); notify('ready'); });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',detect,{once:true}); else detect();
 })();

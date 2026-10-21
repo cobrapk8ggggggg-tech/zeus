@@ -143,6 +143,10 @@ final class TranslationDataTests: XCTestCase {
         view.load(URLRequest(url: URL(string: tab.url + "?next")!))
         try await until { view.url?.query == "next" && page.offered && !page.running && !page.translated }
         XCTAssertEqual(page.completed, 0)
+        XCTAssertTrue(view.canGoBack); view.goBack()
+        try await until { view.url?.query == nil && !view.isLoading && page.offered && !page.running && !page.translated }
+        let restoredLanguage = try await view.evaluateJavaScript("document.documentElement.lang") as? String
+        XCTAssertEqual(restoredLanguage, "en", "Back/forward restoration must not leave an untracked translated DOM")
         let reader = ReaderTranslation(), article = ReaderArticle(title: "A new story", paragraphs: ["A traveler opened the ancient book and started reading another fascinating chapter.", "The stars shone brightly above the quiet village."])
         reader.prepare(article: article, model: model); XCTAssertTrue(reader.suggested)
         reader.translate(article: article, model: model)
