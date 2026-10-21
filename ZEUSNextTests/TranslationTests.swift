@@ -210,12 +210,15 @@ final class TranslationDataTests: XCTestCase {
         let prepared = await model.prepare(tab), view = try XCTUnwrap(prepared), window = try window(view)
         defer { tab.dispose(); window.isHidden = true; try? FileManager.default.removeItem(at: root) }
         view.load(URLRequest(url: URL(string: tab.url)!)); let page = try XCTUnwrap(tab.translation)
-        try await until { page.offered }
+        try await until { page.offered && !view.isLoading }
         // The visible section is deliberately AFTER a long region in DOM order.
         _ = try await view.evaluateJavaScript("document.body.innerHTML='<p id=before>Earlier offscreen chapter text should wait for the visible text to finish translating.</p><div style=height:3000px></div><p id=visible>Visible chapter first paragraph with enough words to detect English correctly.</p><p id=visible2>Visible chapter second paragraph belongs to the same request.</p><div style=height:3000px></div><p id=after>Later offscreen chapter text should be prefetched after the visible paragraphs.</p>';document.querySelector('#visible').scrollIntoView()")
+        // WebKit commits scrollIntoView after this JavaScript turn. Wait for
+        // layout/scroll restoration before asserting which text is on screen.
+        let geometry = try await view.callAsyncJavaScript("document.querySelector('#visible').scrollIntoView();await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));return {scroll:scrollY,top:document.querySelector('#visible').getBoundingClientRect().top,height:innerHeight}", arguments: [:], in: nil, contentWorld: .page)
         let collection = try await view.callAsyncJavaScript("return zeusTranslate.collect(10000,64,true)", arguments: [:], in: nil, contentWorld: PageTranslation.world) as? [String: Any]
         let visible = collection?["segments"] as? [[String: String]]
-        XCTAssertTrue(visible?.contains { $0["text"]?.hasPrefix("Visible chapter first") == true } == true)
+        XCTAssertTrue(visible?.contains { $0["text"]?.hasPrefix("Visible chapter first") == true } == true, "Viewport: \(String(describing: geometry))")
         XCTAssertTrue(visible?.contains { $0["text"]?.hasPrefix("Visible chapter second") == true } == true)
         XCTAssertFalse(visible?.contains { $0["text"]?.hasPrefix("Earlier offscreen") == true } == true)
         page.translate(); try await until { page.translated && !page.running }; XCTAssertNil(page.error)
@@ -224,6 +227,7 @@ final class TranslationDataTests: XCTestCase {
         let before = try XCTUnwrap(JSONSerialization.jsonObject(with: beforeData) as? [[String]])
         XCTAssertTrue(before.first?.contains { $0.hasPrefix("Visible chapter first") } == true)
         XCTAssertTrue(before.first?.contains { $0.hasPrefix("Visible chapter second") } == true)
+        XCTAssertEqual(before.first?.count, 2, "The visible paragraphs must share one request; offscreen text must wait")
         // Reload the same content under a fresh document ID, with one new paragraph.
         view.reload(); try await until { page.offered && !page.running && !page.translated && !view.isLoading }
         _ = try await view.evaluateJavaScript("document.body.innerHTML='<p>Earlier offscreen chapter text should wait for the visible text to finish translating.</p><p>Visible chapter first paragraph with enough words to detect English correctly.</p><p>Visible chapter second paragraph belongs to the same request.</p><p>Later offscreen chapter text should be prefetched after the visible paragraphs.</p>'")
