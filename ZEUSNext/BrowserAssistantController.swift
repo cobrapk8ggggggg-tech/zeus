@@ -210,6 +210,7 @@ import Combine
     private func persist() {
         guard let model, !model.profile.isPrivate, model.profile.id == profileID else { return }
         let archive = BrowserAssistantArchive(conversations: conversations, selectedID: selectedID, preferences: preferences)
-        do { try BrowserDisk.write(archive, to: file) } catch { error = "تعذر حفظ محادثات المساعد: " + error.localizedDescription }
+        do { try BrowserDisk.write(archive, to: file) }
+        catch let writeError { error = "تعذر حفظ محادثات المساعد: " + writeError.localizedDescription }
     }
 }
