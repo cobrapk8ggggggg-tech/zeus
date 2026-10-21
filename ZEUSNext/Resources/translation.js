@@ -63,12 +63,12 @@
       entry.translated = whitespace[1] + item.text.trim() + whitespace[2];
       entry.node.nodeValue = entry.translated; directional(entry.node.parentElement); count++;
     }
+    if (count) document.documentElement.setAttribute('lang',target);
     observer.takeRecords(); applying = false; return count;
   }
   function start(language) {
     active = true; target = language;
     if (!rootState) rootState = {lang:document.documentElement.getAttribute('lang')};
-    document.documentElement.setAttribute('lang',language);
   }
   function restore() {
     active = false; clearTimeout(timer); applying = true;

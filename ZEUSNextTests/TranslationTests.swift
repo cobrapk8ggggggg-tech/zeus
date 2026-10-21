@@ -90,8 +90,18 @@ final class TranslationDataTests: XCTestCase {
         XCTAssertEqual(page.sourceLanguage, "en"); XCTAssertFalse(page.running)
         let isolated = try await view.evaluateJavaScript("typeof window.zeusTranslate") as? String
         XCTAssertEqual(isolated, "undefined")
-        page.translate(); try await until { page.translated && !page.running }
-        XCTAssertNil(page.error); XCTAssertGreaterThan(page.completed, 3)
+        model.data.settings.aiProviders?[0].model = "broken-json"
+        page.translate(); try await until { page.error != nil && !page.running }
+        XCTAssertFalse(page.translated)
+        let failedLanguage = try await view.evaluateJavaScript("document.documentElement.lang") as? String
+        XCTAssertEqual(failedLanguage, "en", "A rejected response must leave language and text unchanged")
+        let failedText = try await view.evaluateJavaScript("document.querySelector('#heading').textContent") as? String
+        XCTAssertEqual(failedText, "A journey beyond the mountains")
+        model.data.settings.aiProviders?[0].model = "fixture-translator"
+        page.translate(); try await until { page.translated && !page.running && page.completed >= 6 }
+        XCTAssertNil(page.error)
+        let frameText = try await view.evaluateJavaScript("document.querySelector('iframe').contentDocument.querySelector('p').textContent") as? String
+        XCTAssertTrue(frameText?.hasPrefix("ترجمة:") == true)
         let heading = try await view.evaluateJavaScript("document.querySelector('#heading').textContent") as? String
         XCTAssertTrue(heading?.hasPrefix("ترجمة:") == true)
         let direction = try await view.evaluateJavaScript("getComputedStyle(document.querySelector('#paragraph')).direction") as? String
