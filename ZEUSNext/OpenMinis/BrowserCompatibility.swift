@@ -3,6 +3,51 @@ import SwiftUI
 import AVKit
 import ImageIO
 import OSLog
+import ObjectiveC
+
+let mediaPlaceholderHeight: CGFloat = 200
+// Bridge OpenMinis' selection/autoscroll contract to SwiftUI's UIScrollView.
+typealias NoAnimationCollectionView = UIScrollView
+private var selectionBridgeKey: UInt8 = 0
+@MainActor private final class SelectionScrollBridge: NSObject {
+    weak var scroll: UIScrollView?
+    var lockedOffset: CGPoint?
+    var selected = false
+    var onStep: ((CGPoint) -> Void)?
+    var point = CGPoint.zero
+    var ticker: CADisplayLink?
+    func stop() { ticker?.invalidate(); ticker = nil }
+    func update(_ point: CGPoint) {
+        self.point = point
+        guard ticker == nil else { return }
+        let link = CADisplayLink(target: self, selector: #selector(tick)); ticker = link; link.add(to: .main, forMode: .common)
+    }
+    @objc func tick() {
+        guard let scroll, selected else { stop(); return }
+        let visible = scroll.bounds, edge: CGFloat = 55
+        let delta: CGFloat = point.y < visible.minY + edge ? -min(10, (visible.minY + edge - point.y) / 5) : point.y > visible.maxY - edge ? min(10, (point.y - visible.maxY + edge) / 5) : 0
+        guard delta != 0 else { return }
+        let y = max(-scroll.adjustedContentInset.top, min(scroll.contentSize.height - visible.height + scroll.adjustedContentInset.bottom, scroll.contentOffset.y + delta))
+        let movement = y - scroll.contentOffset.y
+        scroll.setContentOffset(CGPoint(x: scroll.contentOffset.x, y: y), animated: false)
+        point.y += movement; onStep?(point)
+    }
+}
+extension UIScrollView {
+    private var selectionBridge: SelectionScrollBridge {
+        if let bridge = objc_getAssociatedObject(self, &selectionBridgeKey) as? SelectionScrollBridge { return bridge }
+        let bridge = SelectionScrollBridge(); bridge.scroll = self
+        objc_setAssociatedObject(self, &selectionBridgeKey, bridge, .OBJC_ASSOCIATION_RETAIN_NONATOMIC); return bridge
+    }
+    var offsetLocked: Bool {
+        get { selectionBridge.lockedOffset != nil }
+        set { if newValue { selectionBridge.lockedOffset = contentOffset } else if let offset = selectionBridge.lockedOffset { selectionBridge.lockedOffset = nil; setContentOffset(offset, animated: false) } }
+    }
+    var hasActiveTextSelection: Bool { get { selectionBridge.selected } set { selectionBridge.selected = newValue; if !newValue { selectionBridge.stop() } } }
+    var onAutoScrollStep: ((CGPoint) -> Void)? { get { selectionBridge.onStep } set { selectionBridge.onStep = newValue } }
+    func updateSelectionAutoScroll(touchPoint: CGPoint) { selectionBridge.update(touchPoint) }
+    func stopSelectionAutoScroll() { selectionBridge.stop() }
+}
 
 struct AppLogger {
     let category: String

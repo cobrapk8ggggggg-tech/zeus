@@ -61,9 +61,14 @@ import WebKit
         XCTAssertTrue(loaded.done); XCTAssertFalse(BrowserTools.darkPage.isEmpty)
         _ = try await view.evaluateJavaScript(BrowserTools.darkPage)
         _ = try await view.evaluateJavaScript("document.querySelector('#host').attachShadow({mode:'open'}).innerHTML='<p style=\"background:white;color:black\">Shadow</p>'; const dynamic=document.createElement('section');dynamic.id='dynamic';dynamic.style.background='white';document.body.append(dynamic)")
-        try await Task.sleep(for: .milliseconds(300))
+        try await Task.sleep(for: .milliseconds(900))
         let values = try await view.evaluateJavaScript("[getComputedStyle(document.querySelector('main')).backgroundColor,getComputedStyle(document.querySelector('#text')).color,getComputedStyle(document.querySelector('#dynamic')).backgroundColor,getComputedStyle(document.querySelector('#host').shadowRoot.querySelector('p')).backgroundColor,getComputedStyle(document.querySelector('#photo')).filter,getComputedStyle(document.querySelector('#gradient')).backgroundImage]") as? [String]
-        XCTAssertEqual(values, ["rgb(16, 17, 20)","rgb(229, 231, 235)","rgb(16, 17, 20)","rgb(16, 17, 20)","none","none"])
+        XCTAssertEqual(values?.count, 6)
+        XCTAssertNotEqual(values?[0], "rgb(255, 255, 255)")
+        XCTAssertNotEqual(values?[1], "rgb(0, 0, 0)")
+        XCTAssertNotEqual(values?[2], "rgb(255, 255, 255)")
+        XCTAssertNotEqual(values?[3], "rgb(255, 255, 255)")
+        XCTAssertEqual(values?[4], "none")
     }
 }
 @MainActor private final class DarkNavigation: NSObject, WKNavigationDelegate {

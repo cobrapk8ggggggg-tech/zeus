@@ -577,6 +577,7 @@ struct PastableTextView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> PastableUITextView {
         let tv = PastableUITextView()
+        tv.accessibilityIdentifier = "openMinisComposer"
         tv.delegate = context.coordinator
         tv.font = UIFont.systemFont(ofSize: FontSettings.shared.scaledChatInput(16.5))
         tv.backgroundColor = .clear

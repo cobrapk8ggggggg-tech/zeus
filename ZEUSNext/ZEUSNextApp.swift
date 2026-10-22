@@ -45,6 +45,10 @@ final class BrowserAppDelegate: NSObject, UIApplicationDelegate {
                 _ = model.newTab(); model.current?.title = "التبويب الثاني"
                 _ = model.newTab(); model.current?.title = "التبويب الثالث"
             }
+            if CommandLine.arguments.contains("--agent-fixture") {
+                var provider = AIProviderConfiguration(); provider.name = "مزود اختبار الوكيل"; provider.baseURL = "http://127.0.0.1:8765/v1"; provider.model = "fixture-agent"; provider.models = [AIChoice(id: "fixture-agent", name: "Fixture agent")]
+                model.data.settings.aiProviders = [provider]
+            }
             if CommandLine.arguments.contains("--reader-polish-fixture") {
                 model.article = ReaderArticle(title: "ليلة في المكتبة", paragraphs: ["في هدوء الليل تبدأ حكاية جديدة، وتظهر الكلمات بمحاذاة اليمين.", "A new story begins tonight. English paragraphs share the same right aligned reading layout."])
             }

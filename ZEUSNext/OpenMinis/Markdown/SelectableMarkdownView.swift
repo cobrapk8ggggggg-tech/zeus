@@ -7010,12 +7010,6 @@ struct SelectableMarkdownView: UIViewRepresentable {
         // textView so a subsequent main-thread hang (caught by
         // HangDetector) can dump the actual input that triggered the
         // typesetter feedback loop. Bounded ring of last 10 entries.
-        StreamingHangLogger.shared.recordAssignedText(
-            messageId: messageId,
-            markdown: markdown,
-            attrLen: attributed.length,
-            path: fastPathTaken ? "fast-append" : "full-assign"
-        )
 
         // Walk attachments that mutated their content in place (currently
         // TableAttachment via `update(...)`) and invalidate JUST those
