@@ -11,6 +11,7 @@ struct AgentWireMessage: Codable {
     var content: String
     var toolCallID: String?
     var calls: [AgentToolCall]?
+    var files: [AgentFile]?
     var json: [String: Any] {
         var value: [String: Any] = ["role": role, "content": content]
         if let toolCallID { value["tool_call_id"] = toolCallID }
@@ -18,6 +19,7 @@ struct AgentWireMessage: Codable {
         return value
     }
 }
+struct AgentFile: Codable { var name: String; var mime: String; var relativePath: String }
 struct AgentStoredBlock: Codable {
     var kind: String
     var content: String
@@ -31,6 +33,7 @@ struct AgentStoredMessage: Codable {
     var user: Bool
     var content: String
     var blocks: [AgentStoredBlock]
+    var files: [AgentFile]?
 }
 struct AgentSession: Codable, Identifiable {
     var id = UUID()

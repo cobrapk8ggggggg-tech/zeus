@@ -124,6 +124,41 @@ struct TranslationStoragePage: View {
     private func refresh() async { guard context.permitted else { return }; entries = await TranslationMemory.shared.entries(folder: context.model.profiles.folder(for: context.profile)) }
 }
 
+struct AgentStoragePage: View {
+    @ObservedObject var context: ProfileSettingsContext
+    @State private var sessions: [AgentSession] = []
+    @State private var selected = Set<UUID>()
+    @State private var confirming = false
+    var body: some View {
+        List {
+            ForEach(sessions) { session in
+                Button { if !selected.insert(session.id).inserted { selected.remove(session.id) } } label: {
+                    HStack { Image(systemName: selected.contains(session.id) ? "checkmark.circle.fill" : "circle"); VStack(alignment: .leading, spacing: 4) { Text(session.title); Text("\(session.messages.count) رسالة").font(.caption).foregroundStyle(.secondary) }; Spacer() }
+                }.buttonStyle(.plain)
+            }
+        }.settingsPage("محادثات الوكيل").onAppear(perform: refresh)
+            .toolbar { ToolbarItem(placement: .bottomBar) { Button("حذف المحدد (\(selected.count))", role: .destructive) { confirming = true }.disabled(selected.isEmpty) } }
+            .confirmationDialog("حذف المحادثات المحددة ومرفقاتها فقط؟", isPresented: $confirming) { Button("حذف", role: .destructive) { removeSelected() } }
+    }
+    private var root: URL { context.model.profiles.folder(for: context.profile).appendingPathComponent("OpenMinis") }
+    private func refresh() {
+        guard context.permitted else { return }
+        if context.isActive, let agent = context.model.agent { agent.save(); sessions = agent.sessions }
+        else { sessions = BrowserDisk.read(AgentArchive.self, from: root.appendingPathComponent("agent.json"))?.sessions ?? [] }
+    }
+    private func removeSelected() {
+        guard context.permitted else { return }
+        if context.isActive, let agent = context.model.agent { for id in selected { agent.delete(id) } }
+        else if var archive = BrowserDisk.read(AgentArchive.self, from: root.appendingPathComponent("agent.json")) {
+            archive.sessions.removeAll { selected.contains($0.id) }
+            if let id = archive.selected, selected.contains(id) { archive.selected = nil }
+            for id in selected { try? FileManager.default.removeItem(at: root.appendingPathComponent(id.uuidString)) }
+            do { try BrowserDisk.write(archive, to: root.appendingPathComponent("agent.json")) } catch { context.model.notify(error.localizedDescription) }
+        }
+        selected = []; refresh()
+    }
+}
+
 struct StoredProfileItemsPage: View {
     @ObservedObject var context: ProfileSettingsContext
     let category: StoredItemCategory

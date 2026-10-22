@@ -185,6 +185,7 @@ struct StorageSettingsPage: View {
                 NavigationLink("المواقع — حذف بيانات موقع أو نوع محدد") { WebsiteStoragePage(context: context) }.accessibilityIdentifier("websiteStorageButton")
                 ForEach(StoredItemCategory.allCases) { category in NavigationLink(category.title) { StoredProfileItemsPage(context: context, category: category) } }
                 NavigationLink("الترجمات المحفوظة") { TranslationStoragePage(context: context) }
+                NavigationLink("محادثات الوكيل ومرفقاتها") { AgentStoragePage(context: context) }
             }
             ThemedSection("البيانات") { LabeledContent("ملفات الحساب", value: byteText(bytes)); LabeledContent("مواقع خزّنت بيانات", value: "\(sites)"); LabeledContent("المساحة المتاحة بالجهاز", value: byteText(freeBytes)); Button("مسح الملفات المؤقتة") { action = "cache" }.accessibilityIdentifier("clearCacheButton"); Button("مسح الكوكيز وبيانات المواقع") { action = "web" }; Button("مسح سجل التصفح") { action = "history" }; Button("مسح سجل البحث") { action = "search" }; Button("حذف التنزيلات") { action = "downloads" } }
             if context.isActive { ThemedSection { NavigationLink("المفضلة والسجل") { LibrarySheet(model: context.model) }; NavigationLink("السكربتات") { ScriptsSheet(model: context.model) } } }

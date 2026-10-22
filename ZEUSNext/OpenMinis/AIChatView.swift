@@ -27,6 +27,8 @@ struct AIChatView: View {
     @State private var search = ""
     @State private var share: ShareItem?
     @State private var composerHeight: CGFloat = 120
+    @ObservedObject private var speech = SpeechRecognitionManager.shared
+    @State private var recognizedLength = 0
 
     var body: some View {
         NavigationStack {
@@ -36,6 +38,7 @@ struct AIChatView: View {
                     if !vm.preferences.contextApproved { consent }
                     else { messageList }
                     if let error = vm.errorMessage { errorBanner(error) }
+                    if !vm.messages.flatMap(\.blocks).filter({ $0.toolStatus != nil }).isEmpty { OpenMinisFloatingTools(vm: vm).padding(.horizontal, 12).padding(.bottom, 8) }
                     inputBar
                 }
                 if history { historyPanel.transition(.move(edge: .leading)) }
@@ -48,9 +51,9 @@ struct AIChatView: View {
         .preferredColorScheme(.dark).tint(.white).foregroundStyle(ChatColors.primaryText)
         .environment(\.layoutDirection, .leftToRight)
         .sheet(isPresented: $settings) { settingsSheet }
-        .sheet(item: $detailBlock) { toolDetails($0) }
+        .sheet(item: $detailBlock) { ToolLiveSheet(vm: vm, selected: $0).presentationDetents([.medium, .large]) }
         .sheet(item: $share) { ActivitySheet(url: $0.url) }
-        .overlay { if let approval = vm.approval { approvalCard(approval) } }
+        .sheet(item: $vm.approval) { request in OffloadPermissionDialogContent(request: request) { allow, always in vm.answerApproval(allow, always: always) }.presentationDetents([.medium, .large]).interactiveDismissDisabled().environment(\.layoutDirection, .rightToLeft).preferredColorScheme(.dark) }
         .fileImporter(isPresented: $importFile, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
             do { for url in try result.get() { addFile(url) } } catch { vm.errorMessage = error.localizedDescription }
         }
@@ -59,13 +62,19 @@ struct AIChatView: View {
             Task { for item in values { if let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data) { addImage(image) } }; photos = [] }
         }
         .sheet(isPresented: $camera) { CameraPicker { image in camera = false; if let image { addImage(image) } }.ignoresSafeArea() }
+        .sheet(isPresented: $speech.showLanguagePicker) { SpeechLanguagePickerSheet(speechManager: speech).preferredColorScheme(.dark) }
+        .onReceive(speech.$recognizedText) { text in
+            guard speech.state == .recording else { return }
+            if text.count > recognizedLength { vm.inputText += String(text.dropFirst(recognizedLength)) }
+            recognizedLength = text.count
+        }
         .alert("تسمية المحادثة", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("الاسم", text: $renameText)
             Button("حفظ") { if let id = renaming { vm.rename(id, to: renameText) }; renaming = nil }
             Button("إلغاء", role: .cancel) { renaming = nil }
         }
         .onReceive(NotificationCenter.default.publisher(for: .chatInputAppendRequested)) { note in if let text = note.userInfo?["text"] as? String { vm.inputText += "\n" + text; inputFocused = true } }
-        .onDisappear { vm.save() }
+        .onDisappear { speech.stopRecording(); vm.save() }
         .accessibilityIdentifier("openMinisAssistant")
     }
     @ToolbarContentBuilder private var navigationToolbar: some ToolbarContent {
@@ -155,10 +164,15 @@ struct AIChatView: View {
                     Button("/memory — الذاكرة") { settings = true }
                 } label: { Text("/").font(.system(size: 18, weight: .semibold, design: .rounded)).italic().foregroundStyle(ChatColors.secondaryText).frame(width: 34, height: 34).background(ChatColors.inputIconBg, in: Circle()).overlay(Circle().stroke(ChatColors.inputIconBorder, lineWidth: 0.5)) }
                 Spacer()
+                MicButton(speechManager: speech, inputFocused: $inputFocused, onTap: {
+                    if speech.state == .recording { speech.stopRecording() }
+                    else { Task { if await speech.requestPermissions() { do { recognizedLength = 0; try speech.startRecording() } catch { vm.errorMessage = error.localizedDescription } } else { vm.errorMessage = "لم تُمنح صلاحية الميكروفون والتعرف على الكلام." } } }
+                }, isVoiceActive: speech.state == .recording)
+                if speech.state == .recording { Button(speech.languageLabel) { speech.showLanguagePicker = true }.font(.caption) }
                 if vm.isProcessing { Text("\(vm.step)").font(.caption.monospaced()).foregroundStyle(.secondary); Button { vm.cancel() } label: { Image(systemName: "stop.circle.fill").font(.system(size: 34)).foregroundStyle(.red) }.accessibilityLabel("إيقاف الوكيل") }
                 else { Button { inputFocused = false; vm.send() } label: { Image(systemName: "arrow.up.circle.fill").font(.system(size: 34)).foregroundStyle(vm.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? ChatColors.sendButtonDisabled : ChatColors.sendButton) }.disabled(vm.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("sendAgentMessage") }
             }.padding(.horizontal, 12).padding(.bottom, 10)
-        }.background(ChatColors.inputBg, in: RoundedRectangle(cornerRadius: 20)).overlay(RoundedRectangle(cornerRadius: 20).stroke(ChatColors.inputBorder, lineWidth: 0.5)).padding(.horizontal, 12).padding(.bottom, 8)
+        }.modifier(ComposerSurface()).padding(.horizontal, 12).padding(.bottom, 8)
     }
     private func inputIcon(_ symbol: String) -> some View { Image(systemName: symbol).font(.system(size: 18, weight: .medium)).foregroundStyle(ChatColors.secondaryText).frame(width: 34, height: 34).background(ChatColors.inputIconBg, in: Circle()).overlay(Circle().stroke(ChatColors.inputIconBorder, lineWidth: 0.5)) }
     private var historyPanel: some View {
@@ -196,30 +210,6 @@ struct AIChatView: View {
         }.environment(\.layoutDirection, .rightToLeft).preferredColorScheme(.dark).onDisappear { vm.save() }
     }
     @ObservedObject private var fontSettings = FontSettings.shared
-    private func toolDetails(_ block: AssistantBlock) -> some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    HStack { Text(block.toolDescription).font(.headline); Spacer(); if block.toolStatus == .running { LoadingDotsView(dotSize: 5) } }
-                    if let raw = block.toolInputArgs { SelectableMarkdownView(markdown: "```json\n" + raw + "\n```") }
-                    if let path = block.imageFilePath, let image = UIImage(contentsOfFile: path) { ZoomableImageView(image: image).frame(height: 250) }
-                    SelectableMarkdownView(markdown: block.content.isEmpty ? "جارٍ التنفيذ…" : block.content)
-                }.padding(18)
-            }.navigationTitle("تفاصيل الأداة").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .confirmationAction) { Button("تم") { detailBlock = nil } } }
-        }.preferredColorScheme(.dark).presentationDetents([.medium, .large])
-    }
-    private func approvalCard(_ approval: AgentApproval) -> some View {
-        ZStack(alignment: .bottom) {
-            Color.black.opacity(0.55).ignoresSafeArea()
-            VStack(alignment: .leading, spacing: 16) {
-                HStack { Image(systemName: "hand.raised.fill").font(.title2); VStack(alignment: .leading, spacing: 4) { Text("موافقة على الأداة").font(.headline); Text(BrowserAgentTools.title(approval.call.name)).font(.subheadline).foregroundStyle(.secondary) }; Spacer() }
-                Text(approval.host).font(.subheadline.monospaced()).lineLimit(2)
-                ScrollView { Text(approval.detail).font(.subheadline).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }.frame(maxHeight: 150)
-                HStack { Button("رفض", role: .cancel) { vm.answerApproval(false) }.frame(maxWidth: .infinity); Button("هذه المرة") { vm.answerApproval(true) }.buttonStyle(.bordered).frame(maxWidth: .infinity) }
-                if approval.allowAlways { Button("السماح دائمًا لهذه الأداة على هذا الموقع") { vm.answerApproval(true, always: true) }.font(.subheadline.bold()).frame(maxWidth: .infinity).padding(13).background(.white, in: Capsule()).foregroundStyle(.black) }
-            }.padding(22).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 26)).overlay(RoundedRectangle(cornerRadius: 26).stroke(.white.opacity(0.15))).padding(16).environment(\.layoutDirection, .rightToLeft)
-        }.accessibilityIdentifier("agentApprovalCard")
-    }
     private func errorBanner(_ error: String) -> some View { HStack(spacing: 8) { Image(systemName: "exclamationmark.triangle.fill"); Text(error).font(.caption); Spacer(); Button { vm.errorMessage = nil } label: { Image(systemName: "xmark") } }.foregroundStyle(.red).padding(.horizontal, 16).padding(.vertical, 8).background(Color.red.opacity(0.12)) }
     private func addFile(_ url: URL) { do { let file = try AIAttachment.load(url); guard vm.attachments.reduce(file.data.count, { $0 + $1.data.count }) <= 20_000_000 else { throw AgentFailure.message("الحد الأقصى للمرفقات 20 ميجابايت.") }; vm.attachments.append(file) } catch { vm.errorMessage = error.localizedDescription } }
     private func addImage(_ image: UIImage) { guard let data = image.jpegData(compressionQuality: 0.85), data.count < 16_000_000 else { vm.errorMessage = "الصورة كبيرة جدًا."; return }; vm.attachments.append(AIAttachment(name: "photo.jpg", mime: "image/jpeg", data: data, width: Int(image.size.width), height: Int(image.size.height))) }
@@ -232,10 +222,14 @@ private struct OpenMinisMessageRow: View {
     let retry: () -> Void
     let edit: () -> Void
     @Binding var detailBlock: AssistantBlock?
+    @State private var attachmentPreview: ShareItem?
     var body: some View {
         Group {
             if message.role == .user {
-                HStack { Spacer(minLength: 60); Text(message.content).font(.system(size: FontSettings.shared.scaledMessage(16.5))).padding(.horizontal, 14).padding(.vertical, 10).modifier(UserBubbleSurface(isQueued: false)).contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 18)).contextMenu { Button("نسخ", systemImage: "doc.on.doc") { UIPasteboard.general.string = message.content }; Button("تعديل", systemImage: "square.and.pencil", action: edit); if !active { Button("إعادة المحاولة", systemImage: "arrow.counterclockwise", action: retry) } } preview: { MessageContextMenuPreview(text: message.content) } }.padding(.horizontal, 16).padding(.vertical, 4)
+                VStack(alignment: .trailing, spacing: 6) {
+                    ForEach(message.inputAttachments) { file in Button { attachmentPreview = ShareItem(url: file.cacheURL) } label: { Label(file.fileName, systemImage: file.kind == .image ? "photo" : "doc").font(.caption).padding(10).background(ChatColors.secondaryBg, in: RoundedRectangle(cornerRadius: 10)) } }
+                    HStack { Spacer(minLength: 60); Text(message.content).font(.system(size: FontSettings.shared.scaledMessage(16.5))).padding(.horizontal, 14).padding(.vertical, 10).modifier(UserBubbleSurface(isQueued: false)).contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 18)).contextMenu { Button("نسخ", systemImage: "doc.on.doc") { UIPasteboard.general.string = message.content }; Button("تعديل", systemImage: "square.and.pencil", action: edit); if !active { Button("إعادة المحاولة", systemImage: "arrow.counterclockwise", action: retry) } } preview: { MessageContextMenuPreview(text: message.content) } }
+                }.frame(maxWidth: .infinity, alignment: .trailing).padding(.horizontal, 16).padding(.vertical, 4).sheet(item: $attachmentPreview) { FilePreview(url: $0.url).ignoresSafeArea() }
             } else {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(message.blocks) { block in OpenMinisBlockRow(block: block, active: active, stop: stop, detailBlock: $detailBlock) }
@@ -243,6 +237,20 @@ private struct OpenMinisMessageRow: View {
                     if !active && !message.blocks.isEmpty { HStack(spacing: 17) { Button { UIPasteboard.general.string = message.blocks.filter { $0.kind == .text }.map(\.content).joined(separator: "\n") } label: { Image(systemName: "doc.on.doc") }; Button { VoiceOutputPlayer.shared.enqueueSegmented(message.blocks.filter { $0.kind == .text }.map(\.content).joined(separator: "\n"), sessionId: VoiceOutputPlayer.manualOwnerId) } label: { Image(systemName: "speaker.wave.2") }; Button(action: retry) { Image(systemName: "arrow.counterclockwise") } }.font(.system(size: 13)).foregroundStyle(.secondary).padding(.top, 4) }
                 }.padding(.horizontal, 16).padding(.vertical, 12).frame(maxWidth: .infinity, alignment: .leading)
             }
+        }
+    }
+}
+
+private struct OpenMinisFloatingTools: View {
+    @ObservedObject var vm: BrowserAgent
+    @State private var expanded = false
+    @State private var selectedIdx: Int?
+    private var blocks: [AssistantBlock] { vm.messages.flatMap(\.blocks).filter { $0.toolStatus != nil } }
+    private var displayedIdx: Int { min(max(0, selectedIdx ?? blocks.count - 1), blocks.count - 1) }
+    var body: some View {
+        if !blocks.isEmpty {
+            ToolStatusBar(block: blocks[displayedIdx], toolBlocks: blocks, displayedIdx: displayedIdx, expanded: $expanded, selectedIdx: $selectedIdx)
+                .sheet(isPresented: $expanded) { ToolLiveSheet(vm: vm, selected: blocks[displayedIdx]).presentationDetents([.medium, .large]) }
         }
     }
 }

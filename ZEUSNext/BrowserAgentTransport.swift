@@ -1,7 +1,7 @@
 import Foundation
 
 @MainActor enum BrowserAgentTransport {
-    static func generate(messages: [AgentWireMessage], provider: AIProviderConfiguration, secret: String, session: UUID, attachments: [AIAttachment], delta: @escaping (String, String) -> Void) async throws -> AgentReply {
+    static func generate(messages: [AgentWireMessage], provider: AIProviderConfiguration, secret: String, session: UUID, attachments: [AIAttachment], filesRoot: URL, delta: @escaping (String, String) -> Void) async throws -> AgentReply {
         if provider.kind != .openAICompatible {
             // Account protocols have no client tool schema; use a strict tool-call envelope.
             // Calls still run in the same native executor and return observed results to the next round.
@@ -14,6 +14,18 @@ import Foundation
             return parsed
         }
         var wire = messages.map(\.json)
+        for index in messages.indices {
+            guard let files = messages[index].files, !files.isEmpty else { continue }
+            var content: [[String: Any]] = [["type": "text", "text": messages[index].content]]
+            for file in files {
+                let url = filesRoot.appendingPathComponent(file.relativePath).standardizedFileURL.resolvingSymlinksInPath()
+                guard url.path.hasPrefix(filesRoot.standardizedFileURL.resolvingSymlinksInPath().path + "/"), let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize, size <= 16_000_000, let data = try? Data(contentsOf: url) else { continue }
+                if file.mime.hasPrefix("image/") { content.append(["type": "image_url", "image_url": ["url": "data:" + file.mime + ";base64," + data.base64EncodedString()]]) }
+                else if file.mime == "application/pdf" { content.append(["type": "file", "file": ["filename": file.name, "file_data": "data:application/pdf;base64," + data.base64EncodedString()]]) }
+                else if let text = String(data: data, encoding: .utf8) { content.append(["type": "text", "text": "Attachment " + file.name + ":\n" + String(text.prefix(100_000))]) }
+            }
+            wire[index]["content"] = content
+        }
         if !attachments.isEmpty, let i = wire.lastIndex(where: { $0["role"] as? String == "user" }) {
             var parts: [[String: Any]] = [["type":"text","text":messages[i].content]]
             for attachment in attachments {

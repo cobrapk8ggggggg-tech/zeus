@@ -64,4 +64,29 @@ import WebKit
         XCTAssertTrue(markdown.blocks.contains { if case .table = $0 { return true }; return false })
         XCTAssertTrue(markdown.blocks.contains { if case .mathBlock = $0 { return true }; return false })
     }
+    func testDeletingOneTranslationKeepsOtherSavedTranslations() async throws {
+        let (_, root) = model(); defer { try? FileManager.default.removeItem(at: root) }
+        let saved = await TranslationMemory.shared.save(["one": "الأولى", "two": "الثانية"], namespace: "test", folder: root)
+        XCTAssertTrue(saved)
+        let entries = await TranslationMemory.shared.entries(folder: root)
+        XCTAssertEqual(entries.count, 2)
+        await TranslationMemory.shared.remove(keys: [try XCTUnwrap(entries.first?.id)], folder: root)
+        let remaining = await TranslationMemory.shared.entries(folder: root)
+        XCTAssertEqual(remaining.count, 1)
+    }
+    func testPageReadNeverIncludesPasswordValueOrHiddenFields() async throws {
+        let (model, root) = model(); defer { try? FileManager.default.removeItem(at: root) }
+        let current = try XCTUnwrap(model.current)
+        let prepared = await model.prepare(current)
+        let view = try XCTUnwrap(prepared)
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let window = UIWindow(windowScene: scene); let controller = UIViewController(); window.rootViewController = controller; window.frame = scene.screen.bounds; view.frame = window.bounds; controller.view.addSubview(view); window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        view.loadHTMLString("<html><body><p>Visible chapter</p><input type='password' value='never-share-this'><input type='hidden' value='hidden-token'><textarea>private draft</textarea></body></html>", baseURL: URL(string: "https://example.test"))
+        try await waitUntil { !view.isLoading }
+        try await Task.sleep(for: .milliseconds(300))
+        let result = try await view.callAsyncJavaScript(BrowserAgent.readScript, arguments: ["full": true], in: nil, contentWorld: .world(name: "ZEUSAgent"))
+        let text = String(decoding: try JSONSerialization.data(withJSONObject: result ?? [:]), as: UTF8.self)
+        XCTAssertTrue(text.contains("Visible chapter")); XCTAssertFalse(text.contains("never-share-this")); XCTAssertFalse(text.contains("hidden-token")); XCTAssertFalse(text.contains("private draft"))
+    }
 }

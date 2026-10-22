@@ -13,7 +13,7 @@ struct InputAttachment: Identifiable {
     /// `.ready` by default so all existing construction sites are unchanged.
     var loadState: LoadState
 
-    enum Kind {
+    enum Kind: Equatable {
         case image      // JPEG/PNG/GIF/WebP
         case video      // MP4/MOV/etc.
         case document   // PDF or other file

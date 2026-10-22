@@ -20,6 +20,7 @@ import Combine
     private var approvalAnswer: CheckedContinuation<Bool, Never>?
     private var runID = UUID()
     private var wire: [AgentWireMessage] = []
+    private var messageFiles: [UUID: [AgentFile]] = [:]
     private let folder: URL
     var current: AgentSession? { sessions.first { $0.id == selectedID } }
     var providers: [AIProviderConfiguration] { browser?.data.settings.aiProviders ?? [] }
@@ -38,25 +39,35 @@ import Combine
     func newSession() {
         cancel(); save()
         let session = AgentSession(providerID:providerID)
-        sessions.insert(session,at:0);selectedID=session.id;messages=[];wire=[];save()
+        sessions.insert(session,at:0);selectedID=session.id;messages=[];wire=[];messageFiles=[:];OpenMinisMedia.root=folder;save()
     }
     func select(_ session: AgentSession) { cancel();save();selectedID=session.id;load(session);save() }
     private func load(_ session: AgentSession) {
         wire=session.wire
+        messageFiles = [:]
         messages=session.messages.map { stored in
-            ChatMessage(role:stored.user ? .user:.assistant,content:stored.content,blocks:stored.blocks.map { item in
+            let message = ChatMessage(role:stored.user ? .user:.assistant,content:stored.content,blocks:stored.blocks.map { item in
                 let kind:AssistantBlockKind = item.kind == "text" ? .text : item.kind == "thinking" ? .thinking : .browserTool(action:BrowserAgentTools.title(item.toolName ?? ""))
                 let block=AssistantBlock(kind:kind,content:item.content)
                 block.toolUseId=item.toolName;block.toolInputArgs=item.arguments;block.toolDuration=item.duration;block.imageFilePath=item.screenshot
                 if let status=item.status { block.toolStatus=status == "success" ? .success : status == "failed" ? .failed(message:item.content):.cancelled }
                 return block
             })
+            messageFiles[message.id] = stored.files
+            message.inputAttachments = (stored.files ?? []).map { InputAttachment(fileName: $0.name, cacheURL: folder.appendingPathComponent($0.relativePath), kind: $0.mime.hasPrefix("image/") ? .image : .document) }
+            return message
         }
         OpenMinisMedia.root=folder
     }
     func rename(_ id:UUID,to title:String) { guard let i=sessions.firstIndex(where:{$0.id==id}) else{return};sessions[i].title=String(title.trimmingCharacters(in:.whitespacesAndNewlines).prefix(100));save() }
     func pin(_ id:UUID) { guard let i=sessions.firstIndex(where:{$0.id==id}) else{return};sessions[i].pinned.toggle();save() }
-    func delete(_ id:UUID) { if selectedID==id { cancel();messages=[];wire=[];selectedID=nil };sessions.removeAll{$0.id==id};save() }
+    func delete(_ id:UUID) {
+        if selectedID==id { cancel();messages=[];wire=[];messageFiles=[:];selectedID=nil }
+        sessions.removeAll{$0.id==id}
+        let directory = folder.appendingPathComponent(id.uuidString)
+        try? FileManager.default.removeItem(at: directory)
+        Task { await AIProviderService.shared.end(id) }; save()
+    }
     func chooseProvider(_ id:UUID) { if selectedID==nil{newSession()};guard let i=sessions.firstIndex(where:{$0.id==selectedID}),!isProcessing else{return};sessions[i].providerID=id;sessions[i].model=providers.first{$0.id==id}?.model;save() }
     func chooseModel(_ value:String) { guard let i=sessions.firstIndex(where:{$0.id==selectedID}),!isProcessing else{return};sessions[i].model=value;save() }
     func approveContext() { preferences.contextApproved=true;save() }
@@ -96,9 +107,22 @@ import Combine
         guard !provider.model.isEmpty else {errorMessage="اختر نموذجًا.";return}
         let files=attachments;attachments=[];inputText="";errorMessage=nil;isProcessing=true;step=0
         let owner=UUID();runID=owner
-        messages.append(ChatMessage(role:.user,content:prompt))
+        let userMessage = ChatMessage(role:.user,content:prompt)
+        var storedFiles: [AgentFile] = []
+        do {
+            for attachment in files {
+                let ext = (attachment.name as NSString).pathExtension
+                let safeExtension = !ext.isEmpty && ext.count <= 8 && ext.unicodeScalars.allSatisfy { CharacterSet.alphanumerics.contains($0) && $0.isASCII } ? ext : "dat"
+                let relative = sessionID.uuidString + "/attachments/" + UUID().uuidString + "." + safeExtension
+                let url = folder.appendingPathComponent(relative); try BrowserDisk.ensure(url.deletingLastPathComponent()); try attachment.data.write(to: url, options: [.atomic, .completeFileProtection])
+                storedFiles.append(AgentFile(name: attachment.name, mime: attachment.mime, relativePath: relative))
+                userMessage.inputAttachments.append(InputAttachment(fileName: attachment.name, cacheURL: url, kind: attachment.isImage ? .image : .document))
+            }
+        } catch { errorMessage = error.localizedDescription; isProcessing = false; return }
+        messageFiles[userMessage.id] = storedFiles
+        messages.append(userMessage)
         let response=ChatMessage(role:.assistant,content:"");response.isAwaitingModelResponse=true;messages.append(response)
-        wire.append(AgentWireMessage(role:"user",content:prompt))
+        wire.append(AgentWireMessage(role:"user",content:prompt,files:storedFiles.isEmpty ? nil : storedFiles))
         if let i=sessions.firstIndex(where:{$0.id==sessionID}),sessions[i].title=="محادثة جديدة"{sessions[i].title=String(prompt.prefix(48))}
         save()
         task=Task{[weak self] in
@@ -112,7 +136,7 @@ import Combine
                 for round in 0..<max(1,min(40,self.preferences.maximumSteps)){
                     try Task.checkCancellation();try self.validate();self.step=round+1;response.isAwaitingModelResponse=true
                     let textBlock=AssistantBlock(kind:.text,content:""),thoughtBlock=AssistantBlock(kind:.thinking,content:"")
-                    let reply=try await BrowserAgentTransport.generate(messages:[system]+self.wire,provider:provider,secret:secret,session:sessionID,attachments:pendingFiles){text,thought in
+                    let reply=try await BrowserAgentTransport.generate(messages:[system]+self.wire,provider:provider,secret:secret,session:sessionID,attachments:pendingFiles,filesRoot:self.folder){text,thought in
                         guard self.runID==owner else{return}
                         response.isAwaitingModelResponse=false
                         if !thought.isEmpty { if !response.blocks.contains(where:{$0===thoughtBlock}){response.blocks.append(thoughtBlock)};thoughtBlock.content=thought;thoughtBlock.thinkingContentBuffer=thought }
@@ -204,8 +228,16 @@ import Combine
             if call.name=="browser_download",browser.profile.account?.allowDownloads==false{throw AccountError.permission}
             try await requireApproval(call,host:url.host ?? "",detail:url.absoluteString)
             if call.name=="browser_download"{await browser.downloads.start(url:url,profile:browser.profile,referrer:browser.webView?.url,webView:browser.webView);return "Handed URL to native download manager. Check Downloads for progress."}
-            if args["new_tab"] as? Bool != false{guard let tab=browser.newTab(url:url,foreground:true)else{throw AgentFailure.message("تعذر إنشاء تبويب جديد.")};return try await read(tab,full:false)}
-            browser.open(URLRequest(url:url));guard let current=browser.current else{throw CancellationError()};return try await read(current,full:false)
+            let destination: BrowserTab
+            if args["new_tab"] as? Bool != false {
+                guard let created = browser.newTab(foreground: true) else { throw AgentFailure.message("تعذر إنشاء تبويب جديد.") }; destination = created
+            } else { guard let current = browser.current else { throw CancellationError() }; destination = current }
+            destination.url = url.absoluteString; destination.title = url.host ?? "صفحة جديدة"; destination.error = nil; browser.address = destination.url
+            guard let view = await browser.prepare(destination) else { throw AgentFailure.message("تعذر تجهيز الصفحة.") }
+            view.load(URLRequest(url: url)); browser.changed(); browser.persist()
+            _ = try await webView(destination)
+            if preferences.currentPage { return try await read(destination, full: false) }
+            return "Opened tab_id=\(destination.id.uuidString), URL=\(view.url?.absoluteString ?? destination.url). Page content permission is disabled."
         case "browser_select_tab","browser_close_tab":
             let selected=try tab(args)
             try await requireApproval(call,host:URL(string:selected.url)?.host ?? "tabs",detail:selected.title+"\n"+selected.url,always:call.name=="browser_select_tab")
@@ -239,7 +271,7 @@ import Combine
             guard view.window != nil,view.bounds.width>0 else{throw AgentFailure.message("لقطة الشاشة تتطلب ظهور التبويب أولًا.")}
             let image=try await view.takeSnapshot(configuration:nil)
             guard let data=image.pngData() else{throw AgentFailure.message("تعذر التقاط الصفحة.")}
-            let path=folder.appendingPathComponent("screenshots").appendingPathComponent(UUID().uuidString+".png")
+            let path=folder.appendingPathComponent(selectedID?.uuidString ?? "temporary").appendingPathComponent("screenshots").appendingPathComponent(UUID().uuidString+".png")
             try BrowserDisk.ensure(path.deletingLastPathComponent());try data.write(to:path,options:[.atomic,.completeFileProtection]);block.imageFilePath=path.path
             return "Captured current visible viewport, \(image.size.width)x\(image.size.height)."
         case "browser_library":
@@ -247,7 +279,11 @@ import Combine
             if preferences.library{values+=browser.data.bookmarks.filter{query.isEmpty||($0.title+$0.url).localizedCaseInsensitiveContains(query)}.prefix(60).map{"Bookmark: \($0.title) \($0.url)"}}
             if preferences.history{values+=browser.data.history.filter{query.isEmpty||($0.title+$0.url).localizedCaseInsensitiveContains(query)}.prefix(60).map{"Visit: \($0.title) \($0.url)"}}
             guard preferences.library||preferences.history else{throw AccountError.permission};return values.joined(separator:"\n")
-        case "browser_bookmark":try await requireApproval(call,host:browser.currentHost,detail:browser.current?.title ?? "");browser.bookmarkCurrent();return "Bookmark request completed."
+        case "browser_bookmark":
+            guard browser.profile.role != .guest, browser.profile.role != .kiosk, let current = browser.current, !current.isHome else { throw AccountError.permission }
+            try await requireApproval(call,host:browser.currentHost,detail:current.title);browser.bookmarkCurrent()
+            guard browser.data.bookmarks.contains(where: { $0.url == current.url }) else { throw AgentFailure.message("لم يُحفظ الموقع في المفضلة.") }
+            return "Verified bookmark saved for \(current.url)."
         case "memory_read":return preferences.memory
         case "memory_write":
             let text=String((args["text"] as? String ?? "").prefix(4000));try await requireApproval(call,host:"profile-memory",detail:text,always:false)
@@ -278,7 +314,7 @@ import Combine
                     let kind=block.kind == .text ? "text":block.kind == .thinking ? "thinking":"tool"
                     let status:String?=block.toolStatus.map{switch $0{case .success:return "success";case .failed:return "failed";case .cancelled:return "cancelled";default:return "running"}}
                     return AgentStoredBlock(kind:kind,content:block.content,toolName:block.toolUseId,arguments:block.toolInputArgs,status:status,duration:block.toolDuration,screenshot:block.imageFilePath)
-                })
+                }, files: messageFiles[message.id])
             }
         }
         guard !browser.profile.isPrivate else{return}
