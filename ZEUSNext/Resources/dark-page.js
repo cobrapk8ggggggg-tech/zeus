@@ -35,7 +35,7 @@
     let background=null;
     for(let parent=element;parent;parent=parent.parentElement){background=rgb(getComputedStyle(parent).backgroundColor);if(background)break;}
     background=background||[20,20,20];
-    const fg=rgb(getComputedStyle(element).color);if(!fg)return;
+    const textStyle=getComputedStyle(element),fg=rgb(textStyle.webkitTextFillColor)||rgb(textStyle.color);if(!fg)return;
     const a=lum(fg),b=lum(background),ratio=(Math.max(a,b)+.05)/(Math.min(a,b)+.05);
     if(b<.25&&ratio<4.5) {
       const mapped=fg.slice(0,3).map(x=>Math.round(205+x*.19));

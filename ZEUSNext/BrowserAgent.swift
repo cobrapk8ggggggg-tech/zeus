@@ -104,6 +104,7 @@ import Combine
     func send() {
         let prompt=inputText.trimmingCharacters(in:.whitespacesAndNewlines)
         guard !isProcessing,!prompt.isEmpty else{return}
+        guard attachments.reduce(0, { $0 + $1.data.count }) <= 20_000_000 else { errorMessage = "الحد الأقصى لمجموع المرفقات 20 ميجابايت."; return }
         do{try validate()}catch{errorMessage=error.localizedDescription;return}
         guard preferences.contextApproved else{errorMessage="اختر صلاحيات قراءة سياق المتصفح أولًا.";return}
         if selectedID==nil{newSession()}
@@ -301,7 +302,7 @@ import Combine
     const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
     while(walker.nextNode()&&size<90000){const p=walker.currentNode.parentElement;if(!p||p.closest('script,style,noscript,input,textarea,select,[contenteditable=true]'))continue;const s=getComputedStyle(p),r=p.getBoundingClientRect();if(s.display==='none'||s.visibility==='hidden'||s.opacity==='0'||r.width===0||r.height===0||(!full&&(r.bottom<0||r.top>innerHeight*2)))continue;const t=(walker.currentNode.nodeValue||'').replace(/\s+/g,' ').trim();if(t){out.push(t);size+=t.length}}
     const elements=new Map(),controls=[];
-    for(const e of document.querySelectorAll('a[href],button,input:not([type=hidden]),textarea,select,[role=button]')){if(controls.length>=120)break;const r=e.getBoundingClientRect(),s=getComputedStyle(e);if(!r.width||!r.height||r.bottom<0||r.top>innerHeight*2||s.visibility==='hidden')continue;const id=String(controls.length+1);elements.set(id,e);controls.push({element_id:id,tag:e.tagName,type:e.type||'',label:(e.getAttribute('aria-label')||e.innerText||e.getAttribute('placeholder')||e.name||'').slice(0,180),href:e.tagName==='A'?e.href:undefined})}
+    for(const e of document.querySelectorAll('a[href],button,input:not([type=hidden]),textarea,select,[role=button]')){if(controls.length>=120)break;const r=e.getBoundingClientRect(),s=getComputedStyle(e);if(!r.width||!r.height||r.bottom<0||r.top>innerHeight*2||s.visibility==='hidden')continue;const id=String(controls.length+1);elements.set(id,e);const field=['INPUT','TEXTAREA','SELECT'].includes(e.tagName);controls.push({element_id:id,tag:e.tagName,type:e.type||'',label:(e.getAttribute('aria-label')||(!field?e.innerText:'')||e.getAttribute('placeholder')||e.name||'').slice(0,180),href:e.tagName==='A'?e.href:undefined})}
     window.__zeusAgentSnapshot={url:location.href,elements};return {url:location.href,title:document.title,text:out.join('\n').slice(0,90000),elements:controls,scroll_y:scrollY};
     """#
     static let interactScript = #"""
