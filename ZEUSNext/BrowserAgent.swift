@@ -71,6 +71,11 @@ import Combine
     func chooseProvider(_ id:UUID) { if selectedID==nil{newSession()};guard let i=sessions.firstIndex(where:{$0.id==selectedID}),!isProcessing else{return};sessions[i].providerID=id;sessions[i].model=providers.first{$0.id==id}?.model;save() }
     func chooseModel(_ value:String) { guard let i=sessions.firstIndex(where:{$0.id==selectedID}),!isProcessing else{return};sessions[i].model=value;save() }
     func approveContext() { preferences.contextApproved=true;save() }
+    func openUserLink(_ url: URL) -> Bool {
+        do { try validate() } catch { return false }
+        guard let browser, BrowserURL.isWeb(url), browser.permits(url) else { return false }
+        return browser.newTab(url: url, foreground: true) != nil
+    }
     func cancel() {
         runID=UUID();task?.cancel();task=nil;isProcessing=false
         approvalAnswer?.resume(returning:false);approvalAnswer=nil;approval=nil

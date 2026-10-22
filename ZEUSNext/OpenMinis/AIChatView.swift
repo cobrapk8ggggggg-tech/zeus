@@ -50,6 +50,11 @@ struct AIChatView: View {
         }
         .preferredColorScheme(.dark).tint(.white).foregroundStyle(ChatColors.primaryText)
         .environment(\.layoutDirection, .leftToRight)
+        .environment(\.openURL, OpenURLAction { url in
+            guard vm.openUserLink(url) else { return .discarded }
+            if !canResize { close() }
+            return .handled
+        })
         .sheet(isPresented: $settings) { settingsSheet }
         .sheet(item: $detailBlock) { ToolLiveSheet(vm: vm, selected: $0).presentationDetents([.medium, .large]) }
         .sheet(item: $share) { ActivitySheet(url: $0.url) }
@@ -118,7 +123,7 @@ struct AIChatView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
-                    if vm.messages.isEmpty { emptyState }
+                    if vm.messages.isEmpty && vm.sessions.isEmpty { EmptyChatDirectoryTimeline(onBrowse: { settings = true }).padding(.horizontal, 24).padding(.vertical, 80) }
                     ForEach(vm.messages) { message in
                         OpenMinisMessageRow(message: message, active: vm.isProcessing && vm.messages.last?.id == message.id, stop: { vm.cancel() }, retry: { vm.retry(message) }, edit: { vm.inputText = message.content; inputFocused = true }, detailBlock: $detailBlock)
                     }
@@ -130,15 +135,6 @@ struct AIChatView: View {
             .onChange(of: vm.messages.count) { _, _ in withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo("bottom", anchor: .bottom) } }
             .scrollDismissesKeyboard(.interactively)
         }
-    }
-    private var emptyState: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("ZEUS").font(.system(size: 30, weight: .semibold))
-            Text("ماذا تريد أن نفعل؟").font(.system(size: 19)).foregroundStyle(.secondary)
-            ForEach(["لخّص الصفحة المفتوحة", "قارن الصفحات في تبويباتي", "افتح موقعًا وابحث فيه"], id: \.self) { prompt in
-                Button { vm.inputText = prompt; inputFocused = true } label: { HStack { Text(prompt).font(.subheadline); Spacer(); Image(systemName: "arrow.up.left") }.padding(14).background(ChatColors.secondaryBg, in: RoundedRectangle(cornerRadius: 14)) }
-            }
-        }.padding(.horizontal, 24).padding(.vertical, 55)
     }
     // Original OpenMinis composer layout: attachment chips, multiline native
     // PastableTextView, then + / slash / send under the field, inside one card.
@@ -182,7 +178,7 @@ struct AIChatView: View {
             List {
                 ForEach(vm.sessions.filter { search.isEmpty || $0.title.localizedCaseInsensitiveContains(search) }.sorted { $0.pinned != $1.pinned ? $0.pinned : $0.updated > $1.updated }) { session in
                     Button { vm.select(session); withAnimation { history = false } } label: {
-                        HStack { if session.pinned { Image(systemName: "pin.fill").font(.caption) }; VStack(alignment: .leading, spacing: 5) { Text(session.title).font(.subheadline).lineLimit(1); Text(session.updated, style: .date).font(.caption2).foregroundStyle(.secondary) }; Spacer() }.padding(.vertical, 8)
+                        OpenMinisSessionRow(session: session, active: vm.isProcessing && vm.selectedID == session.id)
                     }.buttonStyle(.plain).listRowBackground(vm.selectedID == session.id ? Color(white: 0.12) : .clear)
                         .contextMenu {
                             Button("إعادة التسمية", systemImage: "pencil") { renameText = session.title; renaming = session.id }
