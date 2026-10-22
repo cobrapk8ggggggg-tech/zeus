@@ -150,6 +150,7 @@ struct CookieSettingsPage: View {
     @Environment(\.browserTheme) private var theme
     @ObservedObject var context: ProfileSettingsContext
     @State private var cookies: [HTTPCookie] = []
+    init(context: ProfileSettingsContext, initialSearch: String = "") { self.context = context; _search = State(initialValue: initialSearch) }
     @State private var search = ""
     @State private var revealed: Set<String> = []
     var body: some View {
@@ -180,6 +181,11 @@ struct StorageSettingsPage: View {
     @State private var result: String?
     var body: some View {
         Form {
+            ThemedSection("إدارة محددة") {
+                NavigationLink("المواقع — حذف بيانات موقع أو نوع محدد") { WebsiteStoragePage(context: context) }.accessibilityIdentifier("websiteStorageButton")
+                ForEach(StoredItemCategory.allCases) { category in NavigationLink(category.title) { StoredProfileItemsPage(context: context, category: category) } }
+                NavigationLink("الترجمات المحفوظة") { TranslationStoragePage(context: context) }
+            }
             ThemedSection("البيانات") { LabeledContent("ملفات الحساب", value: byteText(bytes)); LabeledContent("مواقع خزّنت بيانات", value: "\(sites)"); LabeledContent("المساحة المتاحة بالجهاز", value: byteText(freeBytes)); Button("مسح الملفات المؤقتة") { action = "cache" }.accessibilityIdentifier("clearCacheButton"); Button("مسح الكوكيز وبيانات المواقع") { action = "web" }; Button("مسح سجل التصفح") { action = "history" }; Button("مسح سجل البحث") { action = "search" }; Button("حذف التنزيلات") { action = "downloads" } }
             if context.isActive { ThemedSection { NavigationLink("المفضلة والسجل") { LibrarySheet(model: context.model) }; NavigationLink("السكربتات") { ScriptsSheet(model: context.model) } } }
             if context.model.profile.isAdmin { ThemedSection { Button("مسح كاش الصور من إصدار ZEUS القديم") { action = "legacy" }; Button("إعادة ضبط التطبيق وكل الحسابات") { action = "reset" } } }

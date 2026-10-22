@@ -1,7 +1,7 @@
 name: ZEUS browser verification
 on:
   push:
-    branches: [feature/zeus-tabs-reader-polish-20261021, feature/zeus-cloudflare-translation-20261021, feature/zeus-page-translation-20261021, codex/zeus-browser-next, fix/zeus-next-latest-build-20261020, fix/zeus-browser-stability-20261021]
+    branches: [feature/zeus-openminis-agent-20261022, feature/zeus-tabs-reader-polish-20261021, feature/zeus-cloudflare-translation-20261021, feature/zeus-page-translation-20261021, codex/zeus-browser-next, fix/zeus-next-latest-build-20261020, fix/zeus-browser-stability-20261021]
     paths: [ZEUSNext/**, ZEUSNextTests/**, ZEUSNextUITests/**, .zeus-ci/**, cloudflare/**, .github/workflows/zeus-cloudflare.yml]
   workflow_dispatch:
 permissions:

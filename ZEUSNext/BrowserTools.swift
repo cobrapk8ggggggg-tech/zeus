@@ -5,7 +5,8 @@ import UIKit
 enum BrowserTools {
     static let darkPage: String = {
         guard let url = Bundle.main.url(forResource: "dark-page", withExtension: "js"), let source = try? String(contentsOf: url, encoding: .utf8) else { return "" }
-        return source
+        guard let engineURL = Bundle.main.url(forResource: "darkreader", withExtension: "js"), let engine = try? String(contentsOf: engineURL, encoding: .utf8) else { return "" }
+        return engine + "\n" + source
     }()
     static let consoleScript = """
     (()=>{for(const kind of ['log','warn','error','info']){const original=console[kind];console[kind]=function(...args){try{window.webkit.messageHandlers.zeusConsole.postMessage({type:kind,message:args.map(a=>{try{return typeof a==='string'?a:JSON.stringify(a)}catch{return String(a)}}).join(' ').slice(0,4000)})}catch{};original.apply(console,args)}}})();

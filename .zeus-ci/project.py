@@ -7,16 +7,21 @@ settings = {
     'GENERATE_INFOPLIST_FILE': 'YES', 'CODE_SIGNING_ALLOWED': 'NO',
     'CODE_SIGNING_REQUIRED': 'NO', 'TARGETED_DEVICE_FAMILY': '1,2',
     'ASSETCATALOG_COMPILER_APPICON_NAME': 'AppIcon',
-    'MARKETING_VERSION': '2.4.0', 'CURRENT_PROJECT_VERSION': '8',
+    'MARKETING_VERSION': '2.6.0', 'CURRENT_PROJECT_VERSION': '10',
     'CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]': '.zeus-ci/Simulator.entitlements',
 }
 spec = {
+    'packages': {
+        'swift-cmark': {'url': 'https://github.com/swiftlang/swift-cmark', 'exactVersion': '0.4.0'},
+        'SwiftMath': {'url': 'https://github.com/mgriebling/SwiftMath', 'exactVersion': '1.7.3'},
+    },
     'name': 'ZEUSNext', 'options': {'deploymentTarget': {'iOS': '18.1'}, 'developmentLanguage': 'ar'},
     'settings': {'base': {'SWIFT_VERSION': '5.0', 'CODE_SIGNING_ALLOWED': 'NO'}},
     'targets': {
         'ZEUSNext': {
             'type': 'application', 'platform': 'iOS', 'sources': [{'path': 'ZEUSNext', 'excludes': ['Resources/safari-rules.json', 'Resources/filter-metadata.json']}],
             'settings': {'base': settings},
+            'dependencies': [{'package': 'swift-cmark', 'product': 'cmark-gfm'}, {'package': 'swift-cmark', 'product': 'cmark-gfm-extensions'}, {'package': 'SwiftMath'}],
             'info': {'path': '.zeus-ci/Generated-Info.plist', 'properties': {
                 'CFBundleDisplayName': 'ZEUS', 'UILaunchScreen': {},
                 'UISupportedInterfaceOrientations': ['UIInterfaceOrientationPortrait', 'UIInterfaceOrientationLandscapeLeft', 'UIInterfaceOrientationLandscapeRight'],

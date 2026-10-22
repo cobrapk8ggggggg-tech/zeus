@@ -93,6 +93,7 @@ struct ProfileData: Codable {
     var searches: [String]?
     var forms: [SavedForm]?
     var tabGroups: [TabGroup]?
+    var tabScrollOffsets: [String: Double]?
 }
 
 enum BrowserURL {

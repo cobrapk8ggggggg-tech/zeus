@@ -11,7 +11,7 @@ struct TabsSheet: View {
     @State private var closeAll = false
     var body: some View {
         NavigationStack {
-            ScrollView {
+            RememberedTabScroll(model: model, key: "tabs-" + (model.data.settings.chromeLayout ?? .original).rawValue, axis: .vertical) {
                 VStack(alignment: .leading, spacing: 20) {
                     PanelHeader(title: "نوافذ على عالمك", caption: "\(model.tabs.count) تبويب في \(model.profile.name)")
                     BrowserTabCollection(model: model, grid: true, selected: { dismiss() })

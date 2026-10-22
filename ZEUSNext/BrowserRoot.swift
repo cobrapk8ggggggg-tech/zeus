@@ -4,10 +4,11 @@ import Combine
 
 enum BrowserPanel: String, Identifiable { case translation, tabs, profiles, account, downloads, settings, library, history, tools, scripts, console, forms; var id: String { rawValue } }
 enum BrowserAction: String, CaseIterable, Identifiable {
-    case translate, back, forward, reload, home, newTab, tabs, library, history, reader, gallery, downloads, profiles, scripts, console, shield, share, settings, tools, bookmark, pinTab, twinHorizontal, twinVertical, savePage, printPage, darkPage, fullScreen, saveForm, fillForm
+    case assistant, translate, back, forward, reload, home, newTab, tabs, library, history, reader, gallery, downloads, profiles, scripts, console, shield, share, settings, tools, bookmark, pinTab, twinHorizontal, twinVertical, savePage, printPage, darkPage, fullScreen, saveForm, fillForm
     var id: String { rawValue }
     var symbol: String {
         switch self {
+        case .assistant: return "sparkles"
         case .translate: return "translate"
         case .saveForm: return "plus.rectangle.on.rectangle"; case .fillForm: return "square.and.pencil"
         case .bookmark: return "bookmark.badge.plus"; case .pinTab: return "pin"; case .twinHorizontal: return "rectangle.split.2x1"; case .twinVertical: return "rectangle.split.1x2"; case .savePage: return "doc"; case .printPage: return "printer"; case .darkPage: return "moon"; case .fullScreen: return "arrow.up.left.and.arrow.down.right"
@@ -16,6 +17,7 @@ enum BrowserAction: String, CaseIterable, Identifiable {
     }
     var title: String {
         switch self {
+        case .assistant: return "وكيل ZEUS"
         case .translate: return "ترجمة الصفحة"
         case .saveForm: return "حفظ النموذج"; case .fillForm: return "ملء النماذج"
         case .bookmark: return "إضافة للمفضلة"; case .pinTab: return "تثبيت التبويب"; case .twinHorizontal: return "متصفح مزدوج أفقي"; case .twinVertical: return "متصفح مزدوج عمودي"; case .savePage: return "حفظ الصفحة"; case .printPage: return "طباعة"; case .darkPage: return "تعتيم الصفحة"; case .fullScreen: return "إخفاء الأشرطة"
@@ -36,6 +38,8 @@ struct BrowserRoot: View {
     @State private var topTray = false
     @State private var draft = ""
     @State private var dialogText = ""
+    @State private var assistantVisible = false
+    @State private var assistantExpanded = false
     @FocusState private var addressFocused: Bool
     private var layout: ChromeLayout { model.data.settings.chromeLayout ?? .original }
     private var theme: BrowserTheme { model.data.settings.theme ?? .standard }
@@ -45,18 +49,16 @@ struct BrowserRoot: View {
             theme.backgroundColor.ignoresSafeArea()
             if model.requiresUnlock { lockedView }
             else {
-                VStack(spacing: 0) {
-                    if model.profile.role != .kiosk && layout != .original && barsVisible { topBar.transition(.move(edge: .top).combined(with: .opacity)) }
-                    browserContent.frame(maxWidth: .infinity, maxHeight: .infinity)
-                    if model.profile.role != .kiosk && layout == .dualBars && barsVisible { bottomBar.transition(.move(edge: .bottom).combined(with: .opacity)) }
+                GeometryReader { geometry in
+                    HStack(spacing: 0) {
+                        if assistantVisible, sizeClass == .regular, !assistantExpanded, let agent = model.agent {
+                            assistant(agent, fullScreen: false)
+                                .frame(width: max(300, min(420, geometry.size.width * 0.29)))
+                            Divider().overlay(.white.opacity(0.15))
+                        }
+                        browsingSurface
+                    }.environment(\.layoutDirection, .leftToRight)
                 }
-                if model.profile.role == .kiosk { kioskControls }
-                else if layout == .original { originalControls.environment(\.layoutDirection, .leftToRight) }
-                else if !barsVisible { edgeReveal }
-                if showCurrentUserAvatar && layout == .original && !toolbarVisible && model.profile.role != .kiosk {
-                    VStack { HStack { Spacer(); actionButton(.profiles).glassSurface(18) }; Spacer() }.padding(.top, 35).padding(.trailing, 12).environment(\.layoutDirection, .leftToRight)
-                }
-                if topTray { tabsTray.transition(.move(edge: .top)).zIndex(10) }
             }
             if scenePhase != .active { theme.backgroundColor.ignoresSafeArea().overlay(Image(systemName: "lock").font(.largeTitle)).accessibilityHidden(true) }
         }
@@ -64,6 +66,7 @@ struct BrowserRoot: View {
         .statusBarHidden(layout == .original)
         .ignoresSafeArea(.container, edges: layout == .original ? .all : [])
         .animation(.spring(response: 0.34, dampingFraction: 0.86), value: model.chromeHidden)
+        .fullScreenCover(isPresented: assistantCover) { if let agent = model.agent { assistant(agent, fullScreen: true) } }
         .fullScreenCover(item: $panel) { item in panelContent(item).browserTheme(theme).environment(\.layoutDirection, .rightToLeft) }
         .overlay { if profilePicker { ProfilePickerPopover(model: model, close: { profilePicker = false }, manage: { profilePicker = false; panel = .profiles }).browserTheme(theme) } }
         .overlay(alignment: .top) { if model.current?.loading == true { ProgressView(value: max(0.05, model.current?.progress ?? 0)).progressViewStyle(.linear).tint(theme.accentColor).frame(height: 2).allowsHitTesting(false) } }
@@ -76,15 +79,41 @@ struct BrowserRoot: View {
         .sheet(item: $model.share) { ActivitySheet(url: $0.url) }
         .onChange(of: model.dialog?.id) { _, _ in if let dialog = model.dialog { model.dialog = nil; BrowserPresentation.present(dialog) } }
         .onChange(of: model.notice?.id) { _, _ in if let notice = model.notice { model.notice = nil; BrowserPresentation.notice(notice.text) } }
-        .onChange(of: model.requiresUnlock) { _, locked in if locked { profilePicker = false; panel = nil; model.article = nil; model.gallery = nil; model.formDraft = nil; model.share = nil; BrowserPresentation.dismissTools() } }
+        .onChange(of: model.requiresUnlock) { _, locked in if locked { assistantVisible = false; model.agent?.cancel(); model.agent = nil; profilePicker = false; panel = nil; model.article = nil; model.gallery = nil; model.formDraft = nil; model.share = nil; BrowserPresentation.dismissTools() } }
         .onChange(of: model.address) { _, value in if !addressFocused { draft = value } }
         .onChange(of: scenePhase) { _, phase in if phase == .background { model.backgrounded() }; if phase == .active { model.becameActive() } }
-        .onReceive(model.profiles.$activeID.dropFirst()) { _ in profilePicker = false; panel = nil; model.article = nil; model.gallery = nil; model.formDraft = nil; model.share = nil; BrowserPresentation.dismissTools() }
+        .onReceive(model.profiles.$activeID.dropFirst()) { _ in assistantVisible = false; model.agent?.cancel(); model.agent = nil; profilePicker = false; panel = nil; model.article = nil; model.gallery = nil; model.formDraft = nil; model.share = nil; BrowserPresentation.dismissTools() }
         .onReceive(model.profiles.objectWillChange) { model.changed() }
         .onReceive(model.downloads.objectWillChange) { model.changed() }
         .onReceive(model.downloads.$message) { if let text = $0 { model.downloads.message = nil; model.notify(text) } }
         .onReceive(model.profiles.$errorMessage) { if let text = $0 { model.profiles.errorMessage = nil; model.notify(text) } }
         .task { draft = model.address; await model.ensureCurrentLoaded() }
+    }
+    private var browsingSurface: some View {
+        ZStack {
+                VStack(spacing: 0) {
+                    if model.profile.role != .kiosk && layout != .original && barsVisible { topBar.transition(.move(edge: .top).combined(with: .opacity)) }
+                    browserContent.frame(maxWidth: .infinity, maxHeight: .infinity)
+                    if model.profile.role != .kiosk && layout == .dualBars && barsVisible { bottomBar.transition(.move(edge: .bottom).combined(with: .opacity)) }
+                }
+                if model.profile.role == .kiosk { kioskControls }
+                else if layout == .original { originalControls.environment(\.layoutDirection, .leftToRight) }
+                else if !barsVisible { edgeReveal }
+                if showCurrentUserAvatar && layout == .original && !toolbarVisible && model.profile.role != .kiosk {
+                    VStack { HStack { Spacer(); actionButton(.profiles).glassSurface(18) }; Spacer() }.padding(.top, 35).padding(.trailing, 12).environment(\.layoutDirection, .leftToRight)
+                }
+                if topTray { tabsTray.transition(.move(edge: .top)).zIndex(10) }
+        }.frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    private var assistantCover: Binding<Bool> {
+        Binding(get: { assistantVisible && (sizeClass != .regular || assistantExpanded) }, set: { visible in
+            if !visible { if sizeClass == .regular { assistantExpanded = false } else { assistantVisible = false } }
+        })
+    }
+    private func assistant(_ agent: BrowserAgent, fullScreen: Bool) -> some View {
+        AIChatView(vm: agent, fullScreen: fullScreen, canResize: sizeClass == .regular,
+                   close: { withAnimation { assistantVisible = false; assistantExpanded = false } },
+                   resize: { assistantExpanded.toggle() }).id(model.profile.id)
     }
     @ViewBuilder private var browserContent: some View {
         if model.secondary != nil { TwinBrowserSurface(model: model) }
@@ -102,7 +131,7 @@ struct BrowserRoot: View {
             if layout == .icab {
                 HStack(spacing: 0) {
                     if sizeClass == .regular { actionButton(.library); actionButton(.share); actionButton(.tabs) }
-                    actionButton(.back); actionButton(.forward); addressBar; actionButton(.profiles)
+                    actionButton(.back); actionButton(.forward); addressBar; actionButton(.assistant); actionButton(.profiles)
                 }
                 if model.data.settings.advanced?.showBookmarksBar != false {
                     HStack(spacing: 0) {
@@ -113,14 +142,14 @@ struct BrowserRoot: View {
                     }
                 }
                 if model.data.settings.advanced?.showTabsBar != false {
-                    ScrollView(.horizontal, showsIndicators: false) {
+                    RememberedTabScroll(model: model, key: "icab") {
                         HStack(spacing: 1) {
                             BrowserTabCollection(model: model, compact: true)
                             actionButton(.newTab)
                         }
                     }
                 }
-            } else { HStack { actionButton(.profiles); Spacer(); Text(model.profile.name).font(.subheadline); Spacer(); Button { panel = .account } label: { Image(systemName: "gearshape").font(.system(size: 19)).foregroundStyle(theme.iconColor).frame(width: 44, height: 40).background(theme.buttonBackgroundColor, in: RoundedRectangle(cornerRadius: theme.radius(12))) }.buttonStyle(.plain).accessibilityIdentifier("accountSettingsButton").accessibilityLabel("إعدادات البروفايل") } }
+            } else { HStack { actionButton(.profiles); Spacer(); Text(model.profile.name).font(.subheadline); Spacer(); actionButton(.assistant); Button { panel = .account } label: { Image(systemName: "gearshape").font(.system(size: 19)).foregroundStyle(theme.iconColor).frame(width: 44, height: 40).background(theme.buttonBackgroundColor, in: RoundedRectangle(cornerRadius: theme.radius(12))) }.buttonStyle(.plain).accessibilityIdentifier("accountSettingsButton").accessibilityLabel("إعدادات البروفايل") } }
             if model.current?.loading == true { ProgressView(value: model.current?.progress ?? 0).tint(theme.buttonTextColor).frame(height: 2) }
         }.padding(.horizontal, layout == .icab ? 4 : 12).padding(.vertical, 5).background(theme.backgroundColor).environment(\.layoutDirection, .leftToRight)
     }
@@ -138,7 +167,7 @@ struct BrowserRoot: View {
             if toolbarVisible {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 9) {
-                        ForEach([BrowserAction.back, .forward, .reload, .home, .newTab, .library, .history, .reader, .gallery, .console, .scripts, .darkPage, .tools]) { item in actionButton(item); if [.home, .gallery, .profiles].contains(item) { Divider().frame(width: 30).overlay(theme.textColor.opacity(0.3)) } }
+                        ForEach([BrowserAction.assistant, .back, .forward, .reload, .home, .newTab, .library, .history, .reader, .gallery, .console, .scripts, .darkPage, .tools]) { item in actionButton(item); if [.home, .gallery, .profiles].contains(item) { Divider().frame(width: 30).overlay(theme.textColor.opacity(0.3)) } }
                     }.padding(.vertical, 14).padding(.horizontal, 8)
                 }.frame(width: 64).frame(maxHeight: 680).glassSurface(20)
                     .transition(.move(edge: .trailing)).padding(.vertical, 24)
@@ -165,7 +194,7 @@ struct BrowserRoot: View {
             Color.black.opacity(0.5).ignoresSafeArea().onTapGesture { withAnimation { topTray = false } }
             VStack(spacing: 0) {
                 Capsule().fill(theme.textColor.opacity(0.4)).frame(width: 40, height: 5).padding(.top, 10).padding(.bottom, 20)
-                ScrollView(.horizontal, showsIndicators: false) {
+                RememberedTabScroll(model: model, key: "original") {
                     HStack(spacing: 15) {
                         BrowserTabCollection(model: model, selected: { withAnimation { topTray = false } })
                         Button { _ = model.newTab(); withAnimation { topTray = false } } label: { Image(systemName: "plus").font(.system(size: 30)).frame(width: 140, height: 180).background(theme.textColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [5])).foregroundStyle(theme.textColor.opacity(0.3))) }
@@ -193,6 +222,9 @@ struct BrowserRoot: View {
         addressFocused = false
         withAnimation { toolbarVisible = false; topTray = false }
         switch action {
+        case .assistant:
+            if model.agent == nil { model.agent = BrowserAgent(browser: model) }
+            assistantVisible = true
         case .translate: model.current?.translation?.translate()
         case .back: model.webView?.goBack(); case .forward: model.webView?.goForward(); case .reload: model.reload(); case .home: model.home(); case .newTab: _ = model.newTab(); topTray = false
         case .tabs: if layout == .original { withAnimation { topTray.toggle() } } else { panel = .tabs }

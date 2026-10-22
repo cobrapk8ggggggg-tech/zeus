@@ -10,6 +10,24 @@ actor TranslationMemory {
     static let maximumBytes: Int64 = 32 * 1024 * 1024
     private let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
     struct Stats { var entries: Int; var bytes: Int64 }
+    struct Entry: Identifiable { var id: String; var text: String; var used: Date; var bytes: Int64 }
+    func entries(folder: URL) -> [Entry] {
+        guard let db = open(folder, create: false) else { return [] }; defer { sqlite3_close(db) }
+        var query: OpaquePointer?; defer { sqlite3_finalize(query) }
+        guard sqlite3_prepare_v2(db, "SELECT key,text,used,bytes FROM translations ORDER BY used DESC LIMIT 2000", -1, &query, nil) == SQLITE_OK else { return [] }
+        var result: [Entry] = []
+        while sqlite3_step(query) == SQLITE_ROW, let key = sqlite3_column_text(query, 0), let text = sqlite3_column_text(query, 1) {
+            result.append(Entry(id: String(cString: key), text: String(cString: text), used: Date(timeIntervalSince1970: sqlite3_column_double(query, 2)), bytes: sqlite3_column_int64(query, 3)))
+        }
+        return result
+    }
+    func remove(keys: Set<String>, folder: URL) {
+        guard let db = open(folder, create: false) else { return }; defer { sqlite3_close(db) }
+        var query: OpaquePointer?; defer { sqlite3_finalize(query) }
+        guard sqlite3_prepare_v2(db, "DELETE FROM translations WHERE key=?", -1, &query, nil) == SQLITE_OK else { return }
+        for key in keys { sqlite3_bind_text(query, 1, key, -1, transient); sqlite3_step(query); sqlite3_reset(query) }
+        sqlite3_exec(db, "VACUUM", nil, nil, nil)
+    }
     nonisolated static func namespace(page: String, preferences: TranslationPreferences, provider: AIProviderConfiguration?) -> String {
         var url = URLComponents(string: page); url?.fragment = nil
         var identity = ["v2", url?.string ?? page, preferences.engine.rawValue, preferences.target,

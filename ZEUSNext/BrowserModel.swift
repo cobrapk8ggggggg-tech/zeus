@@ -70,6 +70,7 @@ struct WebDialog: Identifiable {
     @Published var twinVertical = false
     @Published var twinFocused = false
     @Published var twinFraction: CGFloat = 0.5
+    @Published var agent: BrowserAgent?
     private var leftAt: Date?
     private var transitionEpoch = UUID()
     init(profiles: ProfileStore? = nil, useBackgroundDownloads: Bool = true) {
@@ -124,6 +125,7 @@ struct WebDialog: Identifiable {
             controller.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
         }
         let view = WKWebView(frame: .zero, configuration: config)
+        if options.forceDarkWebPages { view.overrideUserInterfaceStyle = .dark }
         view.allowsBackForwardNavigationGestures = options.swipeNavigation;
         if !options.userAgent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { view.customUserAgent = options.userAgent }
         if options.forceDarkWebPages { controller.addUserScript(WKUserScript(source: BrowserTools.darkPage, injectionTime: .atDocumentEnd, forMainFrameOnly: false)) }; view.allowsLinkPreview = true
@@ -221,6 +223,7 @@ struct WebDialog: Identifiable {
         guard !switching, target.account?.enabled != false, target.id != profile.id || requiresUnlock else { return }; switching = true; defer { switching = false }
         if target.requiresPassword, !(await AccountVault.verify(password, id: target.id)) { notify(AccountError.password.localizedDescription); return }
         if target.locked, !(await authenticate(reason: "فتح مساحة \(target.name)")) { return }
+        agent?.cancel(); agent = nil; OpenMinisMedia.root = nil
         transitionEpoch = UUID()
         let previous = profile; twinTabID = nil; twinFocused = false; if !requiresUnlock { persist() }
         for tab in tabs { tab.dispose() }; console.removeAll(); pendingPopup = nil
