@@ -54,7 +54,7 @@ struct AppLogger {
     func debug(_ message: @autoclosure () -> String) { }
     func info(_ message: @autoclosure () -> String) { }
     func notice(_ message: @autoclosure () -> String) { }
-    func warning(_ message: @autoclosure () -> String) { Logger(subsystem: "tools.zeus", category: category).warning("\(message(), privacy: .private)") }
+    func warning(_ message: @autoclosure () -> String) { let value = message(); Logger(subsystem: "tools.zeus", category: category).warning("\(value, privacy: .private)") }
     func error(_ message: @autoclosure () -> String) { warning(message()) }
 }
 struct LLMUsage { var inputTokens = 0; var outputTokens = 0; var cacheCreationInputTokens: Int?; var cacheReadInputTokens: Int? }

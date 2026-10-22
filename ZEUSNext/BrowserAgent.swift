@@ -63,6 +63,9 @@ import Combine
     func cancel() {
         runID=UUID();task?.cancel();task=nil;isProcessing=false
         approvalAnswer?.resume(returning:false);approvalAnswer=nil;approval=nil
+        let completed = Set(wire.compactMap(\.toolCallID))
+        let unfinished = wire.flatMap { $0.calls ?? [] }.filter { !completed.contains($0.id) }
+        for call in unfinished { wire.append(AgentWireMessage(role: "tool", content: "Cancelled by the user; no action was performed.", toolCallID: call.id)) }
         for message in messages { message.isAwaitingModelResponse=false;for block in message.blocks where block.toolStatus == .running { block.toolStatus = .cancelled } }
         save()
     }
@@ -190,6 +193,7 @@ import Combine
     private func execute(_ call:AgentToolCall,block:AssistantBlock) async throws -> String {
         try validate();guard let browser else{throw CancellationError()}
         guard BrowserAgentTools.tools.contains(where:{$0.name==call.name}),call.arguments.utf8.count<100_000 else{throw AgentFailure.message("أداة غير معروفة أو مدخلات أكبر من الحد.")}
+        guard let decoded = try? JSONSerialization.jsonObject(with: Data(call.arguments.utf8)), decoded is [String: Any] else { throw AgentFailure.message("مدخلات الأداة ليست JSON صالحًا.") }
         let args=call.object
         switch call.name{
         case "browser_tabs":return try tabsContext()
@@ -265,7 +269,7 @@ import Combine
     if(e.tagName==='A'&&e.href&&!/^https?:/i.test(e.href))throw Error('Only HTTP links are supported.');e.click();return true;
     """#
     func retry(_ message:ChatMessage) {guard !isProcessing,let i=messages.firstIndex(where:{$0.id==message.id})else{return};let prior=message.role == .user ? i : max(0,i-1);let prompt=messages[prior].content;messages=Array(messages.prefix(prior));wire=[];for item in messages{wire.append(AgentWireMessage(role:item.role == .user ? "user":"assistant",content:item.content))};inputText=prompt;send()}
-    func export() -> URL? {save();let url=FileManager.default.temporaryDirectory.appendingPathComponent("ZEUS-conversation.md");let content=messages.map{($0.role == .user ? "## أنت\n":"## ZEUS\n")+$0.content+$0.blocks.filter{$0.kind == .text}.map(\.content).joined(separator:"\n")}.joined(separator:"\n\n");do{try content.write(to:url,atomically:true,encoding:.utf8);return url}catch{return nil}}
+    func export() -> URL? {save();let url=FileManager.default.temporaryDirectory.appendingPathComponent("ZEUS-conversation.md");let content=messages.map{message in let body = message.role == .user ? message.content : message.blocks.filter{$0.kind == .text}.map(\.content).joined(separator:"\n");return (message.role == .user ? "## أنت\n":"## ZEUS\n")+body}.joined(separator:"\n\n");do{try content.write(to:url,atomically:true,encoding:.utf8);return url}catch{return nil}}
     func save() {
         guard let browser,browser.profile.id==profileID else{return}
         if let i=sessions.firstIndex(where:{$0.id==selectedID}){

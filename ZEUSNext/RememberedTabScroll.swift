@@ -8,6 +8,7 @@ struct RememberedTabScroll<Content: View>: View {
     @ViewBuilder var content: () -> Content
     @State private var position = ScrollPosition()
     @State private var restored = false
+    @State private var owner: UUID?
     @State private var saveTask: Task<Void, Never>?
     var body: some View {
         ScrollView(axis, showsIndicators: false) { content() }
@@ -15,7 +16,7 @@ struct RememberedTabScroll<Content: View>: View {
             .onScrollGeometryChange(for: CGFloat.self) { geometry in
                 axis == .horizontal ? geometry.contentOffset.x + geometry.contentInsets.leading : geometry.contentOffset.y + geometry.contentInsets.top
             } action: { _, offset in
-                guard restored, offset.isFinite else { return }
+                guard restored, owner == model.profile.id, offset.isFinite else { return }
                 if model.data.tabScrollOffsets == nil { model.data.tabScrollOffsets = [:] }
                 model.data.tabScrollOffsets?[key] = max(0, Double(offset))
                 saveTask?.cancel()
@@ -23,6 +24,7 @@ struct RememberedTabScroll<Content: View>: View {
             }
             .task(id: model.profile.id) {
                 restored = false
+                owner = model.profile.id
                 let offset = model.data.tabScrollOffsets?[key] ?? 0
                 // Let the content obtain its real width/height before restoring.
                 await Task.yield()
