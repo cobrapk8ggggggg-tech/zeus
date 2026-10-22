@@ -89,4 +89,19 @@ import WebKit
         let text = String(decoding: try JSONSerialization.data(withJSONObject: result ?? [:]), as: UTF8.self)
         XCTAssertTrue(text.contains("Visible chapter")); XCTAssertFalse(text.contains("never-share-this")); XCTAssertFalse(text.contains("hidden-token")); XCTAssertFalse(text.contains("private draft"))
     }
+    func testDeletingOneSitesCookiesKeepsAnotherSitesSession() async throws {
+        let (model, root) = model(); defer { try? FileManager.default.removeItem(at: root) }
+        let store = model.profiles.websiteDataStore(for: model.profile)
+        let one = try XCTUnwrap(HTTPCookie(properties: [.domain: "first.test", .path: "/", .name: "session", .value: "one"]))
+        let two = try XCTUnwrap(HTTPCookie(properties: [.domain: "second.test", .path: "/", .name: "session", .value: "two"]))
+        await store.httpCookieStore.setCookie(one); await store.httpCookieStore.setCookie(two)
+        let context = ProfileSettingsContext(model: model, profile: model.profile)
+        let controller = WebsiteStorageController(context: context)
+        await controller.refresh()
+        let first = try XCTUnwrap(controller.sites.first { $0.id == "first.test" })
+        await controller.remove(first, types: [WKWebsiteDataTypeCookies])
+        let remaining = await store.httpCookieStore.allCookies()
+        XCTAssertFalse(remaining.contains { $0.domain == "first.test" })
+        XCTAssertTrue(remaining.contains { $0.domain == "second.test" && $0.value == "two" })
+    }
 }
