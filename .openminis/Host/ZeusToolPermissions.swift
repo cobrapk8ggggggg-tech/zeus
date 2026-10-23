@@ -19,7 +19,9 @@ enum ZeusToolInput {
                 guard let number = result[key] as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(), number.doubleValue.isFinite,
                       number.doubleValue.rounded() == number.doubleValue else { throw invalid(name, key, "integer") }
             case .string:
-                if !(raw is String), parameter.description.localizedCaseInsensitiveContains("JSON"), raw is [String: Any] || raw is [Any] {
+                if key == "keywords", ["browser_use", "memory_get"].contains(name), let keywords = raw as? [String] {
+                    result[key] = keywords.joined(separator: " ")
+                } else if !(raw is String), parameter.description.localizedCaseInsensitiveContains("JSON"), raw is [String: Any] || raw is [Any] {
                     result[key] = String(decoding: try JSONSerialization.data(withJSONObject: raw), as: UTF8.self)
                 }
                 guard let value = result[key] as? String else { throw invalid(name, key, "string") }
@@ -70,7 +72,7 @@ enum ZeusPermissionMode: String, CaseIterable {
 
     static func isConsequential(tool: String, args: [String: Any]) -> Bool {
         switch tool {
-        case "file_read", "read_image", "memory_read": return false
+        case "file_read", "read_image", "memory_read", "memory_get": return false
         case let name where name == "zeus_browser" || zeusBrowserOperation(name) != nil:
             let op = zeusBrowserOperation(tool) ?? args["operation"] as? String ?? ""
             var inner = args
@@ -83,7 +85,7 @@ enum ZeusPermissionMode: String, CaseIterable {
             // navigation, settings writes and downloads need explicit consent.
             return true
         case "browser_use":
-            return !["get_state", "getState", "snapshot", "screenshot", "get_tabs", "list_tabs", "scroll"].contains(args["action"] as? String ?? "")
+            return !["get_state", "getState", "snapshot", "screenshot", "get_tabs", "list_tabs", "get_text", "get_readable", "get_page_info", "get_backbone", "find_elements", "scroll", "scroll_and_collect", "wait_for_dom_stable"].contains(args["action"] as? String ?? "")
         default: return true // Shell/MCP can conceal writes; never guess from a title.
         }
     }

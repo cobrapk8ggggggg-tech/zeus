@@ -55,6 +55,9 @@ final class NativeBrowserIntegrationTests: XCTestCase {
         XCTAssertFalse(ZeusToolPermissions.isConsequential(tool: "zeus_browser", args: ["operation": "browser_settings", "action": "read"]))
         XCTAssertTrue(ZeusToolPermissions.isConsequential(tool: "zeus_browser", args: ["operation": "browser_settings", "action": "set"]))
         XCTAssertTrue(ZeusToolPermissions.isConsequential(tool: "shell_execute", args: ["command": "rm file"]))
+        XCTAssertFalse(ZeusToolPermissions.isConsequential(tool: "memory_get", args: [:]))
+        XCTAssertFalse(ZeusToolPermissions.isConsequential(tool: "browser_use", args: ["action": "get_readable"]))
+        XCTAssertTrue(ZeusToolPermissions.isConsequential(tool: "browser_use", args: ["action": "get_cookies"]))
         permissions.mode = .askAll
         let first = UUID(), second = UUID()
         let a = Task { try await permissions.authorize(tool: "file_read", args: [:], sessionID: "test", blockID: first) }
