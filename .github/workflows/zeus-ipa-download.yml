@@ -1,5 +1,12 @@
-name: ZEUS native IPA (manual)
+name: ZEUS browser unsigned IPA (isolated branch)
 on:
+  push:
+    branches:
+      - build/zeus-browser-unsigned-ipa-20261023
+    paths:
+      - .github/workflows/zeus-ipa-download.yml
+      - ZEUSNext/**
+      - .openminis/**
   workflow_dispatch:
     inputs:
       source_ref:
@@ -10,7 +17,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: zeus-native-ipa-${{ inputs.source_ref }}
+  group: zeus-native-ipa-${{ github.ref }}
   cancel-in-progress: false
 jobs:
   ipa:
@@ -20,7 +27,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cobrapk8ggggggg-tech/zeus
-          ref: ${{ inputs.source_ref }}
+          ref: ${{ inputs.source_ref || github.sha }}
           path: browser
           persist-credentials: false
       - uses: actions/checkout@v4
