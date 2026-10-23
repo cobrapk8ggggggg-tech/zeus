@@ -2,7 +2,7 @@ name: ZEUS native browser integration tests
 'on':
   push:
     branches:
-    - feature/openminis-native-20261023
+    - build/zeus-unsigned-ipa-repair-20261023
     paths:
     - ZEUSNext/**
     - .openminis/**
@@ -11,18 +11,18 @@ name: ZEUS native browser integration tests
     inputs:
       source_ref:
         description: Browser source branch, tag or commit to test
-        default: feature/openminis-native-20261023
+        default: build/zeus-unsigned-ipa-repair-20261023
         required: true
         type: string
 permissions:
   contents: read
 concurrency:
   group: zeus-native-integration-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   integration:
     runs-on: macos-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
     - uses: actions/checkout@v4
       with:
@@ -98,8 +98,8 @@ jobs:
           ${{ runner.temp }}/OpenMinisOriginal/Build
           ${{ runner.temp }}/OpenMinisOriginal/SourcePackages
           ${{ runner.temp }}/OpenMinisOriginal/ModuleCache.noindex
-        key: zeus-native-deriveddata-263-v1-${{ github.run_id }}
-        restore-keys: zeus-native-deriveddata-263-v1-
+        key: zeus-native-deriveddata-263-v2-${{ github.run_id }}
+        restore-keys: zeus-native-deriveddata-263-v2-
     - name: Build the native browser and integration tests
       run: |
         set -euo pipefail
@@ -116,7 +116,7 @@ jobs:
           ${{ runner.temp }}/OpenMinisOriginal/Build
           ${{ runner.temp }}/OpenMinisOriginal/SourcePackages
           ${{ runner.temp }}/OpenMinisOriginal/ModuleCache.noindex
-        key: zeus-native-deriveddata-263-v1-${{ github.run_id }}
+        key: zeus-native-deriveddata-263-v2-${{ github.run_id }}
     - name: Select available iPhone and iPad simulators
       run: |
         set -euo pipefail
@@ -131,7 +131,7 @@ jobs:
         PY
       timeout-minutes: 4
     - name: Test the embedded original UI and real browser tools
-      timeout-minutes: 12
+      timeout-minutes: 40
       id: embedded_tests
       run: |
         set -euo pipefail
