@@ -151,6 +151,14 @@ jobs:
         continue-on-error: true
         run: |
           set -euo pipefail
+          python3 browser/.zeus-ci/fixture_server.py > results/fixture-server.log 2>&1 &
+          fixture_pid=$!
+          trap 'kill "$fixture_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8765/v1/models > /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:8765/v1/models > results/fixture-models.json
           tests_failed=0
           for kind in IPHONE IPAD; do
             if [ "$kind" = IPHONE ]; then device="$IPHONE_SIMULATOR"; else device="$IPAD_SIMULATOR"; fi

@@ -5,6 +5,39 @@ import WebKit
 
 @MainActor
 final class NativeBrowserIntegrationTests: XCTestCase {
+    func testOriginalAgentTransportStreamsLongUnicodeAnswerWithoutDroppingTheTail() async throws {
+        let model = LLMModel(id: "fixture-native-stream", displayName: "Native stream fixture", provider: "openai")
+        let transport = OpenAIProvider(apiKey: "local-fixture-only", model: model, customBaseURL: "http://127.0.0.1:8765/v1", appendV1Suffix: false)
+        let provider = OpenAIAgentProvider(provider: transport)
+        let stream = try await provider.streamAgentMessage(messages: [AgentMessage(role: .user, parts: [.text("Stream fixture")])], systemPrompt: nil, tools: [], maxTokens: 16000, thinkingLevel: .off)
+        var text = "", deltas = 0
+        for try await event in stream { if case .textDelta(let delta) = event { deltas += 1; text += delta } }
+        XCTAssertGreaterThan(deltas, 6)
+        XCTAssertGreaterThan(text.count, 20_000)
+        XCTAssertTrue(text.contains("العربية"))
+        XCTAssertTrue(text.hasSuffix("نهاية الرسالة NATIVE_STREAM_END"))
+        XCTAssertTrue(text.contains("```swift"))
+    }
+    func testOriginalAgentTransportAccumulatesPartialBrowserToolArguments() async throws {
+        let model = LLMModel(id: "fixture-native-tool", displayName: "Native tool fixture", provider: "openai")
+        let provider = OpenAIAgentProvider(provider: OpenAIProvider(apiKey: "local-fixture-only", model: model, customBaseURL: "http://127.0.0.1:8765/v1", appendV1Suffix: false))
+        let stream = try await provider.streamAgentMessage(messages: [AgentMessage(role: .user, parts: [.text("Inspect tabs")])], systemPrompt: nil, tools: [ZEUSNativeAgentBridge.definition], maxTokens: 1000, thinkingLevel: .off)
+        var partials = 0, complete = false
+        for try await event in stream {
+            switch event {
+            case .toolInputDelta(let name, _): XCTAssertEqual(name, "zeus_browser"); partials += 1
+            case .toolCallComplete(let id, let name, let args, _):
+                XCTAssertEqual(id, "native-tool-fixture"); XCTAssertEqual(name, "zeus_browser")
+                XCTAssertEqual(args["operation"] as? String, "browser_tabs")
+                XCTAssertEqual(args["arguments"] as? String, "{}")
+                XCTAssertEqual(args["tool_title"] as? String, "قراءة التبويبات الفعلية")
+                complete = true
+            default: break
+            }
+        }
+        XCTAssertGreaterThan(partials, 1)
+        XCTAssertTrue(complete)
+    }
     func testInspectorRunsAgainstRealDOMAndOriginStorage() async throws {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .nonPersistent()

@@ -1,6 +1,7 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import time
 import json
+import os
 from urllib.parse import urlparse, parse_qs
 from threading import Lock
 import struct
@@ -22,6 +23,34 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
             body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', '0'))))
+            if body.get('model') in ('fixture-native-stream', 'fixture-native-tool'):
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/event-stream; charset=utf-8')
+                self.send_header('Connection', 'close')
+                self.end_headers()
+                if body['model'] == 'fixture-native-stream':
+                    fragments = ['# رسالة اختبار البث\n'] + [('Paragraph العربية — complete content.\n' * 100) for _ in range(8)] + ['\n```swift\nprint("complete")\n```\nنهاية الرسالة NATIVE_STREAM_END']
+                    events = [{'choices': [{'delta': {'content': part}, 'finish_reason': None}]} for part in fragments]
+                    events.append({'choices': [{'delta': {}, 'finish_reason': 'stop'}]})
+                else:
+                    arguments = json.dumps({'tool_title': 'قراءة التبويبات الفعلية', 'operation': 'browser_tabs', 'arguments': '{}'}, ensure_ascii=False)
+                    pieces = [arguments[i:i + 16] for i in range(0, len(arguments), 16)]
+                    events = []
+                    for index, part in enumerate(pieces):
+                        call = {'index': 0, 'function': {'arguments': part}}
+                        if index == 0:
+                            call.update({'id': 'native-tool-fixture', 'type': 'function'})
+                            call['function']['name'] = 'zeus_browser'
+                        events.append({'choices': [{'delta': {'tool_calls': [call]}, 'finish_reason': None}]})
+                    events.append({'choices': [{'delta': {}, 'finish_reason': 'tool_calls'}]})
+                for event in events:
+                    self.wfile.write(('data: ' + json.dumps(event, ensure_ascii=False) + '\n\n').encode())
+                    self.wfile.flush()
+                    time.sleep(0.03)
+                self.wfile.write(b'data: [DONE]\n\n')
+                self.wfile.flush()
+                self.close_connection = True
+                return
             if body.get('model') == 'fixture-agent':
                 has_result = any(m.get('role') == 'tool' for m in body.get('messages', []))
                 if has_result:
@@ -96,4 +125,4 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(200); self.send_header('Content-Type', 'text/html; charset=utf-8'); self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)
 
 
-ThreadingHTTPServer(('0.0.0.0', 8765), Handler).serve_forever()
+ThreadingHTTPServer(('0.0.0.0', int(os.environ.get('ZEUS_FIXTURE_PORT', '8765'))), Handler).serve_forever()

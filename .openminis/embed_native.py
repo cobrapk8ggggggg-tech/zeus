@@ -41,9 +41,8 @@ def embed(native, browser, report):
     # Only its file-private visibility changes; its body is untouched.
     replace(source / "Views/ContentView.swift", "private struct SettingsSheet: View", "struct SettingsSheet: View")
     # A compiler boundary around the unchanged native geometry expression.
-    # The embedded app's newer deployment target expands SwiftUI overload
-    # resolution enough to hit the type-checker limit on the original giant
-    # modifier chain. No view, modifier or state is replaced or reordered.
+    # The original giant modifier chain hit the type-checker limit in the
+    # embedded target. No view, modifier or state is replaced or reordered.
     replace(source / "Views/ContentView.swift",
             "    private static let pendingBackgroundNavigationTTL: TimeInterval = 90\n\n    var body: some View {\n        GeometryReader { geo in",
             "    private static let pendingBackgroundNavigationTTL: TimeInterval = 90\n\n    private var zeusNativeGeometry: some View {\n        GeometryReader { geo in")
@@ -53,6 +52,8 @@ def embed(native, browser, report):
 
     definitions = source / "Agent/Chat/AIChatViewModel+ToolDefinitions.swift"
     replace(definitions, "        return tools", "        tools.append(ZEUSNativeAgentBridge.definition)\n        return tools")
+    replace(definitions, 'description: "Control a web browser with up to 3 tabs.',
+            'description: "This is the standalone OpenMinis automation browser, separate from the user\'s ZEUS tabs and browser profile. For the user\'s current page, existing tabs, cookies, storage or navigation use zeus_browser instead. Control a web browser with up to 3 tabs.')
     execution = source / "Agent/Chat/AIChatViewModel+ConcurrentTools.swift"
     text = execution.read_text()
     anchor = '        case "browser_use":'
