@@ -157,7 +157,10 @@ def embed(native, browser, report):
     replace(source / "Providers/Anthropic/OAuthHTTPClient.swift", '        if let body = request.httpBody, !body.isEmpty { return }', '        if let body = request.httpBody, !body.isEmpty { ZeusAgentSchemas.patchAnthropic(request); return }')
     replace(source / "Providers/Anthropic/OAuthHTTPClient.swift", '        // Always set httpBody (even if empty) since the stream is now consumed\n        request.httpBody = data\n', '        // Always set httpBody (even if empty) since the stream is now consumed\n        request.httpBody = data\n        ZeusAgentSchemas.patchAnthropic(request)\n')
     oauth = source / "Agent/Session/MCPOAuthController.swift"
-    replace(oauth, '    var scopes: String?\n', '    var scopes: String?\n    var prompt: String?\n')
+    replace(oauth, '    var scopes: String?\n', '    var scopes: String?\n    var prompt: String?\n    var zeusResource: String?\n')
+    replace(oauth, '        canonicalResourceURI(MCPStore.shared.servers.first(where: { $0.id == server })?.url)', '''        let config = MCPStore.shared.servers.first(where: { $0.id == server })
+        if let resource = config?.oauth?.zeusResource, let url = URL(string: resource), url.scheme == "https", url.host != nil, url.fragment == nil { return resource }
+        return canonicalResourceURI(config?.url)''')
     replace(oauth, 'URLQueryItem(name: "prompt", value: "consent")', 'URLQueryItem(name: "prompt", value: oauth.prompt ?? "consent")')
     replace(oauth, '        req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")', '        req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")\n        req.setValue("application/json", forHTTPHeaderField: "Accept")')
     replace(oauth, '    // MARK: - Helpers\n', '''    // Native HTTP integrations share the original Keychain and OAuth flow.

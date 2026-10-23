@@ -68,7 +68,7 @@ struct ZeusOAuthSetupRequired: Error { let config: MCPOAuthConfig }
             // This identifier is not a token or secret and carries no account.
             var config = MCPOAuthConfig(); config.clientId = "cl_WbdtcToDrMR4ZHvXLGAmbfoYCsQjMeS8"
             config.authorizationEndpoint = "https://vercel.com/oauth/authorize"; config.tokenEndpoint = "https://api.vercel.com/login/oauth/token"
-            config.redirectURI = "http://127.0.0.1:18467/callback"; config.scopes = "openid"; return config
+            config.redirectURI = "http://127.0.0.1:18467/callback"; config.scopes = "openid profile email offline_access"; config.zeusResource = "https://mcp.vercel.com/"; return config
         }
         return nil
     }
@@ -100,6 +100,8 @@ struct ZeusOAuthSetupRequired: Error { let config: MCPOAuthConfig }
         guard let authorization = server["authorization_endpoint"] as? String, let token = server["token_endpoint"] as? String else { throw ZeusPatch.failure("بيانات OAuth غير مكتملة لدى الخدمة.") }
         var config = MCPOAuthConfig(); config.authorizationEndpoint = authorization; config.tokenEndpoint = token; config.redirectURI = "http://127.0.0.1:18467/callback"
         config.scopes = (resource["scopes_supported"] as? [String])?.joined(separator: " ")
+        config.zeusResource = resource["resource"] as? String
+        if service.id == "railway" { config.scopes = "openid profile email offline_access workspace:member" }
         guard let registration = server["registration_endpoint"] as? String, let address = URL(string: registration) else { throw ZeusOAuthSetupRequired(config: config) }
         let result: [String: Any]
         do { result = try await metadata(address, body: ["client_name": "ZEUS Browser", "redirect_uris": [config.redirectURI!], "token_endpoint_auth_method": "none", "grant_types": ["authorization_code", "refresh_token"], "response_types": ["code"], "scope": config.scopes ?? ""]) }
@@ -110,6 +112,7 @@ struct ZeusOAuthSetupRequired: Error { let config: MCPOAuthConfig }
     func connect(_ service: ZeusService) async throws {
         guard !busy else { return }; busy = true; defer { busy = false }
         var oauth = try await discover(service); oauth.prompt = "select_account"
+        if oauth.zeusResource == nil { oauth.zeusResource = service.id == "vercel" ? "https://mcp.vercel.com/" : service.endpoint }
         let id = "zeus-direct-" + service.id + "-" + UUID().uuidString.lowercased()
         var server = try JSONDecoder().decode(MCPServerConfig.self, from: JSONSerialization.data(withJSONObject: ["id": id, "note": service.name, "enabled": false, "url": service.endpoint]))
         server.oauth = oauth; MCPStore.shared.add(server)
@@ -216,14 +219,13 @@ struct ZeusOAuthSetupRequired: Error { let config: MCPOAuthConfig }
     func accountSummary() -> [[String: Any]] { accounts.map { ["account_id": $0.id, "provider": $0.provider, "name": $0.label, "default": $0.isDefault, "verified": $0.verified, "tools": $0.toolCount] } }
     private func identity(_ id: String) async {
         guard let index = accounts.firstIndex(where: { $0.id == id }) else { return }; let provider = accounts[index].provider
-        guard let url = URL(string: provider == "github" ? "https://api.github.com/user" : provider == "vercel" ? "https://api.vercel.com/v2/user" : "https://backboard.railway.com/graphql/v2"), let token = try? await bearer(id) else { return }
+        guard let url = URL(string: provider == "github" ? "https://api.github.com/user" : provider == "vercel" ? "https://api.vercel.com/login/oauth/userinfo" : "https://backboard.railway.com/oauth/me"), let token = try? await bearer(id) else { return }
         var request = URLRequest(url: url); request.timeoutInterval = 20; request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
-        if provider == "railway" { request.httpMethod = "POST"; request.httpBody = try? JSONSerialization.data(withJSONObject: ["query": "query { me { id name email } }"]); request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         guard let (data, response) = try? await URLSession.shared.data(for: request), (response as? HTTPURLResponse)?.statusCode == 200, var object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
         if let user = object["user"] as? [String: Any] { object = user }; if let me = (object["data"] as? [String: Any])?["me"] as? [String: Any] { object = me }
         guard let current = accounts.firstIndex(where: { $0.id == id }) else { return }
-        accounts[current].label = object["login"] as? String ?? object["email"] as? String ?? object["username"] as? String ?? object["name"] as? String ?? accounts[current].label
-        accounts[current].avatar = object["avatar_url"] as? String
+        accounts[current].label = object["login"] as? String ?? object["email"] as? String ?? object["preferred_username"] as? String ?? object["name"] as? String ?? accounts[current].label
+        accounts[current].avatar = object["avatar_url"] as? String ?? object["picture"] as? String
         if let configIndex = MCPStore.shared.servers.firstIndex(where: { $0.id == id }) { var config = MCPStore.shared.servers[configIndex]; config.note = provider + " · " + accounts[current].label; MCPStore.shared.update(config) }; save()
     }
 }
