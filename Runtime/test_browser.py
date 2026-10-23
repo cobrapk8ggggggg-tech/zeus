@@ -72,10 +72,10 @@ async def main():
             field = re.search(r'textbox "Name" \[ref=([^\]]+)\]', snapshot)
             button = re.search(r'button "Verify" \[ref=([^\]]+)\]', snapshot)
             assert field and button, snapshot
-            await tool("browser_fill_form", {"fields": [{"name": "Name", "type": "textbox", "ref": field[1], "value": "Zeus"}]})
-            result = text(await tool("browser_click", {"ref": button[1], "element": "Verify button"}))
+            await tool("browser_fill_form", {"fields": [{"name": "Name", "type": "textbox", "target": field[1], "value": "Zeus"}]})
+            result = text(await tool("browser_click", {"target": button[1], "element": "Verify button"}))
             assert "Zeus ready" in result, result
-            await tool("browser_take_screenshot", {"type": "png", "filename": "browser-smoke.png"})
+            await tool("browser_take_screenshot", {"type": "png", "filename": "browser-smoke.png", "scale": "css"})
             image = Path(directory) / "browser-smoke.png"
             assert image.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
             print(json.dumps({"playwright_mcp": True, "real_chromium": True, "navigation": True, "form_fill_and_click": True, "verified_dom_result": True, "actual_png_screenshot": True}))

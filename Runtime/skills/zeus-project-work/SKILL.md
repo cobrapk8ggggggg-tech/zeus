@@ -37,6 +37,10 @@ navigation, accessibility snapshots, click/fill, console/network observations,
 Playwright execution and screenshots. Exercise the running local project and
 verify resulting UI state. Read the actual snapshot YAML files linked by MCP
 responses for element references; inspect actual PNGs with the image tool.
+Use the live discovered tool schemas, not older API examples: the pinned browser
+uses `target` for interaction and a screenshot `scale`. Read validation errors
+and correct arguments before retrying an interaction; inspect state first if
+the previous call may have changed it.
 This is the WORKER browser with its own isolated
 session, separate from both the user's phone tabs and the phone automation
 browser. It continues without the phone. Do not assume the user's site login
