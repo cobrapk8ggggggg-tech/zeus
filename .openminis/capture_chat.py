@@ -17,6 +17,7 @@ def run(*arguments, check=True):
 
 
 def rpc(method, params=None, timeout=30):
+    print("RPC", method, flush=True)
     request = urllib.request.Request("http://127.0.0.1:8321/rpc", data=json.dumps({"jsonrpc": "2.0", "id": method, "method": method, "params": params or {}}).encode(), headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(request, timeout=timeout) as response:
         payload = json.load(response)

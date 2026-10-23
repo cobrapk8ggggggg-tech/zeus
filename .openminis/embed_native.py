@@ -111,6 +111,12 @@ def embed(native, browser, report):
     replace(execution,
         '                if !(raw is String) && !(raw is [Any]) && !(raw is [String: Any]) { return true }',
         '                if !(raw is String) && !(raw is NSNumber) && !(raw is [Any]) && !(raw is [String: Any]) { return true }')
+    replace(source / "Agent/Chat/AIChatViewModel+ToolPreflight.swift", '        "file_edit": ["new_string"],',
+        '        "file_edit": ["new_string"],\n        "zeus_browser_type": ["text"],')
+    replace(execution, 'tu.name == "file_write" || tu.name == "file_edit" {',
+        'tu.name == "file_write" || tu.name == "file_edit" || tu.name == "zeus_browser" || zeusBrowserOperation(tu.name) != nil {')
+    replace(execution, '            let modelMessage = """\n            Error: This call was NOT executed.',
+        '            let modelMessage = (tu.name == "zeus_browser" || zeusBrowserOperation(tu.name) != nil) ? "Error: Browser call NOT executed: the provider truncated its arguments. Send a complete smaller call. Inspect the current page/state before retrying any mutation." : """\n            Error: This call was NOT executed.')
     replace(source / "Agent/Chat/AIChatViewModel.swift", "        var userSystemPrompt = baseSystemPrompt",
         '        var userSystemPrompt = baseSystemPrompt + "\\n\\n" + ZEUSNativeAgentBridge.context')
     # The card is inserted into the ORIGINAL self-sizing tool cell. The original

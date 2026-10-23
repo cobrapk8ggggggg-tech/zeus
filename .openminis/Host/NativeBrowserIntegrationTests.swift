@@ -47,6 +47,7 @@ final class NativeBrowserIntegrationTests: XCTestCase {
         XCTAssertTrue(open.required.contains("url"))
         XCTAssertNil(open.parameters["operation"])
         XCTAssertNil(open.parameters["arguments"])
+        XCTAssertNil(AIChatViewModel.preflightValidateToolCall(name: "zeus_browser_type", args: ["tab_id": UUID().uuidString, "element_id": "e1", "text": ""], tools: ZEUSNativeAgentBridge.definitions))
         let storage = try XCTUnwrap(ZEUSNativeAgentBridge.definitions.first { $0.name == "zeus_browser_storage" })
         XCTAssertEqual(storage.parameters["action"]?.enumValues, ["read", "set", "remove", "clear"])
         XCTAssertEqual(try ZEUSNativeAgentBridge.normalizedInput(["url": "https://example.com"], toolName: "zeus_browser_open").0, "browser_open")

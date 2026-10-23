@@ -43,6 +43,7 @@ def capture(device, app, output, bundle="com.openminis.app"):
              "settings/mount-external", "settings/environments"]
     captured = []
     for page in pages:
+        print("Capture", page, flush=True)
         if page != "home":
             rpc("debug.fixture.route", {"url": "minis://" + page})
             # Allow the original navigation animation and its SQLite reads.
