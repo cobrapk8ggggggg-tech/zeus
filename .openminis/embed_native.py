@@ -52,7 +52,7 @@ def embed(native, browser, report):
             toolSuccess = true
             if let path = result.imagePath {
                 toolImageData = try await Task.detached(priority: .utility) { try Data(contentsOf: URL(fileURLWithPath: path)) }.value
-                toolImageMimeType = "image/png"
+                toolImageMimeType = "image/jpeg"
                 if msgIdx < messages.count, blockIdx < messages[msgIdx].blocks.count {
                     messages[msgIdx].blocks[blockIdx].imageFilePath = path
                 }
@@ -64,7 +64,15 @@ def embed(native, browser, report):
     text = stream.read_text()
     if 'case "browser_use":' not in text:
         raise RuntimeError("Original browser card mapping was not found")
-    stream.write_text(text.replace('case "browser_use":', 'case "browser_use", "zeus_browser":'))
+    text = text.replace('case "browser_use":', 'case "browser_use", "zeus_browser":')
+    # Preserve the original card/preview renderer, supplying its native action
+    # field from the added browser tool's operation field.
+    text = text.replace('extractPartialStringValue("action", from: accumulated)',
+                        'extractPartialStringValue(name == "zeus_browser" ? "operation" : "action", from: accumulated)')
+    text = text.replace('extractPartialStringValue("action", from: json)',
+                        'extractPartialStringValue(name == "zeus_browser" ? "operation" : "action", from: json)')
+    text = text.replace('args["action"] as? String', '(args["action"] as? String ?? args["operation"] as? String)')
+    stream.write_text(text)
 
     # Original permission UI, with host-specific labels and an additional Always
     # action only for the new browser operations. All original tool dialogs keep

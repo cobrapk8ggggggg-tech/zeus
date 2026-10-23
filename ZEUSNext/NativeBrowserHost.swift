@@ -55,6 +55,7 @@ private final class NativeToolCapture { var imageFilePath: String? }
     private var executing = false
     private var approved = Set<String>()
     private var selectedID: UUID?
+    private var authorizedHost: String?
     private var preferences: AgentPreferences = {
         var value = AgentPreferences()
         value.contextApproved = true; value.library = true; value.history = true
@@ -69,10 +70,10 @@ private final class NativeToolCapture { var imageFilePath: String? }
         folder = browser.profiles.folder(for: browser.profile).appendingPathComponent("OpenMinis")
     }
     public func cancel() { invalidated = true; onInvalidated?() }
+    private static var tools: [BrowserAgentTools.Tool] { BrowserAgentTools.tools.filter { !$0.name.hasPrefix("memory_") } + NativeBrowserInspector.tools }
     public static var catalog: String {
-        let tools = BrowserAgentTools.schema.filter {
-            !(($0["function"] as? [String: Any])?["name"] as? String ?? "").hasPrefix("memory_")
-        }
+        let tools = Self.tools.map { ["type": "function", "function": ["name": $0.name, "description": $0.description,
+            "parameters": ["type": "object", "properties": $0.properties, "required": $0.required, "additionalProperties": false]]] as [String: Any] }
         return String(decoding: (try? JSONSerialization.data(withJSONObject: tools)) ?? Data(), as: UTF8.self)
     }
     public func execute(operation: String, arguments: String, sessionID: String?) async throws -> NativeBrowserToolResult {
@@ -80,18 +81,30 @@ private final class NativeToolCapture { var imageFilePath: String? }
         guard !executing else { throw AgentFailure.message("Execute browser operations sequentially; another operation is still awaiting approval or completion.") }
         executing = true; defer { executing = false }
         guard arguments.utf8.count <= 100_000, !operation.hasPrefix("memory_"),
-              BrowserAgentTools.tools.contains(where: { $0.name == operation }),
+              Self.tools.contains(where: { $0.name == operation }),
               let bytes = arguments.data(using: .utf8),
               (try JSONSerialization.jsonObject(with: bytes)) is [String: Any] else {
             throw AgentFailure.message("Invalid browser operation or arguments")
         }
         let call = AgentToolCall(name: operation, arguments: arguments)
         let destination = (call.object["url"] as? String).flatMap(URL.init(string:))?.host
-        let permanent = !["browser_click", "browser_type", "browser_close_tab"].contains(operation)
+        let globalOperations = ["browser_tabs", "browser_profile", "browser_library", "browser_debug", "browser_console"]
+        let target = globalOperations.contains(operation) || operation == "browser_open" || operation == "browser_download" ? nil : try tab(call.object)
+        let targetURL = target?.url
+        let host = destination ?? targetURL.flatMap { URL(string: $0)?.host } ?? browser?.currentHost ?? ""
+        let permanent = !["browser_click", "browser_type", "browser_close_tab", "browser_evaluate", "browser_cookies", "browser_storage", "browser_debug"].contains(operation)
+        let title = Self.tools.first { $0.name == operation }?.title ?? operation
         guard let authorization, await authorization(NativeBrowserApproval(operation: operation,
-                profile: profileIdentifier, host: destination ?? browser?.currentHost ?? "",
-                details: arguments, allowsPermanent: permanent)) else { throw AccountError.permission }
+                profile: profileIdentifier, host: host,
+                details: title + "\n" + arguments, allowsPermanent: permanent)) else { throw AccountError.permission }
         try validate(); try Task.checkCancellation()
+        if let target {
+            guard browser?.tabs.contains(where: { $0 === target }) == true, target.url == targetURL,
+                  call.object["tab_id"] != nil || browser?.current?.id == target.id else {
+                throw AgentFailure.message("تغيّر التبويب أثناء الموافقة؛ اطلب سياقًا وموافقة جديدين.")
+            }
+        }
+        authorizedHost = host.lowercased(); defer { authorizedHost = nil }
         approved.insert(call.id); defer { approved.remove(call.id) }
         selectedID = sessionID.flatMap(UUID.init(uuidString:))
         let capture = NativeToolCapture()
@@ -130,7 +143,11 @@ private final class NativeToolCapture { var imageFilePath: String? }
         if view.url==nil,let url=URL(string:tab.url){view.load(URLRequest(url:url))}
         let until=Date().addingTimeInterval(25)
         while view.isLoading,Date()<until{try await Task.sleep(for:.milliseconds(150));try validate()}
-        try Task.checkCancellation();try validate();return view
+        try Task.checkCancellation();try validate()
+        guard let host=view.url?.host, authorizedHost==nil || host.lowercased()==authorizedHost else {
+            throw AgentFailure.message("انتقلت الصفحة إلى موقع آخر؛ اطلب موافقة جديدة قبل فحصه.")
+        }
+        return view
     }
     func read(_ tab:BrowserTab,full:Bool) async throws -> String {
         guard preferences.currentPage else{throw AgentFailure.message("قراءة نص الصفحات معطّلة.")}
@@ -140,10 +157,23 @@ private final class NativeToolCapture { var imageFilePath: String? }
     }
     private func execute(_ call:AgentToolCall,block:NativeToolCapture) async throws -> String {
         try validate();guard let browser else{throw CancellationError()}
-        guard BrowserAgentTools.tools.contains(where:{$0.name==call.name}),call.arguments.utf8.count<100_000 else{throw AgentFailure.message("أداة غير معروفة أو مدخلات أكبر من الحد.")}
+        guard Self.tools.contains(where:{$0.name==call.name}),call.arguments.utf8.count<100_000 else{throw AgentFailure.message("أداة غير معروفة أو مدخلات أكبر من الحد.")}
         guard let decoded = try? JSONSerialization.jsonObject(with: Data(call.arguments.utf8)), decoded is [String: Any] else { throw AgentFailure.message("مدخلات الأداة ليست JSON صالحًا.") }
         let args=call.object
         switch call.name{
+        case "browser_debug":
+            guard browser.profile.account?.allowDeveloperTools != false, let enabled = args["enabled"] as? Bool else { throw AccountError.permission }
+            browser.data.settings.developerTools = enabled; browser.applySettings()
+            return try NativeBrowserInspector.encode(["enabled": enabled, "reload": "Active page is being reloaded with the selected inspector/console configuration."])
+        case "browser_console":
+            guard browser.profile.account?.allowDeveloperTools != false else { throw AccountError.permission }
+            return try NativeBrowserInspector.encode(["captureEnabled": browser.data.settings.developerTools,
+                "coverage": "Collected console messages from enabled tabs in the current profile only.",
+                "entries": browser.console.suffix(100).map { ["kind": $0.kind, "text": $0.text, "date": $0.date.timeIntervalSince1970] as [String: Any] }])
+        case "browser_dom", "browser_evaluate", "browser_cookies", "browser_storage", "browser_network":
+            guard browser.profile.account?.allowDeveloperTools != false else { throw AccountError.permission }
+            let view = try await webView(tab(args))
+            return try await NativeBrowserInspector.execute(call.name, args: args, view: view)
         case "browser_tabs":return try tabsContext()
         case "browser_profile":return try profileContext()
         case "browser_read":return try await read(tab(args),full:args["full_page"] as? Bool ?? false)
@@ -194,8 +224,8 @@ private final class NativeToolCapture { var imageFilePath: String? }
             let selected=try tab(args),view=try await webView(selected)
             guard view.window != nil,view.bounds.width>0 else{throw AgentFailure.message("لقطة الشاشة تتطلب ظهور التبويب أولًا.")}
             let image=try await view.takeSnapshot(configuration:nil)
-            guard let data=image.pngData() else{throw AgentFailure.message("تعذر التقاط الصفحة.")}
-            let path=folder.appendingPathComponent(selectedID?.uuidString ?? "temporary").appendingPathComponent("screenshots").appendingPathComponent(UUID().uuidString+".png")
+            guard let data=image.jpegData(compressionQuality:0.9) else{throw AgentFailure.message("تعذر التقاط الصفحة.")}
+            let path=folder.appendingPathComponent(selectedID?.uuidString ?? "temporary").appendingPathComponent("screenshots").appendingPathComponent(UUID().uuidString+".jpg")
             try BrowserDisk.ensure(path.deletingLastPathComponent());try data.write(to:path,options:[.atomic,.completeFileProtection]);block.imageFilePath=path.path
             return "Captured current visible viewport, \(image.size.width)x\(image.size.height)."
         case "browser_library":

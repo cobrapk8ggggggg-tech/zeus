@@ -82,11 +82,11 @@ jobs:
       - name: Build the original application and its original UI tests
         run: |
           set -euo pipefail
-          xcodebuild -project upstream/src/ios/Minis.xcodeproj -scheme Minis \
+          python3 browser/.openminis/run_xcode.py results/original-build.log -- \
+            xcodebuild -project upstream/src/ios/Minis.xcodeproj -scheme Minis \
             -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/OpenMinisOriginal" \
-            build-for-testing CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ARCHS=arm64 \
-            2>&1 | tee results/original-build.log
+            build-for-testing CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ARCHS=arm64
       - name: Verify unchanged original application source
         run: python3 browser/.openminis/verify_source.py upstream results/original-source.json
       - name: Run the original renderer tests on iPad and iPhone
@@ -102,6 +102,7 @@ jobs:
                   output.write(kind.upper() + '_SIMULATOR=' + match['udid'] + '\n')
           PY
       - name: Capture and test the original on both device sizes
+        timeout-minutes: 25
         id: reference_tests
         continue-on-error: true
         run: |
@@ -114,15 +115,17 @@ jobs:
             python3 browser/.openminis/capture_reference.py "$device" \
               "$RUNNER_TEMP/OpenMinisOriginal/Build/Products/Debug-iphonesimulator/Minis.app" \
               "results/screens-$kind" || tests_failed=1
-            xcodebuild -project upstream/src/ios/Minis.xcodeproj -scheme Minis \
+            python3 browser/.openminis/run_xcode.py "results/original-$kind-tests.log" -- \
+              xcodebuild -project upstream/src/ios/Minis.xcodeproj -scheme Minis \
               -configuration Debug -destination "platform=iOS Simulator,id=$device" \
               -derivedDataPath "$RUNNER_TEMP/OpenMinisOriginal" \
               -resultBundlePath "results/original-$kind.xcresult" \
               -only-testing:MinisUITests/MessageListV3UITests/testLongContentMultiBundleRendering \
               -only-testing:MinisUITests/MessageListV3UITests/testStreamingAutoScrollFollowsBottom \
-              -parallel-testing-enabled NO \
+              -parallel-testing-enabled NO -test-timeouts-enabled YES \
+              -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 300 \
               test-without-building CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
-              2>&1 | tee "results/original-$kind-tests.log" || tests_failed=1
+              || tests_failed=1
             xcrun xcresulttool export attachments --path "results/original-$kind.xcresult" \
               --output-path "results/attachments-$kind" || true
             xcrun simctl shutdown "$device"
@@ -137,12 +140,13 @@ jobs:
       - name: Build the native browser and integration tests
         run: |
           set -euo pipefail
-          xcodebuild -project upstream/src/ios/Minis.xcodeproj -scheme Minis \
+          python3 browser/.openminis/run_xcode.py results/embedded-build.log -- \
+            xcodebuild -project upstream/src/ios/Minis.xcodeproj -scheme Minis \
             -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/OpenMinisOriginal" \
-            build-for-testing CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ARCHS=arm64 \
-            2>&1 | tee results/embedded-build.log
+            build-for-testing CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ARCHS=arm64
       - name: Test the embedded original UI and real browser tools
+        timeout-minutes: 25
         id: embedded_tests
         continue-on-error: true
         run: |
@@ -158,16 +162,18 @@ jobs:
             python3 browser/.openminis/capture_reference.py "$device" \
               "$RUNNER_TEMP/OpenMinisOriginal/Build/Products/Debug-iphonesimulator/Minis.app" \
               "results/embedded-screens-$kind" --bundle tools.rea.ZEUSBrowserAnalysis || tests_failed=1
-            xcodebuild -project upstream/src/ios/Minis.xcodeproj -scheme Minis \
+            python3 browser/.openminis/run_xcode.py "results/embedded-$kind-tests.log" -- \
+              xcodebuild -project upstream/src/ios/Minis.xcodeproj -scheme Minis \
               -configuration Debug -destination "platform=iOS Simulator,id=$device" \
               -derivedDataPath "$RUNNER_TEMP/OpenMinisOriginal" \
               -resultBundlePath "results/embedded-$kind.xcresult" \
               -only-testing:ZEUSBrowserIntegrationTests \
               -only-testing:MinisUITests/MessageListV3UITests/testLongContentMultiBundleRendering \
               -only-testing:MinisUITests/MessageListV3UITests/testStreamingAutoScrollFollowsBottom \
-              -parallel-testing-enabled NO \
+              -parallel-testing-enabled NO -test-timeouts-enabled YES \
+              -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 300 \
               test-without-building CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
-              2>&1 | tee "results/embedded-$kind-tests.log" || tests_failed=1
+              || tests_failed=1
             xcrun xcresulttool export attachments --path "results/embedded-$kind.xcresult" \
               --output-path "results/embedded-attachments-$kind" || true
             xcrun simctl shutdown "$device"

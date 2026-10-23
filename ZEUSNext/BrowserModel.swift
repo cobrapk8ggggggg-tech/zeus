@@ -101,6 +101,22 @@ struct WebDialog: Identifiable {
         data.tabs = tabs.map(\.saved); data.selectedTabID = current?.id
         profiles.save(data, for: profile)
     }
+    /// Commit first, then replace live tabs. A failed disk write must leave the
+    /// currently open session untouched, especially on a nearly full device.
+    func importProfileData(_ imported: ProfileData, restoreOpenTabs: Bool) throws {
+        guard !requiresUnlock, !switching, !profile.isPrivate else { throw AccountError.permission }
+        try BrowserDisk.write(imported, to: profiles.folder(for: profile).appendingPathComponent("browser.json"))
+        if restoreOpenTabs {
+            agent?.cancel(); agent = nil
+            for tab in tabs { tab.dispose() }
+            twinTabID = nil; twinFocused = false
+            article = nil; gallery = nil; formDraft = nil; share = nil
+            console.removeAll(); pendingPopup = nil
+        }
+        data = imported
+        if restoreOpenTabs { restoreTabs() }
+        applySettings()
+    }
     func changed() { objectWillChange.send() }
     func notify(_ text: String) { notice = BrowserNotice(text: text) }
     func prepare(_ tab: BrowserTab, supplied: WKWebViewConfiguration? = nil) async -> WKWebView? {
