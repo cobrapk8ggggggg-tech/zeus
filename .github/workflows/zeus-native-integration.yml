@@ -115,7 +115,7 @@ jobs:
         \ iphonesimulator -destination 'generic/platform=iOS Simulator' \\\n  -derivedDataPath \"$RUNNER_TEMP/OpenMinisOriginal\" \\\n  build-for-testing CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO\
         \ ARCHS=arm64\n"
     - name: Test the embedded original UI and real browser tools
-      timeout-minutes: '12'
+      timeout-minutes: 12
       id: embedded_tests
       run: "set -euo pipefail\ntests_failed=0\nfor kind in IPHONE IPAD; do\n  if [ \"$kind\" = IPHONE ]; then device=\"$IPHONE_SIMULATOR\"; else device=\"$IPAD_SIMULATOR\"; fi\n  xcrun simctl boot \"$device\"\
         \ || true\n  xcrun simctl bootstatus \"$device\" -b\n  # Both apps declare minis://. Remove the reference installation so\n  # settings deep links unambiguously open the embedded application.\n\
