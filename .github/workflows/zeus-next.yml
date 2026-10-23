@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   reference:
-    runs-on: macos-15-arm64
+    runs-on: macos-latest
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
@@ -34,6 +34,9 @@ jobs:
           brew install ninja llvm lld libarchive pkg-config meson
           echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
           echo "$(brew --prefix lld)/bin" >> "$GITHUB_PATH"
+          if ! xcrun --sdk iphonesimulator metal --version; then
+            xcodebuild -downloadComponent MetalToolchain
+          fi
       - uses: actions/cache@v4
         id: native
         with:
@@ -43,7 +46,7 @@ jobs:
             upstream/deps/resources
             upstream/deps/frameworks
             upstream/deps/lame-build
-          key: openminis-6339bfcb-simulator-arm64-xcode263-v1
+          key: openminis-6339bfcb-simulator-arm64-xcode263-v2
       - name: Build the actual native dependencies and Linux rootfs
         if: steps.native.outputs.cache-hit != 'true'
         working-directory: upstream

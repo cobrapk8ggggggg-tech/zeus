@@ -30,6 +30,10 @@ def prepare(root: Path, sdk: str) -> dict:
             code = code.replace("--sdk iphoneos", "--sdk iphonesimulator")
             code = code.replace("-miphoneos-version-min=$IOS_DEPLOYMENT_TARGET", "-target arm64-apple-ios${IOS_DEPLOYMENT_TARGET}-simulator")
             code = code.replace("-fembed-bitcode", "")
+            if name == "build_lame.sh":
+                # Upstream includes timestamped object files; force recompilation
+                # so make cannot reuse device objects in the simulator archive.
+                code = code.replace("make -j$(sysctl -n hw.ncpu)", "make clean\nmake -j$(sysctl -n hw.ncpu)")
             # Meson's generated compiler argument is single-quoted.
             code = code.replace("'-miphoneos-version-min=$IOS_DEPLOYMENT_TARGET'", "'-target', 'arm64-apple-ios${IOS_DEPLOYMENT_TARGET}-simulator'")
             code = code.replace("' -target", "'-target")
