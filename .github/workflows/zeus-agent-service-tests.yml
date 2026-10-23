@@ -22,3 +22,7 @@ jobs:
       - run: npm install -g @openai/codex@0.163.0
       - run: python -m unittest -v test_service
         working-directory: Runtime
+      - name: Build the real worker image
+        run: docker build -f Runtime/Dockerfile -t zeus-project-agent:test .
+      - name: Verify container identity and persistent volume after restart
+        run: python Runtime/test_container.py

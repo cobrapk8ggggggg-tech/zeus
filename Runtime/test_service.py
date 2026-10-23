@@ -47,6 +47,17 @@ class APITests(unittest.TestCase):
         self.assertEqual(self.client.post(path, json={**body, "prompt": "different"}).status_code, 409)
         self.assertEqual(len(self.client.get("/v1/tasks").json()["tasks"]), 1)
 
+    def test_diff_keeps_changes_after_the_agent_commits_them(self):
+        import subprocess
+        project = self.project()
+        root = Path(project["workspace"])
+        (root / "feature.txt").write_text("actual change")
+        for args in [["git", "add", "feature.txt"], ["git", "commit", "-m", "Implement feature"]]:
+            subprocess.run(args, cwd=root, capture_output=True, check=True)
+        value = self.client.get(f"/v1/projects/{project['id']}/diff").json()
+        self.assertIn("actual change", value["diff"])
+        self.assertEqual(value["status"], "")
+
     def test_restart_keeps_thread_and_events_without_replaying_writes(self):
         project = self.project()
         task = self.client.post(f"/v1/projects/{project['id']}/tasks", json={"prompt": "work"}).json()

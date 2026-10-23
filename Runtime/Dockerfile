@@ -12,7 +12,7 @@ COPY Runtime/agent_service ./agent_service
 COPY Runtime/skills ./skills
 COPY Runtime/entrypoint.sh /opt/zeus/entrypoint.sh
 ENV PATH="/opt/venv/bin:${PATH}" ZEUS_DATA_DIR=/data PORT=8080
-RUN useradd --uid 10001 --create-home zeus && mkdir /data && chown zeus:zeus /data && chmod 755 /opt/zeus/entrypoint.sh
+RUN useradd --uid 10001 --create-home zeus && mkdir /data && chown zeus:zeus /data && chmod -R a+rX /opt/zeus && chmod 755 /opt/zeus/entrypoint.sh
 VOLUME ["/data"]
 EXPOSE 8080
 ENTRYPOINT ["/opt/zeus/entrypoint.sh"]
