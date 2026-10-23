@@ -146,6 +146,8 @@ private struct ZeusNewProject: View {
     @State private var repository = ""
     @State private var kind = "web"
     @State private var checks = ""
+    @State private var model = ""
+    @State private var models: [[String: Any]] = []
     @State private var error: String?
     @State private var saving = false
     var body: some View {
@@ -153,19 +155,27 @@ private struct ZeusNewProject: View {
             TextField("اسم المشروع", text: $name)
             TextField("رابط المستودع (اختياري)", text: $repository).textInputAutocapitalization(.never)
             Picker("نوع المشروع", selection: $kind) { Text("موقع ويب").tag("web"); Text("تطبيق iOS").tag("ios"); Text("تطبيق Android").tag("android"); Text("عام").tag("generic") }
+            Picker("النموذج", selection: $model) {
+                Text("الافتراضي للحساب").tag("")
+                ForEach(models, id: \.zeusID) { item in
+                    Text(item["displayName"] as? String ?? item.zeusID).tag(item["model"] as? String ?? item.zeusID)
+                }
+            }
             Section("أوامر التحقق، كل أمر في سطر") { TextEditor(text: $checks).frame(minHeight: 90).font(.system(.body, design: .monospaced)) }
             if let error { Text(error).foregroundStyle(.red) }
             Button("إنشاء مساحة المشروع") {
                 saving = true
                 Task {
                     do {
-                        _ = try await ZeusProjects.shared.object("v1/projects", method: "POST", body: ["name": name, "repo_url": repository, "kind": kind, "verify_commands": checks.split(separator: "\n").map(String.init)])
+                        _ = try await ZeusProjects.shared.object("v1/projects", method: "POST", body: ["name": name, "repo_url": repository, "kind": kind, "model": model, "verify_commands": checks.split(separator: "\n").map(String.init)])
                         await ZeusProjects.shared.refresh(); dismiss()
                     } catch { self.error = error.localizedDescription }
                     saving = false
                 }
             }.disabled(saving || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        }.navigationTitle("مشروع جديد").toolbar { Button("إلغاء") { dismiss() } }
+        }.navigationTitle("مشروع جديد").toolbar { Button("إلغاء") { dismiss() } }.task {
+            if let response = try? await ZeusProjects.shared.object("v1/models") { models = response["data"] as? [[String: Any]] ?? [] }
+        }
     }
 }
 
@@ -235,7 +245,7 @@ struct ZeusProjectTaskDetail: View {
             Button("استئناف") { Task { await control("resume") } }
             Button("إلغاء", role: .destructive) { Task { await control("cancel") } }
         }
-        .sheet(item: $detail) { block in ToolLiveSheet(toolBlocks: blocks, currentIdx: blocks.firstIndex(where: { $0.id == block.id }) ?? 0) }
+        .sheet(item: $detail) { block in ToolLiveSheet(toolBlocks: blocks, initialIdx: blocks.firstIndex(where: { $0.id == block.id }) ?? 0, browserPool: nil) }
         .task {
             while !Task.isCancelled {
                 do {
@@ -294,28 +304,48 @@ struct ZeusProjectTaskDetail: View {
     }
 }
 
-extension Dictionary where Key == String, Value == Any { var zeusID: String { self["id"] as? String ?? "" } }
+extension Dictionary where Key == String, Value == Any {
+    var zeusID: String { self["id"] as? String ?? "" }
+    var zeusLabel: String { self["label"] as? String ?? "" }
+}
 
 private struct ZeusRemoteApprovalCard: View {
     let approval: [String: Any]
     let answered: () async -> Void
     @State private var choice: Bool?
+    @State private var answers: [String: String] = [:]
     @State private var error: String?
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label("موافقة على إجراء", systemImage: "hand.raised.fill").font(.headline)
             let details = approval["details"] as? [String: Any] ?? [:]
+            let questions = details["questions"] as? [[String: Any]] ?? []
             Text(details["reason"] as? String ?? details["command"] as? String ?? "راجع الإجراء الذي يطلبه وكيل المشروع.")
             Text(String(data: (try? JSONSerialization.data(withJSONObject: details, options: [.prettyPrinted, .sortedKeys])) ?? Data(), encoding: .utf8) ?? "").font(.caption.monospaced()).lineLimit(12).textSelection(.enabled)
-            ForEach([true, false], id: \.self) { value in
+            if approval["kind"] as? String == "question" {
+                ForEach(questions, id: \.zeusID) { question in
+                    Text(question["question"] as? String ?? "سؤال الوكيل").font(.headline)
+                    ForEach(question["options"] as? [[String: Any]] ?? [], id: \.zeusLabel) { option in
+                        let label = option["label"] as? String ?? ""
+                        Button { answers[question.zeusID] = label } label: {
+                            Label(label, systemImage: answers[question.zeusID] == label ? "largecircle.fill.circle" : "circle")
+                        }.buttonStyle(.plain)
+                        if let text = option["description"] as? String { Text(text).font(.caption).foregroundStyle(.secondary) }
+                    }
+                    TextField("إجابة أخرى", text: Binding(get: { answers[question.zeusID] ?? "" }, set: { answers[question.zeusID] = $0 }))
+                }
+            } else { ForEach([true, false], id: \.self) { value in
                 Button { choice = value } label: { Label(value ? "السماح هذه المرة" : "رفض الإجراء", systemImage: choice == value ? "largecircle.fill.circle" : "circle") }.buttonStyle(.plain)
-            }
+            } }
             Button("تأكيد الاختيار") {
                 Task {
-                    do { _ = try await ZeusProjects.shared.object("v1/approvals/\(approval.zeusID)", method: "POST", body: ["allowed": choice == true]); await answered() }
+                    do {
+                        let payload: [String: Any] = ["allowed": approval["kind"] as? String == "question" || choice == true, "answers": answers.mapValues { ["answers": [$0]] }]
+                        _ = try await ZeusProjects.shared.object("v1/approvals/\(approval.zeusID)", method: "POST", body: payload); await answered()
+                    }
                     catch { self.error = error.localizedDescription }
                 }
-            }.buttonStyle(.borderedProminent).disabled(choice == nil)
+            }.buttonStyle(.borderedProminent).disabled(approval["kind"] as? String == "question" ? questions.contains(where: { (answers[$0.zeusID] ?? "").isEmpty }) : choice == nil)
             if let error { Text(error).foregroundStyle(.red) }
         }.padding().background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18))
     }

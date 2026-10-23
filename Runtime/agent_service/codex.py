@@ -3,6 +3,7 @@ import asyncio
 import json
 import os
 import signal
+from pathlib import Path
 
 
 class CodexRPC:
@@ -13,6 +14,8 @@ class CodexRPC:
         self.process = None
 
     async def start(self):
+        if self.environment.get("CODEX_HOME"):
+            Path(self.environment["CODEX_HOME"]).mkdir(parents=True, exist_ok=True, mode=0o700)
         self.process = await asyncio.create_subprocess_exec(*self.command, cwd=self.cwd, env=self.environment,
             stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
             start_new_session=True, limit=4 * 1024 * 1024)

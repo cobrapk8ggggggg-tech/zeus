@@ -45,6 +45,9 @@ def create_app(data_dir=None, api_token=None, codex_binary=None, public_url=None
     if len(token) < 24:
         raise RuntimeError("Set ZEUS_API_TOKEN to an independent random token of at least 24 characters")
     store = Store(root)
+    bundled = Path(__file__).resolve().parent.parent / "skills"
+    if bundled.exists():
+        shutil.copytree(bundled, store.root / "codex/skills", dirs_exist_ok=True)
     connections = Connections(store, public_url or os.environ.get("ZEUS_PUBLIC_URL", ""), token, port or int(os.environ.get("PORT", "8080")))
     worker = Worker(store, connections, codex_binary or os.environ.get("ZEUS_CODEX_BINARY", "codex"))
     accounts = Accounts(store, connections, worker.codex_binary)

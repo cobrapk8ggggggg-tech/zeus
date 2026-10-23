@@ -147,6 +147,10 @@ class Connections:
                 code, output = await command(["git", "sparse-checkout", "set", item["path"]], root)
                 if code:
                     raise ValueError(output[-2000:])
+            else:
+                code, output = await command(["git", "sparse-checkout", "disable"], root)
+                if code:
+                    raise ValueError(output[-2000:])
         code, revision = await command(["git", "rev-parse", "HEAD"], root)
         source = root / item["path"]
         manifest_file = source / ".codex-plugin/plugin.json"

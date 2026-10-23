@@ -1,0 +1,8 @@
+**
+!Runtime/
+!Runtime/Dockerfile
+!Runtime/requirements.txt
+!Runtime/agent_service/
+!Runtime/agent_service/*.py
+!Runtime/skills/
+!Runtime/skills/**
