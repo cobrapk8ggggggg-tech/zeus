@@ -34,6 +34,27 @@ final class NativeBrowserIntegrationTests: XCTestCase {
         XCTAssertThrowsError(try ZeusAgentSchemas.validate(["ids": [12], "name": NSNull()], schema: shape))
         XCTAssertThrowsError(try ZeusAgentSchemas.validate(["ids": ["UPPER"], "name": true], schema: shape))
     }
+    func testGeminiWireUsesFullJSONSchemaForNativeObjectArguments() throws {
+        let declaration = GeminiConversation.toolDefinition(name: "integration_call", description: "fixture", parameters: [:])
+        XCTAssertNil(declaration["parameters"])
+        let shape = try XCTUnwrap(declaration["parametersJsonSchema"] as? [String: Any])
+        let fields = try XCTUnwrap(shape["properties"] as? [String: [String: Any]])
+        XCTAssertEqual(fields["arguments"]?["type"] as? String, "object")
+        XCTAssertEqual(fields["arguments"]?["additionalProperties"] as? Bool, true)
+        let plan = GeminiConversation.toolDefinition(name: "update_plan", description: "fixture", parameters: [:])
+        XCTAssertEqual((((plan["parametersJsonSchema"] as? [String: Any])?["properties"] as? [String: [String: Any]])?["plan"]?["type"] as? String), "array")
+    }
+    func testOpenAIWiresKeepDynamicArgumentsAndOptionalFields() throws {
+        for responses in [false, true] {
+            let declaration = try XCTUnwrap(ZeusAgentSchemas.openAI("integration_call", description: "fixture", responses: responses))
+            let function: [String: Any]
+            if responses { function = declaration } else { function = try XCTUnwrap(declaration["function"] as? [String: Any]) }
+            XCTAssertEqual(function["strict"] as? Bool, false)
+            let shape = try XCTUnwrap(function["parameters"] as? [String: Any])
+            try ZeusAgentSchemas.validate(["account_id": "fixture", "tool_name": "read", "arguments": ["nested": ["ids": [1, 2]]]], schema: shape)
+            XCTAssertFalse((shape["required"] as? [String] ?? []).contains("approval_reason"))
+        }
+    }
     func testNativeRuntimeAcceptsNestedSchemasAndRejectsMalformedArguments() throws {
         let schema = try XCTUnwrap(ZeusAgentSchemas.schema("update_plan"))
         try ZeusAgentSchemas.validate(["plan": [["step": "Build", "status": "in_progress"]]], schema: schema)
@@ -76,6 +97,25 @@ final class NativeBrowserIntegrationTests: XCTestCase {
         XCTAssertNotNil(restored.continuation(session: vm.sessionId))
         do { _ = try await restored.execute("update_plan", args: plan, callID: "same", vm: vm); XCTFail("A persisted call must never replay") } catch {}
         XCTAssertFalse(restored.context(session: vm.sessionId).contains("ledger"))
+        XCTAssertNotNil(restored.continuation(session: vm.sessionId))
+        XCTAssertNil(restored.continuation(session: vm.sessionId))
+        XCTAssertEqual(restored.state(vm.sessionId!).status, "waiting_user")
+        XCTAssertNotNil(restored.pausedNotice(session: vm.sessionId))
+    }
+    func testPartialVerificationCannotMarkTaskCompleteAfterReload() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let runtime = ZeusAgentHarness(root: root), vm = AIChatViewModel(); vm.sessionId = UUID().uuidString
+        _ = try await runtime.execute("update_plan", args: ["plan": [["step": "Verify", "status": "completed"]], "verification_commands": ["check-one", "check-two"]], callID: "plan", vm: vm)
+        // Simulate interruption after only one of the two real check results
+        // reached durable storage. Completion must reject incomplete evidence.
+        var saved = runtime.state(vm.sessionId!)
+        saved.checks = [ZeusAgentHarness.Check(command: "check-one", exitCode: 0, output: "", generation: saved.generation, date: Date())]
+        let file = try XCTUnwrap(FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil).first)
+        try JSONEncoder().encode(saved).write(to: file, options: .atomic)
+        let restored = ZeusAgentHarness(root: root)
+        do { _ = try await restored.execute("task_complete", args: ["status": "completed", "summary": "Finished"], callID: "finish", vm: vm); XCTFail("Both registered results are required") } catch {}
+        XCTAssertEqual(restored.state(vm.sessionId!).status, "running")
     }
     func testNativeRuntimeReallyEditsTestsRepairsAndVerifiesAProject() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -96,6 +136,14 @@ final class NativeBrowserIntegrationTests: XCTestCase {
         _ = try await runtime.execute("update_plan", args: ["plan": [["step": "Implement and verify", "status": "completed"]]], callID: "finish-plan", vm: vm)
         _ = try await runtime.execute("task_complete", args: ["status": "completed", "summary": "Actual files and shell checks passed"], callID: "finish", vm: vm)
         XCTAssertEqual(runtime.state(vm.sessionId!).status, "completed")
+        let other = AIChatViewModel(); other.sessionId = "other-" + UUID().uuidString
+        let written = try await other.executeFileWrite(from: ZeusAgentHarness.json(["path": dir + "/value.txt", "content": "isolated-other", "create_dirs": true]))
+        XCTAssertTrue(written.success)
+        let original = try await vm.executeCommand("cat " + ZeusAgentHarness.quote(dir + "/value.txt"), timeout: 30) { _ in }
+        XCTAssertEqual(original.output.trimmingCharacters(in: .whitespacesAndNewlines), "correct")
+        let isolated = try await other.executeCommand("cat " + ZeusAgentHarness.quote(dir + "/value.txt"), timeout: 30) { _ in }
+        XCTAssertEqual(isolated.output.trimmingCharacters(in: .whitespacesAndNewlines), "isolated-other")
+        _ = try await other.executeCommand("rm -rf -- " + ZeusAgentHarness.quote(dir), timeout: 30) { _ in }
         _ = try await vm.executeCommand("rm -rf -- " + ZeusAgentHarness.quote(dir), timeout: 30) { _ in }
     }
     func testOfficialSkillsInstallOfflineWithTheirOriginalAssets() async throws {

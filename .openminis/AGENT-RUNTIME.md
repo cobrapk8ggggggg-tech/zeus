@@ -10,7 +10,11 @@ dependency of this native runtime and must not be deployed as its replacement.
 
 1. **Native tools and provider contracts**: nested JSON schemas on OpenAI Chat
    Completions/Responses, Gemini, Antigravity and Anthropic requests; recursive
-   validation before permission/execution. Incomplete streamed arguments and
+   validation before permission/execution. Native OpenAI tools explicitly use
+   `strict:false` to preserve dynamic integration objects and optional fields.
+   Gemini's official `parametersJsonSchema` carries full nested schemas rather
+   than erasing free-form objects through the older OpenAPI subset.
+   Incomplete streamed arguments and
    tool-looking prose never execute. Verify both malformed calls and the actual
    transmitted provider schema.
 2. **Project execution**: context-checked multi-file `apply_patch`, real local

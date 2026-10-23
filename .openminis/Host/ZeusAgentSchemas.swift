@@ -95,6 +95,14 @@ enum ZeusAgentSchemas {
         default: break
         }
     }
+    static func openAI(_ name: String, description: String, responses: Bool) -> [String: Any]? {
+        guard let shape = schema(name) else { return nil }
+        // Responses otherwise normalizes omitted strictness and may reject
+        // dynamic integration arguments or silently require optional fields.
+        var function: [String: Any] = ["name": name, "description": description, "parameters": shape, "strict": false]
+        if responses { function["type"] = "function"; return function }
+        return ["type": "function", "function": function]
+    }
     static func gemini(_ input: [String: Any]) -> [String: Any] {
         var output = input
         if let type = output["type"] as? String { output["type"] = type.uppercased() }

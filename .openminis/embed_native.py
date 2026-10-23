@@ -141,19 +141,32 @@ def embed(native, browser, report):
             }''')
     replace(source / "Agent/Chat/AIChatViewModel.swift", "            let contextHistory = effectiveAgentHistory()", "            userSystemPrompt = ZeusAgentHarness.shared.refreshContext(userSystemPrompt, session: sessionId)\n            let contextHistory = effectiveAgentHistory()")
     replace(source / "Agent/Chat/AIChatViewModel.swift", "                userSystemPrompt = baseSystemPrompt", '                userSystemPrompt = baseSystemPrompt + "\\n\\n" + ZEUSNativeAgentBridge.context')
+    file_tools = source / "Agent/Chat/AIChatViewModel+FileTools.swift"
+    replace(file_tools, 'ISHExecutionCoordinator.shared.hostURL(for: linuxPath)', 'ISHExecutionCoordinator.shared.hostURL(for: linuxPath, sessionId: self.sessionId)')
+    replace(file_tools, 'ISHExecutionCoordinator.shared.hostURL(for: path)', 'ISHExecutionCoordinator.shared.hostURL(for: path, sessionId: self.sessionId)')
     replace(source / "Agent/Chat/AIChatViewModel.swift", "                break\n            }\n\n            // Build assistant RawMessage now but defer DB write", '''                if !canResume, !Task.isCancelled, let reminder = ZeusAgentHarness.shared.continuation(session: sessionId) {
                     agentHistory.append(AgentMessage(role: .user, parts: [.text("<zeus_runtime_instruction source='application'>" + reminder + "</zeus_runtime_instruction>")]))
                     continue
                 }
+                if let notice = ZeusAgentHarness.shared.pausedNotice(session: sessionId) { messages[msgIdx].error = notice; canResume = true }
                 break
             }
 
             // Build assistant RawMessage now but defer DB write''')
     openai = source / "Providers/OpenAI/OpenAIAgentProvider.swift"
-    replace(openai, '                    "parameters": [\n                        "type": "object",\n                        "properties": properties,\n                        "required": tool.required,\n                    ] as [String: Any],', '                    "parameters": ZeusAgentSchemas.schema(tool.name) ?? ["type": "object", "properties": properties, "required": tool.required],')
-    replace(openai, '                "parameters": [\n                    "type": "object",\n                    "properties": properties,\n                    "required": tool.required,\n                ] as [String: Any],', '                "parameters": ZeusAgentSchemas.schema(tool.name) ?? ["type": "object", "properties": properties, "required": tool.required],')
+    for method, responses in [("convertToolsChatCompletions", "false"), ("convertToolsResponsesAPI", "true")]:
+        anchor = '    private func ' + method + '(_ tools: [AgentToolDefinition]) -> [[String: Any]] {\n        tools.map { tool in'
+        replace(openai, anchor, anchor + '\n            if let native = ZeusAgentSchemas.openAI(tool.name, description: tool.description, responses: ' + responses + ') { return native }')
     replace(source / "Providers/Gemini/GeminiAgentProvider.swift", '                parameters: params\n', '                parameters: ZeusAgentSchemas.schema(tool.name).map(ZeusAgentSchemas.gemini) ?? params\n')
     replace(source / "Providers/Antigravity/AntigravityAgentProvider.swift", '                parameters: params\n', '                parameters: ZeusAgentSchemas.schema(tool.name).map(ZeusAgentSchemas.gemini) ?? params\n')
+    replace(source / "Providers/Gemini/GeminiProvider.swift", '''        [
+            "name": name,
+            "description": description,
+            "parameters": parameters,
+        ]''', '''        if let schema = ZeusAgentSchemas.schema(name) {
+            return ["name": name, "description": description, "parametersJsonSchema": schema]
+        }
+        return ["name": name, "description": description, "parameters": parameters]''')
     replace(source / "Providers/Anthropic/OAuthHTTPClient.swift", '        if let body = request.httpBody, !body.isEmpty { return }', '        if let body = request.httpBody, !body.isEmpty { ZeusAgentSchemas.patchAnthropic(request); return }')
     replace(source / "Providers/Anthropic/OAuthHTTPClient.swift", '        // Always set httpBody (even if empty) since the stream is now consumed\n        request.httpBody = data\n', '        // Always set httpBody (even if empty) since the stream is now consumed\n        request.httpBody = data\n        ZeusAgentSchemas.patchAnthropic(request)\n')
     oauth = source / "Agent/Session/MCPOAuthController.swift"

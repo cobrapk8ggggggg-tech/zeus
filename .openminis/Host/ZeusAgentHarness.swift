@@ -99,10 +99,17 @@ import CryptoKit
     func continuation(session: String?) -> String? {
         guard let session else { return nil }
         var value = state(session)
-        guard value.status == "running", !value.plan.isEmpty, value.noToolContinuations < 2,
+        guard value.status == "running", !value.plan.isEmpty,
               Date().timeIntervalSince(value.started) < Double(Self.maxHours * 3600) else { return nil }
+        if value.noToolContinuations >= 2 {
+            value.status = "waiting_user"; value.checkpoint = "توقف النموذج عن استدعاء الأدوات رغم وجود خطوات غير مكتملة. التقدم محفوظ؛ يمكنك الاستئناف أو اختيار نموذج آخر."; try? save(session, value); return nil
+        }
         value.noToolContinuations += 1; try? save(session, value)
         return "Runtime continuation: this task is still active. A progress message is not completion. Inspect task_checkpoint, continue the pending steps using real structured tool calls, run task_verify, then task_complete. If blocked, record the actual blocker with task_complete(status:blocked). Do not repeat an uncertain mutation; inspect its result first."
+    }
+    func pausedNotice(session: String?) -> String? {
+        guard let session else { return nil }; let value = state(session)
+        return value.status == "waiting_user" && !value.checkpoint.isEmpty ? value.checkpoint : nil
     }
     func observe(session: String?, tool: String, success: Bool) {
         guard let session, !ZeusAgentSchemas.names.contains(tool), !tool.hasPrefix("zeus_browser_") else { return }
@@ -190,17 +197,28 @@ import CryptoKit
             value = state(session); value.generation += 1; try save(session, value)
             do {
                 for change in changes {
+                    let url = try ZeusPatch.safeURL(change.path, root: root)
+                    let current = FileManager.default.fileExists(atPath: url.path) ? try Data(contentsOf: url) : nil
+                    guard current == change.before else { throw ZeusPatch.failure("File changed before commit: \(change.path)") }
                     try await write(change.after, path: workdir + "/" + change.path, vm: vm)
                     committed.append(change)
                 }
             } catch {
                 var failed: [String] = []
-                for change in committed.reversed() { do { try await write(change.before, path: workdir + "/" + change.path, vm: vm) } catch { failed.append(change.path) } }
+                for change in committed.reversed() {
+                    do {
+                        let url = try ZeusPatch.safeURL(change.path, root: root)
+                        let current = FileManager.default.fileExists(atPath: url.path) ? try Data(contentsOf: url) : nil
+                        guard current == change.after else { throw ZeusPatch.failure("Concurrent edit preserved") }
+                        try await write(change.before, path: workdir + "/" + change.path, vm: vm)
+                    } catch { failed.append(change.path) }
+                }
                 throw ZeusPatch.failure("Patch commit failed: \(error.localizedDescription). Rollback failures: \(failed). Inspect files before retrying.")
             }
             return "Applied verified patch to \(changes.count) file(s):\n" + changes.map(\.path).joined(separator: "\n")
         case "exec_command":
             let command = args["cmd"] as! String, cwd = try directory(args), id = UUID().uuidString
+            let timeout = try commandTimeout(args["timeout_seconds"] as? Int ?? 900, session: session)
             guard jobs.values.filter({ $0.owner == session && $0.exitCode == nil }).count < 8 else { throw ZeusPatch.failure("Eight commands are already running. Poll or finish them before starting more.") }
             let finished = jobs.values.filter({ $0.exitCode != nil }).sorted { $0.started < $1.started }
             for old in finished.prefix(max(0, finished.count - 24)) { jobs.removeValue(forKey: old.id) }
@@ -209,7 +227,7 @@ import CryptoKit
             jobs[id] = Job(id: id, owner: session, command: command)
             let task = Task { @MainActor [weak self] in
                 do {
-                    let result = try await vm.executeCommand("cd " + Self.quote(cwd) + " && " + command, timeout: Double(args["timeout_seconds"] as? Int ?? 900)) { line in self?.append(line + "\n", job: id) }
+                    let result = try await vm.executeCommand("cd " + Self.quote(cwd) + " && " + command, timeout: timeout) { line in self?.append(line + "\n", job: id) }
                     guard var job = self?.jobs[id] else { return }
                     if job.output.isEmpty { job.output = String(result.output.suffix(100000)) }
                     job.exitCode = result.exitCode; job.task = nil; self?.jobs[id] = job
@@ -239,8 +257,10 @@ import CryptoKit
             var checks: [Check] = []
             for command in commands {
                 try Task.checkCancellation()
-                let result = try await vm.executeCommand("cd " + Self.quote(cwd) + " && " + command, timeout: Double(args["timeout_seconds"] as? Int ?? 900)) { _ in }
+                let timeout = try commandTimeout(args["timeout_seconds"] as? Int ?? 900, session: session)
+                let result = try await vm.executeCommand("cd " + Self.quote(cwd) + " && " + command, timeout: timeout) { _ in }
                 checks.append(Check(command: command, exitCode: result.exitCode, output: String(result.output.suffix(20000)), generation: generation, date: Date()))
+                value = state(session); value.checks = checks; try save(session, value)
             }
             value = state(session); value.checks = checks; try save(session, value)
             return try Self.json(checks.map { ["command": $0.command, "exitCode": $0.exitCode, "output": String($0.output.suffix(6000)), "generation": $0.generation] as [String: Any] })
@@ -251,10 +271,21 @@ import CryptoKit
                 guard !jobs.values.contains(where: { $0.owner == session && $0.exitCode == nil }) else { throw ZeusPatch.failure("Completion blocked: command still running.") }
                 guard !value.checks.isEmpty, value.checks.allSatisfy({ $0.exitCode == 0 && $0.generation == value.generation }) else { throw ZeusPatch.failure("Completion blocked: run task_verify after the latest edits and fix every failing check. If the environment cannot verify, record status=blocked with that limitation.") }
             }
+            if status == "completed" {
+                guard !value.verificationCommands.isEmpty, Set(value.checks.map(\.command)) == Set(value.verificationCommands) else { throw ZeusPatch.failure("Completion blocked: not every registered verification command has a recorded result.") }
+            }
             value.status = status; value.checkpoint = (args["summary"] as! String) + "\n" + (args["limitations"] as? String ?? ""); try save(session, value)
             return "Task status: " + status + "\n" + value.checkpoint
         default: throw ZeusPatch.failure("Unknown native runtime tool.")
         }
+    }
+    private func commandTimeout(_ requested: Int, session: String) throws -> TimeInterval {
+        if let notice = budgetNotice(session: session) { throw ZeusPatch.failure(notice) }
+        let value = state(session)
+        if value.plan.isEmpty { return Double(requested) }
+        let remaining = Double(Self.maxHours * 3600) - Date().timeIntervalSince(value.started)
+        guard remaining > 0 else { throw ZeusPatch.failure("Task time budget exhausted; checkpoint saved.") }
+        return min(Double(requested), remaining)
     }
     private func directory(_ args: [String: Any]) throws -> String {
         let path = args["workdir"] as? String ?? "/var/minis/workspace"
@@ -288,10 +319,17 @@ import CryptoKit
     }
     private func snapshot(_ session: String) throws -> String {
         let value = state(session)
+        let commands = value.commands ?? [:]
+        let records = commands.sorted { lhs, rhs in
+            if lhs.value.hasPrefix("running:") != rhs.value.hasPrefix("running:") { return lhs.value.hasPrefix("running:") }
+            return lhs.key < rhs.key
+        }.prefix(40).map { id, status in
+            (id, status.hasPrefix("running:") && jobs[id] == nil ? "Possibly interrupted after restart; inspect process/files before retrying. " + status : status)
+        }
         return try Self.json(["goal": value.goal, "status": value.status, "generation": value.generation, "checkpoint": value.checkpoint,
             "plan": value.plan.map { ["step": $0.step, "status": $0.status] }, "verification_commands": value.verificationCommands,
             "checks": value.checks.map { ["command": $0.command, "exit_code": $0.exitCode, "generation": $0.generation] as [String: Any] },
-            "recorded_tool_calls": value.ledger.count, "command_records": (value.commands ?? [:]).mapValues { $0.hasPrefix("running:") ? "Possibly interrupted after restart; inspect process/files before retrying. " + $0 : $0 },
+            "recorded_tool_calls": value.ledger.count, "command_records_count": commands.count, "command_records": Dictionary(uniqueKeysWithValues: records),
             "local_commands": jobs.values.filter { $0.owner == session }.map { ["session_id": $0.id, "running": $0.exitCode == nil] as [String: Any] }])
     }
 }

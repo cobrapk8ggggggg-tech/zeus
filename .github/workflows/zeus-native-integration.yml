@@ -10,6 +10,7 @@ name: ZEUS native browser integration tests
     paths:
     - ZEUSNext/**
     - .openminis/**
+    - .zeus-ci/fixture_server.py
     - .github/workflows/zeus-native-integration.yml
   workflow_dispatch:
     inputs:

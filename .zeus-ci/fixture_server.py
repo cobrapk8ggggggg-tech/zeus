@@ -45,6 +45,8 @@ def harness_events(body):
         if previous_stage == 2 and json.loads(previous)['running']: stage = 2
     if stage >= len(steps):
         return [{'choices': [{'delta': {'content': 'NATIVE_HARNESS_VERIFIED: تم إنشاء المشروع وإصلاح فحصه الفاشل والتحقق منه فعلياً.'}, 'finish_reason': None}]}, {'choices': [{'delta': {}, 'finish_reason': 'stop'}]}]
+    if stage == 5 and not any(m.get('role') == 'user' and '<zeus_runtime_instruction' in str(m.get('content', '')) for m in body.get('messages', [])):
+        return [{'choices': [{'delta': {'content': 'مستجد: ظهر فشل في الفحص وسأواصل إصلاحه.'}, 'finish_reason': None}]}, {'choices': [{'delta': {}, 'finish_reason': 'stop'}]}]
     name, args = steps[stage]
     if stage == 2:
         started = next(m for m in results if m['tool_call_id'].startswith('zeus-harness-1-'))
