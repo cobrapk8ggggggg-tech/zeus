@@ -2,6 +2,7 @@
 import hashlib
 import importlib.util
 import json
+import re
 from pathlib import Path
 import shutil
 import tempfile
@@ -36,10 +37,11 @@ class NativeEmbeddingTests(unittest.TestCase):
             # addition to the existing permission card and app-group constants.
             for file in (UPSTREAM / "src/ios/Views").rglob("*.swift"):
                 relative = file.relative_to(UPSTREAM / "src/ios")
-                if str(relative) in {"Views/Chat/OffloadPermissionDialog.swift", "Views/Chat/AIChatView.swift", "Views/Chat/ToolLiveSheet.swift", "Views/Settings/OffloadPermissionSettingsView.swift"}:
+                if str(relative) in {"Views/Chat/OffloadPermissionDialog.swift", "Views/Chat/AIChatView.swift", "Views/Chat/ToolLiveSheet.swift", "Views/Settings/OffloadPermissionSettingsView.swift", "Views/Chat/SelectableMarkdownView.swift"}:
                     continue
                 expected = file.read_text().replace("group.com.openminis.app", "group.tools.zeus.openminis").replace("iCloud.com.openminis.app", "iCloud.tools.zeus.openminis")
                 if str(relative) == "Views/ContentView.swift":
+                    expected = re.sub(r'private let supportedLanguages: \[LanguageOption\] = \[.*?\n\]', 'private let supportedLanguages: [LanguageOption] = [\n    LanguageOption(id: "ar", name: "العربية", flag: "🇸🇦"),\n]', expected, count=1, flags=re.S)
                     expected = expected.replace("private struct SettingsSheet: View", "struct SettingsSheet: View")
                     expected = expected.replace("    private static let pendingBackgroundNavigationTTL: TimeInterval = 90\n\n    var body: some View {\n        GeometryReader { geo in", "    private static let pendingBackgroundNavigationTTL: TimeInterval = 90\n\n    private var zeusNativeGeometry: some View {\n        GeometryReader { geo in")
                     expected = expected.replace("        }\n        .onReceive(\n            NotificationCenter.default.publisher(for: .sessionDidCreate),", "        }\n    }\n\n    var body: some View {\n        zeusNativeGeometry\n        .onReceive(\n            NotificationCenter.default.publisher(for: .sessionDidCreate),")
@@ -54,6 +56,8 @@ class NativeEmbeddingTests(unittest.TestCase):
                         expected = expected.replace(anchor, "    }\n\n" + declaration + "\n        " + previous + "\n" + anchor)
                 if str(relative) == "Views/Chat/AssistantBlockView.swift":
                     expected = expected.replace('case .browserTool:   toolName = "browser_use"', 'case .browserTool:   toolName = block.zeusIsUserBrowser ? "zeus_browser" : "browser_use"')
+                if str(relative) == "Views/Providers/ProviderInstancesView.swift":
+                    expected = expected.replace('let shadows = store.shadowVoiceProviders()', 'let shadows: [ProviderConfigStore.ShadowVoiceProvider] = []')
                 expected = expected.replace('"Minis"', '"Zeus"')
                 for tool in ("Shell", "Editor", "Browser", "Memory"):
                     expected = expected.replace('return "Minis is using ' + tool + '"', 'return String(localized: "Minis is using ' + tool + '")')
@@ -71,6 +75,14 @@ class NativeEmbeddingTests(unittest.TestCase):
             self.assertIn("return model", (browser / ".openminis/build/BrowserFixtureFactory.swift").read_text())
             localized = json.loads((native / "src/ios/Localizable.xcstrings").read_text())["strings"]
             self.assertFalse(any(entry.get("localizations", {}).get("ar", {}).get("stringUnit", {}).get("value") == "خيار" for entry in localized.values()))
+            for key, entry in localized.items():
+                self.assertLessEqual(set(entry.get("localizations", {})), {"ar"})
+                arabic = entry.get("localizations", {}).get("ar", {}).get("stringUnit", {}).get("value", "")
+                self.assertFalse(arabic.startswith("معلومات:"), key)
+            vad = (native / "src/ios/Providers/Voice/VoiceActivityDetector.swift").read_text()
+            self.assertNotIn("import RealTimeCutVADLibrary", vad)
+            self.assertNotIn("ffmpeg_offload_register();", (native / "src/ios/iSH/ISHKernel.m").read_text())
+            self.assertNotIn("micButtonContainer\n", (native / "src/ios/Views/Chat/AIChatView.swift").read_text())
             self.assertIn("ZeusToolPermissions.shared.authorize", execution)
             self.assertNotIn(".offloadPermissionDialog()", (native / "src/ios/Views/Chat/AIChatView.swift").read_text())
             self.assertIn("@MainActor enum BrowserFixtureFactory", (browser / ".openminis/build/BrowserFixtureFactory.swift").read_text())

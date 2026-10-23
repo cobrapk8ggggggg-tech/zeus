@@ -11,6 +11,7 @@ from pathlib import Path
 import shutil
 import subprocess
 from debug_fixture import prepare_fixture
+from text_only import apply as apply_text_only
 
 
 def replace(file, before, after, count=1):
@@ -70,7 +71,7 @@ def embed(native, browser, report):
             return AgentToolDefinition(name: tool.name, description: tool.description, parameters: parameters, required: tool.required, propertyOrdering: tool.propertyOrdering)
         }""")
     replace(definitions, 'description: "Control a web browser with up to 3 tabs.',
-            'description: "This is the standalone Zeus automation browser, separate from the user\'s ZEUS tabs and browser profile. For the user\'s current page, existing tabs, cookies, storage or navigation use zeus_browser instead. Control a web browser with up to 3 tabs.')
+            'description: "This is the standalone Zeus automation browser, separate from the user\'s ZEUS tabs and browser profile. For the user\'s current page use zeus_browser_read; for existing tabs use zeus_browser_tabs; for user-browser navigation use zeus_browser_open. Other zeus_browser_* tools inspect its settings, cookies and storage. Control a web browser with up to 3 tabs.')
     execution = source / "Agent/Chat/AIChatViewModel+ConcurrentTools.swift"
     text = execution.read_text()
     anchor = '        case "browser_use":'
@@ -281,6 +282,7 @@ def embed(native, browser, report):
     factory = factory.replace("_browser = StateObject(wrappedValue: model)", "return model").replace("_browser = StateObject(wrappedValue: BrowserModel())", "return BrowserModel()")
     (generated / "BrowserFixtureFactory.swift").write_text("import SwiftUI\n@MainActor enum BrowserFixtureFactory {\n" + factory + "}\n")
 
+    apply_text_only(source, browser)
     changed = []
     for name, digest in before.items():
         file = source / name

@@ -14,6 +14,10 @@ nonisolated func zeusBrowserOperation(_ name: String) -> String? {
 @MainActor
 struct ZEUSBrowserRootEntry: View {
     init() {
+        UserDefaults.standard.set("ar", forKey: "appLanguage")
+        UserDefaults.standard.set("text", forKey: "composerInputModePreference")
+        UserDefaults.standard.set(false, forKey: "voice.output.readRepliesAloud")
+        Bundle.setLanguage("ar")
         #if DEBUG
         _ = ZEUSNativeFixtureBootstrap.configured
         #endif
