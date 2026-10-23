@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
+from debug_fixture import prepare_fixture
 
 
 def replace(file, before, after, count=1):
@@ -30,13 +31,15 @@ def embed(native, browser, report):
         app.write_bytes(subprocess.check_output(["git", "show", revision + ":src/ios/MinisApp.swift"], cwd=native))
     before = {str(f.relative_to(source)): hashlib.sha256(f.read_bytes()).hexdigest()
               for f in source.rglob("*.swift")}
+    prepare_fixture(native)
     generated = browser / ".openminis/build"
     generated.mkdir(parents=True, exist_ok=True)
 
     # The application remains OpenMinis' original @main/AppDelegate/root setup;
     # its root content now embeds the browser with the original AI UI alongside.
     replace(source / "MinisApp.swift", "                ContentView()", "                ZEUSBrowserRootEntry()")
-    shutil.copyfile(browser / ".openminis/Host/ZEUSNativeIntegration.swift", source / "ZEUSNativeIntegration.swift")
+    for name in ("ZEUSNativeIntegration.swift", "ZeusToolPermissions.swift"):
+        shutil.copyfile(browser / ".openminis/Host" / name, source / name)
     # Reuse the exact native settings sheet from the browser's AI settings row.
     # Only its file-private visibility changes; its body is untouched.
     replace(source / "Views/ContentView.swift", "private struct SettingsSheet: View", "struct SettingsSheet: View")
@@ -60,18 +63,27 @@ def embed(native, browser, report):
         replace(source / "Views/ContentView.swift", anchor, "    }\n\n" + declaration + "\n        " + previous + "\n" + anchor)
 
     definitions = source / "Agent/Chat/AIChatViewModel+ToolDefinitions.swift"
-    replace(definitions, "        return tools", "        tools.append(ZEUSNativeAgentBridge.definition)\n        return tools")
+    replace(definitions, "        return tools", """        tools.append(contentsOf: ZEUSNativeAgentBridge.definitions)
+        return tools.map { tool in
+            var parameters = tool.parameters
+            parameters["approval_reason"] = AgentToolParam(type: .string, description: "For consequential actions, explain what you intend to change and why in the user language. The app displays this on an inline approval card.")
+            return AgentToolDefinition(name: tool.name, description: tool.description, parameters: parameters, required: tool.required, propertyOrdering: tool.propertyOrdering)
+        }""")
     replace(definitions, 'description: "Control a web browser with up to 3 tabs.',
-            'description: "This is the standalone OpenMinis automation browser, separate from the user\'s ZEUS tabs and browser profile. For the user\'s current page, existing tabs, cookies, storage or navigation use zeus_browser instead. Control a web browser with up to 3 tabs.')
+            'description: "This is the standalone Zeus automation browser, separate from the user\'s ZEUS tabs and browser profile. For the user\'s current page, existing tabs, cookies, storage or navigation use zeus_browser instead. Control a web browser with up to 3 tabs.')
     execution = source / "Agent/Chat/AIChatViewModel+ConcurrentTools.swift"
     text = execution.read_text()
     anchor = '        case "browser_use":'
     parts = text.split(anchor)
     if len(parts) < 2:
         raise RuntimeError("Original browser tool dispatch was not found")
-    adapter = '''        case "zeus_browser":
-            let result = try await ZEUSNativeAgentBridge.shared.execute(argsJson, sessionID: sessionId)
+    adapter = '''        case let name where name == "zeus_browser" || zeusBrowserOperation(name) != nil:
+            let result = try await ZEUSNativeAgentBridge.shared.execute(argsJson, sessionID: sessionId, toolName: name)
             toolOutput = result.text
+            toolPageURL = result.pageURL
+            if msgIdx < messages.count, blockIdx < messages[msgIdx].blocks.count {
+                messages[msgIdx].blocks[blockIdx].browserURL = result.pageURL
+            }
             toolSuccess = true
             if let path = result.imagePath {
                 toolImageData = try await Task.detached(priority: .utility) { try Data(contentsOf: URL(fileURLWithPath: path)) }.value
@@ -82,52 +94,175 @@ def embed(native, browser, report):
             }
 
 '''
-    execution.write_text(parts[0] + adapter + anchor + parts[1] + ''.join('        case "browser_use", "zeus_browser":' + p for p in parts[2:]))
+    execution.write_text(parts[0] + adapter + anchor + parts[1] + ''.join('        case let name where name == "browser_use" || name == "zeus_browser" || zeusBrowserOperation(name) != nil:' + p for p in parts[2:]))
+
+    replace(execution, "        do {\n        switch tu.name {", """        do {
+        let toolArgs = try ZeusToolInput.normalize(name: tu.name, args: toolArgs, tools: tools)
+        let argsJson = String(decoding: try JSONSerialization.data(withJSONObject: toolArgs), as: UTF8.self)
+        if tu.name == "zeus_browser" || zeusBrowserOperation(tu.name) != nil { _ = try ZEUSNativeAgentBridge.normalizedInput(toolArgs, toolName: tu.name) }
+        try await ZeusToolPermissions.shared.authorize(tool: tu.name, args: toolArgs, sessionID: sessionId,
+            blockID: messages[msgIdx].blocks[blockIdx].id)
+        switch tu.name {""")
+    # Avoid a second, old modal after the common gate already authorized shell.
+    text = execution.read_text()
+    start = text.index("            // Offload permission check.")
+    end = text.index("            // Delay execution.", start)
+    execution.write_text(text[:start] + "            // Permissions are handled once by ZeusToolPermissions before dispatch.\n\n" + text[end:])
+    # The original preflight incorrectly marked required Boolean/integer values
+    # as damaged just because they were not strings. Preserve valid typed args.
+    replace(execution,
+        '                if !(raw is String) && !(raw is [Any]) && !(raw is [String: Any]) { return true }',
+        '                if !(raw is String) && !(raw is NSNumber) && !(raw is [Any]) && !(raw is [String: Any]) { return true }')
+    replace(source / "Agent/Chat/AIChatViewModel+ToolPreflight.swift", '        "file_edit": ["new_string"],',
+        '        "file_edit": ["new_string"],\n        "zeus_browser_type": ["text"],')
+    replace(execution, 'tu.name == "file_write" || tu.name == "file_edit" {',
+        'tu.name == "file_write" || tu.name == "file_edit" || tu.name == "zeus_browser" || zeusBrowserOperation(tu.name) != nil {')
+    replace(execution, '            let modelMessage = """\n            Error: This call was NOT executed.',
+        '            let modelMessage = (tu.name == "zeus_browser" || zeusBrowserOperation(tu.name) != nil) ? "Error: Browser call NOT executed: the provider truncated its arguments. Send a complete smaller call. Inspect the current page/state before retrying any mutation." : """\n            Error: This call was NOT executed.')
+    replace(source / "Agent/Chat/AIChatViewModel.swift", "        var userSystemPrompt = baseSystemPrompt",
+        '        var userSystemPrompt = baseSystemPrompt + "\\n\\n" + ZEUSNativeAgentBridge.context')
+    # The card is inserted into the ORIGINAL self-sizing tool cell. The original
+    # transcript/composer/Markdown remain unchanged; only this extension is new.
+    list_file = source / "Agent/MessageList/CollectionViewMessageListV3.swift"
+    replace(list_file, "    var body: some View {\n        AssistantBlockView(",
+        "    var body: some View {\n        VStack(alignment: .leading, spacing: 8) {\n        AssistantBlockView(")
+    replace(list_file, "            detailBlock: $bridge.detailBlock\n        )\n        .frame(maxWidth:",
+        "            detailBlock: $bridge.detailBlock\n        )\n        ZeusInlineApprovalCard(blockID: block.id)\n        }\n        .frame(maxWidth:")
+    replace(list_file, "            NotificationCenter.default.publisher(for: .messageListNeedsResnapshot)", """            NotificationCenter.default.publisher(for: .zeusApprovalChanged)
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] notification in
+                    guard let self, let blockID = notification.object as? UUID,
+                          let ds = self.dataSource, let cv = self.viewController?.collectionView,
+                          let layout = self.viewController?.messageListLayout else { return }
+                    var snapshot = ds.snapshot()
+                    for (index, item) in snapshot.itemIdentifiers.enumerated() {
+                        if case .assistantBlock(_, let id) = item, id == blockID {
+                            (cv.cellForItem(at: IndexPath(item: index, section: 0)) as? SelfSizingCell)?.clearCachedHeight()
+                            layout.invalidateHeight(at: index)
+                            snapshot.reconfigureItems([item])
+                            ds.apply(snapshot, animatingDifferences: false)
+                            layout.invalidateLayout()
+                            break
+                        }
+                    }
+                }.store(in: &subscriptions)
+            NotificationCenter.default.publisher(for: .messageListNeedsResnapshot)""")
+    replace(source / "Views/Chat/AIChatView.swift", "        .offloadPermissionDialog()", "        // Zeus approvals render inline in the original tool cells.")
+    replace(source / "Views/Settings/OffloadPermissionSettingsView.swift", '        List {\n            Section("Background")',
+        '        List {\n            ZeusPermissionSettingsSection()\n            Section("Background")')
+    replace(source / "Views/Settings/OffloadPermissionSettingsView.swift", '''            Section("Privacy") {
+                ForEach(settingsCommands, id: \\.name) { cmd in
+                    CommandPermissionRow(command: cmd)
+                }
+            }
+''', "")
+    replace(source / "Views/Settings/OffloadPermissionSettingsView.swift", "                    manager.setAllBypass()",
+        "                    ZeusToolPermissions.shared.mode = .unrestricted\n                    manager.setAllBypass()")
+
+
     stream = source / "Agent/Chat/AIChatViewModel+SSEStream.swift"
     text = stream.read_text()
     if 'case "browser_use":' not in text:
         raise RuntimeError("Original browser card mapping was not found")
-    text = text.replace('case "browser_use":', 'case "browser_use", "zeus_browser":')
+    text = text.replace('case "browser_use":', 'case let browserName where browserName == "browser_use" || browserName == "zeus_browser" || zeusBrowserOperation(browserName) != nil:')
     # Preserve the original card/preview renderer, supplying its native action
     # field from the added browser tool's operation field.
     text = text.replace('extractPartialStringValue("action", from: accumulated)',
-                        'extractPartialStringValue(name == "zeus_browser" ? "operation" : "action", from: accumulated)')
+                        '(zeusBrowserOperation(name) ?? extractPartialStringValue(name == "zeus_browser" ? "operation" : "action", from: accumulated))')
     text = text.replace('extractPartialStringValue("action", from: json)',
-                        'extractPartialStringValue(name == "zeus_browser" ? "operation" : "action", from: json)')
-    text = text.replace('args["action"] as? String', '(args["action"] as? String ?? args["operation"] as? String)')
+                        '(zeusBrowserOperation(name) ?? extractPartialStringValue(name == "zeus_browser" ? "operation" : "action", from: json))')
+    text = text.replace('args["action"] as? String', '(zeusBrowserOperation(name) ?? args["action"] as? String ?? args["operation"] as? String)')
+    text = text.replace('.browserTool(action: "")', '.browserTool(action: zeusBrowserOperation(name) ?? (name == "zeus_browser" ? "browser_pending" : ""))')
+    text = text.replace('(name == "browser_use")\n                    ? extractPartialStringValue', '(name == "browser_use" || name == "zeus_browser" || zeusBrowserOperation(name) != nil)\n                    ? extractPartialStringValue')
+    text = text.replace('} else if let mgr = browserTabPool.activeManager {', '} else if name == "browser_use", let mgr = browserTabPool.activeManager {')
     stream.write_text(text)
 
-    # Original permission UI, with host-specific labels and an additional Always
-    # action only for the new browser operations. All original tool dialogs keep
-    # their original controls and semantics.
-    permissions = source / "Agent/Offload/OffloadPermissionManager.swift"
-    replace(permissions, "    static let allCommands: [OffloadCommandInfo] = [",
-            "    static var allCommands: [OffloadCommandInfo] { baseCommands + ZEUSNativeAgentBridge.browserPermissionCommands }\n    private static let baseCommands: [OffloadCommandInfo] = [")
-    replace(permissions, "    let continuation: CheckedContinuation<Bool, Never>",
-            "    let continuation: CheckedContinuation<Bool, Never>\n    var permitsPersistentGrant = false")
-    replace(permissions, 'fullCommand: String = "") async -> PermissionResult',
-            'fullCommand: String = "", requestLabel: String? = nil, requestDescription: String? = nil, permitsPersistentGrant: Bool = false) async -> PermissionResult')
-    replace(permissions, 'let displayLabel = cmdInfo?.displayLabel ?? command', 'let displayLabel = requestLabel ?? cmdInfo?.displayLabel ?? command')
-    replace(permissions, 'let description = cmdInfo?.description ?? ""', 'let description = requestDescription ?? cmdInfo?.description ?? ""')
-    replace(permissions, 'continuation: continuation\n', 'continuation: continuation,\n                    permitsPersistentGrant: permitsPersistentGrant\n')
-    dialog = source / "Views/Chat/OffloadPermissionDialog.swift"
-    replace(dialog, 'Text("The agent wants to use **\\(request.commandName)**")',
-            'Text("The agent wants to use **\\(request.commandName.hasPrefix("zeus-browser/") ? request.displayLabel : request.commandName)**")')
-    replace(dialog, 'Text("Allow in Session")', 'Text(request.commandName.hasPrefix("zeus-browser/") ? "السماح هذه المرة" : String(localized: "Allow in Session"))')
-    marker = '''                Button {
-                    OffloadPermissionManager.shared.respond(to: request.id, allowed: false)'''
-    addition = '''                if request.commandName.hasPrefix("zeus-browser/"), request.permitsPersistentGrant {
-                    Button {
-                        OffloadPermissionManager.shared.setPermissionLevel(.bypass, for: request.commandName)
-                        OffloadPermissionManager.shared.respond(to: request.id, allowed: true)
-                    } label: {
-                        Text("السماح دائمًا لهذا الإجراء على هذا الموقع")
-                            .font(.headline).frame(maxWidth: .infinity).padding(.vertical, 12)
-                    }.buttonStyle(.borderedProminent).tint(.blue)
-                }
+    detail = source / "Views/Chat/ToolLiveSheet.swift"
+    replace(detail, 'if isLive, onBrowserTakeover != nil, case .browserTool = block.kind {',
+        'if isLive, onBrowserTakeover != nil, case .browserTool = block.kind, !block.zeusIsUserBrowser {')
+    replace(detail, '} else if case .browserTool = block.kind, browserPool != nil {',
+        '} else if case .browserTool = block.kind, browserPool != nil, !block.zeusIsUserBrowser {')
+    replace(detail, '            case .browserTool: browserContent',
+        '            case .browserTool:\n                if block.zeusIsUserBrowser { browserTextResultContent(block.content) } else { browserContent }')
+    replace(detail, '        // Inherit from preceding browser block\n',
+        '        if block.zeusIsUserBrowser { return "" }\n        // Inherit from preceding browser block\n')
+    replace(detail, '                let prev = toolBlocks[i]\n',
+        '                let prev = toolBlocks[i]\n                if prev.zeusIsUserBrowser { continue }\n')
+    replace(detail, '        guard let manager = browserPool?.activeManager else { return }',
+        '        guard !block.zeusIsUserBrowser, let manager = browserPool?.activeManager else { return }', count=2)
+    replace(detail, 'let script = dict["script"] as? String,',
+        'let script = (dict["script"] as? String ?? dict["code"] as? String),')
+    replace(source / "Views/Chat/AssistantBlockView.swift", 'case .browserTool:   toolName = "browser_use"',
+        'case .browserTool:   toolName = block.zeusIsUserBrowser ? "zeus_browser" : "browser_use"')
 
-'''
-    replace(dialog, marker, addition + marker)
+    # Existing DEBUG RPC only, restricted to explicit isolated fixture launches.
+    # These cases are compiled out of Release together with the upstream server.
+    replace(source / "Debug/DebugJSONRPC.swift", '        case "rpc.discover":', '''        case "zeus.fixture.approvals":
+            guard CommandLine.arguments.contains("--zeus-native-fixture") else { throw RPCError(code: -32601, message: "Fixture launch required") }
+            return await MainActor.run {
+                ["requests": ZeusToolPermissions.shared.requests.values.map {
+                    ["id": $0.id.uuidString, "tool": $0.tool, "title": $0.title, "explanation": $0.explanation]
+                }]
+            }
+        case "zeus.fixture.approval.respond":
+            guard CommandLine.arguments.contains("--zeus-native-fixture"),
+                  let value = params["id"] as? String, let id = UUID(uuidString: value),
+                  let allowed = params["allowed"] as? Bool else { throw RPCError(code: -32602, message: "Fixture launch and valid response required") }
+            return await MainActor.run { ZeusToolPermissions.shared.respond(id, allowed: allowed); return ["responded": true] }
+        case "zeus.fixture.settings":
+            guard CommandLine.arguments.contains("--zeus-native-fixture") else { throw RPCError(code: -32601, message: "Fixture launch required") }
+            return try await ZEUSNativeAgentBridge.shared.execute("{\\"operation\\":\\"browser_settings\\",\\"action\\":\\"read\\"}", sessionID: nil).text
+        case "rpc.discover":''')
+
+    # Preserve native browser tool kinds when the original database rebuilds
+    # UI history after restart; automation and user-browser URLs stay separate.
+    history = source / "Agent/Chat/ChatStore.swift"
+    replace(history, '        var lastBrowserURL: String?', '        var lastBrowserURL: String?\n        var lastZeusBrowserURL: String?')
+    replace(history, '                case "browser_use":\n                    let action = extractStringParam("action", from: tu.input)', '''                case let name where name == "zeus_browser" || zeusBrowserOperation(name) != nil:
+                    let operation = zeusBrowserOperation(name) ?? extractStringParam("operation", from: tu.input)
+                    kind = .browserTool(action: operation)
+                    content = "ZEUS: \\(operation)"
+                    let argURL = extractStringParam("url", from: tu.input)
+                    if !argURL.isEmpty { lastZeusBrowserURL = argURL }
+                case "browser_use":
+                    let action = extractStringParam("action", from: tu.input)''')
+    replace(history, '                    block.browserURL = lastBrowserURL',
+        '                    block.browserURL = block.zeusIsUserBrowser ? lastZeusBrowserURL : lastBrowserURL')
+    replace(history, '                        lastBrowserURL = pageURL',
+        '                        if blocks[blockIdx].zeusIsUserBrowser { lastZeusBrowserURL = pageURL } else { lastBrowserURL = pageURL }')
+    replace(history, '        case "browser_use":\n            let action = str("action") ?? "browse"',
+        '        case let name where name == "browser_use" || name == "zeus_browser" || zeusBrowserOperation(name) != nil:\n            let action = zeusBrowserOperation(name) ?? str("operation") ?? str("action") ?? "browse"')
+    replace(history, 'return cap("browser_use \\(action)")', 'return cap("\\(name) \\(action)")')
+
+    # Reviewed localization/branding overrides, preserving original localization
+    # keys, command names, URL schemes and database identifiers.
+    replace(source / "Agent/Session/SoulStore.swift", 'case "name":  if !value.isEmpty { meta.name = value }',
+        'case "name":  if !value.isEmpty { meta.name = value.lowercased() == "minis" ? "Zeus" : value }')
+    strings_file = source / "Localizable.xcstrings"
+    strings = json.loads(strings_file.read_text())
+    overrides = json.loads((browser / ".openminis/arabic-overrides.json").read_text())
+    for key in overrides:
+        strings["strings"].setdefault(key, {"localizations": {}})
+    for key, entry in strings["strings"].items():
+        localizations = entry.setdefault("localizations", {})
+        for language, localization in localizations.items():
+            unit = localization.get("stringUnit")
+            if unit and isinstance(unit.get("value"), str):
+                unit["value"] = unit["value"].replace("OpenMinis", "Zeus").replace("Minis", "Zeus")
+        if "Minis" in key:
+            localizations["en"] = {"stringUnit": {"state": "translated", "value": key.replace("OpenMinis", "Zeus").replace("Minis", "Zeus")}}
+        if key in overrides:
+            localizations["ar"] = {"stringUnit": {"state": "translated", "value": overrides[key]}}
+    strings_file.write_text(json.dumps(strings, ensure_ascii=False, indent=2) + "\n")
+    for file in source.rglob("*.swift"):
+        if "MinisTests" in file.parts or "MinisUITests" in file.parts: continue
+        original = file.read_text()
+        branded = original.replace('"Minis"', '"Zeus"')
+        # ToolLiveSheet returns dynamic strings, so explicitly localize these
+        # labels; SwiftUI cannot localize an already-created String by itself.
+        for tool in ("Shell", "Editor", "Browser", "Memory"):
+            branded = branded.replace('return "Minis is using ' + tool + '"', 'return String(localized: "Minis is using ' + tool + '")')
+        if branded != original: file.write_text(branded)
 
     # Separate identity from a separately installed OpenMinis. Conversations,
     # providers, skills and memory intentionally remain GLOBAL inside ZEUS.

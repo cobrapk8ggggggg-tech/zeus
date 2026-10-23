@@ -7,9 +7,9 @@ import WebKit
 @MainActor enum NativeBrowserInspector {
     static let tools: [BrowserAgentTools.Tool] = [
         .init(name: "browser_dom", title: "فحص DOM", description: "Inspect real HTML, computed styles and geometry for a CSS selector in an existing tab. Output is bounded and untrusted.", properties: ["tab_id": ["type": "string"], "selector": ["type": "string"]], required: []),
-        .init(name: "browser_evaluate", title: "تنفيذ JavaScript", description: "Execute an async JavaScript function body in the actual page world. Use return to produce a value. May mutate the page; requires fresh approval for each call.", properties: ["tab_id": ["type": "string"], "code": ["type": "string"]], required: ["code"]),
-        .init(name: "browser_cookies", title: "كوكيز الموقع", description: "List (including HttpOnly), set, delete one named cookie, or explicitly clear cookies matching the selected tab's host, in its profile only. Every call requires fresh approval. Set accepts name,value,path,secure,http_only,expires (Unix seconds).", properties: ["tab_id": ["type": "string"], "action": ["type": "string", "enum": ["list", "set", "delete", "clear"]], "name": ["type": "string"], "value": ["type": "string"], "path": ["type": "string"], "secure": ["type": "boolean"], "http_only": ["type": "boolean"], "expires": ["type": "number"]], required: ["action"]),
-        .init(name: "browser_storage", title: "تخزين الموقع", description: "Read, set, remove or explicitly clear localStorage/sessionStorage for the existing page's origin. Bounded output. Requires fresh approval, including reads of potentially sensitive data.", properties: ["tab_id": ["type": "string"], "area": ["type": "string", "enum": ["local", "session"]], "action": ["type": "string", "enum": ["read", "set", "remove", "clear"]], "key": ["type": "string"], "value": ["type": "string"]], required: ["area", "action"]),
+        .init(name: "browser_evaluate", title: "تنفيذ JavaScript", description: "Execute an async JavaScript function body in the actual page world. Use return to produce a value. May mutate the page; governed by the global tool permission mode.", properties: ["tab_id": ["type": "string"], "code": ["type": "string"]], required: ["code"]),
+        .init(name: "browser_cookies", title: "كوكيز الموقع", description: "List (including HttpOnly), set, delete one named cookie, or explicitly clear cookies matching the selected tab's host, in its profile only. Governed by the global tool permission mode. Set accepts name,value,path,secure,http_only,expires (Unix seconds).", properties: ["tab_id": ["type": "string"], "action": ["type": "string", "enum": ["list", "set", "delete", "clear"]], "name": ["type": "string"], "value": ["type": "string"], "path": ["type": "string"], "secure": ["type": "boolean"], "http_only": ["type": "boolean"], "expires": ["type": "number"]], required: ["action"]),
+        .init(name: "browser_storage", title: "تخزين الموقع", description: "Read, set, remove or explicitly clear localStorage/sessionStorage for the existing page's origin. Bounded output. Reads may reveal sensitive data and are consequential under the global permission mode.", properties: ["tab_id": ["type": "string"], "area": ["type": "string", "enum": ["local", "session"]], "action": ["type": "string", "enum": ["read", "set", "remove", "clear"]], "key": ["type": "string"], "value": ["type": "string"]], required: ["area", "action"]),
         .init(name: "browser_network", title: "توقيت طلبات الصفحة", description: "Read actual Resource Timing and navigation records for the existing main frame. Includes URLs, initiators, timing, transfer sizes and protocol where WebKit exposes them. This is not a complete HTTP capture: headers, response bodies, workers and WebSocket frames are not exposed by this operation.", properties: ["tab_id": ["type": "string"]], required: []),
         .init(name: "browser_console", title: "سجل الكونسول", description: "Read actual console entries already collected for the selected tab in the active profile. Output is bounded; no messages recorded before instrumentation are invented.", properties: ["tab_id": ["type": "string"]], required: []),
         .init(name: "browser_debug", title: "تفعيل فحص المتصفح", description: "Enable or disable native Web Inspector and console capture in the active profile. Recreates its live web views and reloads the active page; requires approval.", properties: ["enabled": ["type": "boolean"]], required: ["enabled"])
@@ -33,8 +33,27 @@ import WebKit
             return try encode(value ?? NSNull())
         case "browser_evaluate":
             guard let code = args["code"] as? String, !code.isEmpty, code.utf8.count <= 50_000 else { throw AgentFailure.message("أدخل كود JavaScript أقل من 50 كيلوبايت.") }
-            let value = try await view.callAsyncJavaScript(code, arguments: [:], in: nil, contentWorld: .page)
-            return try encode(value ?? NSNull())
+            // WKWebView cannot bridge DOM nodes, functions, BigInt or circular
+            // objects directly. Serialize inside JS while retaining real errors.
+            let script = """
+            const result = await (async () => {
+            \(code)
+            })();
+            const seen = new WeakSet();
+            return JSON.stringify(result === undefined ? null : result, (key, value) => {
+              if (typeof value === 'bigint') return value.toString();
+              if (typeof value === 'function') return '[Function]';
+              if (value instanceof Node) return {node:value.nodeName,text:(value.textContent||'').slice(0,10000),html:value.outerHTML?.slice(0,20000)};
+              if (typeof value === 'object' && value !== null) {
+                if (seen.has(value)) return '[Circular]'; seen.add(value);
+              }
+              return value;
+            });
+            """
+            let value = try await view.callAsyncJavaScript(script, arguments: [:], in: nil, contentWorld: .page)
+            let output = value as? String ?? "null"
+            guard output.utf8.count <= 300_000 else { throw AgentFailure.message("النتيجة كبيرة؛ أرجع حقولًا محددة أو أجزاء أصغر.") }
+            return output
         case "browser_network":
             let value = try await view.callAsyncJavaScript(#"""
             return {url:location.href,coverage:'Main-frame Resource Timing only; no request/response headers or bodies. Cross-origin timings may be redacted by WebKit.',

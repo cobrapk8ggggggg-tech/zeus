@@ -24,7 +24,7 @@ class OriginalReferenceTests(unittest.TestCase):
                   "src/ios/Minis.xcodeproj/xcshareddata/xcschemes/Minis.xcscheme",
                   "src/ios/Views/Chat/AIChatView.swift",
                   "src/ios/Agent/MessageList/CollectionViewMessageListV3.swift",
-                  "src/ios/MinisApp.swift"]
+                  "src/ios/MinisApp.swift", "src/ios/Debug/DebugJSONRPC.swift", "src/ios/Providers/ProviderConfigStore.swift"]
         for name in names:
             target = root / name
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -48,7 +48,7 @@ class OriginalReferenceTests(unittest.TestCase):
             self.assertIn("'-target', 'arm64-apple-ios${IOS_DEPLOYMENT_TARGET}-simulator'", cross)
             self.assertIn("make clean\nmake -j", (root / "deps/build_lame.sh").read_text())
             for name in report["applicationFilesSHA256"]:
-                if not name.endswith(".xcconfig") and name != "src/ios/MinisApp.swift":
+                if not name.endswith(".xcconfig") and name not in report["testEntryAdapters"]:
                     self.assertEqual((root / name).read_bytes(), (UPSTREAM / name).read_bytes())
             tests = ET.parse(root / "src/ios/Minis.xcodeproj/xcshareddata/xcschemes/Minis.xcscheme").getroot().find("TestAction/Testables")
             self.assertEqual([t.find("BuildableReference").get("BlueprintName") for t in tests], ["MinisUITests"])

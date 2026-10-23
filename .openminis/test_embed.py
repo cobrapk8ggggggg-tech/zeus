@@ -25,17 +25,18 @@ class NativeEmbeddingTests(unittest.TestCase):
             shutil.copyfile(HERE / "source.lock.json", browser / ".openminis/source.lock.json")
             (browser / "ZEUSNext").mkdir()
             shutil.copyfile(HERE.parent / "ZEUSNext/ZEUSNextApp.swift", browser / "ZEUSNext/ZEUSNextApp.swift")
+            shutil.copyfile(HERE / "arabic-overrides.json", browser / ".openminis/arabic-overrides.json")
             report = root / "adapters.json"
             revision = json.loads((HERE / "source.lock.json").read_text())["commit"]
             with patch.object(MODULE.subprocess, "check_output", return_value=revision + "\n"):
                 MODULE.embed(native, browser, report)
             changed = {item["file"] for item in json.loads(report.read_text())["modifiedNativeFiles"]}
-            self.assertGreater(json.loads(report.read_text())["unchangedNativeSwiftFiles"], 350)
+            self.assertGreater(json.loads(report.read_text())["unchangedNativeSwiftFiles"], 340)
             # Every original view remains byte-identical except the declared
             # addition to the existing permission card and app-group constants.
             for file in (UPSTREAM / "src/ios/Views").rglob("*.swift"):
                 relative = file.relative_to(UPSTREAM / "src/ios")
-                if str(relative) == "Views/Chat/OffloadPermissionDialog.swift":
+                if str(relative) in {"Views/Chat/OffloadPermissionDialog.swift", "Views/Chat/AIChatView.swift", "Views/Chat/ToolLiveSheet.swift", "Views/Settings/OffloadPermissionSettingsView.swift"}:
                     continue
                 expected = file.read_text().replace("group.com.openminis.app", "group.tools.zeus.openminis").replace("iCloud.com.openminis.app", "iCloud.tools.zeus.openminis")
                 if str(relative) == "Views/ContentView.swift":
@@ -51,15 +52,27 @@ class NativeEmbeddingTests(unittest.TestCase):
                     for anchor, name, previous in boundaries:
                         declaration = "    var body: some View {" if name == "body" else "    private var " + name + ": some View {"
                         expected = expected.replace(anchor, "    }\n\n" + declaration + "\n        " + previous + "\n" + anchor)
+                if str(relative) == "Views/Chat/AssistantBlockView.swift":
+                    expected = expected.replace('case .browserTool:   toolName = "browser_use"', 'case .browserTool:   toolName = block.zeusIsUserBrowser ? "zeus_browser" : "browser_use"')
+                expected = expected.replace('"Minis"', '"Zeus"')
+                for tool in ("Shell", "Editor", "Browser", "Memory"):
+                    expected = expected.replace('return "Minis is using ' + tool + '"', 'return String(localized: "Minis is using ' + tool + '")')
                 self.assertEqual((native / "src/ios" / relative).read_text(), expected, str(relative))
-            for name in ("Agent/MessageList/CollectionViewMessageListV3.swift", "Agent/Chat/ChatStore.swift"):
-                self.assertNotIn(name, changed)
+            original_store = (UPSTREAM / "src/ios/Agent/Chat/ChatStore.swift").read_text()
+            adapted_store = (native / "src/ios/Agent/Chat/ChatStore.swift").read_text()
+            # Storage/protocol/sync methods after UI conversion remain untouched.
+            marker = "    func toAgentMessage("
+            self.assertEqual(adapted_store[adapted_store.index(marker):], original_store[original_store.index(marker):])
             execution = (native / "src/ios/Agent/Chat/AIChatViewModel+ConcurrentTools.swift").read_text()
-            self.assertIn('case "zeus_browser":', execution)
+            self.assertIn('name == "zeus_browser" || zeusBrowserOperation(name) != nil', execution)
             self.assertIn('case "browser_use":', execution)
             self.assertIn("ZEUSNativeAgentBridge.shared.execute", execution)
             self.assertIn("ContentView()", (native / "src/ios/ZEUSNativeIntegration.swift").read_text())
             self.assertIn("return model", (browser / ".openminis/build/BrowserFixtureFactory.swift").read_text())
+            localized = json.loads((native / "src/ios/Localizable.xcstrings").read_text())["strings"]
+            self.assertFalse(any(entry.get("localizations", {}).get("ar", {}).get("stringUnit", {}).get("value") == "خيار" for entry in localized.values()))
+            self.assertIn("ZeusToolPermissions.shared.authorize", execution)
+            self.assertNotIn(".offloadPermissionDialog()", (native / "src/ios/Views/Chat/AIChatView.swift").read_text())
             self.assertIn("@MainActor enum BrowserFixtureFactory", (browser / ".openminis/build/BrowserFixtureFactory.swift").read_text())
 
 

@@ -17,6 +17,7 @@ def run(*arguments, check=True):
 
 
 def rpc(method, params=None, timeout=30):
+    print("RPC", method, flush=True)
     request = urllib.request.Request("http://127.0.0.1:8321/rpc", data=json.dumps({"jsonrpc": "2.0", "id": method, "method": method, "params": params or {}}).encode(), headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(request, timeout=timeout) as response:
         payload = json.load(response)
@@ -37,10 +38,11 @@ def capture(device, bundle, output):
     settings["debug.auth.required"] = False
     settings["appearanceMode"] = 2
     settings["appLanguage"] = "ar"
+    settings["zeus.agent.permissionMode"] = "consequential"
     preferences.parent.mkdir(parents=True, exist_ok=True)
     preferences.write_bytes(plistlib.dumps(settings, fmt=plistlib.FMT_BINARY))
     arguments = ["xcrun", "simctl", "launch", "--terminate-running-process", device, bundle,
-                 "-AppleLanguages", "(ar)", "-AppleLocale", "ar_SA", "--zeus-native-fixture"]
+                 "-AppleLanguages", "(ar)", "-AppleLocale", "ar_SA", "-appearanceMode", "2", "-appLanguage", "ar", "--zeus-native-fixture"]
     if bundle != "com.openminis.app":
         arguments += ["--open-native-agent", "--layout=icab", "--uitesting"]
     try:
@@ -48,8 +50,8 @@ def capture(device, bundle, output):
         deadline = time.monotonic() + 40
         while True:
             try:
-                rpc("provider.instances.list", timeout=2)
-                break
+                if rpc("debug.fixture.providerReady", timeout=2).get("ready"):
+                    break
             except Exception:
                 if time.monotonic() >= deadline:
                     raise
@@ -63,13 +65,43 @@ def capture(device, bundle, output):
             raise RuntimeError("The original agent did not retain the complete fixture response")
         session = answer["sessionId"]
         (output / "conversation-result.json").write_text(json.dumps(answer, ensure_ascii=False, indent=2))
-        run("xcrun", "simctl", "openurl", device, "minis://sessions/" + session)
+        rpc("debug.fixture.route", {"url": "minis://sessions/" + session})
         time.sleep(2)
         run("xcrun", "simctl", "io", device, "screenshot", str(output / "chat.png"))
         (output / "blocks-diff.json").write_text(json.dumps(rpc("chat.session.blocksDiff", {"sessionId": session}), ensure_ascii=False, indent=2))
         (output / "view-tree.json").write_text(json.dumps(rpc("debug.viewTree", {"maxDepth": 20}), ensure_ascii=False, indent=2))
+        if bundle != "com.openminis.app":
+            critical = rpc("provider.models.add", {"instanceId": instance["id"], "modelId": "fixture-native-approval", "displayName": "Approval fixture", "contextWindow": 128000, "maxOutputTokens": 2000})
+            pending = rpc("chat.prompt", {"prompt": "فعّل الصفحات الداكنة بعد عرض الموافقة داخل المحادثة.", "modelEntryId": critical["id"], "thinkingLevel": "off", "wait": False})
+            session = pending["sessionId"]
+            rpc("debug.fixture.route", {"url": "minis://sessions/" + session})
+            deadline = time.monotonic() + 40
+            while True:
+                requests = rpc("zeus.fixture.approvals")["requests"]
+                if requests:
+                    break
+                if time.monotonic() > deadline:
+                    raise RuntimeError("The real agent did not publish its inline approval")
+                time.sleep(0.2)
+            request = requests[0]
+            if request["tool"] != "zeus_browser_settings" or "سأغيّر" not in request["explanation"]:
+                raise RuntimeError("The original agent lost the tool schema/approval explanation")
+            time.sleep(1)
+            run("xcrun", "simctl", "io", device, "screenshot", str(output / "inline-approval.png"))
+            (output / "inline-approval-tree.json").write_text(json.dumps(rpc("debug.viewTree", {"maxDepth": 25}), ensure_ascii=False, indent=2))
+            rpc("zeus.fixture.approval.respond", {"id": request["id"], "allowed": True})
+            deadline = time.monotonic() + 30
+            while rpc("chat.session.status", {"sessionId": session}).get("isRunning", False):
+                if time.monotonic() > deadline:
+                    raise RuntimeError("Agent did not resume after inline approval")
+                time.sleep(0.2)
+            actual = json.loads(rpc("zeus.fixture.settings"))
+            if actual["settings"]["advanced"]["forceDarkWebPages"] is not True:
+                raise RuntimeError("The approved agent tool did not change the real browser setting")
+            (output / "approved-browser-state.json").write_text(json.dumps(actual, ensure_ascii=False, indent=2))
+            run("xcrun", "simctl", "io", device, "screenshot", str(output / "inline-approved-result.png"))
         for route in ["settings", "settings/providers", "settings/model-groups"]:
-            run("xcrun", "simctl", "openurl", device, "minis://" + route)
+            rpc("debug.fixture.route", {"url": "minis://" + route})
             time.sleep(1.5)
             run("xcrun", "simctl", "io", device, "screenshot", str(output / (route.replace("/", "-") + ".png")))
     finally:
