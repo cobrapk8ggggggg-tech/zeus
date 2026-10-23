@@ -1,0 +1,102 @@
+name: OpenMinis original native reference
+on:
+  push:
+    branches: [feature/openminis-native-20261023]
+    paths: [.openminis/**, .github/workflows/openminis-native.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: openminis-reference-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  reference:
+    runs-on: macos-15-arm64
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: naruto00o9n-max/OpenMinis
+          ref: 6339bfcb25190ebf80fd03086c4ead81cf9428ba
+          path: upstream
+          submodules: recursive
+          persist-credentials: false
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26.3'
+      - name: Prepare the original source for the simulator SDK
+        run: |
+          test "$(uname -m)" = arm64
+          python3 .openminis/prepare_reference.py upstream --sdk iphonesimulator --manifest results/original-source.json
+          brew install ninja llvm lld libarchive pkg-config meson
+          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+          echo "$(brew --prefix lld)/bin" >> "$GITHUB_PATH"
+      - uses: actions/cache@v4
+        id: native
+        with:
+          path: |
+            upstream/deps/libs
+            upstream/deps/include
+            upstream/deps/resources
+            upstream/deps/frameworks
+            upstream/deps/lame-build
+          key: openminis-6339bfcb-simulator-arm64-xcode263-v1
+      - name: Build the actual native dependencies and Linux rootfs
+        if: steps.native.outputs.cache-hit != 'true'
+        working-directory: upstream
+        run: |
+          set -euo pipefail
+          bash deps/build_lame.sh 2>&1 | tee ../results/lame.log
+          bash deps/build_ffmpeg.sh 2>&1 | tee ../results/ffmpeg.log
+          bash deps/build_ish.sh 2>&1 | tee ../results/ish.log
+          bash deps/prepare_alpine_rootfs.sh 2>&1 | tee ../results/rootfs.log
+      - name: Build the original application and its original UI tests
+        run: |
+          set -euo pipefail
+          xcodebuild -project upstream/src/ios/Minis.xcodeproj -scheme Minis \
+            -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/OpenMinisOriginal" \
+            build-for-testing CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ARCHS=arm64 \
+            2>&1 | tee results/original-build.log
+      - name: Run the original renderer tests on iPad and iPhone
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, subprocess
+          devices = json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','-j']))['devices']
+          all_devices = [d for group in devices.values() for d in group]
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              for kind in ['iPhone', 'iPad']:
+                  match = next(d for d in all_devices if kind in d['name'])
+                  output.write(kind.upper() + '_SIMULATOR=' + match['udid'] + '\n')
+          PY
+      - name: Capture and test both device sizes
+        run: |
+          set -euo pipefail
+          for kind in IPHONE IPAD; do
+            if [ "$kind" = IPHONE ]; then device="$IPHONE_SIMULATOR"; else device="$IPAD_SIMULATOR"; fi
+            xcrun simctl boot "$device" || true
+            xcrun simctl bootstatus "$device" -b
+            xcrun simctl install "$device" "$RUNNER_TEMP/OpenMinisOriginal/Build/Products/Debug-iphonesimulator/Minis.app"
+            xcrun simctl launch "$device" com.openminis.app -AppleLanguages '(ar)' -AppleLocale ar_SA
+            xcrun simctl io "$device" screenshot "results/original-$kind.png"
+            xcodebuild -project upstream/src/ios/Minis.xcodeproj -scheme Minis \
+              -configuration Debug -destination "platform=iOS Simulator,id=$device" \
+              -derivedDataPath "$RUNNER_TEMP/OpenMinisOriginal" \
+              -resultBundlePath "results/original-$kind.xcresult" \
+              -only-testing:MinisUITests/MessageListV3UITests/testLongContentMultiBundleRendering \
+              -only-testing:MinisUITests/MessageListV3UITests/testStreamingAutoScrollFollowsBottom \
+              test-without-building CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+              2>&1 | tee "results/original-$kind-tests.log"
+            xcrun simctl shutdown "$device"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: openminis-original-reference
+          path: results
+          retention-days: 14
+          if-no-files-found: error
