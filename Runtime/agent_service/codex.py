@@ -76,7 +76,7 @@ class CodexRPC:
 
     async def drain_stderr(self):
         # Consume diagnostics without leaking authentication headers into events.
-        while await self.process.stderr.readline():
+        while await self.process.stderr.read(65536):
             pass
 
     async def close(self):
@@ -92,7 +92,8 @@ class CodexRPC:
                 except ProcessLookupError:
                     pass
                 await self.process.wait()
-        for reader in (getattr(self, "reader", None), getattr(self, "stderr", None)):
+        readers = [r for r in (getattr(self, "reader", None), getattr(self, "stderr", None)) if r]
+        for reader in readers:
             if reader:
                 reader.cancel()
-        await asyncio.gather(*self.handlers, return_exceptions=True)
+        await asyncio.gather(*self.handlers, *readers, return_exceptions=True)

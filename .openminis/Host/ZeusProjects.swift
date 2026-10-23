@@ -148,12 +148,21 @@ private struct ZeusNewProject: View {
     @State private var checks = ""
     @State private var model = ""
     @State private var models: [[String: Any]] = []
+    @State private var repositories: [[String: Any]] = []
     @State private var error: String?
     @State private var saving = false
     var body: some View {
         Form {
             TextField("اسم المشروع", text: $name)
             TextField("رابط المستودع (اختياري)", text: $repository).textInputAutocapitalization(.never)
+            if !repositories.isEmpty {
+                Picker("من حساب GitHub", selection: $repository) {
+                    Text("مشروع جديد أو رابط مخصص").tag("")
+                    ForEach(repositories, id: \.zeusRepositoryName) { item in
+                        Text(item.zeusRepositoryName).tag(item["url"] as? String ?? "")
+                    }
+                }
+            }
             Picker("نوع المشروع", selection: $kind) { Text("موقع ويب").tag("web"); Text("تطبيق iOS").tag("ios"); Text("تطبيق Android").tag("android"); Text("عام").tag("generic") }
             Picker("النموذج", selection: $model) {
                 Text("الافتراضي للحساب").tag("")
@@ -175,6 +184,7 @@ private struct ZeusNewProject: View {
             }.disabled(saving || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }.navigationTitle("مشروع جديد").toolbar { Button("إلغاء") { dismiss() } }.task {
             if let response = try? await ZeusProjects.shared.object("v1/models") { models = response["data"] as? [[String: Any]] ?? [] }
+            if let response = try? await ZeusProjects.shared.object("v1/github/repositories") { repositories = response["repositories"] as? [[String: Any]] ?? [] }
         }
     }
 }
@@ -328,6 +338,7 @@ extension Dictionary where Key == String, Value == Any {
     var zeusID: String { self["id"] as? String ?? "" }
     var zeusLabel: String { self["label"] as? String ?? "" }
     var zeusFileName: String { self["name"] as? String ?? "" }
+    var zeusRepositoryName: String { self["nameWithOwner"] as? String ?? "" }
 }
 
 private struct ZeusRemoteApprovalCard: View {

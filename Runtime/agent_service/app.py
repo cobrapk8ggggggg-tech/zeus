@@ -120,6 +120,17 @@ def create_app(data_dir=None, api_token=None, codex_binary=None, public_url=None
     async def models():
         return await accounts.models()
 
+    @app.get("/v1/github/repositories", dependencies=authorized)
+    async def github_repositories():
+        try:
+            connections.credentials("github")
+        except KeyError:
+            raise ValueError("اربط حساب GitHub من الإضافات أولًا.")
+        code, output = await command(["gh", "repo", "list", "--limit", "100", "--json", "nameWithOwner,url,isPrivate,defaultBranchRef"], store.root, connections.environment(), timeout=60)
+        if code:
+            raise ValueError("تعذر جلب المستودعات؛ تحقق من صلاحيات الحساب المتصل. " + output[-1000:])
+        return {"repositories": json.loads(output)}
+
     @app.post("/v1/projects", dependencies=authorized)
     async def create_project(value: ProjectInput):
         if value.kind not in {"generic", "web", "ios", "android"}:

@@ -36,7 +36,6 @@ struct ZeusPlugin: Decodable, Identifiable {
         } catch { self.error = error.localizedDescription }
     }
     func sync(_ plugin: ZeusPlugin) async throws {
-        for skill in plugin.skills { _ = try await SkillStore.shared.importFromGitHub(urlString: skill.url) }
         guard plugin.connected, plugin.mcp_url != nil, let token = plugin.proxy_token else { return }
         let id = "zeus-" + plugin.id
         let object: [String: Any] = ["id": id, "note": plugin.name, "enabled": true,
@@ -80,7 +79,7 @@ private struct ZeusPluginDetail: View {
             Section("المكون الأصلي") {
                 Text(current.description)
                 if let revision = current.revision { Text(String(revision.prefix(12))).font(.caption.monospaced()) }
-                Button(current.installed ? "مزامنة المهارات والاتصال" : "تثبيت الإضافة") { Task { await store.install(current) } }.disabled(store.busy)
+                Button(current.installed ? "مزامنة اتصال الإضافة" : "تثبيت الإضافة") { Task { await store.install(current) } }.disabled(store.busy)
             }
             if current.mcp_url != nil {
                 Section("الحساب") {
@@ -90,7 +89,17 @@ private struct ZeusPluginDetail: View {
                     if current.connected { Label("الحساب متصل", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
                 }
             }
-            Section("المهارات") { ForEach(current.skills, id: \.url) { skill in Text(skill.name) } }
+            Section("مهارات متاحة للوكيل داخل المتصفح") {
+                ForEach(current.skills, id: \.url) { skill in
+                    Button(skill.name) {
+                        Task {
+                            busy = true; defer { busy = false }
+                            do { _ = try await SkillStore.shared.importFromGitHub(urlString: skill.url); error = nil }
+                            catch { self.error = error.localizedDescription }
+                        }
+                    }.disabled(busy)
+                }
+            }
             if let error = error ?? store.error { Text(error).foregroundStyle(.red) }
         }.navigationTitle(current.name)
             .onChange(of: scenePhase) { value in if value == .active { Task { await store.refresh() } } }
