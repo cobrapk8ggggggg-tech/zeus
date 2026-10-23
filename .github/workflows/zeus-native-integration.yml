@@ -148,6 +148,14 @@ jobs:
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
       timeout-minutes: 8
       run: bash browser/.openminis/run_native_stage.sh tests IPHONE "${IPHONE_SIMULATOR}"
+    - name: 'IPHONE: Save unit diagnostics immediately'
+      if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: zeus-iphone-unit-diagnostics
+        path: results/embedded-IPHONE*
+        retention-days: 14
+        if-no-files-found: warn
     - name: 'IPHONE: Capture original settings'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
       timeout-minutes: 5
@@ -168,6 +176,14 @@ jobs:
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
       timeout-minutes: 8
       run: bash browser/.openminis/run_native_stage.sh tests IPAD "${IPAD_SIMULATOR}"
+    - name: 'IPAD: Save unit diagnostics immediately'
+      if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: zeus-ipad-unit-diagnostics
+        path: results/embedded-IPAD*
+        retention-days: 14
+        if-no-files-found: warn
     - name: 'IPAD: Capture original settings'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
       timeout-minutes: 5
