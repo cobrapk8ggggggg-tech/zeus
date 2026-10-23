@@ -35,7 +35,9 @@ account, runner, permission or resource. Never fabricate test results.
 The `zeus-browser` MCP server provides actual headless Chromium on the worker:
 navigation, accessibility snapshots, click/fill, console/network observations,
 Playwright execution and screenshots. Exercise the running local project and
-verify resulting UI state. This is the WORKER browser with its own isolated
+verify resulting UI state. Read the actual snapshot YAML files linked by MCP
+responses for element references; inspect actual PNGs with the image tool.
+This is the WORKER browser with its own isolated
 session, separate from both the user's phone tabs and the phone automation
 browser. It continues without the phone. Do not assume the user's site login
 exists here or transfer cookies without an explicit request.

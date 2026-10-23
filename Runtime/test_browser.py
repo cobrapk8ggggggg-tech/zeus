@@ -31,7 +31,7 @@ async def main():
     threading.Thread(target=server.serve_forever, daemon=True).start()
     with tempfile.TemporaryDirectory(prefix="zeus-browser-smoke-") as directory:
         process = await asyncio.create_subprocess_exec(executable, "--headless", "--no-sandbox", "--isolated", "--executable-path", chromium, "--output-dir", directory,
-            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, limit=8_000_000)
+            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, limit=8_000_000, cwd=directory)
         async def drain():
             while await process.stderr.read(65536): pass
         stderr = asyncio.create_task(drain())
@@ -53,7 +53,15 @@ async def main():
                         return result
                 raise RuntimeError("MCP exited before answering")
         async def tool(name, arguments): return await call("tools/call", {"name": name, "arguments": arguments})
-        def text(result): return "\n".join(c.get("text", "") for c in result.get("content", []))
+        def text(result):
+            output = "\n".join(c.get("text", "") for c in result.get("content", []))
+            # Current official MCP returns the real accessibility snapshot as
+            # a file link. Read that file instead of assuming inline text.
+            for reference in re.findall(r'\[Snapshot\]\(([^)]+)\)', output):
+                file = (Path(directory) / reference).resolve()
+                assert file.is_relative_to(Path(directory).resolve()), reference
+                output += "\n" + file.read_text()
+            return output
         try:
             await call("initialize", {"protocolVersion": "2025-03-26", "capabilities": {}, "clientInfo": {"name": "zeus-worker-smoke", "version": "1"}})
             await send({"jsonrpc": "2.0", "method": "notifications/initialized"})
