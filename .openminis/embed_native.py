@@ -49,6 +49,15 @@ def embed(native, browser, report):
     replace(source / "Views/ContentView.swift",
             "        }\n        .onReceive(\n            NotificationCenter.default.publisher(for: .sessionDidCreate),",
             "        }\n    }\n\n    var body: some View {\n        zeusNativeGeometry\n        .onReceive(\n            NotificationCenter.default.publisher(for: .sessionDidCreate),")
+    replace(source / "Views/ContentView.swift", "    var body: some View {\n        zeusNativeGeometry",
+            "    private var zeusNativeIncoming: some View {\n        zeusNativeGeometry")
+    for anchor, name, previous in [
+        ("        .fullScreenCover(isPresented: $showTerminal) {", "zeusNativePresentations", "zeusNativeIncoming"),
+        ("        .onReceive(NotificationCenter.default.publisher(for: .cloudSyncDidFetchChanges)) { _ in", "zeusNativeSessionLifecycle", "zeusNativePresentations"),
+        ("        .onChange(of: shareCoordinator.hasPendingShare) { hasPending in", "body", "zeusNativeSessionLifecycle")
+    ]:
+        declaration = "    var body: some View {" if name == "body" else "    private var " + name + ": some View {"
+        replace(source / "Views/ContentView.swift", anchor, "    }\n\n" + declaration + "\n        " + previous + "\n" + anchor)
 
     definitions = source / "Agent/Chat/AIChatViewModel+ToolDefinitions.swift"
     replace(definitions, "        return tools", "        tools.append(ZEUSNativeAgentBridge.definition)\n        return tools")

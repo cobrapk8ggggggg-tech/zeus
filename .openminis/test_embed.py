@@ -42,6 +42,15 @@ class NativeEmbeddingTests(unittest.TestCase):
                     expected = expected.replace("private struct SettingsSheet: View", "struct SettingsSheet: View")
                     expected = expected.replace("    private static let pendingBackgroundNavigationTTL: TimeInterval = 90\n\n    var body: some View {\n        GeometryReader { geo in", "    private static let pendingBackgroundNavigationTTL: TimeInterval = 90\n\n    private var zeusNativeGeometry: some View {\n        GeometryReader { geo in")
                     expected = expected.replace("        }\n        .onReceive(\n            NotificationCenter.default.publisher(for: .sessionDidCreate),", "        }\n    }\n\n    var body: some View {\n        zeusNativeGeometry\n        .onReceive(\n            NotificationCenter.default.publisher(for: .sessionDidCreate),")
+                    expected = expected.replace("    var body: some View {\n        zeusNativeGeometry", "    private var zeusNativeIncoming: some View {\n        zeusNativeGeometry")
+                    boundaries = [
+                        ("        .fullScreenCover(isPresented: $showTerminal) {", "zeusNativePresentations", "zeusNativeIncoming"),
+                        ("        .onReceive(NotificationCenter.default.publisher(for: .cloudSyncDidFetchChanges)) { _ in", "zeusNativeSessionLifecycle", "zeusNativePresentations"),
+                        ("        .onChange(of: shareCoordinator.hasPendingShare) { hasPending in", "body", "zeusNativeSessionLifecycle")
+                    ]
+                    for anchor, name, previous in boundaries:
+                        declaration = "    var body: some View {" if name == "body" else "    private var " + name + ": some View {"
+                        expected = expected.replace(anchor, "    }\n\n" + declaration + "\n        " + previous + "\n" + anchor)
                 self.assertEqual((native / "src/ios" / relative).read_text(), expected, str(relative))
             for name in ("Agent/MessageList/CollectionViewMessageListV3.swift", "Agent/Chat/ChatStore.swift"):
                 self.assertNotIn(name, changed)
