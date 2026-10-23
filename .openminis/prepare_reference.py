@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 import subprocess
 import xml.etree.ElementTree as ET
+from debug_fixture import prepare_fixture
 
 
 def prepare(root: Path, sdk: str) -> dict:
@@ -88,9 +89,11 @@ private enum OpenMinisReferenceFixtureBootstrap {
 }
 '''
     app.write_text(code)
+    fixtures = prepare_fixture(root)
+    adapters = {str(file.relative_to(root)): hashlib.sha256(file.read_bytes()).hexdigest() for file in [app] + fixtures}
     return {"repository": expected["repository"], "commit": actual, "sdk": sdk,
             "applicationFilesSHA256": manifest,
-            "testEntryAdapters": {"src/ios/MinisApp.swift": hashlib.sha256(app.read_bytes()).hexdigest()}}
+            "testEntryAdapters": adapters}
 
 
 if __name__ == "__main__":

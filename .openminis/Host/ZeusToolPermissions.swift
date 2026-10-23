@@ -38,8 +38,8 @@ enum ZeusPermissionMode: String, CaseIterable {
     static func isConsequential(tool: String, args: [String: Any]) -> Bool {
         switch tool {
         case "file_read", "read_image", "memory_read": return false
-        case "zeus_browser":
-            let op = args["operation"] as? String ?? ""
+        case let name where name == "zeus_browser" || zeusBrowserOperation(name) != nil:
+            let op = zeusBrowserOperation(tool) ?? args["operation"] as? String ?? ""
             var inner = args
             if let nested = args["arguments"] as? [String: Any] { inner.merge(nested) { _, new in new } }
             if let raw = args["arguments"] as? String,
@@ -86,13 +86,13 @@ enum ZeusPermissionMode: String, CaseIterable {
         continuation.resume(returning: allowed)
     }
     func cancelBrowserRequests() {
-        for request in Array(requests.values) where request.tool == "zeus_browser" { respond(request.id, allowed: false) }
+        for request in Array(requests.values) where request.tool == "zeus_browser" || zeusBrowserOperation(request.tool) != nil { respond(request.id, allowed: false) }
     }
     private func changed(_ id: UUID) {
         NotificationCenter.default.post(name: .zeusApprovalChanged, object: id)
     }
     private static func destination(tool: String, args: [String: Any]) -> String {
-        if tool == "zeus_browser" { return "متصفحك ZEUS · " + (args["operation"] as? String ?? "") + "\n" + (args["url"] as? String ?? args["tab_id"] as? String ?? "البروفايل النشط") }
+        if tool == "zeus_browser" || zeusBrowserOperation(tool) != nil { return "متصفحك ZEUS · " + (zeusBrowserOperation(tool) ?? args["operation"] as? String ?? "") + "\n" + (args["url"] as? String ?? args["tab_id"] as? String ?? "البروفايل النشط") }
         if tool == "browser_use" { return "متصفح الأتمتة المستقل · " + (args["action"] as? String ?? "") + "\n" + (args["url"] as? String ?? "") }
         if let path = args["path"] as? String { return String(path.prefix(500)) }
         if let command = args["command"] as? String { return String(command.prefix(600)) }
@@ -157,5 +157,14 @@ struct ZeusPermissionSettingsSection: View {
                 }.accessibilityAddTraits(selection == mode.rawValue ? [.isSelected] : [])
             }
         }
+    }
+}
+
+// Browser cards retain the source renderer but must never attach ZEUS actions
+// to the separate automation pool, its snapshots or takeover buttons.
+extension AssistantBlock {
+    var zeusIsUserBrowser: Bool {
+        if case .browserTool(let action) = kind { return action.hasPrefix("browser_") }
+        return false
     }
 }

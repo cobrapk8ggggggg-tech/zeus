@@ -43,6 +43,13 @@ final class NativeBrowserIntegrationTests: XCTestCase {
         XCTAssertTrue(permissions.requests.isEmpty)
     }
     func testBrowserToolAcceptsFlatAndLegacyObjectsAndRejectsInvalidFields() throws {
+        let open = try XCTUnwrap(ZEUSNativeAgentBridge.definitions.first { $0.name == "zeus_browser_open" })
+        XCTAssertTrue(open.required.contains("url"))
+        XCTAssertNil(open.parameters["operation"])
+        XCTAssertNil(open.parameters["arguments"])
+        let storage = try XCTUnwrap(ZEUSNativeAgentBridge.definitions.first { $0.name == "zeus_browser_storage" })
+        XCTAssertEqual(storage.parameters["action"]?.enumValues, ["read", "set", "remove", "clear"])
+        XCTAssertEqual(try ZEUSNativeAgentBridge.normalizedInput(["url": "https://example.com"], toolName: "zeus_browser_open").0, "browser_open")
         let flat = try ZEUSNativeAgentBridge.normalizedInput(["operation": "browser_open", "url": "https://example.com", "new_tab": "false"])
         XCTAssertEqual(flat.0, "browser_open")
         XCTAssertTrue(flat.1.contains("false"))

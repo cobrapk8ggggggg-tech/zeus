@@ -54,6 +54,7 @@ public struct NativeBrowserApproval {
 public struct NativeBrowserToolResult {
     public let text: String
     public let imagePath: String?
+    public let pageURL: String?
 }
 private final class NativeToolCapture { var imageFilePath: String? }
 
@@ -84,6 +85,9 @@ private final class NativeToolCapture { var imageFilePath: String? }
     static var tools: [BrowserAgentTools.Tool] { BrowserAgentTools.tools.filter { !$0.name.hasPrefix("memory_") } + NativeBrowserInspector.tools + NativeBrowserControl.tools }
     public static func validatedArguments(operation: String, json: String) throws -> String {
         try NativeBrowserContract.arguments(operation: operation, json: json, tools: tools)
+    }
+    public static var toolSpecifications: [[String: Any]] {
+        tools.map { ["name": $0.name, "description": $0.description, "properties": $0.properties, "required": $0.required] }
     }
     public static var operationNames: [String] { tools.map(\.name) }
     public static var parameterSchemas: [String: [String: Any]] {
@@ -130,7 +134,7 @@ private final class NativeToolCapture { var imageFilePath: String? }
         let capture = NativeToolCapture()
         let output = try await execute(call, block: capture)
         if operation != "browser_profiles" || call.object["action"] as? String != "switch" { try validate() }
-        return NativeBrowserToolResult(text: output, imagePath: capture.imageFilePath)
+        return NativeBrowserToolResult(text: output, imagePath: capture.imageFilePath, pageURL: browser?.current?.webView?.url?.absoluteString)
     }
     private func validate() throws {
         try Task.checkCancellation()

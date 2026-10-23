@@ -36,7 +36,7 @@ class NativeEmbeddingTests(unittest.TestCase):
             # addition to the existing permission card and app-group constants.
             for file in (UPSTREAM / "src/ios/Views").rglob("*.swift"):
                 relative = file.relative_to(UPSTREAM / "src/ios")
-                if str(relative) in {"Views/Chat/OffloadPermissionDialog.swift", "Views/Chat/AIChatView.swift", "Views/Settings/OffloadPermissionSettingsView.swift"}:
+                if str(relative) in {"Views/Chat/OffloadPermissionDialog.swift", "Views/Chat/AIChatView.swift", "Views/Chat/ToolLiveSheet.swift", "Views/Settings/OffloadPermissionSettingsView.swift"}:
                     continue
                 expected = file.read_text().replace("group.com.openminis.app", "group.tools.zeus.openminis").replace("iCloud.com.openminis.app", "iCloud.tools.zeus.openminis")
                 if str(relative) == "Views/ContentView.swift":
@@ -52,6 +52,8 @@ class NativeEmbeddingTests(unittest.TestCase):
                     for anchor, name, previous in boundaries:
                         declaration = "    var body: some View {" if name == "body" else "    private var " + name + ": some View {"
                         expected = expected.replace(anchor, "    }\n\n" + declaration + "\n        " + previous + "\n" + anchor)
+                if str(relative) == "Views/Chat/AssistantBlockView.swift":
+                    expected = expected.replace('case .browserTool:   toolName = "browser_use"', 'case .browserTool:   toolName = block.zeusIsUserBrowser ? "zeus_browser" : "browser_use"')
                 expected = expected.replace('"Minis"', '"Zeus"')
                 for tool in ("Shell", "Editor", "Browser", "Memory"):
                     expected = expected.replace('return "Minis is using ' + tool + '"', 'return String(localized: "Minis is using ' + tool + '")')
@@ -59,7 +61,7 @@ class NativeEmbeddingTests(unittest.TestCase):
             for name in ("Agent/Chat/ChatStore.swift",):
                 self.assertNotIn(name, changed)
             execution = (native / "src/ios/Agent/Chat/AIChatViewModel+ConcurrentTools.swift").read_text()
-            self.assertIn('case "zeus_browser":', execution)
+            self.assertIn('name == "zeus_browser" || zeusBrowserOperation(name) != nil', execution)
             self.assertIn('case "browser_use":', execution)
             self.assertIn("ZEUSNativeAgentBridge.shared.execute", execution)
             self.assertIn("ContentView()", (native / "src/ios/ZEUSNativeIntegration.swift").read_text())

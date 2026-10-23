@@ -23,7 +23,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
             body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', '0'))))
-            if body.get('model') in ('fixture-native-stream', 'fixture-native-tool'):
+            if body.get('model') in ('fixture-native-stream', 'fixture-native-tool', 'fixture-native-approval'):
                 if body.get('stream') is False:
                     encoded = json.dumps({'choices': [{'message': {'role': 'assistant', 'content': 'محادثة الاختبار'}, 'finish_reason': 'stop'}]}, ensure_ascii=False).encode()
                     self.send_response(200)
@@ -36,19 +36,23 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header('Content-Type', 'text/event-stream; charset=utf-8')
                 self.send_header('Connection', 'close')
                 self.end_headers()
-                if body['model'] == 'fixture-native-stream':
+                if body['model'] == 'fixture-native-approval' and any(m.get('role') == 'tool' for m in body.get('messages', [])):
+                    events = [{'choices': [{'delta': {'content': 'تم تنفيذ إعداد المتصفح بعد الموافقة. APPROVAL_FIXTURE_DONE'}, 'finish_reason': None}]}, {'choices': [{'delta': {}, 'finish_reason': 'stop'}]}]
+                elif body['model'] == 'fixture-native-stream':
                     fragments = ['# رسالة اختبار البث\n'] + [('Paragraph العربية — complete content.\n' * 100) for _ in range(8)] + ['\n```swift\nprint("complete")\n```\nنهاية الرسالة NATIVE_STREAM_END']
                     events = [{'choices': [{'delta': {'content': part}, 'finish_reason': None}]} for part in fragments]
                     events.append({'choices': [{'delta': {}, 'finish_reason': 'stop'}]})
                 else:
                     arguments = json.dumps({'tool_title': 'قراءة التبويبات الفعلية', 'operation': 'browser_tabs', 'arguments': '{}'}, ensure_ascii=False)
+                    if body['model'] == 'fixture-native-approval':
+                        arguments = json.dumps({'tool_title': 'تفعيل الوضع الداكن للصفحات', 'approval_reason': 'سأغيّر إعداد الصفحات الداكنة في البروفايل النشط، وقد تُعاد تهيئة الصفحة المفتوحة لتطبيقه.', 'action': 'set', 'key': 'advanced.forceDarkWebPages', 'value': 'true'}, ensure_ascii=False)
                     pieces = [arguments[i:i + 16] for i in range(0, len(arguments), 16)]
                     events = []
                     for index, part in enumerate(pieces):
                         call = {'index': 0, 'function': {'arguments': part}}
                         if index == 0:
                             call.update({'id': 'native-tool-fixture', 'type': 'function'})
-                            call['function']['name'] = 'zeus_browser'
+                            call['function']['name'] = 'zeus_browser_settings' if body['model'] == 'fixture-native-approval' else 'zeus_browser'
                         events.append({'choices': [{'delta': {'tool_calls': [call]}, 'finish_reason': None}]})
                     events.append({'choices': [{'delta': {}, 'finish_reason': 'tool_calls'}]})
                 for event in events:
