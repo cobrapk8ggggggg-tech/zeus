@@ -17,6 +17,12 @@ UPSTREAM = HERE.parent / "Vendor/OpenMinis"
 
 
 class NativeEmbeddingTests(unittest.TestCase):
+    def test_arabic_overrides_preserve_format_arguments(self):
+        overrides = json.loads((HERE / "arabic-overrides.json").read_text())
+        token = re.compile(r'%(?:\d+\$)?[-+#0 ]*(?:\d+|\*)?(?:\.(?:\d+|\*))?(?:ll|l|h|z)?[@diuoxXfFeEgGcs]')
+        for source, translated in overrides.items():
+            self.assertEqual(sorted(token.findall(source)), sorted(token.findall(translated)), source)
+            self.assertFalse(translated.startswith("معلومات:"), source)
     def test_original_views_and_runtime_survive_host_adapters(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

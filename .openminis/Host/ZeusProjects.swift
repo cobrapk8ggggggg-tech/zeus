@@ -209,11 +209,31 @@ private struct ZeusProjectDetail: View {
 
 private struct ZeusProjectFiles: View {
     let projectID: String
+    var path: String = ""
     @State private var output = ""
+    @State private var files: [[String: Any]] = []
     var body: some View {
-        ScrollView { Text(output).font(.system(.caption, design: .monospaced)).frame(maxWidth: .infinity, alignment: .leading).padding().textSelection(.enabled) }
-            .navigationTitle("تغييرات المشروع").task {
-                do { let value = try await ZeusProjects.shared.object("v1/projects/\(projectID)/diff"); output = (value["status"] as? String ?? "") + "\n" + (value["diff"] as? String ?? "") }
+        List {
+            Section("الملفات") {
+                ForEach(files, id: \.zeusFileName) { entry in
+                    let name = entry["name"] as? String ?? ""
+                    NavigationLink { ZeusProjectFiles(projectID: projectID, path: path.isEmpty ? name : path + "/" + name) } label: {
+                        Label(name, systemImage: entry["directory"] as? Bool == true ? "folder" : "doc.text")
+                    }
+                }
+            }
+            if !output.isEmpty { Section(path.isEmpty ? "الفروق من بداية المشروع" : "المحتوى") { Text(output).font(.system(.caption, design: .monospaced)).textSelection(.enabled) } }
+        }.navigationTitle(path.isEmpty ? "ملفات المشروع" : URL(fileURLWithPath: path).lastPathComponent).task {
+                do {
+                    var query = URLComponents(); query.queryItems = [URLQueryItem(name: "path", value: path)]
+                    let content = try await ZeusProjects.shared.object("v1/projects/\(projectID)/files?" + (query.percentEncodedQuery ?? ""))
+                    files = content["files"] as? [[String: Any]] ?? []
+                    output = content["text"] as? String ?? ""
+                    if path.isEmpty {
+                        let value = try await ZeusProjects.shared.object("v1/projects/\(projectID)/diff")
+                        output = (value["status"] as? String ?? "") + "\n" + (value["diff"] as? String ?? "")
+                    }
+                }
                 catch { output = error.localizedDescription }
             }
     }
@@ -307,6 +327,7 @@ struct ZeusProjectTaskDetail: View {
 extension Dictionary where Key == String, Value == Any {
     var zeusID: String { self["id"] as? String ?? "" }
     var zeusLabel: String { self["label"] as? String ?? "" }
+    var zeusFileName: String { self["name"] as? String ?? "" }
 }
 
 private struct ZeusRemoteApprovalCard: View {

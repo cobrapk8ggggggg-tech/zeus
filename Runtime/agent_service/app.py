@@ -154,7 +154,13 @@ def create_app(data_dir=None, api_token=None, codex_binary=None, public_url=None
             raise ValueError(output)
         for key, value_text in [("user.name", "Zeus"), ("user.email", "zeus@localhost"), ("credential.helper", "!gh auth git-credential")]:
             await command(["git", "config", key, value_text], workspace, environment)
-        project = {**value.model_dump(), "id": identifier, "workspace": str(workspace), "branch": branch, "created": time.time()}
+        head_code, baseline = await command(["git", "rev-parse", "HEAD"], workspace, environment)
+        if head_code:
+            code, output = await command(["git", "commit", "--allow-empty", "-m", "Initialize ZEUS project workspace"], workspace, environment)
+            if code:
+                raise ValueError(output[-2000:])
+            _, baseline = await command(["git", "rev-parse", "HEAD"], workspace, environment)
+        project = {**value.model_dump(), "id": identifier, "workspace": str(workspace), "branch": branch, "base_sha": baseline.strip(), "created": time.time()}
         return store.put("project", project)
 
     @app.patch("/v1/projects/{identifier}", dependencies=authorized)
@@ -171,8 +177,10 @@ def create_app(data_dir=None, api_token=None, codex_binary=None, public_url=None
         project = store.get("project", identifier)
         root = Path(project["workspace"]).resolve()
         selected = (root / path).resolve()
-        if not selected.is_relative_to(root) or ".git" in Path(path).parts:
+        if not selected.is_relative_to(root) or ".git" in selected.relative_to(root).parts:
             raise ValueError("مسار الملف خارج مساحة المشروع.")
+        if not selected.exists():
+            raise HTTPException(404, "الملف غير موجود.")
         if selected.is_dir():
             return {"path": path, "files": [{"name": p.name, "directory": p.is_dir()} for p in sorted(selected.iterdir()) if p.name != ".git"][:1000]}
         if selected.stat().st_size > 2_000_000:
@@ -183,8 +191,9 @@ def create_app(data_dir=None, api_token=None, codex_binary=None, public_url=None
     async def project_diff(identifier: str):
         project = store.get("project", identifier)
         _, status = await command(["git", "status", "--short"], project["workspace"])
-        code, diff = await command(["git", "diff", "HEAD", "--"], project["workspace"])
-        return {"status": status, "diff": diff, "has_head": code == 0, "branch": project["branch"]}
+        code, diff = await command(["git", "diff", project.get("base_sha", "HEAD"), "--"], project["workspace"])
+        _, untracked = await command(["git", "ls-files", "--others", "--exclude-standard"], project["workspace"])
+        return {"status": status, "diff": diff, "untracked": untracked.splitlines(), "has_head": code == 0, "branch": project["branch"]}
 
     @app.get("/v1/tasks", dependencies=authorized)
     async def tasks(project_id: str = ""):

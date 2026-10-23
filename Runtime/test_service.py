@@ -73,8 +73,9 @@ class APITests(unittest.TestCase):
                 return {}
         with patch("agent_service.worker.CodexRPC", Engine), TestClient(self.app, headers={"Authorization": "Bearer " + TOKEN}) as server:
             project = server.post("/v1/projects", json={"name": "Disconnect test", "verify_commands": ["exit 0"]}).json()
-            with TestClient(self.app, headers={"Authorization": "Bearer " + TOKEN}) as other:
-                task = other.post(f"/v1/projects/{project['id']}/tasks", json={"prompt": "work"}).json()
+            other = TestClient(self.app, headers={"Authorization": "Bearer " + TOKEN})
+            task = other.post(f"/v1/projects/{project['id']}/tasks", json={"prompt": "work"}).json()
+            other.close()
             # The short-lived HTTP client is now gone; the server's worker is
             # still owned by the outer application lifespan.
             deadline = time.monotonic() + 5
