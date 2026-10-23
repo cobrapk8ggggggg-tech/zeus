@@ -47,6 +47,7 @@ class NativeEmbeddingTests(unittest.TestCase):
             self.assertIn("ZEUSNativeAgentBridge.shared.execute", execution)
             self.assertIn("ContentView()", (native / "src/ios/ZEUSNativeIntegration.swift").read_text())
             self.assertIn("return model", (browser / ".openminis/build/BrowserFixtureFactory.swift").read_text())
+            self.assertIn("@MainActor enum BrowserFixtureFactory", (browser / ".openminis/build/BrowserFixtureFactory.swift").read_text())
 
 
 if __name__ == "__main__":

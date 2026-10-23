@@ -119,7 +119,7 @@ def embed(native, browser, report):
     end = original_app.index("    var body: some Scene", start)
     factory = original_app[start:end].replace("    init() {", "    static func make() -> BrowserModel {")
     factory = factory.replace("_browser = StateObject(wrappedValue: model)", "return model").replace("_browser = StateObject(wrappedValue: BrowserModel())", "return BrowserModel()")
-    (generated / "BrowserFixtureFactory.swift").write_text("import SwiftUI\nenum BrowserFixtureFactory {\n" + factory + "}\n")
+    (generated / "BrowserFixtureFactory.swift").write_text("import SwiftUI\n@MainActor enum BrowserFixtureFactory {\n" + factory + "}\n")
 
     changed = []
     for name, digest in before.items():
