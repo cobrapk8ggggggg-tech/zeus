@@ -116,6 +116,17 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(TimeoutError):
             await command(["python3", "-c", "import time; time.sleep(30)"], self.store.root, timeout=.05)
 
+    async def test_unconnected_plugins_do_not_break_codex_mcp_startup(self):
+        self.store.put("plugin", {"id": "github", "revision": "test", "skills": []})
+        self.connections.write_codex_config()
+        config = self.store.root / "codex/config.toml"
+        self.assertNotIn("[mcp_servers.github]", config.read_text())
+        self.connections.save_token("github", {"access_token": "independent-test-token"})
+        self.connections.write_codex_config()
+        self.assertIn("[mcp_servers.github]", config.read_text())
+        self.assertNotIn("independent-test-token", config.read_text())
+        self.assertNotIn("independent-test-token", self.store.get("connection", "github")["encrypted"])
+
     async def test_approval_survives_requester_and_grants_only_requested_permissions(self):
         task = self.store.put("task", {"id": "task", "status": "running", "permission_mode": "consequential"})
         permissions = {"network": {"enabled": True}}

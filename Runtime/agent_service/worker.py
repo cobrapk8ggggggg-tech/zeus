@@ -203,6 +203,11 @@ blocker/permission/budget is reached. Never claim started jobs/deploys succeeded
 Keep a concise plan and checkpoints in .zeus/task-{task['id']}.md.
 The parent may reconnect after hours; do not depend on the phone staying open.
 When resuming, inspect current files/Git/CI state before replaying any write.
+Permission mode: {task['permission_mode']}. In consequential mode request engine
+approval before destructive deletion, publishing/deployment, credential exposure
+or account-wide changes. Explain the exact destination and impact. Full access
+to the worker is not itself user approval for those operations. Respect explicit
+authorization already given in this task; never invent a grant.
 Project: {project['name']}
 Acceptance: {task['acceptance']}
 Independent verification commands: {json.dumps(project.get('verify_commands', []))}

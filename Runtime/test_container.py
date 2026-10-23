@@ -45,7 +45,9 @@ print(urllib.request.urlopen(r,timeout=15).read().decode())'''
         uid = run("exec", name, "sh", "-c", "awk '/^Uid:/{print $2}' /proc/1/status")
         assert uid == "10001", uid
         print(json.dumps({"container_health": True, "codex_version": capabilities["codex_version"], "volume_persistence_after_restart": True, "worker_uid": uid}, indent=2))
-    except BaseException:
+    except BaseException as error:
+        if isinstance(error, subprocess.CalledProcessError):
+            print(error.stderr, file=sys.stderr)
         diagnostic = subprocess.run(["docker", "logs", "--tail", "80", name], capture_output=True, text=True)
         print(diagnostic.stdout + diagnostic.stderr, file=sys.stderr)
         raise

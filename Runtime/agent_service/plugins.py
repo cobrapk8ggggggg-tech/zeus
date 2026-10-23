@@ -181,7 +181,7 @@ class Connections:
         directory.mkdir(exist_ok=True)
         text = '# Generated ZEUS MCP proxies; no provider credentials in this file.\n'
         for item in self.catalog():
-            if item["installed"] and item.get("mcp_url"):
+            if item["installed"] and item["connected"] and item.get("mcp_url"):
                 text += f'\n[mcp_servers.{item["id"]}]\nurl = "http://127.0.0.1:{self.port}/mcp/{item["id"]}"\nbearer_token_env_var = "ZEUS_MCP_{item["id"].upper()}"\n'
         (directory / "config.toml").write_text(text)
 
