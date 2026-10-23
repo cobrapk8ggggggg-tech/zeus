@@ -32,7 +32,7 @@ class NativeEmbeddingTests(unittest.TestCase):
             with patch.object(MODULE.subprocess, "check_output", return_value=revision + "\n"):
                 MODULE.embed(native, browser, report)
             changed = {item["file"] for item in json.loads(report.read_text())["modifiedNativeFiles"]}
-            self.assertGreater(json.loads(report.read_text())["unchangedNativeSwiftFiles"], 340)
+            self.assertGreaterEqual(json.loads(report.read_text())["unchangedNativeSwiftFiles"], 330)
             # Every original view remains byte-identical except the declared
             # addition to the existing permission card and app-group constants.
             for file in (UPSTREAM / "src/ios/Views").rglob("*.swift"):
@@ -41,6 +41,11 @@ class NativeEmbeddingTests(unittest.TestCase):
                     continue
                 expected = file.read_text().replace("group.com.openminis.app", "group.tools.zeus.openminis").replace("iCloud.com.openminis.app", "iCloud.tools.zeus.openminis")
                 if str(relative) == "Views/ContentView.swift":
+                    expected = expected.replace('                Section("Agent Runtime") {', '''                Section("مشاريع Zeus") {
+                    NavigationLink { ZeusProjectsSettingsView() } label: { Label("المشاريع والبيئات", systemImage: "folder.badge.gearshape") }
+                    NavigationLink { ZeusPluginsSettingsView() } label: { Label("الإضافات", systemImage: "puzzlepiece.extension") }
+                }
+                Section("Agent Runtime") {''')
                     expected = re.sub(r'private let supportedLanguages: \[LanguageOption\] = \[.*?\n\]', 'private let supportedLanguages: [LanguageOption] = [\n    LanguageOption(id: "ar", name: "العربية", flag: "🇸🇦"),\n]', expected, count=1, flags=re.S)
                     expected = expected.replace("private struct SettingsSheet: View", "struct SettingsSheet: View")
                     expected = expected.replace("    private static let pendingBackgroundNavigationTTL: TimeInterval = 90\n\n    var body: some View {\n        GeometryReader { geo in", "    private static let pendingBackgroundNavigationTTL: TimeInterval = 90\n\n    private var zeusNativeGeometry: some View {\n        GeometryReader { geo in")

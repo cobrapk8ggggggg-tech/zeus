@@ -39,7 +39,7 @@ def embed(native, browser, report):
     # The application remains OpenMinis' original @main/AppDelegate/root setup;
     # its root content now embeds the browser with the original AI UI alongside.
     replace(source / "MinisApp.swift", "                ContentView()", "                ZEUSBrowserRootEntry()")
-    for name in ("ZEUSNativeIntegration.swift", "ZeusToolPermissions.swift"):
+    for name in ("ZEUSNativeIntegration.swift", "ZeusToolPermissions.swift", "ZeusProjects.swift", "ZeusPlugins.swift", "ZeusCodexAccount.swift"):
         shutil.copyfile(browser / ".openminis/Host" / name, source / name)
     # Reuse the exact native settings sheet from the browser's AI settings row.
     # Only its file-private visibility changes; its body is untouched.
@@ -65,6 +65,7 @@ def embed(native, browser, report):
 
     definitions = source / "Agent/Chat/AIChatViewModel+ToolDefinitions.swift"
     replace(definitions, "        return tools", """        tools.append(contentsOf: ZEUSNativeAgentBridge.definitions)
+        tools.append(contentsOf: ZeusProjectTools.definitions)
         return tools.map { tool in
             var parameters = tool.parameters
             parameters["approval_reason"] = AgentToolParam(type: .string, description: "For consequential actions, explain what you intend to change and why in the user language. The app displays this on an inline approval card.")
@@ -93,6 +94,11 @@ def embed(native, browser, report):
                     messages[msgIdx].blocks[blockIdx].imageFilePath = path
                 }
             }
+
+'''
+    adapter += '''        case let name where name.hasPrefix("zeus_project_"):
+            toolOutput = try await ZeusProjectTools.execute(name, args: toolArgs, callID: tu.id)
+            toolSuccess = true
 
 '''
     execution.write_text(parts[0] + adapter + anchor + parts[1] + ''.join('        case let name where name == "browser_use" || name == "zeus_browser" || zeusBrowserOperation(name) != nil:' + p for p in parts[2:]))
@@ -283,6 +289,11 @@ def embed(native, browser, report):
     (generated / "BrowserFixtureFactory.swift").write_text("import SwiftUI\n@MainActor enum BrowserFixtureFactory {\n" + factory + "}\n")
 
     apply_text_only(source, browser)
+    replace(source / "Views/ContentView.swift", '                Section("Agent Runtime") {', '''                Section("مشاريع Zeus") {
+                    NavigationLink { ZeusProjectsSettingsView() } label: { Label("المشاريع والبيئات", systemImage: "folder.badge.gearshape") }
+                    NavigationLink { ZeusPluginsSettingsView() } label: { Label("الإضافات", systemImage: "puzzlepiece.extension") }
+                }
+                Section("Agent Runtime") {''')
     changed = []
     for name, digest in before.items():
         file = source / name

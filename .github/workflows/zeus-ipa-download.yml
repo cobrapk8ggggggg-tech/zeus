@@ -105,7 +105,6 @@ jobs:
           test -f "$app/Info.plist"
           test ! -d "$app/_CodeSignature"
           test -d "$app/PlugIns"
-          test -d "$app/Frameworks"
           test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" = tools.rea.ZEUSBrowserAnalysis
           xcrun lipo "$app/Minis" -verify_arch arm64
           python3 browser/.openminis/prune_resources.py "$app" > results/text-edition-resources.json

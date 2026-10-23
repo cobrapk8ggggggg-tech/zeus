@@ -72,6 +72,7 @@ enum ZeusPermissionMode: String, CaseIterable {
 
     static func isConsequential(tool: String, args: [String: Any]) -> Bool {
         switch tool {
+        case "zeus_project_list", "zeus_project_status", "zeus_project_events", "zeus_project_diff": return false
         case "file_read", "read_image", "memory_read", "memory_get": return false
         case let name where name == "zeus_browser" || zeusBrowserOperation(name) != nil:
             let op = zeusBrowserOperation(tool) ?? args["operation"] as? String ?? ""
