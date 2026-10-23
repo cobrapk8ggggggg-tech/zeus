@@ -97,6 +97,8 @@ def embed(native, browser, report):
     execution.write_text(parts[0] + adapter + anchor + parts[1] + ''.join('        case let name where name == "browser_use" || name == "zeus_browser" || zeusBrowserOperation(name) != nil:' + p for p in parts[2:]))
 
     replace(execution, "        do {\n        switch tu.name {", """        do {
+        let toolArgs = try ZeusToolInput.normalize(name: tu.name, args: toolArgs, tools: tools)
+        let argsJson = String(decoding: try JSONSerialization.data(withJSONObject: toolArgs), as: UTF8.self)
         if tu.name == "zeus_browser" || zeusBrowserOperation(tu.name) != nil { _ = try ZEUSNativeAgentBridge.normalizedInput(toolArgs, toolName: tu.name) }
         try await ZeusToolPermissions.shared.authorize(tool: tu.name, args: toolArgs, sessionID: sessionId,
             blockID: messages[msgIdx].blocks[blockIdx].id)
@@ -219,6 +221,8 @@ def embed(native, browser, report):
     strings_file = source / "Localizable.xcstrings"
     strings = json.loads(strings_file.read_text())
     overrides = json.loads((browser / ".openminis/arabic-overrides.json").read_text())
+    for key in overrides:
+        strings["strings"].setdefault(key, {"localizations": {}})
     for key, entry in strings["strings"].items():
         localizations = entry.setdefault("localizations", {})
         for language, localization in localizations.items():

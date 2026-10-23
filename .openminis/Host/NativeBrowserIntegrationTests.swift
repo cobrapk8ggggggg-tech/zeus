@@ -5,6 +5,16 @@ import WebKit
 
 @MainActor
 final class NativeBrowserIntegrationTests: XCTestCase {
+    func testCoreToolTypesAreNormalizedBeforeExecution() throws {
+        let tool = AgentToolDefinition(name: "fixture", description: "fixture", parameters: ["enabled": AgentToolParam(type: .boolean, description: "flag"), "limit": AgentToolParam(type: .integer, description: "count"), "arguments": AgentToolParam(type: .string, description: "JSON arguments"), "action": AgentToolParam(type: .string, description: "action", enumValues: ["read", "write"])], required: [])
+        let result = try ZeusToolInput.normalize(name: "fixture", args: ["enabled": "false", "limit": "25", "arguments": ["key": "value"], "action": "read"], tools: [tool])
+        XCTAssertEqual(result["enabled"] as? Bool, false)
+        XCTAssertEqual(result["limit"] as? Int, 25)
+        XCTAssertTrue((result["arguments"] as? String ?? "").contains("value"))
+        XCTAssertThrowsError(try ZeusToolInput.normalize(name: "fixture", args: ["enabled": 1], tools: [tool]))
+        XCTAssertThrowsError(try ZeusToolInput.normalize(name: "fixture", args: ["limit": true], tools: [tool]))
+        XCTAssertThrowsError(try ZeusToolInput.normalize(name: "fixture", args: ["action": "invented"], tools: [tool]))
+    }
     func testProfileSwitchCancelsInlineBrowserApproval() async throws {
         let (browser, root) = model()
         defer { try? FileManager.default.removeItem(at: root) }

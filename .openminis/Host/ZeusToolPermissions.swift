@@ -1,4 +1,37 @@
 import SwiftUI
+import CoreFoundation
+
+/// The original tool model advertises primitive types. Enforce those types for
+/// every registered tool, not only WebKit operations, before it gets permission.
+enum ZeusToolInput {
+    static func normalize(name: String, args: [String: Any], tools: [AgentToolDefinition]) throws -> [String: Any] {
+        guard let definition = tools.first(where: { $0.name == name }) else { return args }
+        var result = args
+        for (key, parameter) in definition.parameters {
+            guard let raw = result[key] else { continue }
+            if raw is NSNull, !definition.required.contains(key) { result.removeValue(forKey: key); continue }
+            switch parameter.type {
+            case .boolean:
+                if let value = raw as? String, ["true", "false"].contains(value.lowercased()) { result[key] = value.lowercased() == "true" }
+                guard let number = result[key] as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID() else { throw invalid(name, key, "boolean (true or false)") }
+            case .integer:
+                if let value = raw as? String, let number = Int(value) { result[key] = number }
+                guard let number = result[key] as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(), number.doubleValue.isFinite,
+                      number.doubleValue.rounded() == number.doubleValue else { throw invalid(name, key, "integer") }
+            case .string:
+                if !(raw is String), parameter.description.localizedCaseInsensitiveContains("JSON"), raw is [String: Any] || raw is [Any] {
+                    result[key] = String(decoding: try JSONSerialization.data(withJSONObject: raw), as: UTF8.self)
+                }
+                guard let value = result[key] as? String else { throw invalid(name, key, "string") }
+                if let values = parameter.enumValues, !values.contains(value) { throw invalid(name, key, "one of: " + values.joined(separator: ", ")) }
+            }
+        }
+        return result
+    }
+    private static func invalid(_ name: String, _ key: String, _ expected: String) -> NSError {
+        NSError(domain: "ZeusToolInput", code: 2, userInfo: [NSLocalizedDescriptionKey: "INVALID_ARGUMENTS: \(name).\(key) must be \(expected). The tool was not executed; correct this field before retrying."])
+    }
+}
 
 enum ZeusPermissionMode: String, CaseIterable {
     case askAll, consequential, unrestricted

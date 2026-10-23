@@ -79,5 +79,9 @@
   "LB": "LB",
   "npx": "npx",
   "SKILL.md": "SKILL.md",
-  "STDIO": "STDIO"
+  "STDIO": "STDIO",
+  "Minis is using Shell": "يستخدم Zeus الطرفية",
+  "Minis is using Editor": "يستخدم Zeus المحرر",
+  "Minis is using Browser": "يستخدم Zeus المتصفح",
+  "Minis is using Memory": "يستخدم Zeus الذاكرة"
 }
