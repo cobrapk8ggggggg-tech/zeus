@@ -32,7 +32,8 @@ class ISHHostnameTests(unittest.TestCase):
 #include <assert.h>
 struct uname { char system[65],hostname[65],release[65],version[65],arch[65],domain[65]; };
 const char *uname_version="fixture", *uname_hostname_override;
-int uname(struct utsname *value) { memset(value,0,sizeof(*value)); return -1; }
+static int zeus_fixture_uname(struct utsname *value) { memset(value,0,sizeof(*value)); return -1; }
+#define uname(value) zeus_fixture_uname(value)
 void do_uname(''' + body + '''
 int main(void) {
  char long_name[600]; memset(long_name,'a',599); long_name[599]=0;
@@ -44,5 +45,5 @@ int main(void) {
 }
 ''')
             binary = root / "check"
-            subprocess.run([compiler, "-DGUEST_ARM64", "-D_FORTIFY_SOURCE=2", "-O1", "-fsanitize=address", str(c), "-o", str(binary)], check=True, capture_output=True)
-            subprocess.run([str(binary)], check=True, capture_output=True)
+            subprocess.run([compiler, "-DGUEST_ARM64", "-D_FORTIFY_SOURCE=2", "-O1", "-fsanitize=address", str(c), "-o", str(binary)], check=True, capture_output=True, timeout=30)
+            subprocess.run([str(binary)], check=True, capture_output=True, timeout=30)

@@ -43,6 +43,8 @@ final class NativeBrowserIntegrationTests: XCTestCase {
         ]
         for bad in badCases { XCTAssertThrowsError(try ZeusAgentSchemas.validate(bad, schema: schema)) }
         XCTAssertThrowsError(try ZeusAgentSchemas.validate(["cmd": "pwd", "timeout_seconds": true], schema: ZeusAgentSchemas.schema("exec_command")!))
+        XCTAssertThrowsError(try ZeusAgentSchemas.validate(["cmd": "pwd", "timeout_seconds": -1], schema: ZeusAgentSchemas.schema("exec_command")!))
+        XCTAssertThrowsError(try ZeusAgentSchemas.validate(["cmd": "pwd", "timeout_seconds": 999999], schema: ZeusAgentSchemas.schema("exec_command")!))
     }
     func testPatchPrevalidatesAllFilesAndRejectsAmbiguousOrEscapingPaths() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

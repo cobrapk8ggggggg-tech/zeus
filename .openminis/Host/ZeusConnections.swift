@@ -62,8 +62,15 @@ struct ZeusOAuthSetupRequired: Error { let config: MCPOAuthConfig }
     }
     func disconnect(_ id: String) { listingTasks[id]?.cancel(); refreshTasks[id]?.cancel(); MCPStore.shared.delete(id: id); sessions.removeValue(forKey: id); tools.removeValue(forKey: id); versions.removeValue(forKey: id); accounts.removeAll { $0.id == id }; save() }
     func client(_ provider: String) -> MCPOAuthConfig? {
-        guard let data = UserDefaults.standard.data(forKey: "zeus.integrations.client." + provider) else { return nil }
-        return try? JSONDecoder().decode(MCPOAuthConfig.self, from: data)
+        if let data = UserDefaults.standard.data(forKey: "zeus.integrations.client." + provider), let config = try? JSONDecoder().decode(MCPOAuthConfig.self, from: data) { return config }
+        if provider == "vercel" {
+            // Public native client registered for ZEUS itself on 2026-10-23.
+            // This identifier is not a token or secret and carries no account.
+            var config = MCPOAuthConfig(); config.clientId = "cl_WbdtcToDrMR4ZHvXLGAmbfoYCsQjMeS8"
+            config.authorizationEndpoint = "https://vercel.com/oauth/authorize"; config.tokenEndpoint = "https://api.vercel.com/login/oauth/token"
+            config.redirectURI = "http://127.0.0.1:18467/callback"; config.scopes = "openid"; return config
+        }
+        return nil
     }
     func saveClient(_ provider: String, config: MCPOAuthConfig, secret: String) throws {
         guard !config.clientId.isEmpty, URL(string: config.authorizationEndpoint)?.scheme == "https", URL(string: config.tokenEndpoint)?.scheme == "https" else { throw ZeusPatch.failure("أكمل بيانات تطبيق OAuth الخاص بـZEUS.") }
@@ -91,10 +98,12 @@ struct ZeusOAuthSetupRequired: Error { let config: MCPOAuthConfig }
         guard let issuerString = (resource["authorization_servers"] as? [String])?.first, let issuer = URL(string: issuerString), issuer.scheme == "https", let host = issuer.host else { throw ZeusPatch.failure("الخدمة لم تعلن خادم OAuth صالحاً.") }
         let server = try await metadata(URL(string: "https://" + host + "/.well-known/oauth-authorization-server" + (issuer.path == "/" ? "" : issuer.path))!)
         guard let authorization = server["authorization_endpoint"] as? String, let token = server["token_endpoint"] as? String else { throw ZeusPatch.failure("بيانات OAuth غير مكتملة لدى الخدمة.") }
-        var config = MCPOAuthConfig(); config.authorizationEndpoint = authorization; config.tokenEndpoint = token; config.redirectURI = "minis-mcp://oauth/callback"
+        var config = MCPOAuthConfig(); config.authorizationEndpoint = authorization; config.tokenEndpoint = token; config.redirectURI = "http://127.0.0.1:18467/callback"
         config.scopes = (resource["scopes_supported"] as? [String])?.joined(separator: " ")
         guard let registration = server["registration_endpoint"] as? String, let address = URL(string: registration) else { throw ZeusOAuthSetupRequired(config: config) }
-        let result = try await metadata(address, body: ["client_name": "ZEUS Browser", "redirect_uris": [config.redirectURI!], "token_endpoint_auth_method": "none", "grant_types": ["authorization_code", "refresh_token"], "response_types": ["code"], "scope": config.scopes ?? ""])
+        let result: [String: Any]
+        do { result = try await metadata(address, body: ["client_name": "ZEUS Browser", "redirect_uris": [config.redirectURI!], "token_endpoint_auth_method": "none", "grant_types": ["authorization_code", "refresh_token"], "response_types": ["code"], "scope": config.scopes ?? ""]) }
+        catch { throw ZeusOAuthSetupRequired(config: config) }
         guard let id = result["client_id"] as? String, !id.isEmpty else { throw ZeusPatch.failure("الخدمة لم تُرجع معرّف تطبيق OAuth.") }
         config.clientId = id; try saveClient(service.id, config: config, secret: result["client_secret"] as? String ?? ""); return config
     }
@@ -294,8 +303,15 @@ private struct ZeusOAuthClientSetup: View {
                     Link("تسجيل تطبيق ZEUS لدى GitHub", destination: URL(string: "https://github.com/settings/applications/new?oauth_application%5Bname%5D=ZEUS%20Browser&oauth_application%5Burl%5D=https%3A%2F%2Fgithub.com%2Fcobrapk8ggggggg-tech%2Fzeus&oauth_application%5Bcallback_url%5D=http%3A%2F%2F127.0.0.1%3A18467%2Fcallback")!)
                     Text("يلزم تسجيل تطبيق ZEUS مرة واحدة لدى GitHub؛ يُستخدم بعدها لربط حساباتك عبر صفحة الموافقة الأصلية.").font(.caption).foregroundStyle(.secondary)
                 }
+                if service.id == "railway" {
+                    Link("تسجيل تطبيق ZEUS في Railway", destination: URL(string: "https://railway.com/dashboard")!)
+                    Text("إعدادات مساحة العمل ← Developer ← New OAuth App ← Native. عنوان العودة أدناه. التسجيل التلقائي معطّل حالياً لدى Railway.").font(.caption).foregroundStyle(.secondary)
+                }
                 TextField("Client ID", text: $client).textInputAutocapitalization(.never).autocorrectionDisabled()
-                SecureField("Client Secret عند اشتراطه", text: $secret).textInputAutocapitalization(.never).autocorrectionDisabled()
+                if service.id != "railway" { SecureField("Client Secret عند اشتراطه", text: $secret).textInputAutocapitalization(.never).autocorrectionDisabled() }
+                Text("http://127.0.0.1:18467/callback").font(.caption.monospaced()).textSelection(.enabled).environment(\.layoutDirection, .leftToRight)
+            }
+            DisclosureGroup("إعدادات متقدمة") {
                 TextField("Authorization URL", text: $auth).textInputAutocapitalization(.never).autocorrectionDisabled()
                 TextField("Token URL", text: $token).textInputAutocapitalization(.never).autocorrectionDisabled()
                 TextField("الصلاحيات", text: $scopes).textInputAutocapitalization(.never).autocorrectionDisabled()
@@ -303,7 +319,7 @@ private struct ZeusOAuthClientSetup: View {
             }
             if let error { Text(error).foregroundStyle(.red) }
         }.navigationTitle("إعداد OAuth").toolbar { ToolbarItem(placement: .confirmationAction) { Button("حفظ") { save() } }; ToolbarItem(placement: .cancellationAction) { Button("إلغاء") { dismiss() } } }
-            .onAppear { client = initial?.clientId ?? ""; auth = initial?.authorizationEndpoint ?? (service.id == "github" ? "https://github.com/login/oauth/authorize" : ""); token = initial?.tokenEndpoint ?? (service.id == "github" ? "https://github.com/login/oauth/access_token" : ""); scopes = service.id == "github" ? "repo read:org user:email workflow" : initial?.scopes ?? ""; redirect = initial?.redirectURI?.hasPrefix("http") == true ? initial!.redirectURI! : "http://127.0.0.1:18467/callback" }
+            .onAppear { client = initial?.clientId ?? ""; auth = initial?.authorizationEndpoint ?? (service.id == "github" ? "https://github.com/login/oauth/authorize" : "https://backboard.railway.com/oauth/auth"); token = initial?.tokenEndpoint ?? (service.id == "github" ? "https://github.com/login/oauth/access_token" : "https://backboard.railway.com/oauth/token"); scopes = service.id == "github" ? "repo read:org user:email workflow" : initial?.scopes ?? "workspace:member"; redirect = initial?.redirectURI?.hasPrefix("http") == true ? initial!.redirectURI! : "http://127.0.0.1:18467/callback" }
         }
     }
     private func save() { do { var config = MCPOAuthConfig(); config.clientId = client; config.authorizationEndpoint = auth; config.tokenEndpoint = token; config.scopes = scopes; config.redirectURI = redirect; try ZeusConnections.shared.saveClient(service.id, config: config, secret: secret); dismiss() } catch { self.error = error.localizedDescription } }

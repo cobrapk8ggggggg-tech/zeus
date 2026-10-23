@@ -50,7 +50,8 @@ jobs:
       with:
         xcode-version: '26.3'
     - name: Test original UI adapters and actual iSH hostname handling
-      run: ZEUS_OPENMINIS_SOURCE="$PWD/upstream" python3 -m unittest discover -s browser/.openminis -p 'test_*.py'
+      timeout-minutes: 4
+      run: ZEUS_OPENMINIS_SOURCE="$PWD/upstream" python3 -m unittest discover -v -s browser/.openminis -p 'test_*.py'
     - name: Prepare the original source for the simulator SDK
       run: |
         test "$(uname -m)" = arm64

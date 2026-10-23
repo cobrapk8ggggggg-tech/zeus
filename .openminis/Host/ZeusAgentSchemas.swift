@@ -88,8 +88,8 @@ enum ZeusAgentSchemas {
             guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(), number.doubleValue.isFinite else { throw invalid("expected a finite number") }
             let n = number.doubleValue
             if schema["type"] as? String == "integer", n.rounded() != n { throw invalid("expected an integer") }
-            if let min = schema["minimum"] as? Double, n < min { throw invalid("below minimum") }
-            if let max = schema["maximum"] as? Double, n > max { throw invalid("above maximum") }
+            if let min = (schema["minimum"] as? NSNumber)?.doubleValue, n < min { throw invalid("below minimum") }
+            if let max = (schema["maximum"] as? NSNumber)?.doubleValue, n > max { throw invalid("above maximum") }
         case "boolean":
             guard let number = value as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID() else { throw invalid("expected a boolean") }
         default: break

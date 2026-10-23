@@ -30,8 +30,14 @@ dependency of this native runtime and must not be deployed as its replacement.
    refresh, session/version negotiation, paginated tool discovery, nested input
    validation and no automatic write replay. Account pages show real accounts,
    primary selection and actual read/write tool annotations. OAuth DCR is used
-   only when advertised. GitHub requires registering a ZEUS OAuth application
-   once; the app cannot reuse ChatGPT's client. Provider pages must not claim a
+   only when advertised and accepted. Real registration testing found Railway
+   currently responds `access_denied: Dynamic client registration is disabled`.
+   Railway therefore requires a Native/Public client registered once in the
+   workspace's Developer settings. GitHub likewise requires registering a ZEUS
+   OAuth application once; the app cannot reuse ChatGPT's client. Vercel rejected
+   the custom-scheme callback but accepted the native loopback callback; a ZEUS
+   public client was registered successfully and its nonsecret ID is built in.
+   No user's account/token was linked by that registration. Provider pages must not claim a
    successful connection before the actual tools/list completes.
 5. **Skills**: 59 pinned official OpenAI plugin skills with their references,
    scripts and attribution. `ZEUSDefaultSkills/manifest.json` records source
