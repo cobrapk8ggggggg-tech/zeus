@@ -7,6 +7,7 @@ struct ZeusProject: Decodable, Identifiable {
     let kind: String
     let branch: String
     let model: String
+    let verify_commands: [String]
 }
 struct ZeusProjectTask: Decodable, Identifiable {
     let id: String
@@ -196,15 +197,21 @@ private struct ZeusProjectDetail: View {
     @State private var error: String?
     @State private var running = false
     @State private var started: String?
+    @State private var hours = 2
+    @State private var attempts = 3
     var body: some View {
         Form {
             Section("المهمة") { TextEditor(text: $prompt).frame(minHeight: 150) }
             Section("نتيجة القبول المطلوبة") { TextEditor(text: $acceptance).frame(minHeight: 90) }
+            Section("حدود التنفيذ") {
+                Picker("المهلة بالساعات", selection: $hours) { ForEach([1, 2, 4, 8, 12, 24], id: \.self) { Text("\($0)").tag($0) } }
+                Stepper("محاولات إصلاح التحقق: \(attempts)", value: $attempts, in: 1...10)
+            }
             Button("بدء التنفيذ المستقل") {
                 running = true
                 Task {
                     do {
-                        let result = try await ZeusProjects.shared.object("v1/projects/\(project.id)/tasks", method: "POST", body: ["prompt": prompt, "acceptance": acceptance, "permission_mode": ZeusToolPermissions.shared.mode.rawValue, "idempotency_key": UUID().uuidString])
+                        let result = try await ZeusProjects.shared.object("v1/projects/\(project.id)/tasks", method: "POST", body: ["prompt": prompt, "acceptance": acceptance, "permission_mode": ZeusToolPermissions.shared.mode.rawValue, "max_seconds": hours * 3600, "max_attempts": attempts, "idempotency_key": UUID().uuidString])
                         started = result["id"] as? String
                     } catch { self.error = error.localizedDescription }
                     running = false
@@ -213,7 +220,43 @@ private struct ZeusProjectDetail: View {
             if let started { NavigationLink("متابعة المهمة") { ZeusProjectTaskDetail(taskID: started) } }
             if let error { Text(error).foregroundStyle(.red) }
             NavigationLink("ملفات المشروع والفروق") { ZeusProjectFiles(projectID: project.id) }
+            NavigationLink("إعدادات المشروع والتحقق") { ZeusProjectConfiguration(project: project) }
         }.navigationTitle(project.name)
+    }
+}
+
+private struct ZeusProjectConfiguration: View {
+    let project: ZeusProject
+    @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
+    @State private var model = ""
+    @State private var checks = ""
+    @State private var models: [[String: Any]] = []
+    @State private var error: String?
+    @State private var saving = false
+    var body: some View {
+        Form {
+            TextField("اسم المشروع", text: $name)
+            Picker("النموذج", selection: $model) {
+                Text("الافتراضي للحساب").tag("")
+                ForEach(models, id: \.zeusID) { item in Text(item["displayName"] as? String ?? item.zeusID).tag(item["model"] as? String ?? item.zeusID) }
+            }
+            Section("أوامر التحقق، كل أمر في سطر") { TextEditor(text: $checks).frame(minHeight: 130).font(.body.monospaced()) }
+            Button("حفظ") {
+                saving = true
+                Task {
+                    do {
+                        _ = try await ZeusProjects.shared.object("v1/projects/\(project.id)", method: "PATCH", body: ["name": name, "model": model, "verify_commands": checks.split(separator: "\n").map(String.init)])
+                        await ZeusProjects.shared.refresh(); dismiss()
+                    } catch { self.error = error.localizedDescription }
+                    saving = false
+                }
+            }.disabled(saving || name.isEmpty)
+            if let error { Text(error).foregroundStyle(.red) }
+        }.navigationTitle("إعدادات المشروع").task {
+            name = project.name; model = project.model; checks = project.verify_commands.joined(separator: "\n")
+            if let response = try? await ZeusProjects.shared.object("v1/models") { models = response["data"] as? [[String: Any]] ?? [] }
+        }
     }
 }
 
@@ -391,13 +434,18 @@ private struct ZeusRemoteApprovalCard: View {
         .init(name: "zeus_project_status", description: "Inspect a saved coding task's actual state and error. Only completed means independent verification succeeded; queued/running/needs_verification are not success.", parameters: ["task_id": .init(type: .string, description: "Task ID")], required: ["task_id"]),
         .init(name: "zeus_project_events", description: "Read actual streamed coding tool activity, outputs and verification reports, from a durable event cursor. Use after to avoid rereading old output.", parameters: ["task_id": .init(type: .string, description: "Task ID"), "after": .init(type: .integer, description: "Last received event seq, initially zero")], required: ["task_id"]),
         .init(name: "zeus_project_control", description: "Cancel or explicitly resume a saved task from its Codex thread and current files. Inspect an interrupted task before resuming; uncertain writes are not automatically replayed.", parameters: ["task_id": .init(type: .string, description: "Task ID"), "action": .init(type: .string, description: "Action", enumValues: ["cancel", "resume"])], required: ["task_id", "action"]),
-        .init(name: "zeus_project_diff", description: "Read actual Git status and diff for a remote project.", parameters: ["project_id": .init(type: .string, description: "Project ID")], required: ["project_id"])
+        .init(name: "zeus_project_diff", description: "Read actual Git status and diff for a remote project.", parameters: ["project_id": .init(type: .string, description: "Project ID")], required: ["project_id"]),
+        .init(name: "zeus_project_files", description: "List a remote project's actual files or read a UTF-8 file up to 2 MB. Paths are relative to that workspace.", parameters: ["project_id": .init(type: .string, description: "Project ID"), "path": .init(type: .string, description: "Relative file/directory path, empty for root")], required: ["project_id"]),
+        .init(name: "zeus_project_configure", description: "Update a project's name, model or independent verification commands. Never weaken checks to hide a failure. verify_commands is a JSON string array.", parameters: ["project_id": .init(type: .string, description: "Project ID"), "name": .init(type: .string, description: "Optional project name"), "model": .init(type: .string, description: "Optional valid Codex model ID"), "verify_commands": .init(type: .string, description: "Optional JSON array of meaningful shell checks")], required: ["project_id"])
     ]
     static func execute(_ name: String, args: [String: Any], callID: String) async throws -> String {
         let service = ZeusProjects.shared
         var value: [String: Any]
         let project = args["project_id"] as? String ?? ""
         let task = args["task_id"] as? String ?? ""
+        for identifier in [project, task] where !identifier.isEmpty {
+            guard UUID(uuidString: identifier) != nil else { throw service.failure("معرّف مشروع أو مهمة غير صالح؛ اجلب المعرّفات من قائمة المشاريع أولًا.") }
+        }
         switch name {
         case "zeus_project_list": value = ["projects": try await service.object("v1/projects"), "tasks": try await service.object("v1/tasks")]
         case "zeus_project_create":
@@ -410,6 +458,13 @@ private struct ZeusRemoteApprovalCard: View {
         case "zeus_project_events": value = try await service.object("v1/tasks/\(task)/events?after=\(args["after"] as? Int ?? 0)")
         case "zeus_project_control": value = try await service.object("v1/tasks/\(task)/\(args["action"] as? String ?? "")", method: "POST")
         case "zeus_project_diff": value = try await service.object("v1/projects/\(project)/diff")
+        case "zeus_project_files":
+            var query = URLComponents(); query.queryItems = [URLQueryItem(name: "path", value: args["path"] as? String ?? "")]
+            value = try await service.object("v1/projects/\(project)/files?" + (query.percentEncodedQuery ?? ""))
+        case "zeus_project_configure":
+            var body = args.filter { ["name", "model", "verify_commands"].contains($0.key) }
+            if let raw = body["verify_commands"] as? String { body["verify_commands"] = try JSONSerialization.jsonObject(with: Data(raw.utf8)) }
+            value = try await service.object("v1/projects/\(project)", method: "PATCH", body: body)
         default: throw service.failure("أداة مشاريع غير معروفة.")
         }
         return String(decoding: try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]), as: UTF8.self)
