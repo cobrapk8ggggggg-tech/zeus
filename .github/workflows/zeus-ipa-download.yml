@@ -109,7 +109,7 @@ jobs:
           test -d "$app/PlugIns"
           test -d "$app/Frameworks"
           test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" = tools.rea.ZEUSBrowserAnalysis
-          xcrun lipo -verify_arch arm64 "$app/Minis"
+          xcrun lipo "$app/Minis" -verify_arch arm64
           mkdir -p results/Payload
           cp -R "$app" results/Payload/
           (cd results && zip -qry ZEUS-native-unsigned.ipa Payload)
