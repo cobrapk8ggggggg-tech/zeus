@@ -244,6 +244,17 @@ struct BrowserRoot: View {
             guard nativeAssistant != nil else { return }
             #endif
             if model.agent == nil { model.agent = BrowserAgent(browser: model) }
+            #if ZEUS_NATIVE_HOST
+            model.agent?.interfaceAction = { action in
+                let owner = model.profile.id
+                // Dismiss the existing cover before presenting the original
+                // reader/gallery/settings UI through its normal button handler.
+                assistantVisible = false
+                try await Task.sleep(for: .milliseconds(450))
+                guard model.profile.id == owner, !model.requiresUnlock else { throw AccountError.permission }
+                perform(action)
+            }
+            #endif
             assistantVisible = true
         case .translate: model.current?.translation?.translate()
         case .back: model.webView?.goBack(); case .forward: model.webView?.goForward(); case .reload: model.reload(); case .home: model.home(); case .newTab: _ = model.newTab(); topTray = false

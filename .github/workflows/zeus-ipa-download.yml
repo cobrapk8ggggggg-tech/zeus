@@ -9,7 +9,7 @@ on:
       source_ref:
         description: Browser source branch, tag or commit to package
         required: false
-        default: build/zeus-unsigned-ipa-repair-20261023
+        default: fix/zeus-agent-tools-permissions-20261023
         type: string
 permissions:
   contents: read

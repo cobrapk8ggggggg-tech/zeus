@@ -79,6 +79,12 @@ final class NativeBrowserIntegrationTests: XCTestCase {
         XCTAssertEqual(browser.data.settings.textScale, 1)
         let read = try await NativeBrowserControl.execute("browser_settings", args: ["action": "read"], browser: browser)
         XCTAssertTrue(read.contains("advanced.forceDarkWebPages"))
+        _ = try await NativeBrowserControl.execute("browser_settings", args: ["action": "set", "key": "reading.backgroundHex", "value": "\"141414\""], browser: browser)
+        XCTAssertEqual(browser.data.settings.reading?.backgroundHex, "141414")
+        _ = try await NativeBrowserControl.execute("browser_settings", args: ["action": "set", "key": "reading.backgroundHex", "value": "null"], browser: browser)
+        XCTAssertNil(browser.data.settings.reading?.backgroundHex)
+        let help = try await NativeBrowserControl.execute("browser_help", args: [:], browser: browser)
+        XCTAssertTrue(help.contains("assistantButton")); XCTAssertTrue(help.contains("twinHorizontal"))
         _ = try await NativeBrowserControl.execute("browser_profiles", args: ["action": "create", "name": "Agent created"], browser: browser)
         let target = try XCTUnwrap(browser.profiles.profiles.first { $0.name == "Agent created" })
         _ = try await NativeBrowserControl.execute("browser_profiles", args: ["action": "update", "profile_id": target.id.uuidString, "key": "name", "value": "\"Updated profile\""], browser: browser)
@@ -139,6 +145,33 @@ final class NativeBrowserIntegrationTests: XCTestCase {
         _ = try await NativeBrowserInspector.execute("browser_storage", args: ["area": "local", "action": "remove", "key": "chapter"], view: view)
         let empty = try await NativeBrowserInspector.execute("browser_storage", args: ["area": "local", "action": "read", "key": "chapter"], view: view)
         XCTAssertFalse(empty.contains("42"))
+    }
+    func testPageReadSuppliesTabIDAndOldElementIDsSurviveAnotherRead() async throws {
+        let (browser, root) = model(); defer { try? FileManager.default.removeItem(at: root) }
+        let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600))
+        let loader = NativeInspectorFixture()
+        try await loader.load("<input id='name' aria-label='Name'><div contenteditable='true' aria-label='Message' style='width:200px;height:80px'></div><p>Real interaction fixture.</p>", view: view)
+        let tab = try XCTUnwrap(browser.current); tab.url = "https://example.com"; tab.webView = view
+        let session = NativeBrowserSession(browser: browser); session.authorization = { _ in true }
+        let first = try await session.execute(operation: "browser_read", arguments: "{}", sessionID: nil)
+        let data = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(first.text.utf8)) as? [String: Any])
+        XCTAssertEqual(data["tab_id"] as? String, tab.id.uuidString)
+        let elements = try XCTUnwrap(data["elements"] as? [[String: Any]])
+        let input = try XCTUnwrap(elements.first { $0["label"] as? String == "Name" }?["element_id"] as? String)
+        let editor = try XCTUnwrap(elements.first { $0["label"] as? String == "Message" }?["element_id"] as? String)
+        _ = try await session.execute(operation: "browser_read", arguments: "{}", sessionID: nil)
+        func args(_ id: String, _ text: String) throws -> String {
+            String(decoding: try JSONSerialization.data(withJSONObject: ["tab_id": tab.id.uuidString, "element_id": id, "text": text]), as: UTF8.self)
+        }
+        _ = try await session.execute(operation: "browser_type", arguments: args(input, "Alice"), sessionID: nil)
+        _ = try await session.execute(operation: "browser_type", arguments: args(editor, "A real editable message"), sessionID: nil)
+        let actual = try await view.callAsyncJavaScript("return {name:document.querySelector('#name').value,message:document.querySelector('[contenteditable]').textContent}", arguments: [:], in: nil, contentWorld: .page) as? [String: String]
+        XCTAssertEqual(actual?["name"], "Alice")
+        XCTAssertEqual(actual?["message"], "A real editable message")
+        try await loader.load("<input id='replacement' value='unchanged'>", view: view)
+        do { _ = try await session.execute(operation: "browser_type", arguments: args(input, "must not type"), sessionID: nil); XCTFail("Previous-document IDs must be rejected") } catch {}
+        let unchanged = try await view.callAsyncJavaScript("return document.querySelector('#replacement').value", arguments: [:], in: nil, contentWorld: .page) as? String
+        XCTAssertEqual(unchanged, "unchanged")
     }
     func testInspectorCookiesIncludeHttpOnlyButStayWithinTheSelectedSite() async throws {
         let config = WKWebViewConfiguration(); config.websiteDataStore = .nonPersistent()

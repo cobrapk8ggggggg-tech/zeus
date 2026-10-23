@@ -74,14 +74,28 @@ private final class NativeToolCapture { var imageFilePath: String? }
         return value
     }()
     public var authorization: ((NativeBrowserApproval) async -> Bool)?
+    var interfaceAction: ((BrowserAction) async throws -> Void)?
     public var onInvalidated: (() -> Void)?
     public var profileIdentifier: String { profileID.uuidString }
+    public var liveContext: String {
+        guard !invalidated, let browser, browser.profile.id == profileID, !browser.requiresUnlock else { return "{\"available\":false}" }
+        let current: [String: Any] = browser.current.map {
+            ["id": $0.id.uuidString, "title": String($0.title.prefix(256)), "url": String($0.url.prefix(2048))]
+        } ?? [:]
+        let context: [String: Any] = ["available": true, "application": "ZEUS Browser", "agent": "Zeus",
+            "location": "Integrated AI conversation panel", "profile_id": profileIdentifier,
+            "profile_name": browser.profile.name, "profile_role": browser.profile.role.rawValue,
+            "layout": (browser.data.settings.chromeLayout ?? .original).rawValue,
+            "current_tab": current, "tab_count": browser.tabs.count,
+            "user_browser_tool": "zeus_browser_*", "separate_automation_browser_tool": "browser_use"]
+        return (try? NativeBrowserInspector.encode(context)) ?? "{}"
+    }
     private let folder: URL
     init(browser: BrowserModel) {
         self.browser = browser; profileID = browser.profile.id
         folder = browser.profiles.folder(for: browser.profile).appendingPathComponent("OpenMinis")
     }
-    public func cancel() { invalidated = true; onInvalidated?() }
+    public func cancel() { invalidated = true; interfaceAction = nil; onInvalidated?() }
     static var tools: [BrowserAgentTools.Tool] { BrowserAgentTools.tools.filter { !$0.name.hasPrefix("memory_") } + NativeBrowserInspector.tools + NativeBrowserControl.tools }
     public static func validatedArguments(operation: String, json: String) throws -> String {
         try NativeBrowserContract.arguments(operation: operation, json: json, tools: tools)
@@ -109,7 +123,7 @@ private final class NativeToolCapture { var imageFilePath: String? }
         let normalized = try NativeBrowserContract.arguments(operation: operation, json: arguments, tools: Self.tools)
         let call = AgentToolCall(name: operation, arguments: normalized)
         let destination = (call.object["url"] as? String).flatMap(URL.init(string:))?.host
-        let globalOperations = ["browser_tabs", "browser_profile", "browser_library", "browser_debug", "browser_help", "browser_settings", "browser_profiles"]
+        let globalOperations = ["browser_tabs", "browser_profile", "browser_library", "browser_debug", "browser_help", "browser_settings", "browser_profiles", "browser_interface"]
         let target = globalOperations.contains(operation) || operation == "browser_open" || operation == "browser_download" ? nil : try tab(call.object)
         let targetURL = target?.url
         let host = destination ?? targetURL.flatMap { URL(string: $0)?.host } ?? browser?.currentHost ?? ""
@@ -177,7 +191,11 @@ private final class NativeToolCapture { var imageFilePath: String? }
         guard preferences.currentPage else{throw AgentFailure.message("قراءة نص الصفحات معطّلة.")}
         let view=try await webView(tab)
         let result=try await view.callAsyncJavaScript(Self.readScript,arguments:["full":full],in:nil,contentWorld:.world(name:"ZEUSAgent"))
-        return String(decoding:try JSONSerialization.data(withJSONObject:result ?? [:]),as:UTF8.self)
+        var context = result as? [String: Any] ?? [:]
+        context["tab_id"] = tab.id.uuidString
+        context["profile_id"] = profileIdentifier
+        if let popup = browser?.pendingPopup?.url?.absoluteString { context["pending_popup_url"] = popup }
+        return String(decoding: try JSONSerialization.data(withJSONObject: context), as: UTF8.self)
     }
     private func execute(_ call:AgentToolCall,block:NativeToolCapture) async throws -> String {
         try validate();guard let browser else{throw CancellationError()}
@@ -185,6 +203,13 @@ private final class NativeToolCapture { var imageFilePath: String? }
         guard let decoded = try? JSONSerialization.jsonObject(with: Data(call.arguments.utf8)), decoded is [String: Any] else { throw AgentFailure.message("مدخلات الأداة ليست JSON صالحًا.") }
         let args=call.object
         switch call.name{
+        case "browser_interface":
+            guard let name = args["action"] as? String, let action = BrowserAction(rawValue: name), action != .assistant,
+                  let interfaceAction else { throw AgentFailure.message("واجهة المتصفح غير متاحة لهذا السياق.") }
+            if action == .settings, browser.profile.account?.allowSettings == false { throw AccountError.permission }
+            if action == .console, browser.profile.account?.allowDeveloperTools == false { throw AccountError.permission }
+            try await interfaceAction(action)
+            return "Invoked native ZEUS button: \(action.title). Its normal UI flow has started; asynchronous extraction, printing or sharing may still require user interaction."
         case "browser_help", "browser_settings", "browser_profiles":
             return try await NativeBrowserControl.execute(call.name, args: args, browser: browser)
         case "browser_debug":
@@ -274,13 +299,21 @@ private final class NativeToolCapture { var imageFilePath: String? }
     const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
     while(walker.nextNode()&&size<90000){const p=walker.currentNode.parentElement;if(!p||p.closest('script,style,noscript,input,textarea,select,[contenteditable=true]'))continue;const s=getComputedStyle(p),r=p.getBoundingClientRect();if(s.display==='none'||s.visibility==='hidden'||s.opacity==='0'||r.width===0||r.height===0||(!full&&(r.bottom<0||r.top>innerHeight*2)))continue;const t=(walker.currentNode.nodeValue||'').replace(/\s+/g,' ').trim();if(t){out.push(t);size+=t.length}}
     const previous=window.__zeusAgentSnapshot;const elements=previous?.url===location.href?previous.elements:new Map(),controls=[];if(elements.size>2000)elements.clear();
-    for(const e of document.querySelectorAll('a[href],button,input:not([type=hidden]),textarea,select,[role=button]')){if(controls.length>=120)break;const r=e.getBoundingClientRect(),s=getComputedStyle(e);if(!r.width||!r.height||r.bottom<0||r.top>innerHeight*2||s.visibility==='hidden')continue;const id='e'+String(window.__zeusAgentElementSequence=(window.__zeusAgentElementSequence||0)+1);elements.set(id,e);const field=['INPUT','TEXTAREA','SELECT'].includes(e.tagName);controls.push({element_id:id,tag:e.tagName,type:e.type||'',label:(e.getAttribute('aria-label')||(!field?e.innerText:'')||e.getAttribute('placeholder')||e.name||'').slice(0,180),href:e.tagName==='A'?e.href:undefined})}
-    window.__zeusAgentSnapshot={url:location.href,elements};return {url:location.href,title:document.title,text:out.join('\n').slice(0,90000),elements:controls,scroll_y:scrollY};
+    for(const e of document.querySelectorAll('a[href],button,input:not([type=hidden]),textarea,select,[role=button],[contenteditable=true],[role=textbox]')){if(controls.length>=120)break;const r=e.getBoundingClientRect(),s=getComputedStyle(e);if(!r.width||!r.height||r.bottom<0||r.top>innerHeight*2||s.visibility==='hidden')continue;const id='e'+String(window.__zeusAgentElementSequence=(window.__zeusAgentElementSequence||0)+1);elements.set(id,e);const field=['INPUT','TEXTAREA','SELECT'].includes(e.tagName)||e.isContentEditable;controls.push({element_id:id,tag:e.tagName,type:e.type||'',label:(e.getAttribute('aria-label')||(!field?e.innerText:'')||e.getAttribute('placeholder')||e.name||'').slice(0,180),href:e.tagName==='A'?e.href:null})}
+    window.__zeusAgentSnapshot={url:location.href,elements};return {url:location.href,title:document.title,text:out.join('\n').slice(0,90000),elements:controls,scroll_y:scrollY,truncated:size>=90000,controls_limit:120};
     """#
     static let interactScript = #"""
     const s=window.__zeusAgentSnapshot,e=s?.elements?.get(id);if(!e||!e.isConnected||s.url!==location.href)throw Error('Stale element; read page again.');
-    if(action==='type'){if(!['INPUT','TEXTAREA'].includes(e.tagName)||['password','hidden','file'].includes(e.type)||/(password|passcode|credit|card|cc-|otp|one-time|cvc|cvv)/i.test([e.name,e.id,e.autocomplete].join(' ')))throw Error('Sensitive or unsupported field.');const proto=e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(e,text);e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));return true;}
-    if(e.tagName==='A'&&e.href&&!/^https?:/i.test(e.href))throw Error('Only HTTP links are supported.');e.click();return true;
+    if(action==='type'){
+      if((!['INPUT','TEXTAREA'].includes(e.tagName)&&!e.isContentEditable)||['password','hidden','file'].includes(e.type)||/(password|passcode|credit|card|cc-|otp|one-time|cvc|cvv)/i.test([e.name,e.id,e.autocomplete,e.getAttribute('aria-label')].join(' ')))throw Error('Sensitive or unsupported field.');
+      e.focus({preventScroll:true});
+      if(e.isContentEditable){
+        const selection=getSelection(),range=document.createRange();range.selectNodeContents(e);selection.removeAllRanges();selection.addRange(range);
+        if(!document.execCommand('insertText',false,text)){e.textContent=text;e.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:text}));}
+      }else{const proto=e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(e,text);e.dispatchEvent(new Event('input',{bubbles:true}));}
+      e.dispatchEvent(new Event('change',{bubbles:true}));return true;
+    }
+    if(e.tagName==='A'&&e.href&&!/^https?:/i.test(e.href))throw Error('Only HTTP links are supported.');if(typeof e.click==='function')e.click();else e.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;
     """#
 }
 typealias BrowserAgent = NativeBrowserSession
