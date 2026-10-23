@@ -101,6 +101,8 @@ def embed(native, browser, report):
     # action only for the new browser operations. All original tool dialogs keep
     # their original controls and semantics.
     permissions = source / "Agent/Offload/OffloadPermissionManager.swift"
+    replace(permissions, "    static let allCommands: [OffloadCommandInfo] = [",
+            "    static var allCommands: [OffloadCommandInfo] { baseCommands + ZEUSNativeAgentBridge.browserPermissionCommands }\n    private static let baseCommands: [OffloadCommandInfo] = [")
     replace(permissions, "    let continuation: CheckedContinuation<Bool, Never>",
             "    let continuation: CheckedContinuation<Bool, Never>\n    var permitsPersistentGrant = false")
     replace(permissions, 'fullCommand: String = "") async -> PermissionResult',

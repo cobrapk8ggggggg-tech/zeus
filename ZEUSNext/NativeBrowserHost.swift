@@ -46,6 +46,7 @@ extension EnvironmentValues {
 public struct NativeBrowserApproval {
     public let operation: String
     public let profile: String
+    public let profileName: String
     public let host: String
     public let details: String
     public let allowsPermanent: Bool
@@ -102,10 +103,10 @@ private final class NativeToolCapture { var imageFilePath: String? }
         let target = globalOperations.contains(operation) || operation == "browser_open" || operation == "browser_download" ? nil : try tab(call.object)
         let targetURL = target?.url
         let host = destination ?? targetURL.flatMap { URL(string: $0)?.host } ?? browser?.currentHost ?? ""
-        let permanent = !["browser_click", "browser_type", "browser_close_tab", "browser_evaluate", "browser_cookies", "browser_storage", "browser_debug"].contains(operation)
+        let permanent = !["browser_click", "browser_type", "browser_close_tab", "browser_evaluate", "browser_cookies", "browser_storage", "browser_debug"].contains(operation) && browser?.profile.isPrivate == false
         let title = Self.tools.first { $0.name == operation }?.title ?? operation
         guard let authorization, await authorization(NativeBrowserApproval(operation: operation,
-                profile: profileIdentifier, host: host,
+                profile: profileIdentifier, profileName: browser?.profile.name ?? "", host: host,
                 details: title + "\n" + arguments, allowsPermanent: permanent)) else { throw AccountError.permission }
         try validate(); try Task.checkCancellation()
         if let target {

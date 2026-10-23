@@ -77,6 +77,10 @@ tests.add_dependency(target)
 tests.frameworks_build_phase.add_file_reference(target.product_reference)
 tests.source_build_phase.add_file_reference(group.new_file((browser + '.openminis/Host/NativeBrowserIntegrationTests.swift').to_s))
 tests.build_configurations.each do |config|
+  app_config = app.build_configurations.find { |candidate| candidate.name == config.name }
+  %w[HEADER_SEARCH_PATHS FRAMEWORK_SEARCH_PATHS LIBRARY_SEARCH_PATHS].each do |key|
+    config.build_settings[key] = app_config.build_settings[key] if app_config.build_settings[key]
+  end
   config.build_settings.merge!({
     'SWIFT_VERSION' => '5.0', 'GENERATE_INFOPLIST_FILE' => 'YES',
     'PRODUCT_BUNDLE_IDENTIFIER' => 'tools.zeus.native.tests',

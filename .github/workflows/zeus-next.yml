@@ -1,15 +1,4 @@
 name: ZEUS native simulator tests
-on:
-  push:
-    branches: [feature/openminis-native-20261023]
-    paths: [ZEUSNext/**, .openminis/**, .github/workflows/zeus-next.yml]
-  workflow_dispatch:
-    inputs:
-      source_ref:
-        description: Browser source branch, tag or commit to test
-        default: feature/openminis-native-20261023
-        required: true
-        type: string
 permissions:
   contents: read
 concurrency:
@@ -20,183 +9,210 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
-        with:
-          repository: cobrapk8ggggggg-tech/zeus
-          ref: ${{ inputs.source_ref || (github.repository == 'cobrapk8ggggggg-tech/zeus' && github.sha) || 'feature/openminis-native-20261023' }}
-          path: browser
-          persist-credentials: false
-      - name: Record the exact browser revision
-        run: |
-          mkdir -p results
-          git -C browser rev-parse HEAD > results/browser-commit.txt
-      - uses: actions/checkout@v4
-        with:
-          repository: naruto00o9n-max/OpenMinis
-          ref: 6339bfcb25190ebf80fd03086c4ead81cf9428ba
-          path: upstream
-          submodules: recursive
-          persist-credentials: false
-      - uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: '26.3'
-      - name: Prepare the original source for the simulator SDK
-        run: |
-          test "$(uname -m)" = arm64
-          python3 browser/.openminis/prepare_reference.py upstream --sdk iphonesimulator --manifest results/original-source.json
-          brew install ninja llvm lld libarchive pkg-config meson
-          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
-          echo "$(brew --prefix lld)/bin" >> "$GITHUB_PATH"
-          if ! xcrun --sdk iphonesimulator metal --version; then
-            xcodebuild -downloadComponent MetalToolchain
-          fi
-      - uses: actions/cache/restore@v4
-        id: native
-        with:
-          path: |
-            upstream/deps/libs
-            upstream/deps/include
-            upstream/deps/resources
-            upstream/deps/frameworks
-            upstream/deps/lame-build
-          key: openminis-6339bfcb-simulator-arm64-xcode263-v2
-      - name: Build the actual native dependencies and Linux rootfs
-        if: steps.native.outputs.cache-hit != 'true'
-        working-directory: upstream
-        run: |
-          set -euo pipefail
-          bash deps/build_lame.sh 2>&1 | tee ../results/lame.log
-          bash deps/build_ffmpeg.sh 2>&1 | tee ../results/ffmpeg.log
-          bash deps/build_ish.sh 2>&1 | tee ../results/ish.log
-          bash deps/prepare_alpine_rootfs.sh 2>&1 | tee ../results/rootfs.log
-      - uses: actions/cache/save@v4
-        if: steps.native.outputs.cache-hit != 'true'
-        with:
-          path: |
-            upstream/deps/libs
-            upstream/deps/include
-            upstream/deps/resources
-            upstream/deps/frameworks
-            upstream/deps/lame-build
-          key: openminis-6339bfcb-simulator-arm64-xcode263-v2
-      - name: Build the original application and its original UI tests
-        run: |
-          set -euo pipefail
-          python3 browser/.openminis/run_xcode.py results/original-build.log -- \
+    - uses: actions/checkout@v4
+      with:
+        repository: cobrapk8ggggggg-tech/zeus
+        ref: ${{ inputs.source_ref || (github.repository == 'cobrapk8ggggggg-tech/zeus' && github.sha) || 'feature/openminis-native-20261023' }}
+        path: browser
+        persist-credentials: false
+    - name: Record the exact browser revision
+      run: |
+        mkdir -p results
+        git -C browser rev-parse HEAD > results/browser-commit.txt
+    - uses: actions/checkout@v4
+      with:
+        repository: naruto00o9n-max/OpenMinis
+        ref: 6339bfcb25190ebf80fd03086c4ead81cf9428ba
+        path: upstream
+        submodules: recursive
+        persist-credentials: false
+    - uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: '26.3'
+    - name: Prepare the original source for the simulator SDK
+      run: |
+        test "$(uname -m)" = arm64
+        python3 browser/.openminis/prepare_reference.py upstream --sdk iphonesimulator --manifest results/original-source.json
+        brew install ninja llvm lld libarchive pkg-config meson
+        echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+        echo "$(brew --prefix lld)/bin" >> "$GITHUB_PATH"
+        if ! xcrun --sdk iphonesimulator metal --version; then
+          xcodebuild -downloadComponent MetalToolchain
+        fi
+    - uses: actions/cache/restore@v4
+      id: native
+      with:
+        path: |
+          upstream/deps/libs
+          upstream/deps/include
+          upstream/deps/resources
+          upstream/deps/frameworks
+          upstream/deps/lame-build
+        key: openminis-6339bfcb-simulator-arm64-xcode263-v2
+    - name: Build the actual native dependencies and Linux rootfs
+      if: steps.native.outputs.cache-hit != 'true'
+      working-directory: upstream
+      run: |
+        set -euo pipefail
+        bash deps/build_lame.sh 2>&1 | tee ../results/lame.log
+        bash deps/build_ffmpeg.sh 2>&1 | tee ../results/ffmpeg.log
+        bash deps/build_ish.sh 2>&1 | tee ../results/ish.log
+        bash deps/prepare_alpine_rootfs.sh 2>&1 | tee ../results/rootfs.log
+    - uses: actions/cache/save@v4
+      if: steps.native.outputs.cache-hit != 'true'
+      with:
+        path: |
+          upstream/deps/libs
+          upstream/deps/include
+          upstream/deps/resources
+          upstream/deps/frameworks
+          upstream/deps/lame-build
+        key: openminis-6339bfcb-simulator-arm64-xcode263-v2
+    - name: Build the original application and its original UI tests
+      run: |
+        set -euo pipefail
+        python3 browser/.openminis/run_xcode.py results/original-build.log -- \
+          xcodebuild -project upstream/src/ios/Minis.xcodeproj -scheme Minis \
+          -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+          -derivedDataPath "$RUNNER_TEMP/OpenMinisOriginal" \
+          build-for-testing CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ARCHS=arm64
+    - name: Verify unchanged original application source
+      run: python3 browser/.openminis/verify_source.py upstream results/original-source.json
+    - name: Run the original renderer tests on iPad and iPhone
+      run: |
+        set -euo pipefail
+        python3 - <<'PY'
+        import json, os, subprocess
+        devices = json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','-j']))['devices']
+        all_devices = [d for group in devices.values() for d in group]
+        with open(os.environ['GITHUB_ENV'], 'a') as output:
+            for kind in ['iPhone', 'iPad']:
+                match = next(d for d in all_devices if kind in d['name'])
+                output.write(kind.upper() + '_SIMULATOR=' + match['udid'] + '\n')
+        PY
+    - name: Capture and test the original on both device sizes
+      timeout-minutes: 25
+      id: reference_tests
+      continue-on-error: true
+      run: |
+        set -euo pipefail
+        python3 browser/.zeus-ci/fixture_server.py > results/reference-fixture-server.log 2>&1 &
+        fixture_pid=$!
+        trap 'kill "$fixture_pid" 2>/dev/null || true' EXIT
+        for attempt in {1..30}; do
+          if curl --fail --silent http://127.0.0.1:8765/v1/models > /dev/null; then break; fi
+          sleep 1
+        done
+        curl --fail --silent http://127.0.0.1:8765/v1/models > results/reference-fixture-models.json
+        tests_failed=0
+        for kind in IPHONE IPAD; do
+          if [ "$kind" = IPHONE ]; then device="$IPHONE_SIMULATOR"; else device="$IPAD_SIMULATOR"; fi
+          xcrun simctl boot "$device" || true
+          xcrun simctl bootstatus "$device" -b
+          python3 browser/.openminis/capture_reference.py "$device" \
+            "$RUNNER_TEMP/OpenMinisOriginal/Build/Products/Debug-iphonesimulator/Minis.app" \
+            "results/screens-$kind" || tests_failed=1
+          python3 browser/.openminis/capture_chat.py "$device" com.openminis.app \
+            "results/original-conversation-$kind" || tests_failed=1
+          python3 browser/.openminis/run_xcode.py "results/original-$kind-tests.log" -- \
             xcodebuild -project upstream/src/ios/Minis.xcodeproj -scheme Minis \
-            -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug -destination "platform=iOS Simulator,id=$device" \
             -derivedDataPath "$RUNNER_TEMP/OpenMinisOriginal" \
-            build-for-testing CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ARCHS=arm64
-      - name: Verify unchanged original application source
-        run: python3 browser/.openminis/verify_source.py upstream results/original-source.json
-      - name: Run the original renderer tests on iPad and iPhone
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json, os, subprocess
-          devices = json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','-j']))['devices']
-          all_devices = [d for group in devices.values() for d in group]
-          with open(os.environ['GITHUB_ENV'], 'a') as output:
-              for kind in ['iPhone', 'iPad']:
-                  match = next(d for d in all_devices if kind in d['name'])
-                  output.write(kind.upper() + '_SIMULATOR=' + match['udid'] + '\n')
-          PY
-      - name: Capture and test the original on both device sizes
-        timeout-minutes: 25
-        id: reference_tests
-        continue-on-error: true
-        run: |
-          set -euo pipefail
-          tests_failed=0
-          for kind in IPHONE IPAD; do
-            if [ "$kind" = IPHONE ]; then device="$IPHONE_SIMULATOR"; else device="$IPAD_SIMULATOR"; fi
-            xcrun simctl boot "$device" || true
-            xcrun simctl bootstatus "$device" -b
-            python3 browser/.openminis/capture_reference.py "$device" \
-              "$RUNNER_TEMP/OpenMinisOriginal/Build/Products/Debug-iphonesimulator/Minis.app" \
-              "results/screens-$kind" || tests_failed=1
-            python3 browser/.openminis/run_xcode.py "results/original-$kind-tests.log" -- \
-              xcodebuild -project upstream/src/ios/Minis.xcodeproj -scheme Minis \
-              -configuration Debug -destination "platform=iOS Simulator,id=$device" \
-              -derivedDataPath "$RUNNER_TEMP/OpenMinisOriginal" \
-              -resultBundlePath "results/original-$kind.xcresult" \
-              -only-testing:MinisUITests/MessageListV3UITests/testLongContentMultiBundleRendering \
-              -only-testing:MinisUITests/MessageListV3UITests/testStreamingAutoScrollFollowsBottom \
-              -parallel-testing-enabled NO -test-timeouts-enabled YES \
-              -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 300 \
-              test-without-building CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
-              || tests_failed=1
-            xcrun xcresulttool export attachments --path "results/original-$kind.xcresult" \
-              --output-path "results/attachments-$kind" || true
-            xcrun simctl shutdown "$device"
-          done
-          exit "$tests_failed"
-      - name: Embed the original native application in the browser
-        run: |
-          set -euo pipefail
-          python3 browser/.openminis/embed_native.py upstream browser results/native-adapters.json
-          gem install xcodeproj --version 1.27.0 --no-document
-          ruby browser/.openminis/build_project.rb upstream browser
-      - name: Build the native browser and integration tests
-        run: |
-          set -euo pipefail
-          python3 browser/.openminis/run_xcode.py results/embedded-build.log -- \
+            -resultBundlePath "results/original-$kind.xcresult" \
+            -only-testing:MinisUITests/MessageListV3UITests/testLongContentMultiBundleRendering \
+            -only-testing:MinisUITests/MessageListV3UITests/testStreamingAutoScrollFollowsBottom \
+            -parallel-testing-enabled NO -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 300 \
+            test-without-building CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            || tests_failed=1
+          xcrun xcresulttool export attachments --path "results/original-$kind.xcresult" \
+            --output-path "results/attachments-$kind" || true
+          xcrun simctl shutdown "$device"
+        done
+        exit "$tests_failed"
+    - name: Embed the original native application in the browser
+      run: |
+        set -euo pipefail
+        python3 browser/.openminis/embed_native.py upstream browser results/native-adapters.json
+        gem install xcodeproj --version 1.27.0 --no-document
+        ruby browser/.openminis/build_project.rb upstream browser
+    - name: Build the native browser and integration tests
+      run: |
+        set -euo pipefail
+        python3 browser/.openminis/run_xcode.py results/embedded-build.log -- \
+          xcodebuild -project upstream/src/ios/Minis.xcodeproj -scheme Minis \
+          -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+          -derivedDataPath "$RUNNER_TEMP/OpenMinisOriginal" \
+          build-for-testing CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ARCHS=arm64
+    - name: Test the embedded original UI and real browser tools
+      timeout-minutes: 25
+      id: embedded_tests
+      continue-on-error: true
+      run: |
+        set -euo pipefail
+        python3 browser/.zeus-ci/fixture_server.py > results/fixture-server.log 2>&1 &
+        fixture_pid=$!
+        trap 'kill "$fixture_pid" 2>/dev/null || true' EXIT
+        for attempt in {1..30}; do
+          if curl --fail --silent http://127.0.0.1:8765/v1/models > /dev/null; then break; fi
+          sleep 1
+        done
+        curl --fail --silent http://127.0.0.1:8765/v1/models > results/fixture-models.json
+        tests_failed=0
+        for kind in IPHONE IPAD; do
+          if [ "$kind" = IPHONE ]; then device="$IPHONE_SIMULATOR"; else device="$IPAD_SIMULATOR"; fi
+          xcrun simctl boot "$device" || true
+          xcrun simctl bootstatus "$device" -b
+          # Both apps declare minis://. Remove the reference installation so
+          # settings deep links unambiguously open the embedded application.
+          xcrun simctl uninstall "$device" com.openminis.app || true
+          python3 browser/.openminis/capture_reference.py "$device" \
+            "$RUNNER_TEMP/OpenMinisOriginal/Build/Products/Debug-iphonesimulator/Minis.app" \
+            "results/embedded-screens-$kind" --bundle tools.rea.ZEUSBrowserAnalysis || tests_failed=1
+          python3 browser/.openminis/capture_chat.py "$device" tools.rea.ZEUSBrowserAnalysis \
+            "results/embedded-conversation-$kind" || tests_failed=1
+          python3 browser/.openminis/run_xcode.py "results/embedded-$kind-tests.log" -- \
             xcodebuild -project upstream/src/ios/Minis.xcodeproj -scheme Minis \
-            -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug -destination "platform=iOS Simulator,id=$device" \
             -derivedDataPath "$RUNNER_TEMP/OpenMinisOriginal" \
-            build-for-testing CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ARCHS=arm64
-      - name: Test the embedded original UI and real browser tools
-        timeout-minutes: 25
-        id: embedded_tests
-        continue-on-error: true
-        run: |
-          set -euo pipefail
-          python3 browser/.zeus-ci/fixture_server.py > results/fixture-server.log 2>&1 &
-          fixture_pid=$!
-          trap 'kill "$fixture_pid" 2>/dev/null || true' EXIT
-          for attempt in {1..30}; do
-            if curl --fail --silent http://127.0.0.1:8765/v1/models > /dev/null; then break; fi
-            sleep 1
-          done
-          curl --fail --silent http://127.0.0.1:8765/v1/models > results/fixture-models.json
-          tests_failed=0
-          for kind in IPHONE IPAD; do
-            if [ "$kind" = IPHONE ]; then device="$IPHONE_SIMULATOR"; else device="$IPAD_SIMULATOR"; fi
-            xcrun simctl boot "$device" || true
-            xcrun simctl bootstatus "$device" -b
-            # Both apps declare minis://. Remove the reference installation so
-            # settings deep links unambiguously open the embedded application.
-            xcrun simctl uninstall "$device" com.openminis.app || true
-            python3 browser/.openminis/capture_reference.py "$device" \
-              "$RUNNER_TEMP/OpenMinisOriginal/Build/Products/Debug-iphonesimulator/Minis.app" \
-              "results/embedded-screens-$kind" --bundle tools.rea.ZEUSBrowserAnalysis || tests_failed=1
-            python3 browser/.openminis/run_xcode.py "results/embedded-$kind-tests.log" -- \
-              xcodebuild -project upstream/src/ios/Minis.xcodeproj -scheme Minis \
-              -configuration Debug -destination "platform=iOS Simulator,id=$device" \
-              -derivedDataPath "$RUNNER_TEMP/OpenMinisOriginal" \
-              -resultBundlePath "results/embedded-$kind.xcresult" \
-              -only-testing:ZEUSBrowserIntegrationTests \
-              -only-testing:MinisUITests/MessageListV3UITests/testLongContentMultiBundleRendering \
-              -only-testing:MinisUITests/MessageListV3UITests/testStreamingAutoScrollFollowsBottom \
-              -parallel-testing-enabled NO -test-timeouts-enabled YES \
-              -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 300 \
-              test-without-building CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
-              || tests_failed=1
-            xcrun xcresulttool export attachments --path "results/embedded-$kind.xcresult" \
-              --output-path "results/embedded-attachments-$kind" || true
-            xcrun simctl shutdown "$device"
-          done
-          exit "$tests_failed"
-      - name: Require both original and embedded tests to pass
-        if: always()
-        env:
-          ORIGINAL_RESULT: ${{ steps.reference_tests.outcome }}
-          EMBEDDED_RESULT: ${{ steps.embedded_tests.outcome }}
-        run: test "$ORIGINAL_RESULT" = success && test "$EMBEDDED_RESULT" = success
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: zeus-native-test-reports
-          path: results
-          retention-days: 14
-          if-no-files-found: error
+            -resultBundlePath "results/embedded-$kind.xcresult" \
+            -only-testing:ZEUSBrowserIntegrationTests \
+            -only-testing:MinisUITests/MessageListV3UITests/testLongContentMultiBundleRendering \
+            -only-testing:MinisUITests/MessageListV3UITests/testStreamingAutoScrollFollowsBottom \
+            -parallel-testing-enabled NO -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 300 \
+            test-without-building CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            || tests_failed=1
+          xcrun xcresulttool export attachments --path "results/embedded-$kind.xcresult" \
+            --output-path "results/embedded-attachments-$kind" || true
+          xcrun simctl shutdown "$device"
+        done
+        exit "$tests_failed"
+    - name: Require both original and embedded tests to pass
+      if: always()
+      env:
+        ORIGINAL_RESULT: ${{ steps.reference_tests.outcome }}
+        EMBEDDED_RESULT: ${{ steps.embedded_tests.outcome }}
+      run: test "$ORIGINAL_RESULT" = success && test "$EMBEDDED_RESULT" = success
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: zeus-native-test-reports
+        path: results
+        retention-days: 14
+        if-no-files-found: error
+'on':
+  push:
+    branches:
+    - feature/openminis-native-20261023
+    paths:
+    - ZEUSNext/**
+    - .openminis/**
+    - .github/workflows/zeus-next.yml
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Browser source branch, tag or commit to test
+        default: feature/openminis-native-20261023
+        required: true
+        type: string

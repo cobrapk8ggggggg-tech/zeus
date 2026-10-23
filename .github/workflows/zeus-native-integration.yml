@@ -91,6 +91,15 @@ jobs:
         python3 browser/.openminis/embed_native.py upstream browser results/native-adapters.json
         gem install xcodeproj --version 1.27.0 --no-document
         ruby browser/.openminis/build_project.rb upstream browser
+    - uses: actions/cache/restore@v4
+      id: swift_cache
+      with:
+        path: |
+          ${{ runner.temp }}/OpenMinisOriginal/Build
+          ${{ runner.temp }}/OpenMinisOriginal/SourcePackages
+          ${{ runner.temp }}/OpenMinisOriginal/ModuleCache.noindex
+        key: zeus-native-deriveddata-263-v1-${{ github.run_id }}
+        restore-keys: zeus-native-deriveddata-263-v1-
     - name: Build the native browser and integration tests
       run: |
         set -euo pipefail
@@ -99,6 +108,15 @@ jobs:
           -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
           -derivedDataPath "$RUNNER_TEMP/OpenMinisOriginal" \
           build-for-testing CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ARCHS=arm64
+      id: native_build
+    - uses: actions/cache/save@v4
+      if: always() && steps.native_build.outcome != 'skipped' && steps.swift_cache.outputs.cache-hit != 'true'
+      with:
+        path: |
+          ${{ runner.temp }}/OpenMinisOriginal/Build
+          ${{ runner.temp }}/OpenMinisOriginal/SourcePackages
+          ${{ runner.temp }}/OpenMinisOriginal/ModuleCache.noindex
+        key: zeus-native-deriveddata-263-v1-${{ github.run_id }}
     - name: Select available iPhone and iPad simulators
       run: |
         set -euo pipefail
@@ -136,6 +154,8 @@ jobs:
           python3 browser/.openminis/capture_reference.py "$device" \
             "$RUNNER_TEMP/OpenMinisOriginal/Build/Products/Debug-iphonesimulator/Minis.app" \
             "results/embedded-screens-$kind" --bundle tools.rea.ZEUSBrowserAnalysis || tests_failed=1
+          python3 browser/.openminis/capture_chat.py "$device" tools.rea.ZEUSBrowserAnalysis \
+            "results/embedded-conversation-$kind" || tests_failed=1
           python3 browser/.openminis/run_xcode.py "results/embedded-$kind-tests.log" -- \
             xcodebuild -project upstream/src/ios/Minis.xcodeproj -scheme Minis \
             -configuration Debug -destination "platform=iOS Simulator,id=$device" \

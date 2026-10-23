@@ -5,6 +5,24 @@ import WebKit
 
 @MainActor
 final class NativeBrowserIntegrationTests: XCTestCase {
+    func testProfileSwitchDismissesTheOriginalPendingBrowserPermissionCard() async throws {
+        let (browser, root) = model()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let bridge = NativeBrowserSession(browser: browser)
+        browser.agent = bridge
+        ZEUSNativeAgentBridge.shared.bind(bridge)
+        let call = Task { try await bridge.execute(operation: "browser_tabs", arguments: "{}", sessionID: nil) }
+        let deadline = Date().addingTimeInterval(5)
+        while OffloadPermissionManager.shared.pendingRequest == nil, Date() < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let request = try XCTUnwrap(OffloadPermissionManager.shared.pendingRequest)
+        XCTAssertTrue(OffloadPermissionManager.allCommands.contains { $0.name == request.commandName })
+        let second = browser.profiles.add(name: "Second", accent: "white", isPrivate: false)
+        await browser.switchProfile(to: second)
+        XCTAssertNil(OffloadPermissionManager.shared.pendingRequest)
+        do { _ = try await call.value; XCTFail("Old approval must be cancelled immediately") } catch {}
+    }
     func testOriginalAgentTransportStreamsLongUnicodeAnswerWithoutDroppingTheTail() async throws {
         let model = LLMModel(id: "fixture-native-stream", displayName: "Native stream fixture", provider: "openai")
         let transport = OpenAIProvider(apiKey: "local-fixture-only", model: model, customBaseURL: "http://127.0.0.1:8765/v1", appendV1Suffix: false)

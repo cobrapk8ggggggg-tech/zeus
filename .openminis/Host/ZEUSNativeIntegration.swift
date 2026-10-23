@@ -7,6 +7,11 @@ import ZEUSBrowser
 
 @MainActor
 struct ZEUSBrowserRootEntry: View {
+    init() {
+        #if DEBUG
+        _ = ZEUSNativeFixtureBootstrap.configured
+        #endif
+    }
     var body: some View {
         #if DEBUG
         if CommandLine.arguments.contains("--uitest-message-list") {
@@ -23,6 +28,16 @@ struct ZEUSBrowserRootEntry: View {
         #endif
     }
 }
+
+#if DEBUG
+private enum ZEUSNativeFixtureBootstrap {
+    static let configured: Void = {
+        if CommandLine.arguments.contains("--zeus-native-fixture") {
+            UserDefaults.standard.set(false, forKey: "debug.auth.required")
+        }
+    }()
+}
+#endif
 
 @MainActor
 private struct OriginalPreferencesRoot: View {
@@ -123,6 +138,13 @@ private final class AgentContainerController: UIViewController {
 final class ZEUSNativeAgentBridge {
     static let shared = ZEUSNativeAgentBridge()
     private weak var browser: NativeBrowserSession?
+    static var browserPermissionCommands: [OffloadCommandInfo] {
+        let entries = UserDefaults.standard.dictionary(forKey: "zeus.browser.permission.labels") as? [String: String] ?? [:]
+        return entries.keys.sorted().map { command in
+            OffloadCommandInfo(name: command, displayLabel: entries[command] ?? command,
+                description: "ZEUS · صلاحية خاصة بالإجراء والموقع والبروفايل", category: .privacy, showInSettings: true)
+        }
+    }
     func bind(_ session: NativeBrowserSession) {
         browser = session
         session.authorization = { [weak session] request in
@@ -131,6 +153,13 @@ final class ZEUSNativeAgentBridge {
             let digest = SHA256.hash(data: Data(scope.utf8)).map { String(format: "%02x", $0) }.joined()
             let command = "zeus-browser/" + request.operation + ":" + digest.prefix(16)
             let manager = OffloadPermissionManager.shared
+            let label = request.profileName + " · " + request.host + " · " + request.operation
+            var labels = UserDefaults.standard.dictionary(forKey: "zeus.browser.permission.labels") as? [String: String] ?? [:]
+            if labels[command] != label {
+                labels[command] = label
+                UserDefaults.standard.set(labels, forKey: "zeus.browser.permission.labels")
+                manager.objectWillChange.send()
+            }
             let marker = "zeus.browser.permission.initialized." + command
             if !UserDefaults.standard.bool(forKey: marker) {
                 manager.setPermissionLevel(.askOnce, for: command)
@@ -141,14 +170,20 @@ final class ZEUSNativeAgentBridge {
             // explicit persistent permission for this operation/host/profile.
             let result = await manager.checkPermission(for: command, sessionId: UUID().uuidString,
                 fullCommand: request.operation + " " + request.details,
-                requestLabel: "المتصفح · " + request.host,
+                requestLabel: request.profileName + " · " + request.host,
                 requestDescription: request.details,
                 permitsPersistentGrant: request.allowsPermanent)
             if case .allowed = result { return true }
             return false
         }
         session.onInvalidated = { [weak self, weak session] in
-            if self?.browser === session { self?.browser = nil }
+            if self?.browser === session {
+                self?.browser = nil
+                let manager = OffloadPermissionManager.shared
+                if let pending = manager.pendingRequest, pending.commandName.hasPrefix("zeus-browser/") {
+                    manager.respond(to: pending.id, allowed: false)
+                }
+            }
         }
     }
 

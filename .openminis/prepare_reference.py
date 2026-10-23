@@ -66,6 +66,7 @@ def prepare(root: Path, sdk: str) -> dict:
     code += '''
 // Reference-test entry only; both branches use untouched upstream views.
 private struct OpenMinisReferenceRoot: View {
+    init() { _ = OpenMinisReferenceFixtureBootstrap.configured }
     @ViewBuilder var body: some View {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--uitest-message-list") {
@@ -75,6 +76,15 @@ private struct OpenMinisReferenceRoot: View {
         ContentView()
         #endif
     }
+}
+private enum OpenMinisReferenceFixtureBootstrap {
+    static let configured: Void = {
+        #if DEBUG
+        if CommandLine.arguments.contains("--zeus-native-fixture") {
+            UserDefaults.standard.set(false, forKey: "debug.auth.required")
+        }
+        #endif
+    }()
 }
 '''
     app.write_text(code)

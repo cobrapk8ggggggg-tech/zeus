@@ -24,6 +24,14 @@ class Handler(BaseHTTPRequestHandler):
         try:
             body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', '0'))))
             if body.get('model') in ('fixture-native-stream', 'fixture-native-tool'):
+                if body.get('stream') is False:
+                    encoded = json.dumps({'choices': [{'message': {'role': 'assistant', 'content': 'محادثة الاختبار'}, 'finish_reason': 'stop'}]}, ensure_ascii=False).encode()
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json; charset=utf-8')
+                    self.send_header('Content-Length', str(len(encoded)))
+                    self.end_headers()
+                    self.wfile.write(encoded)
+                    return
                 self.send_response(200)
                 self.send_header('Content-Type', 'text/event-stream; charset=utf-8')
                 self.send_header('Connection', 'close')
