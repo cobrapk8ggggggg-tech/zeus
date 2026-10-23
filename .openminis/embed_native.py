@@ -37,6 +37,19 @@ def embed(native, browser, report):
     # its root content now embeds the browser with the original AI UI alongside.
     replace(source / "MinisApp.swift", "                ContentView()", "                ZEUSBrowserRootEntry()")
     shutil.copyfile(browser / ".openminis/Host/ZEUSNativeIntegration.swift", source / "ZEUSNativeIntegration.swift")
+    # Reuse the exact native settings sheet from the browser's AI settings row.
+    # Only its file-private visibility changes; its body is untouched.
+    replace(source / "Views/ContentView.swift", "private struct SettingsSheet: View", "struct SettingsSheet: View")
+    # A compiler boundary around the unchanged native geometry expression.
+    # The embedded app's newer deployment target expands SwiftUI overload
+    # resolution enough to hit the type-checker limit on the original giant
+    # modifier chain. No view, modifier or state is replaced or reordered.
+    replace(source / "Views/ContentView.swift",
+            "    private static let pendingBackgroundNavigationTTL: TimeInterval = 90\n\n    var body: some View {\n        GeometryReader { geo in",
+            "    private static let pendingBackgroundNavigationTTL: TimeInterval = 90\n\n    private var zeusNativeGeometry: some View {\n        GeometryReader { geo in")
+    replace(source / "Views/ContentView.swift",
+            "        }\n        .onReceive(\n            NotificationCenter.default.publisher(for: .sessionDidCreate),",
+            "        }\n    }\n\n    var body: some View {\n        zeusNativeGeometry\n        .onReceive(\n            NotificationCenter.default.publisher(for: .sessionDidCreate),")
 
     definitions = source / "Agent/Chat/AIChatViewModel+ToolDefinitions.swift"
     replace(definitions, "        return tools", "        tools.append(ZEUSNativeAgentBridge.definition)\n        return tools")

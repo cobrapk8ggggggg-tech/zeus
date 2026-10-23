@@ -38,6 +38,10 @@ class NativeEmbeddingTests(unittest.TestCase):
                 if str(relative) == "Views/Chat/OffloadPermissionDialog.swift":
                     continue
                 expected = file.read_text().replace("group.com.openminis.app", "group.tools.zeus.openminis").replace("iCloud.com.openminis.app", "iCloud.tools.zeus.openminis")
+                if str(relative) == "Views/ContentView.swift":
+                    expected = expected.replace("private struct SettingsSheet: View", "struct SettingsSheet: View")
+                    expected = expected.replace("    private static let pendingBackgroundNavigationTTL: TimeInterval = 90\n\n    var body: some View {\n        GeometryReader { geo in", "    private static let pendingBackgroundNavigationTTL: TimeInterval = 90\n\n    private var zeusNativeGeometry: some View {\n        GeometryReader { geo in")
+                    expected = expected.replace("        }\n        .onReceive(\n            NotificationCenter.default.publisher(for: .sessionDidCreate),", "        }\n    }\n\n    var body: some View {\n        zeusNativeGeometry\n        .onReceive(\n            NotificationCenter.default.publisher(for: .sessionDidCreate),")
                 self.assertEqual((native / "src/ios" / relative).read_text(), expected, str(relative))
             for name in ("Agent/MessageList/CollectionViewMessageListV3.swift", "Agent/Chat/ChatStore.swift"):
                 self.assertNotIn(name, changed)

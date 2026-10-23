@@ -9,14 +9,24 @@ public struct NativeAssistantPresentation {
     public let resize: () -> Void
 }
 public typealias NativeAssistantFactory = (NativeBrowserSession, NativeAssistantPresentation) -> AnyView
+public typealias NativePreferencesFactory = () -> AnyView
+private struct NativePreferencesKey: EnvironmentKey { static let defaultValue: NativePreferencesFactory? = nil }
+extension EnvironmentValues {
+    public var nativeAgentPreferences: NativePreferencesFactory? {
+        get { self[NativePreferencesKey.self] }
+        set { self[NativePreferencesKey.self] = newValue }
+    }
+}
 
 /// Browser shell only. The app supplies the unmodified OpenMinis chat root.
 @MainActor public struct NativeBrowserHostView: View {
     @StateObject private var holder = NativeBrowserHolder()
     private let assistant: NativeAssistantFactory
-    public init(assistant: @escaping NativeAssistantFactory) { self.assistant = assistant }
+    private let preferences: NativePreferencesFactory?
+    public init(preferences: NativePreferencesFactory? = nil, assistant: @escaping NativeAssistantFactory) { self.assistant = assistant; self.preferences = preferences }
     public var body: some View {
         BrowserRoot(model: holder.model, nativeAssistant: assistant)
+            .environment(\.nativeAgentPreferences, preferences)
             .preferredColorScheme(holder.model.data.settings.theme?.light == true ? .light : .dark)
             .environment(\.layoutDirection, .rightToLeft)
     }

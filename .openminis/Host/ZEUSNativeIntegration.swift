@@ -12,15 +12,28 @@ struct ZEUSBrowserRootEntry: View {
         if CommandLine.arguments.contains("--uitest-message-list") {
             MessageListTestView()
         } else {
-            NativeBrowserHostView { session, presentation in
+            NativeBrowserHostView(preferences: { AnyView(OriginalPreferencesRoot()) }) { session, presentation in
                 AnyView(NativeAgentContainer(session: session, presentation: presentation))
             }
         }
         #else
-        NativeBrowserHostView { session, presentation in
+        NativeBrowserHostView(preferences: { AnyView(OriginalPreferencesRoot()) }) { session, presentation in
             AnyView(NativeAgentContainer(session: session, presentation: presentation))
         }
         #endif
+    }
+}
+
+@MainActor
+private struct OriginalPreferencesRoot: View {
+    @State private var showTerminal = false
+    @AppStorage("appearanceMode") private var appearanceMode = 0
+    var body: some View {
+        SettingsSheet(showTerminal: $showTerminal)
+            .environmentObject(ShareCoordinator.shared)
+            .tint(.blue)
+            .preferredColorScheme(appearanceMode == 1 ? .light : appearanceMode == 2 ? .dark : nil)
+            .sheet(isPresented: $showTerminal) { ISHTerminalView(showCloseButton: true) }
     }
 }
 

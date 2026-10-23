@@ -22,6 +22,10 @@ struct SettingsSheet: View {
     @State private var selection: SettingsCategory? = .account
     @State private var path: [SettingsCategory]
     @State private var search = ""
+    #if ZEUS_NATIVE_HOST
+    @Environment(\.nativeAgentPreferences) private var nativePreferences
+    @State private var showNativePreferences = false
+    #endif
     private let activeAtOpening: UUID
     init(model: BrowserModel, profile: BrowserProfile? = nil) {
         activeAtOpening = model.profiles.activeID
@@ -43,15 +47,26 @@ struct SettingsSheet: View {
         }.tint(theme.buttonTextColor).foregroundStyle(theme.textColor).preferredColorScheme(theme.light ? .light : .dark).environment(\.layoutDirection, .rightToLeft).browserTheme(theme)
             .onReceive(context.model.profiles.$activeID) { id in if id != activeAtOpening { dismiss() } }
             .onReceive(context.model.$requiresUnlock) { locked in if locked { dismiss() } }
+            #if ZEUS_NATIVE_HOST
+            .sheet(isPresented: $showNativePreferences) { if let nativePreferences { nativePreferences() } }
+            #endif
     }
     private var categoryList: some View {
         List {
             ForEach(0..<6) { group in
                 ThemedSection {
                     ForEach(SettingsCategory.allCases.filter { $0.group == group && (context.profile.account?.allowSettings != false || context.model.profile.isAdmin || [.account, .help].contains($0)) && (search.isEmpty || $0.title.localizedCaseInsensitiveContains(search)) }) { category in
+                        #if ZEUS_NATIVE_HOST
+                        if category == .ai, nativePreferences != nil {
+                            Button { showNativePreferences = true } label: { categoryLabel(category) }.buttonStyle(.plain).listRowBackground(theme.backgroundColor)
+                        } else if sizeClass == .regular {
+                            Button { selection = category } label: { categoryLabel(category) }.buttonStyle(.plain).listRowBackground(theme.backgroundColor).overlay(alignment: .leading) { if selection == category { Rectangle().fill(theme.accentColor).frame(width: 2) } }
+                        } else { NavigationLink(value: category) { categoryLabel(category) }.listRowBackground(theme.backgroundColor) }
+                        #else
                         if sizeClass == .regular {
                             Button { selection = category } label: { categoryLabel(category) }.buttonStyle(.plain).listRowBackground(theme.backgroundColor).overlay(alignment: .leading) { if selection == category { Rectangle().fill(theme.accentColor).frame(width: 2) } }
                         } else { NavigationLink(value: category) { categoryLabel(category) }.listRowBackground(theme.backgroundColor) }
+                        #endif
                     }
                 }
             }
