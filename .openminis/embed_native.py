@@ -100,7 +100,7 @@ def embed(native, browser, report):
             toolOutput = try await ZeusAgentHarness.shared.execute(name, args: toolArgs, callID: tu.id, vm: self)
             if let object = try? JSONSerialization.jsonObject(with: Data(toolOutput.utf8)) as? [String: Any], object["isError"] as? Bool == true { toolSuccess = false }
             else if let object = try? JSONSerialization.jsonObject(with: Data(toolOutput.utf8)) as? [String: Any], let code = object["exit_code"] as? Int { toolSuccess = code == 0 }
-            else if name == "task_verify", let checks = try? JSONSerialization.jsonObject(with: Data(toolOutput.utf8)) as? [[String: Any]] { toolSuccess = checks.allSatisfy { $0["exitCode"] as? Int == 0 } }
+            else if ["task_verify", "task_verify_mcp"].contains(name), let checks = try? JSONSerialization.jsonObject(with: Data(toolOutput.utf8)) as? [[String: Any]] { toolSuccess = checks.allSatisfy { $0["exitCode"] as? Int == 0 } }
             else { toolSuccess = true }
 
 '''

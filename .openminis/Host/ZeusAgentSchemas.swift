@@ -4,7 +4,7 @@ import CoreFoundation
 /// Provider-independent JSON schemas for the native execution runtime.
 /// These are real nested schemas, not JSON encoded inside string parameters.
 enum ZeusAgentSchemas {
-    static let names: Set<String> = ["update_plan", "apply_patch", "exec_command", "write_stdin", "task_checkpoint", "task_verify", "task_complete", "integration_accounts", "integration_tools", "integration_call"]
+    static let names: Set<String> = ["update_plan", "apply_patch", "exec_command", "write_stdin", "task_checkpoint", "task_verify", "task_verify_mcp", "task_complete", "integration_accounts", "integration_tools", "integration_call"]
     static func schema(_ name: String) -> [String: Any]? {
         var fields: [String: Any] = ["tool_title": ["type": "string"], "approval_reason": ["type": "string"]]
         var requiredFields: [String] = []
@@ -31,6 +31,10 @@ enum ZeusAgentSchemas {
             fields.merge(["commands": ["type": "array", "minItems": 1, "maxItems": 15, "items": ["type": "string", "minLength": 1]], "workdir": ["type": "string"], "timeout_seconds": ["type": "integer", "minimum": 1, "maximum": 3600]]) { _, b in b }; requiredFields = ["commands"]
         case "task_complete":
             fields.merge(["status": ["type": "string", "enum": ["completed", "blocked", "waiting_user"]], "summary": ["type": "string", "minLength": 1], "limitations": ["type": "string"]]) { _, b in b }; requiredFields = ["status", "summary"]
+        case "task_verify_mcp":
+            let assertion: [String: Any] = ["type": "object", "properties": ["path": ["type": "array", "minItems": 1, "maxItems": 12, "items": ["type": "string"]], "equals": ["type": ["string", "number", "boolean", "null"]]], "required": ["path", "equals"], "additionalProperties": false]
+            let check: [String: Any] = ["type": "object", "properties": ["account_id": ["type": "string"], "tool_name": ["type": "string"], "arguments": ["type": "object", "additionalProperties": true], "assertions": ["type": "array", "minItems": 1, "maxItems": 10, "items": assertion]], "required": ["account_id", "tool_name", "arguments", "assertions"], "additionalProperties": false]
+            fields["checks"] = ["type": "array", "minItems": 1, "maxItems": 15, "items": check]; requiredFields = ["checks"]
         default: return nil
         }
         return ["type": "object", "properties": fields, "required": requiredFields, "additionalProperties": false]

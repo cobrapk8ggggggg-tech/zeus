@@ -73,7 +73,7 @@ enum ZeusPermissionMode: String, CaseIterable {
 
     static func isConsequential(tool: String, args: [String: Any]) -> Bool {
         switch tool {
-        case "update_plan", "task_checkpoint", "task_complete", "integration_accounts", "integration_tools": return false
+        case "update_plan", "task_checkpoint", "task_complete", "task_verify_mcp", "integration_accounts", "integration_tools": return false
         case "integration_call": return !ZeusConnections.shared.isReadOnly(args["account_id"] as? String ?? "", tool: args["tool_name"] as? String ?? "")
         case "write_stdin": return args["terminate"] as? Bool == true || !(args["chars"] as? String ?? "").isEmpty
         case "zeus_project_list", "zeus_project_status", "zeus_project_events", "zeus_project_diff", "zeus_project_files": return false

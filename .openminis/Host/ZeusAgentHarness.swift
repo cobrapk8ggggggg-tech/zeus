@@ -14,6 +14,9 @@ import CryptoKit
         var checkpoint = ""
         var checks: [Check] = []
         var verificationCommands: [String] = []
+        var remoteVerificationKeys: [String]?
+        var remoteChecks: [Check]?
+        var remoteVerificationSpecs: [String]?
         var generation = 0
         var noToolContinuations = 0
         var started = Date()
@@ -79,6 +82,7 @@ import CryptoKit
             "write_stdin": "Read new output or terminate a command started by exec_command in THIS conversation. Empty chars polls; terminate cancels. Interactive input is unsupported here; use the original terminal tool for that. Supply offset from previous next_offset to avoid duplicate output.",
             "task_checkpoint": "Save/read the current plan, verification and checkpoint. action=save with note records durable progress for reconnect/resume. Do not store credentials. Read before resuming a long project.",
             "task_verify": "Run actual build/test commands in the current project and record each exit code/output against the current edit generation. commands is an ARRAY of strings. Failed checks remain failures and must be fixed. This is evidence, not a promise to test.",
+            "task_verify_mcp": "Verify remote work through actual READ-ONLY linked MCP tools, e.g. GitHub Actions or deployment status, without requiring a local shell. checks is an array of exact account/tool/arguments plus assertions [{path:[JSON keys or array indices],equals:scalar}]. Use exact run/deployment IDs and assert commit identity AND successful terminal status. Only structured JSON evidence is accepted; prose promises do not count. Earlier registered assertions cannot be weakened. Remote mutations invalidate earlier verification.",
             "task_complete": "Finish a planned task only when all steps are complete, no jobs are running and current-generation verification passes. Use status=blocked or waiting_user with the precise reason when verification/resources are unavailable. Do not mark tests passed when they were not run."
         ]
         return ZeusAgentSchemas.names.sorted().map { name in
@@ -164,13 +168,15 @@ import CryptoKit
             return try Self.json(["account_id": account.id, "matching_tools": filtered.count, "tools": selected, "schema_hint": "Use query with an exact tool name to fetch its full inputSchema before calling it."])
         case "integration_call":
             let account = try ZeusConnections.shared.account(args["account_id"] as? String)
+            _ = try await ZeusConnections.shared.listTools(account.id)
+            if !ZeusConnections.shared.isReadOnly(account.id, tool: args["tool_name"] as! String) { value = state(session); value.generation += 1; try save(session, value) }
             return try Self.json(try await ZeusConnections.shared.call(account.id, name: args["tool_name"] as! String, arguments: args["arguments"] as! [String: Any]))
         case "update_plan":
             let data = try JSONSerialization.data(withJSONObject: args["plan"]!)
             let plan = try JSONDecoder().decode([Step].self, from: data)
             guard plan.filter({ $0.status == "in_progress" }).count <= 1 else { throw ZeusPatch.failure("Only one plan step can be in_progress.") }
             if value.plan.isEmpty || value.status != "running" { value.started = Date() }
-            if value.status == "completed" { value.checks = []; value.verificationCommands = []; value.generation = 0 }
+            if value.status == "completed" { value.checks = []; value.verificationCommands = []; value.remoteChecks = []; value.remoteVerificationKeys = []; value.remoteVerificationSpecs = []; value.generation = 0 }
             if let commands = args["verification_commands"] as? [String], !commands.isEmpty {
                 guard value.verificationCommands.isEmpty || Set(value.verificationCommands).isSubset(of: Set(commands)) else { throw ZeusPatch.failure("Verification checks cannot be removed or weakened during an active task.") }
                 value.verificationCommands = commands
@@ -182,6 +188,7 @@ import CryptoKit
         case "task_checkpoint":
             if args["action"] as? String == "save" { value.checkpoint = args["note"] as? String ?? value.checkpoint; try save(session, value) }
             return try snapshot(session)
+        case "task_verify_mcp": return try await verifyRemote(args["checks"] as! [[String: Any]], session: session)
         case "apply_patch":
             guard !patching else { throw ZeusPatch.failure("Another patch is committing; inspect its result before applying the next patch.") }
             patching = true; defer { patching = false }
@@ -269,15 +276,51 @@ import CryptoKit
             if status == "completed" {
                 guard !value.plan.isEmpty, value.plan.allSatisfy({ $0.status == "completed" }) else { throw ZeusPatch.failure("Completion blocked: unfinished plan steps.") }
                 guard !jobs.values.contains(where: { $0.owner == session && $0.exitCode == nil }) else { throw ZeusPatch.failure("Completion blocked: command still running.") }
-                guard !value.checks.isEmpty, value.checks.allSatisfy({ $0.exitCode == 0 && $0.generation == value.generation }) else { throw ZeusPatch.failure("Completion blocked: run task_verify after the latest edits and fix every failing check. If the environment cannot verify, record status=blocked with that limitation.") }
+                let checks = value.checks + (value.remoteChecks ?? [])
+                guard !checks.isEmpty, checks.allSatisfy({ $0.exitCode == 0 && $0.generation == value.generation }) else { throw ZeusPatch.failure("Completion blocked: run task_verify/task_verify_mcp after the latest edits and fix every failing check. If the environment cannot verify, record status=blocked with that limitation.") }
             }
             if status == "completed" {
-                guard !value.verificationCommands.isEmpty, Set(value.checks.map(\.command)) == Set(value.verificationCommands) else { throw ZeusPatch.failure("Completion blocked: not every registered verification command has a recorded result.") }
+                guard Set(value.checks.map(\.command)) == Set(value.verificationCommands), Set((value.remoteChecks ?? []).map(\.command)) == Set(value.remoteVerificationKeys ?? []) else { throw ZeusPatch.failure("Completion blocked: not every registered verification check has a recorded result.") }
             }
             value.status = status; value.checkpoint = (args["summary"] as! String) + "\n" + (args["limitations"] as? String ?? ""); try save(session, value)
             return "Task status: " + status + "\n" + value.checkpoint
         default: throw ZeusPatch.failure("Unknown native runtime tool.")
         }
+    }
+    func verifyRemote(_ specs: [[String: Any]], session: String, connections: ZeusConnections? = nil) async throws -> String {
+        try ZeusAgentSchemas.validate(["checks": specs], schema: ZeusAgentSchemas.schema("task_verify_mcp")!)
+        let connection = connections ?? ZeusConnections.shared
+        var prepared: [(spec: [String: Any], key: String, json: String)] = []
+        for spec in specs {
+            let id = spec["account_id"] as! String, name = spec["tool_name"] as! String
+            _ = try connection.account(id)
+            let definitions = try await connection.listTools(id)
+            guard let definition = definitions.first(where: { $0["name"] as? String == name }), connection.isReadOnly(id, tool: name), let schema = definition["inputSchema"] as? [String: Any] else { throw ZeusPatch.failure("Remote verification requires an advertised read-only tool and its exact schema.") }
+            try ZeusAgentSchemas.validate(spec["arguments"]!, schema: schema)
+            let json = try Self.json(spec)
+            guard json.utf8.count <= 8000 else { throw ZeusPatch.failure("Remote verification specification exceeds 8KB; request a smaller status result.") }
+            let hash = SHA256.hash(data: Data(json.utf8)).map { String(format: "%02x", $0) }.joined()
+            prepared.append((spec, "mcp:" + id + ":" + name + ":" + hash, json))
+        }
+        guard !jobs.values.contains(where: { $0.owner == session && $0.exitCode == nil }) else { throw ZeusPatch.failure("Wait for running project commands before verification.") }
+        var value = state(session)
+        let keys = prepared.map(\.key), generation = value.generation
+        guard Set(value.remoteVerificationKeys ?? []).isSubset(of: Set(keys)) else { throw ZeusPatch.failure("Remote verification assertions cannot be removed or weakened. Run every registered check.") }
+        value.remoteVerificationKeys = keys; value.remoteVerificationSpecs = prepared.map(\.json); value.remoteChecks = []; try save(session, value)
+        var checks: [Check] = []
+        for item in prepared {
+            try Task.checkCancellation()
+            if let notice = budgetNotice(session: session) { throw ZeusPatch.failure(notice) }
+            let spec = item.spec
+            let output: String, code: Int
+            do {
+                let response = try await connection.call(spec["account_id"] as! String, name: spec["tool_name"] as! String, arguments: spec["arguments"] as! [String: Any])
+                output = try ZeusRemoteEvidence.evaluate(response, assertions: spec["assertions"] as! [[String: Any]]); code = 0
+            } catch { output = String(error.localizedDescription.prefix(6000)); code = 1 }
+            checks.append(Check(command: item.key, exitCode: code, output: output, generation: generation, date: Date()))
+            value = state(session); value.remoteChecks = checks; try save(session, value)
+        }
+        return try Self.json(checks.map { ["command": $0.command, "exitCode": $0.exitCode, "output": $0.output, "generation": $0.generation] as [String: Any] })
     }
     private func commandTimeout(_ requested: Int, session: String) throws -> TimeInterval {
         if let notice = budgetNotice(session: session) { throw ZeusPatch.failure(notice) }
@@ -328,9 +371,39 @@ import CryptoKit
         }
         return try Self.json(["goal": value.goal, "status": value.status, "generation": value.generation, "checkpoint": value.checkpoint,
             "plan": value.plan.map { ["step": $0.step, "status": $0.status] }, "verification_commands": value.verificationCommands,
+            "remote_verification": (value.remoteVerificationSpecs ?? []).compactMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) },
+            "remote_checks": (value.remoteChecks ?? []).map { ["key": $0.command, "exit_code": $0.exitCode, "generation": $0.generation] as [String: Any] },
             "checks": value.checks.map { ["command": $0.command, "exit_code": $0.exitCode, "generation": $0.generation] as [String: Any] },
             "recorded_tool_calls": value.ledger.count, "command_records_count": commands.count, "command_records": Dictionary(uniqueKeysWithValues: records),
             "local_commands": jobs.values.filter { $0.owner == session }.map { ["session_id": $0.id, "running": $0.exitCode == nil] as [String: Any] }])
+    }
+}
+
+enum ZeusRemoteEvidence {
+    static func evaluate(_ response: [String: Any], assertions: [[String: Any]]) throws -> String {
+        guard !assertions.isEmpty else { throw ZeusPatch.failure("At least one explicit remote verification assertion is required.") }
+        guard response["isError"] as? Bool != true else { throw ZeusPatch.failure("Remote status tool reported an error; verification failed.") }
+        let payload: Any
+        if let structured = response["structuredContent"] { payload = structured }
+        else {
+            let text = (response["content"] as? [[String: Any]] ?? []).filter { $0["type"] as? String == "text" }.compactMap { $0["text"] as? String }.joined(separator: "\n")
+            guard let data = text.data(using: .utf8), let json = try? JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed) else { throw ZeusPatch.failure("No structured JSON evidence was returned. A prose success message is not verification.") }; payload = json
+        }
+        var results: [[String: Any]] = []
+        for assertion in assertions {
+            guard let path = assertion["path"] as? [String], !path.isEmpty, let expected = assertion["equals"] else { throw ZeusPatch.failure("Malformed remote verification assertion.") }
+            var actual = payload
+            for key in path {
+                if let object = actual as? [String: Any], let next = object[key] { actual = next }
+                else if let array = actual as? [Any], let index = Int(key), array.indices.contains(index) { actual = array[index] }
+                else { throw ZeusPatch.failure("Remote verification path missing: " + path.joined(separator: ".")) }
+            }
+            let encoded = try JSONSerialization.data(withJSONObject: actual, options: [.fragmentsAllowed, .sortedKeys])
+            let target = try JSONSerialization.data(withJSONObject: expected, options: [.fragmentsAllowed, .sortedKeys])
+            guard encoded == target else { throw ZeusPatch.failure("Remote verification failed at " + path.joined(separator: ".") + ": " + String(String(decoding: encoded, as: UTF8.self).prefix(1000))) }
+            results.append(["path": path, "actual": actual, "passed": true])
+        }
+        return String(decoding: try JSONSerialization.data(withJSONObject: results, options: .sortedKeys), as: UTF8.self)
     }
 }
 

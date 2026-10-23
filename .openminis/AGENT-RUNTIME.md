@@ -26,7 +26,12 @@ dependency of this native runtime and must not be deployed as its replacement.
 3. **Persistence and verification**: atomic per-conversation plans/checkpoints,
    call-ID deduplication across restart, refreshed bounded task context after
    compaction, configurable turn/time budgets, actual test exit codes tied to
-   the edit generation, and a completion gate. Do not weaken earlier checks to
+   the edit generation, and a completion gate. `task_verify_mcp` verifies actual
+   read-only MCP results against exact JSON assertions (including run/deployment
+   and commit identity), so remote GitHub Actions work does not need a fake
+   local shell test. Prose success messages, wrong commits and tool error
+   results are rejected. Registered assertions cannot be removed or weakened;
+   remote mutations invalidate earlier evidence too. Do not weaken earlier checks to
    turn a failed test green. An uncertain write is inspected, never replayed
    automatically. A lost local process is reported as possibly interrupted,
    not automatically restarted.

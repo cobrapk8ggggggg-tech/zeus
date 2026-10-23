@@ -27,6 +27,29 @@ final class NativeBrowserIntegrationTests: XCTestCase {
         connections.makeDefault("second")
         XCTAssertEqual(try connections.account(nil, provider: "github").id, "second")
         XCTAssertEqual(ZeusConnections(storageKey: key).accounts.count, 2)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let runtime = ZeusAgentHarness(root: root), vm = AIChatViewModel(); vm.sessionId = "remote-" + UUID().uuidString
+        _ = try await runtime.execute("update_plan", args: ["plan": [["step": "Verify remote project", "status": "completed"]]], callID: "plan", vm: vm)
+        let spec: [String: Any] = ["account_id": "second", "tool_name": "fixture_read", "arguments": ["input": ["values": [1]]], "assertions": [["path": ["account"], "equals": "second"]]]
+        _ = try await runtime.verifyRemote([spec], session: vm.sessionId!, connections: connections)
+        var weakened = spec; weakened["assertions"] = [["path": ["account"], "equals": "first"]]
+        do { _ = try await runtime.verifyRemote([weakened], session: vm.sessionId!, connections: connections); XCTFail("Registered remote assertions cannot change") } catch {}
+        var mutating = spec; mutating["tool_name"] = "fixture_write"
+        do { _ = try await runtime.verifyRemote([mutating], session: vm.sessionId!, connections: connections); XCTFail("Verification must not invoke mutating tools") } catch {}
+        runtime.observe(session: vm.sessionId, tool: "shell_execute", success: true)
+        do { _ = try await runtime.execute("task_complete", args: ["status": "completed", "summary": "stale evidence"], callID: "stale", vm: vm); XCTFail("Mutations invalidate remote evidence too") } catch {}
+        _ = try await runtime.verifyRemote([spec], session: vm.sessionId!, connections: connections)
+        _ = try await runtime.execute("task_complete", args: ["status": "completed", "summary": "Verified using real remote read-only JSON without local Linux"], callID: "finish", vm: vm)
+        XCTAssertEqual(runtime.state(vm.sessionId!).status, "completed")
+    }
+    func testRemoteVerificationRejectsProseWrongCommitsAndErrorResults() throws {
+        let assertions: [[String: Any]] = [["path": ["conclusion"], "equals": "success"], ["path": ["head_sha"], "equals": "expected-commit"]]
+        let success: [String: Any] = ["structuredContent": ["conclusion": "success", "head_sha": "expected-commit"]]
+        XCTAssertNoThrow(try ZeusRemoteEvidence.evaluate(success, assertions: assertions))
+        XCTAssertThrowsError(try ZeusRemoteEvidence.evaluate(["content": [["type": "text", "text": "The deployment succeeded!"]]], assertions: assertions))
+        XCTAssertThrowsError(try ZeusRemoteEvidence.evaluate(["structuredContent": ["conclusion": "success", "head_sha": "other-commit"]], assertions: assertions))
+        XCTAssertThrowsError(try ZeusRemoteEvidence.evaluate(["isError": true, "structuredContent": success["structuredContent"]!], assertions: assertions))
     }
     func testIntegrationSchemasResolveReferencesAndNullableAlternatives() throws {
         let shape: [String: Any] = ["type": "object", "$defs": ["id": ["type": "string", "pattern": "^[a-z]+$"]], "properties": ["ids": ["type": "array", "items": ["$ref": "#/$defs/id"]], "name": ["type": ["string", "null"]]], "required": ["ids", "name"], "additionalProperties": false]
