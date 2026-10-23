@@ -108,6 +108,8 @@ jobs:
           test -d "$app/Frameworks"
           test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" = tools.rea.ZEUSBrowserAnalysis
           xcrun lipo "$app/Minis" -verify_arch arm64
+          python3 browser/.openminis/size_audit.py "$app" results/ipa-size-audit.json --strip
+          xcrun lipo "$app/Minis" -verify_arch arm64
           mkdir -p results/Payload
           cp -R "$app" results/Payload/
           (cd results && zip -qry ZEUS-native-unsigned.ipa Payload)
@@ -126,6 +128,7 @@ jobs:
             results/*commit.txt
             results/native-adapters.json
             results/ipa-zip-check.txt
+            results/ipa-size-audit.json
           retention-days: 14
           compression-level: 0
           if-no-files-found: error

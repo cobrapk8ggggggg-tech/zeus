@@ -32,8 +32,10 @@ target.build_configurations.each do |config|
 end
 app.add_dependency(target)
 app.frameworks_build_phase.add_file_reference(target.product_reference)
-bridge = project.main_group.new_file((native + 'src/ios/ZEUSNativeIntegration.swift').to_s)
-app.source_build_phase.add_file_reference(bridge)
+%w[ZEUSNativeIntegration.swift ZeusToolPermissions.swift].each do |name|
+  bridge = project.main_group.new_file((native + 'src/ios' + name).to_s)
+  app.source_build_phase.add_file_reference(bridge)
+end
 
 # Browser resources are resolved by Bundle.main from inside the static module.
 Dir.glob((browser + 'ZEUSNext/Resources/*').to_s).each do |path|
@@ -60,8 +62,22 @@ app.build_configurations.each do |config|
   config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'tools.rea.ZEUSBrowserAnalysis'
   config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '18.1'
   config.build_settings['MARKETING_VERSION'] = '2.7.0'
-  config.build_settings['CURRENT_PROJECT_VERSION'] = '11'
+  config.build_settings['CURRENT_PROJECT_VERSION'] = '12'
   config.build_settings['INFOPLIST_KEY_CFBundleDisplayName'] = 'ZEUS'
+end
+# A device `build` (unlike archive/install) did not strip the original app's
+# 49 MB symbol-name table. Keep debug symbols in the separate dSYM, not the IPA.
+([app, target] + project.targets.select { |item| item.product_type == 'com.apple.product-type.app-extension' }).each do |item|
+  item.build_configurations.select { |config| config.name == 'Release' }.each do |config|
+    config.build_settings.merge!({
+      'SWIFT_OPTIMIZATION_LEVEL' => '-Osize', 'GCC_OPTIMIZATION_LEVEL' => 's',
+      'DEAD_CODE_STRIPPING' => 'YES', 'COPY_PHASE_STRIP' => 'YES',
+      'STRIP_INSTALLED_PRODUCT' => 'YES', 'STRIP_STYLE' => 'all',
+      'DEBUG_INFORMATION_FORMAT' => 'dwarf-with-dsym',
+      'CLANG_ENABLE_CODE_COVERAGE' => 'NO', 'GCC_GENERATE_TEST_COVERAGE_FILES' => 'NO',
+      'GCC_INSTRUMENT_PROGRAM_FLOW_ARCS' => 'NO', 'ENABLE_TESTABILITY' => 'NO'
+    })
+  end
 end
 project.targets.each do |other|
   next unless other.product_type == 'com.apple.product-type.app-extension'

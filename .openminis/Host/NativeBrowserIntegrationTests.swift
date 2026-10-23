@@ -5,23 +5,77 @@ import WebKit
 
 @MainActor
 final class NativeBrowserIntegrationTests: XCTestCase {
-    func testProfileSwitchDismissesTheOriginalPendingBrowserPermissionCard() async throws {
+    func testProfileSwitchCancelsInlineBrowserApproval() async throws {
         let (browser, root) = model()
         defer { try? FileManager.default.removeItem(at: root) }
         let bridge = NativeBrowserSession(browser: browser)
-        browser.agent = bridge
-        ZEUSNativeAgentBridge.shared.bind(bridge)
-        let call = Task { try await bridge.execute(operation: "browser_tabs", arguments: "{}", sessionID: nil) }
-        let deadline = Date().addingTimeInterval(5)
-        while OffloadPermissionManager.shared.pendingRequest == nil, Date() < deadline {
-            try await Task.sleep(for: .milliseconds(20))
-        }
-        let request = try XCTUnwrap(OffloadPermissionManager.shared.pendingRequest)
-        XCTAssertTrue(OffloadPermissionManager.allCommands.contains { $0.name == request.commandName })
+        browser.agent = bridge; ZEUSNativeAgentBridge.shared.bind(bridge)
+        let permissions = ZeusToolPermissions.shared, previous = permissions.mode
+        permissions.mode = .askAll; defer { permissions.mode = previous }
+        let id = UUID()
+        let call = Task { try await permissions.authorize(tool: "zeus_browser", args: ["operation": "browser_tabs"], sessionID: "test", blockID: id) }
+        while permissions.requests[id] == nil { try await Task.sleep(for: .milliseconds(10)) }
         let second = browser.profiles.add(name: "Second", accent: "white", isPrivate: false)
         await browser.switchProfile(to: second)
-        XCTAssertNil(OffloadPermissionManager.shared.pendingRequest)
-        do { _ = try await call.value; XCTFail("Old approval must be cancelled immediately") } catch {}
+        XCTAssertNil(permissions.requests[id])
+        do { try await call.value; XCTFail("Old approval must be cancelled immediately") } catch {}
+    }
+    func testPermissionModesAndConcurrentRequestsStayIndependent() async throws {
+        let permissions = ZeusToolPermissions.shared, previous = permissions.mode
+        defer { permissions.mode = previous }
+        permissions.mode = .consequential
+        try await permissions.authorize(tool: "zeus_browser", args: ["operation": "browser_read"], sessionID: "test", blockID: UUID())
+        XCTAssertFalse(ZeusToolPermissions.isConsequential(tool: "zeus_browser", args: ["operation": "browser_settings", "action": "read"]))
+        XCTAssertTrue(ZeusToolPermissions.isConsequential(tool: "zeus_browser", args: ["operation": "browser_settings", "action": "set"]))
+        XCTAssertTrue(ZeusToolPermissions.isConsequential(tool: "shell_execute", args: ["command": "rm file"]))
+        permissions.mode = .askAll
+        let first = UUID(), second = UUID()
+        let a = Task { try await permissions.authorize(tool: "file_read", args: [:], sessionID: "test", blockID: first) }
+        let b = Task { try await permissions.authorize(tool: "file_read", args: [:], sessionID: "test", blockID: second) }
+        while permissions.requests.count < 2 { try await Task.sleep(for: .milliseconds(10)) }
+        permissions.respond(first, allowed: false)
+        XCTAssertNotNil(permissions.requests[second])
+        permissions.respond(second, allowed: true)
+        do { try await a.value; XCTFail("Denied call must not execute") } catch {}
+        try await b.value
+        permissions.mode = .unrestricted
+        try await permissions.authorize(tool: "shell_execute", args: ["command": "true"], sessionID: "test", blockID: UUID())
+        XCTAssertTrue(permissions.requests.isEmpty)
+    }
+    func testBrowserToolAcceptsFlatAndLegacyObjectsAndRejectsInvalidFields() throws {
+        let flat = try ZEUSNativeAgentBridge.normalizedInput(["operation": "browser_open", "url": "https://example.com", "new_tab": "false"])
+        XCTAssertEqual(flat.0, "browser_open")
+        XCTAssertTrue(flat.1.contains("false"))
+        let legacy = try ZEUSNativeAgentBridge.normalizedInput(["operation": "browser_open", "arguments": ["url": "https://example.com", "new_tab": false]])
+        XCTAssertEqual(flat.1, legacy.1)
+        XCTAssertThrowsError(try ZEUSNativeAgentBridge.normalizedInput(["operation": "browser_open"]))
+        XCTAssertThrowsError(try ZEUSNativeAgentBridge.normalizedInput(["operation": "browser_read", "selector_typo": "a"]))
+        XCTAssertThrowsError(try ZEUSNativeAgentBridge.normalizedInput(["operation": "browser_cookies", "action": "removeAll"]))
+        XCTAssertThrowsError(try ZEUSNativeAgentBridge.normalizedInput(["operation": "browser_open", "url": "https://a.test", "arguments": ["url": "https://b.test"]]))
+    }
+    func testParallelBrowserCallsAreSerializedRatherThanRandomlyRejected() async throws {
+        let (browser, root) = model(); defer { try? FileManager.default.removeItem(at: root) }
+        let bridge = NativeBrowserSession(browser: browser)
+        bridge.authorization = { _ in try? await Task.sleep(for: .milliseconds(50)); return true }
+        async let first = bridge.execute(operation: "browser_tabs", arguments: "{}", sessionID: nil)
+        async let second = bridge.execute(operation: "browser_tabs", arguments: "{}", sessionID: nil)
+        let results = try await [first, second]
+        XCTAssertEqual(results.count, 2)
+        XCTAssertTrue(results.allSatisfy { $0.text.contains("tab_id=") })
+    }
+    func testSettingsToolsPersistRealSettingsAndValidateBeforeWriting() async throws {
+        let (browser, root) = model(); defer { try? FileManager.default.removeItem(at: root) }
+        _ = try await NativeBrowserControl.execute("browser_settings", args: ["action": "set", "key": "shieldsEnabled", "value": "false"], browser: browser)
+        XCTAssertFalse(browser.data.settings.shieldsEnabled)
+        XCTAssertFalse(browser.profiles.load(browser.profile).settings.shieldsEnabled)
+        do { _ = try await NativeBrowserControl.execute("browser_settings", args: ["action": "set", "key": "textScale", "value": "99"], browser: browser); XCTFail("Invalid value accepted") } catch {}
+        XCTAssertEqual(browser.data.settings.textScale, 1)
+        let read = try await NativeBrowserControl.execute("browser_settings", args: ["action": "read"], browser: browser)
+        XCTAssertTrue(read.contains("advanced.forceDarkWebPages"))
+        _ = try await NativeBrowserControl.execute("browser_profiles", args: ["action": "create", "name": "Agent created"], browser: browser)
+        let target = try XCTUnwrap(browser.profiles.profiles.first { $0.name == "Agent created" })
+        _ = try await NativeBrowserControl.execute("browser_profiles", args: ["action": "update", "profile_id": target.id.uuidString, "key": "name", "value": "\"Updated profile\""], browser: browser)
+        XCTAssertEqual(browser.profiles.profile(target.id)?.name, "Updated profile")
     }
     func testOriginalAgentTransportStreamsLongUnicodeAnswerWithoutDroppingTheTail() async throws {
         let model = LLMModel(id: "fixture-native-stream", displayName: "Native stream fixture", provider: "openai")
@@ -66,6 +120,12 @@ final class NativeBrowserIntegrationTests: XCTestCase {
         XCTAssertTrue(dom.contains("Real chapter text"))
         let evaluated = try await NativeBrowserInspector.execute("browser_evaluate", args: ["code": "document.querySelector('#chapter').textContent='Changed by real JavaScript'; return document.querySelector('#chapter').textContent"], view: view)
         XCTAssertTrue(evaluated.contains("Changed by real JavaScript"))
+        let node = try await NativeBrowserInspector.execute("browser_evaluate", args: ["code": "return document.querySelector('#chapter')"], view: view)
+        XCTAssertTrue(node.contains("MAIN"))
+        let circular = try await NativeBrowserInspector.execute("browser_evaluate", args: ["code": "const a={n:123n};a.self=a;return a;"], view: view)
+        XCTAssertTrue(circular.contains("Circular")); XCTAssertTrue(circular.contains("123"))
+        do { _ = try await NativeBrowserInspector.execute("browser_evaluate", args: ["code": "throw Error('Fixture real failure')"], view: view); XCTFail("JS error must surface") } catch {}
+
         _ = try await NativeBrowserInspector.execute("browser_storage", args: ["area": "local", "action": "set", "key": "chapter", "value": "42"], view: view)
         let stored = try await NativeBrowserInspector.execute("browser_storage", args: ["area": "local", "action": "read", "key": "chapter"], view: view)
         XCTAssertTrue(stored.contains("42"))

@@ -81,7 +81,16 @@ private final class NativeToolCapture { var imageFilePath: String? }
         folder = browser.profiles.folder(for: browser.profile).appendingPathComponent("OpenMinis")
     }
     public func cancel() { invalidated = true; onInvalidated?() }
-    private static var tools: [BrowserAgentTools.Tool] { BrowserAgentTools.tools.filter { !$0.name.hasPrefix("memory_") } + NativeBrowserInspector.tools }
+    static var tools: [BrowserAgentTools.Tool] { BrowserAgentTools.tools.filter { !$0.name.hasPrefix("memory_") } + NativeBrowserInspector.tools + NativeBrowserControl.tools }
+    public static func validatedArguments(operation: String, json: String) throws -> String {
+        try NativeBrowserContract.arguments(operation: operation, json: json, tools: tools)
+    }
+    public static var operationNames: [String] { tools.map(\.name) }
+    public static var parameterSchemas: [String: [String: Any]] {
+        var result: [String: [String: Any]] = [:]
+        for tool in tools { for (key, schema) in tool.properties { if let schema = schema as? [String: Any] { result[key] = schema } } }
+        return result
+    }
     public static var catalog: String {
         let tools = Self.tools.map { ["type": "function", "function": ["name": $0.name, "description": $0.description,
             "parameters": ["type": "object", "properties": $0.properties, "required": $0.required, "additionalProperties": false]]] as [String: Any] }
@@ -89,17 +98,14 @@ private final class NativeToolCapture { var imageFilePath: String? }
     }
     public func execute(operation: String, arguments: String, sessionID: String?) async throws -> NativeBrowserToolResult {
         try validate()
-        guard !executing else { throw AgentFailure.message("Execute browser operations sequentially; another operation is still awaiting approval or completion.") }
+        // The upstream agent dispatches parallel tool calls. Serialize operations on
+        // the same WKWebView instead of rejecting otherwise valid calls.
+        while executing { try await Task.sleep(for: .milliseconds(50)); try validate() }
         executing = true; defer { executing = false }
-        guard arguments.utf8.count <= 100_000, !operation.hasPrefix("memory_"),
-              Self.tools.contains(where: { $0.name == operation }),
-              let bytes = arguments.data(using: .utf8),
-              (try JSONSerialization.jsonObject(with: bytes)) is [String: Any] else {
-            throw AgentFailure.message("Invalid browser operation or arguments")
-        }
-        let call = AgentToolCall(name: operation, arguments: arguments)
+        let normalized = try NativeBrowserContract.arguments(operation: operation, json: arguments, tools: Self.tools)
+        let call = AgentToolCall(name: operation, arguments: normalized)
         let destination = (call.object["url"] as? String).flatMap(URL.init(string:))?.host
-        let globalOperations = ["browser_tabs", "browser_profile", "browser_library", "browser_debug"]
+        let globalOperations = ["browser_tabs", "browser_profile", "browser_library", "browser_debug", "browser_help", "browser_settings", "browser_profiles"]
         let target = globalOperations.contains(operation) || operation == "browser_open" || operation == "browser_download" ? nil : try tab(call.object)
         let targetURL = target?.url
         let host = destination ?? targetURL.flatMap { URL(string: $0)?.host } ?? browser?.currentHost ?? ""
@@ -115,12 +121,15 @@ private final class NativeToolCapture { var imageFilePath: String? }
                 throw AgentFailure.message("تغيّر التبويب أثناء الموافقة؛ اطلب سياقًا وموافقة جديدين.")
             }
         }
-        authorizedHost = host.lowercased(); defer { authorizedHost = nil }
+        // Navigation/read operations may legitimately follow HTTP redirects. Bind
+        // sensitive origin inspection to the approved host, not ordinary reads.
+        authorizedHost = ["browser_evaluate", "browser_cookies", "browser_storage", "browser_dom", "browser_network"].contains(operation) ? host.lowercased() : nil
+        defer { authorizedHost = nil }
         approved.insert(call.id); defer { approved.remove(call.id) }
         selectedID = sessionID.flatMap(UUID.init(uuidString:))
         let capture = NativeToolCapture()
         let output = try await execute(call, block: capture)
-        try validate()
+        if operation != "browser_profiles" || call.object["action"] as? String != "switch" { try validate() }
         return NativeBrowserToolResult(text: output, imagePath: capture.imageFilePath)
     }
     private func validate() throws {
@@ -172,6 +181,8 @@ private final class NativeToolCapture { var imageFilePath: String? }
         guard let decoded = try? JSONSerialization.jsonObject(with: Data(call.arguments.utf8)), decoded is [String: Any] else { throw AgentFailure.message("مدخلات الأداة ليست JSON صالحًا.") }
         let args=call.object
         switch call.name{
+        case "browser_help", "browser_settings", "browser_profiles":
+            return try await NativeBrowserControl.execute(call.name, args: args, browser: browser)
         case "browser_debug":
             guard browser.profile.account?.allowDeveloperTools != false, let enabled = args["enabled"] as? Bool else { throw AccountError.permission }
             browser.data.settings.developerTools = enabled; browser.applySettings()
@@ -258,8 +269,8 @@ private final class NativeToolCapture { var imageFilePath: String? }
     const root=document.body||document.documentElement,out=[];let size=0;
     const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
     while(walker.nextNode()&&size<90000){const p=walker.currentNode.parentElement;if(!p||p.closest('script,style,noscript,input,textarea,select,[contenteditable=true]'))continue;const s=getComputedStyle(p),r=p.getBoundingClientRect();if(s.display==='none'||s.visibility==='hidden'||s.opacity==='0'||r.width===0||r.height===0||(!full&&(r.bottom<0||r.top>innerHeight*2)))continue;const t=(walker.currentNode.nodeValue||'').replace(/\s+/g,' ').trim();if(t){out.push(t);size+=t.length}}
-    const elements=new Map(),controls=[];
-    for(const e of document.querySelectorAll('a[href],button,input:not([type=hidden]),textarea,select,[role=button]')){if(controls.length>=120)break;const r=e.getBoundingClientRect(),s=getComputedStyle(e);if(!r.width||!r.height||r.bottom<0||r.top>innerHeight*2||s.visibility==='hidden')continue;const id=String(controls.length+1);elements.set(id,e);const field=['INPUT','TEXTAREA','SELECT'].includes(e.tagName);controls.push({element_id:id,tag:e.tagName,type:e.type||'',label:(e.getAttribute('aria-label')||(!field?e.innerText:'')||e.getAttribute('placeholder')||e.name||'').slice(0,180),href:e.tagName==='A'?e.href:undefined})}
+    const previous=window.__zeusAgentSnapshot;const elements=previous?.url===location.href?previous.elements:new Map(),controls=[];if(elements.size>2000)elements.clear();
+    for(const e of document.querySelectorAll('a[href],button,input:not([type=hidden]),textarea,select,[role=button]')){if(controls.length>=120)break;const r=e.getBoundingClientRect(),s=getComputedStyle(e);if(!r.width||!r.height||r.bottom<0||r.top>innerHeight*2||s.visibility==='hidden')continue;const id='e'+String(window.__zeusAgentElementSequence=(window.__zeusAgentElementSequence||0)+1);elements.set(id,e);const field=['INPUT','TEXTAREA','SELECT'].includes(e.tagName);controls.push({element_id:id,tag:e.tagName,type:e.type||'',label:(e.getAttribute('aria-label')||(!field?e.innerText:'')||e.getAttribute('placeholder')||e.name||'').slice(0,180),href:e.tagName==='A'?e.href:undefined})}
     window.__zeusAgentSnapshot={url:location.href,elements};return {url:location.href,title:document.title,text:out.join('\n').slice(0,90000),elements:controls,scroll_y:scrollY};
     """#
     static let interactScript = #"""

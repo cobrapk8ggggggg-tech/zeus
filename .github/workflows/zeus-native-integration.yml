@@ -3,6 +3,7 @@ name: ZEUS native browser integration tests
   push:
     branches:
     - build/zeus-unsigned-ipa-repair-20261023
+    - fix/zeus-agent-tools-permissions-20261023
     paths:
     - ZEUSNext/**
     - .openminis/**
