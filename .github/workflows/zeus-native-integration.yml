@@ -108,11 +108,14 @@ jobs:
         python3 - <<'PY'
         import json, os, subprocess
         devices = json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','-j']))['devices']
-        all_devices = [d for group in devices.values() for d in group]
+        types = json.loads(subprocess.check_output(['xcrun','simctl','list','devicetypes','-j']))['devicetypes']
         with open(os.environ['GITHUB_ENV'], 'a') as output:
             for kind in ['iPhone', 'iPad']:
-                match = next(d for d in all_devices if kind in d['name'])
-                output.write(kind.upper() + '_SIMULATOR=' + match['udid'] + '\n')
+                runtime, match = next((runtime, device) for runtime, group in devices.items() for device in group if kind in device['name'])
+                type_id = match.get('deviceTypeIdentifier') or next(t['identifier'] for t in types if t['name'] == match['name'])
+                name = 'ZEUS-' + kind + '-' + os.environ['GITHUB_RUN_ID']
+                identifier = subprocess.check_output(['xcrun','simctl','create',name,type_id,runtime], text=True).strip()
+                output.write(kind.upper() + '_SIMULATOR=' + identifier + '\n')
         PY
       timeout-minutes: 4
     - name: Start simulator boot before Swift compilation
