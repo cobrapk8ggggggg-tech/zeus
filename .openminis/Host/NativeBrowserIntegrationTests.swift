@@ -5,6 +5,35 @@ import WebKit
 
 @MainActor
 final class NativeBrowserIntegrationTests: XCTestCase {
+    func testNativeMCPUsesRealHTTPPaginationNestedSchemasAndIsolatedAccounts() async throws {
+        let key = "zeus.integration.fixture." + UUID().uuidString
+        defer { UserDefaults.standard.removeObject(forKey: key) }
+        let connections = ZeusConnections(storageKey: key)
+        let accounts = ["first", "second"].map { ZeusLinkedAccount(id: $0, provider: "github", label: $0, isDefault: $0 == "first", verified: false, toolCount: 0, linkedAt: Date()) }
+        connections.configureFixture(endpoint: URL(string: "http://127.0.0.1:8765/mcp-fixture")!, accounts: accounts)
+        XCTAssertThrowsError(try connections.account("missing", provider: "github"))
+        XCTAssertThrowsError(try connections.account("first", provider: "vercel"))
+        XCTAssertEqual(try connections.account(nil, provider: "github").id, "first")
+        async let first = connections.listTools("first")
+        async let second = connections.listTools("second")
+        let lists = try await [first, second]
+        XCTAssertEqual(lists.map(\.count), [2, 2])
+        XCTAssertTrue(connections.isReadOnly("first", tool: "fixture_read"))
+        XCTAssertFalse(connections.isReadOnly("first", tool: "fixture_write"))
+        do { _ = try await connections.call("first", name: "fixture_write", arguments: ["input": "malformed"]); XCTFail("Nested arguments must be rejected before HTTP mutation") } catch {}
+        let result = try await connections.call("second", name: "fixture_read", arguments: ["input": ["values": [1, 2, 3]]])
+        let text = ((result["content"] as? [[String: Any]])?.first?["text"] as? String) ?? ""
+        XCTAssertTrue(text.contains("second")); XCTAssertFalse(text.contains("first"))
+        connections.makeDefault("second")
+        XCTAssertEqual(try connections.account(nil, provider: "github").id, "second")
+        XCTAssertEqual(ZeusConnections(storageKey: key).accounts.count, 2)
+    }
+    func testIntegrationSchemasResolveReferencesAndNullableAlternatives() throws {
+        let shape: [String: Any] = ["type": "object", "$defs": ["id": ["type": "string", "pattern": "^[a-z]+$"]], "properties": ["ids": ["type": "array", "items": ["$ref": "#/$defs/id"]], "name": ["type": ["string", "null"]]], "required": ["ids", "name"], "additionalProperties": false]
+        try ZeusAgentSchemas.validate(["ids": ["alpha"], "name": NSNull()], schema: shape)
+        XCTAssertThrowsError(try ZeusAgentSchemas.validate(["ids": [12], "name": NSNull()], schema: shape))
+        XCTAssertThrowsError(try ZeusAgentSchemas.validate(["ids": ["UPPER"], "name": true], schema: shape))
+    }
     func testNativeRuntimeAcceptsNestedSchemasAndRejectsMalformedArguments() throws {
         let schema = try XCTUnwrap(ZeusAgentSchemas.schema("update_plan"))
         try ZeusAgentSchemas.validate(["plan": [["step": "Build", "status": "in_progress"]]], schema: schema)
@@ -76,12 +105,10 @@ final class NativeBrowserIntegrationTests: XCTestCase {
             XCTAssertTrue(FileManager.default.fileExists(atPath: SkillStore.shared.skillDirectoryURL(for: skill.id).appendingPathComponent("SKILL.md").path))
         }
     }
-    func testDirectIntegrationCatalogDoesNotRequireAProjectServer() async throws {
-        let plugins = ZeusPlugins.shared
-        await plugins.refresh()
-        XCTAssertEqual(Set(plugins.plugins.map(\.id)), ["github", "railway", "vercel"])
-        XCTAssertNil(plugins.error)
-        XCTAssertEqual(ZeusPlugins.directCatalog.first(where: { $0.0 == "github" })?.2, "https://api.githubcopilot.com/mcp/")
+    func testDirectIntegrationCatalogDoesNotRequireAProjectServer() throws {
+        XCTAssertEqual(Set(ZeusService.catalog.map(\.id)), ["github", "railway", "vercel"])
+        XCTAssertTrue(ZeusService.catalog.allSatisfy { URL(string: $0.endpoint)?.scheme == "https" })
+        XCTAssertEqual(ZeusService.catalog.first(where: { $0.id == "github" })?.endpoint, "https://api.githubcopilot.com/mcp/")
     }
     func testProgressTextAndQuotedJSONNeverBecomeToolCalls() async throws {
         let model = LLMModel(id: "fixture-native-progress-tool", displayName: "Progress fixture", provider: "openai")

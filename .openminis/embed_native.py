@@ -39,7 +39,7 @@ def embed(native, browser, report):
     # The application remains OpenMinis' original @main/AppDelegate/root setup;
     # its root content now embeds the browser with the original AI UI alongside.
     replace(source / "MinisApp.swift", "                ContentView()", "                ZEUSBrowserRootEntry()")
-    for name in ("ZEUSNativeIntegration.swift", "ZeusToolPermissions.swift", "ZeusProjects.swift", "ZeusPlugins.swift", "ZeusCodexAccount.swift", "ZeusDefaultSkills.swift", "ZeusAgentSchemas.swift", "ZeusPatch.swift", "ZeusAgentHarness.swift"):
+    for name in ("ZEUSNativeIntegration.swift", "ZeusToolPermissions.swift", "ZeusDefaultSkills.swift", "ZeusAgentSchemas.swift", "ZeusPatch.swift", "ZeusAgentHarness.swift", "ZeusConnections.swift"):
         shutil.copyfile(browser / ".openminis/Host" / name, source / name)
     # Reuse the exact native settings sheet from the browser's AI settings row.
     # Only its file-private visibility changes; its body is untouched.
@@ -98,7 +98,8 @@ def embed(native, browser, report):
 '''
     adapter += '''        case let name where ZeusAgentSchemas.names.contains(name):
             toolOutput = try await ZeusAgentHarness.shared.execute(name, args: toolArgs, callID: tu.id, vm: self)
-            if let object = try? JSONSerialization.jsonObject(with: Data(toolOutput.utf8)) as? [String: Any], let code = object["exit_code"] as? Int { toolSuccess = code == 0 }
+            if let object = try? JSONSerialization.jsonObject(with: Data(toolOutput.utf8)) as? [String: Any], object["isError"] as? Bool == true { toolSuccess = false }
+            else if let object = try? JSONSerialization.jsonObject(with: Data(toolOutput.utf8)) as? [String: Any], let code = object["exit_code"] as? Int { toolSuccess = code == 0 }
             else if name == "task_verify", let checks = try? JSONSerialization.jsonObject(with: Data(toolOutput.utf8)) as? [[String: Any]] { toolSuccess = checks.allSatisfy { $0["exitCode"] as? Int == 0 } }
             else { toolSuccess = true }
 
@@ -132,6 +133,14 @@ def embed(native, browser, report):
         '        var userSystemPrompt = baseSystemPrompt + "\\n\\n" + ZEUSNativeAgentBridge.context + ZeusAgentHarness.shared.context(session: sessionId)')
     replace(execution, "        let snapshotItem = ToolSnapshotItem(", "        ZeusAgentHarness.shared.observe(session: sessionId, tool: tu.name, success: toolSuccess)\n        let snapshotItem = ToolSnapshotItem(")
     replace(source / "Agent/Chat/AIChatViewModel.swift", "    func cancel() {", "    func cancel() {\n        ZeusAgentHarness.shared.cancel(session: sessionId)")
+    replace(source / "Agent/Chat/AIChatViewModel.swift", "    static let maxAgentTurns = 200", "    static var maxAgentTurns: Int { ZeusAgentHarness.maxTurns }")
+    replace(source / "Agent/Chat/AIChatViewModel.swift", "            defer { turnCount += 1 }", '''            defer { turnCount += 1 }
+            if let notice = ZeusAgentHarness.shared.budgetNotice(session: sessionId) {
+                if msgIdx >= 0, msgIdx < messages.count { messages[msgIdx].error = notice }
+                canResume = true; hitTurnLimit = false; break
+            }''')
+    replace(source / "Agent/Chat/AIChatViewModel.swift", "            let contextHistory = effectiveAgentHistory()", "            userSystemPrompt = ZeusAgentHarness.shared.refreshContext(userSystemPrompt, session: sessionId)\n            let contextHistory = effectiveAgentHistory()")
+    replace(source / "Agent/Chat/AIChatViewModel.swift", "                userSystemPrompt = baseSystemPrompt", '                userSystemPrompt = baseSystemPrompt + "\\n\\n" + ZEUSNativeAgentBridge.context')
     replace(source / "Agent/Chat/AIChatViewModel.swift", "                break\n            }\n\n            // Build assistant RawMessage now but defer DB write", '''                if !canResume, !Task.isCancelled, let reminder = ZeusAgentHarness.shared.continuation(session: sessionId) {
                     agentHistory.append(AgentMessage(role: .user, parts: [.text("<zeus_runtime_instruction source='application'>" + reminder + "</zeus_runtime_instruction>")]))
                     continue
@@ -144,8 +153,38 @@ def embed(native, browser, report):
     replace(openai, '                    "parameters": [\n                        "type": "object",\n                        "properties": properties,\n                        "required": tool.required,\n                    ] as [String: Any],', '                    "parameters": ZeusAgentSchemas.schema(tool.name) ?? ["type": "object", "properties": properties, "required": tool.required],')
     replace(openai, '                "parameters": [\n                    "type": "object",\n                    "properties": properties,\n                    "required": tool.required,\n                ] as [String: Any],', '                "parameters": ZeusAgentSchemas.schema(tool.name) ?? ["type": "object", "properties": properties, "required": tool.required],')
     replace(source / "Providers/Gemini/GeminiAgentProvider.swift", '                parameters: params\n', '                parameters: ZeusAgentSchemas.schema(tool.name).map(ZeusAgentSchemas.gemini) ?? params\n')
+    replace(source / "Providers/Antigravity/AntigravityAgentProvider.swift", '                parameters: params\n', '                parameters: ZeusAgentSchemas.schema(tool.name).map(ZeusAgentSchemas.gemini) ?? params\n')
     replace(source / "Providers/Anthropic/OAuthHTTPClient.swift", '        if let body = request.httpBody, !body.isEmpty { return }', '        if let body = request.httpBody, !body.isEmpty { ZeusAgentSchemas.patchAnthropic(request); return }')
     replace(source / "Providers/Anthropic/OAuthHTTPClient.swift", '        // Always set httpBody (even if empty) since the stream is now consumed\n        request.httpBody = data\n', '        // Always set httpBody (even if empty) since the stream is now consumed\n        request.httpBody = data\n        ZeusAgentSchemas.patchAnthropic(request)\n')
+    oauth = source / "Agent/Session/MCPOAuthController.swift"
+    replace(oauth, '    var scopes: String?\n', '    var scopes: String?\n    var prompt: String?\n')
+    replace(oauth, 'URLQueryItem(name: "prompt", value: "consent")', 'URLQueryItem(name: "prompt", value: oauth.prompt ?? "consent")')
+    replace(oauth, '        req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")', '        req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")\n        req.setValue("application/json", forHTTPHeaderField: "Accept")')
+    replace(oauth, '    // MARK: - Helpers\n', '''    // Native HTTP integrations share the original Keychain and OAuth flow.
+    static func refreshAccessTokenForZeus(server: String, oauth: MCPOAuthConfig) async throws -> String {
+        guard var stored = tokens(server: server) else { throw OAuthError.badConfig("أعد ربط الحساب عبر OAuth.") }
+        if stored.expiresAt == 0 || stored.expiresAt > Date().timeIntervalSince1970 + 60 { return stored.accessToken }
+        guard let refresh = stored.refreshToken, let url = URL(string: oauth.tokenEndpoint), url.scheme == "https" else { throw OAuthError.badConfig("انتهى التفويض؛ أعد ربط الحساب.") }
+        var form = ["grant_type": "refresh_token", "refresh_token": refresh, "client_id": oauth.clientId]
+        if let secret = clientSecret(server: server), !secret.isEmpty { form["client_secret"] = secret }
+        if let resource = resourceURI(server: server) { form["resource"] = resource }
+        var request = URLRequest(url: url); request.httpMethod = "POST"; request.timeoutInterval = 30
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.httpBody = form.map { "\\($0.key)=\\(formEncode($0.value))" }.joined(separator: "&").data(using: .utf8)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+              let object = try JSONSerialization.jsonObject(with: data) as? [String: Any], let access = object["access_token"] as? String else { throw OAuthError.exchangeFailed("تعذر تجديد الحساب؛ أعد تسجيل الدخول.") }
+        stored.accessToken = access
+        stored.refreshToken = object["refresh_token"] as? String ?? stored.refreshToken
+        stored.expiresAt = Date().timeIntervalSince1970 + ((object["expires_in"] as? NSNumber)?.doubleValue ?? 3600)
+        keychainSet(try JSONEncoder().encode(stored), account: "\\(server)#tokens")
+        materializeBridge(server: server, oauth: oauth, tokens: stored)
+        return access
+    }
+
+    // MARK: - Helpers
+''')
     # The card is inserted into the ORIGINAL self-sizing tool cell. The original
     # transcript/composer/Markdown remain unchanged; only this extension is new.
     list_file = source / "Agent/MessageList/CollectionViewMessageListV3.swift"
@@ -222,7 +261,13 @@ def embed(native, browser, report):
 
     # Existing DEBUG RPC only, restricted to explicit isolated fixture launches.
     # These cases are compiled out of Release together with the upstream server.
-    replace(source / "Debug/DebugJSONRPC.swift", '        case "rpc.discover":', '''        case "zeus.fixture.approvals":
+    replace(source / "Debug/DebugJSONRPC.swift", '        case "rpc.discover":', '''        case "zeus.fixture.permission":
+            guard CommandLine.arguments.contains("--zeus-native-fixture"), let raw = params["mode"] as? String, let mode = ZeusPermissionMode(rawValue: raw) else { throw RPCError(code: -32602, message: "Isolated fixture mode required") }
+            return await MainActor.run { ZeusToolPermissions.shared.mode = mode; return ["mode": raw] }
+        case "zeus.fixture.task":
+            guard CommandLine.arguments.contains("--zeus-native-fixture"), let session = params["sessionId"] as? String else { throw RPCError(code: -32602, message: "Isolated fixture and session required") }
+            return await MainActor.run { ZeusAgentHarness.shared.context(session: session) }
+        case "zeus.fixture.approvals":
             guard CommandLine.arguments.contains("--zeus-native-fixture") else { throw RPCError(code: -32601, message: "Fixture launch required") }
             return await MainActor.run {
                 ["requests": ZeusToolPermissions.shared.requests.values.map {

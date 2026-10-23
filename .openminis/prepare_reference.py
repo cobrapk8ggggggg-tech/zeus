@@ -11,6 +11,7 @@ from pathlib import Path
 import subprocess
 import xml.etree.ElementTree as ET
 from debug_fixture import prepare_fixture
+from patch_ish import patch as patch_ish
 
 
 def prepare(root: Path, sdk: str) -> dict:
@@ -18,6 +19,7 @@ def prepare(root: Path, sdk: str) -> dict:
     actual = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
     if actual != expected["commit"]:
         raise RuntimeError(f"Source revision mismatch: {actual}")
+    patch_ish(root)
     manifest = {}
     for file in sorted((root / "src/ios").rglob("*")):
         if file.is_file() and ".xcodeproj" not in str(file.relative_to(root)):

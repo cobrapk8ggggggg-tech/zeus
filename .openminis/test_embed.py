@@ -2,6 +2,7 @@
 import hashlib
 import importlib.util
 import json
+import os
 import re
 from pathlib import Path
 import shutil
@@ -13,7 +14,7 @@ HERE = Path(__file__).parent
 SPEC = importlib.util.spec_from_file_location("embed_native", HERE / "embed_native.py")
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
-UPSTREAM = HERE.parent / "Vendor/OpenMinis"
+UPSTREAM = Path(os.environ.get("ZEUS_OPENMINIS_SOURCE", HERE.parent / "Vendor/OpenMinis"))
 
 
 class NativeEmbeddingTests(unittest.TestCase):

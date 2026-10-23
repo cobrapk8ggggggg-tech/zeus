@@ -4,11 +4,18 @@ import CoreFoundation
 /// Provider-independent JSON schemas for the native execution runtime.
 /// These are real nested schemas, not JSON encoded inside string parameters.
 enum ZeusAgentSchemas {
-    static let names: Set<String> = ["update_plan", "apply_patch", "exec_command", "write_stdin", "task_checkpoint", "task_verify", "task_complete"]
+    static let names: Set<String> = ["update_plan", "apply_patch", "exec_command", "write_stdin", "task_checkpoint", "task_verify", "task_complete", "integration_accounts", "integration_tools", "integration_call"]
     static func schema(_ name: String) -> [String: Any]? {
         var fields: [String: Any] = ["tool_title": ["type": "string"], "approval_reason": ["type": "string"]]
         var requiredFields: [String] = []
         switch name {
+        case "integration_accounts": break
+        case "integration_tools":
+            fields["account_id"] = ["type": "string"]; fields["provider"] = ["type": "string", "enum": ["github", "railway", "vercel"]]
+            fields["query"] = ["type": "string"]; fields["limit"] = ["type": "integer", "minimum": 1, "maximum": 50]
+        case "integration_call":
+            fields["account_id"] = ["type": "string"]; fields["tool_name"] = ["type": "string"]
+            fields["arguments"] = ["type": "object", "additionalProperties": true]; requiredFields = ["account_id", "tool_name", "arguments"]
         case "update_plan":
             fields.merge(["explanation": ["type": "string"], "goal": ["type": "string"], "plan": ["type": "array", "minItems": 1, "maxItems": 30,
                 "items": ["type": "object", "properties": ["step": ["type": "string", "minLength": 1], "status": ["type": "string", "enum": ["pending", "in_progress", "completed"]]], "required": ["step", "status"], "additionalProperties": false]], "verification_commands": ["type": "array", "maxItems": 15, "items": ["type": "string", "minLength": 1]]]) { _, b in b }; requiredFields = ["plan"]
@@ -28,27 +35,55 @@ enum ZeusAgentSchemas {
         }
         return ["type": "object", "properties": fields, "required": requiredFields, "additionalProperties": false]
     }
-    static func validate(_ value: Any, schema: [String: Any], path: String = "arguments") throws {
+    static func validate(_ value: Any, schema: [String: Any], path: String = "arguments", root: [String: Any]? = nil, depth: Int = 0) throws {
         func invalid(_ why: String) -> NSError { NSError(domain: "ZeusSchema", code: 1, userInfo: [NSLocalizedDescriptionKey: "INVALID_ARGUMENTS: \(path): \(why). Nothing was executed; correct the structured call."]) }
-        if let options = schema["enum"] as? [String], let string = value as? String, !options.contains(string) { throw invalid("expected one of \(options.joined(separator: ", "))") }
+        guard depth <= 64 else { throw invalid("schema nesting exceeds the limit") }
+        let root = root ?? schema
+        if let reference = schema["$ref"] as? String {
+            guard reference.hasPrefix("#/") else { throw invalid("external schema references are not supported") }
+            var target: Any = root
+            for part in reference.dropFirst(2).split(separator: "/") {
+                let key = String(part).replacingOccurrences(of: "~1", with: "/").replacingOccurrences(of: "~0", with: "~")
+                guard let next = (target as? [String: Any])?[key] else { throw invalid("unresolved schema reference") }; target = next
+            }
+            guard let shape = target as? [String: Any] else { throw invalid("invalid schema reference") }
+            try validate(value, schema: shape, path: path, root: root, depth: depth + 1)
+        }
+        if let types = schema["type"] as? [String] {
+            for type in types { var shape = schema; shape["type"] = type; if (try? validate(value, schema: shape, path: path, root: root, depth: depth + 1)) != nil { return } }
+            throw invalid("value does not match the allowed types")
+        }
+        for keyword in ["anyOf", "oneOf", "allOf"] {
+            if let shapes = schema[keyword] as? [[String: Any]] {
+                let matched = shapes.filter { (try? validate(value, schema: $0, path: path, root: root, depth: depth + 1)) != nil }.count
+                guard keyword == "allOf" ? matched == shapes.count : keyword == "oneOf" ? matched == 1 : matched > 0 else { throw invalid("value does not satisfy \(keyword)") }
+            }
+        }
+        if let options = schema["enum"] as? [Any] {
+            let encoded = try JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed, .sortedKeys])
+            guard options.contains(where: { (try? JSONSerialization.data(withJSONObject: $0, options: [.fragmentsAllowed, .sortedKeys])) == encoded }) else { throw invalid("value is outside the enum") }
+        }
         switch schema["type"] as? String {
+        case "null": guard value is NSNull else { throw invalid("expected null") }
         case "object":
             guard let object = value as? [String: Any] else { throw invalid("expected an object") }
             let properties = schema["properties"] as? [String: [String: Any]] ?? [:]
-            for key in schema["required"] as? [String] ?? [] where object[key] == nil || object[key] is NSNull { throw invalid("missing \(key)") }
+            for key in schema["required"] as? [String] ?? [] where object[key] == nil { throw invalid("missing \(key)") }
             for (key, child) in object {
-                if let shape = properties[key] { try validate(child, schema: shape, path: path + "." + key) }
+                if let shape = properties[key] { try validate(child, schema: shape, path: path + "." + key, root: root, depth: depth + 1) }
+                else if let shape = schema["additionalProperties"] as? [String: Any] { try validate(child, schema: shape, path: path + "." + key, root: root, depth: depth + 1) }
                 else if schema["additionalProperties"] as? Bool == false { throw invalid("unknown field \(key)") }
             }
         case "array":
             guard let array = value as? [Any] else { throw invalid("expected an array, not an encoded JSON string") }
             if let n = schema["minItems"] as? Int, array.count < n { throw invalid("needs at least \(n) items") }
             if let n = schema["maxItems"] as? Int, array.count > n { throw invalid("too many items") }
-            if let shape = schema["items"] as? [String: Any] { for (i, item) in array.enumerated() { try validate(item, schema: shape, path: "\(path)[\(i)]") } }
+            if let shape = schema["items"] as? [String: Any] { for (i, item) in array.enumerated() { try validate(item, schema: shape, path: "\(path)[\(i)]", root: root, depth: depth + 1) } }
         case "string":
             guard let string = value as? String else { throw invalid("expected a string") }
             if let n = schema["minLength"] as? Int, string.count < n { throw invalid("string is too short") }
             if let n = schema["maxLength"] as? Int, string.count > n { throw invalid("string is too long") }
+            if let pattern = schema["pattern"] as? String, try NSRegularExpression(pattern: pattern).firstMatch(in: string, range: NSRange(string.startIndex..., in: string)) == nil { throw invalid("string does not match the schema pattern") }
         case "integer", "number":
             guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(), number.doubleValue.isFinite else { throw invalid("expected a finite number") }
             let n = number.doubleValue

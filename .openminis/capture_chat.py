@@ -7,9 +7,11 @@ import argparse
 import json
 from pathlib import Path
 import plistlib
+import shutil
 import subprocess
 import time
 import urllib.request
+import uuid
 
 
 def run(*arguments, check=True):
@@ -38,6 +40,7 @@ def capture(device, bundle, output):
     settings["debug.auth.required"] = False
     settings["appearanceMode"] = 2
     settings["appLanguage"] = "ar"
+    settings["loggingEnabled"] = True
     settings["zeus.agent.permissionMode"] = "consequential"
     preferences.parent.mkdir(parents=True, exist_ok=True)
     preferences.write_bytes(plistlib.dumps(settings, fmt=plistlib.FMT_BINARY))
@@ -71,6 +74,18 @@ def capture(device, bundle, output):
         (output / "blocks-diff.json").write_text(json.dumps(rpc("chat.session.blocksDiff", {"sessionId": session}), ensure_ascii=False, indent=2))
         (output / "view-tree.json").write_text(json.dumps(rpc("debug.viewTree", {"maxDepth": 20}), ensure_ascii=False, indent=2))
         if bundle != "com.openminis.app":
+            harness = rpc("provider.models.add", {"instanceId": instance["id"], "modelId": "fixture-native-harness-" + uuid.uuid4().hex, "displayName": "Project execution fixture", "contextWindow": 128000, "maxOutputTokens": 4000})
+            rpc("zeus.fixture.permission", {"mode": "unrestricted"})
+            try:
+                project = rpc("chat.prompt", {"prompt": "أنشئ مشروع اختبار فعلياً، شغّل الفحص، أصلح الخطأ ثم تحقق منه قبل الإكمال.", "modelEntryId": harness["id"], "thinkingLevel": "off", "wait": True, "waitTimeout": 180}, timeout=200)
+                if "NATIVE_HARNESS_VERIFIED" not in project.get("responseText", ""):
+                    raise RuntimeError("The original model/tool loop did not finish the real project fixture")
+                state = rpc("zeus.fixture.task", {"sessionId": project["sessionId"]})
+                if '"status":"completed"' not in state or '"exit_code":0' not in state:
+                    raise RuntimeError("Native project completion has no passing verification evidence")
+                (output / "native-project-result.json").write_text(json.dumps({"conversation": project, "state": state}, ensure_ascii=False, indent=2))
+            finally:
+                rpc("zeus.fixture.permission", {"mode": "consequential"})
             critical = rpc("provider.models.add", {"instanceId": instance["id"], "modelId": "fixture-native-approval", "displayName": "Approval fixture", "contextWindow": 128000, "maxOutputTokens": 2000})
             pending = rpc("chat.prompt", {"prompt": "فعّل الصفحات الداكنة بعد عرض الموافقة داخل المحادثة.", "modelEntryId": critical["id"], "thinkingLevel": "off", "wait": False})
             session = pending["sessionId"]
@@ -105,6 +120,13 @@ def capture(device, bundle, output):
             time.sleep(1.5)
             run("xcrun", "simctl", "io", device, "screenshot", str(output / (route.replace("/", "-") + ".png")))
     finally:
+        logs = container / "Library/Logs"
+        if logs.exists():
+            shutil.copytree(logs, output / "application-logs", dirs_exist_ok=True)
+        diagnostics = Path.home() / "Library/Logs/DiagnosticReports"
+        for crash in diagnostics.glob("*.ips"):
+            if crash.name.startswith(("ZEUS", "Minis")):
+                shutil.copy2(crash, output / crash.name)
         run("xcrun", "simctl", "terminate", device, bundle, check=False)
         current = plistlib.loads(preferences.read_bytes()) if preferences.exists() else settings
         if prior is None:

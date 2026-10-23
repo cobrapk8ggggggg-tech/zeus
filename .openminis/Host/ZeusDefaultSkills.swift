@@ -24,7 +24,7 @@ import SwiftUI
         busy = true; defer { busy = false }
         do {
             guard let root = Bundle.main.url(forResource: "ZEUSDefaultSkills", withExtension: nil) else {
-                throw ZeusProjects.shared.failure("ملفات المهارات الافتراضية غير موجودة في هذه النسخة.")
+                throw ZeusPatch.failure("ملفات المهارات الافتراضية غير موجودة في هذه النسخة.")
             }
             let catalog = try JSONDecoder().decode(Catalog.self, from: Data(contentsOf: root.appendingPathComponent("manifest.json")))
             entries = catalog.skills

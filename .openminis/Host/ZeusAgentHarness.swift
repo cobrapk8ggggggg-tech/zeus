@@ -19,9 +19,11 @@ import CryptoKit
         var started = Date()
         var updated = Date()
         var ledger: [String: String] = [:]
+        var commands: [String: String]? = [:]
     }
     struct Job: Identifiable {
         let id: String; let owner: String; let command: String
+        let started = Date()
         var output = ""; var baseOffset = 0; var exitCode: Int?; var error: String?
         var task: Task<Void, Never>?
     }
@@ -52,8 +54,25 @@ import CryptoKit
     }
     static func json(_ value: Any) throws -> String { String(decoding: try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys, .fragmentsAllowed]), as: UTF8.self) }
     static func quote(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'" }
+    static var maxTurns: Int { let n = UserDefaults.standard.integer(forKey: "zeus.agent.maxTurns"); return n == 0 ? 500 : min(max(n, 100), 2000) }
+    static var maxHours: Int { let n = UserDefaults.standard.integer(forKey: "zeus.agent.maxHours"); return n == 0 ? 2 : min(max(n, 1), 12) }
+    func budgetNotice(session: String?) -> String? {
+        guard let session else { return nil }
+        var value = state(session)
+        guard value.status == "running", !value.plan.isEmpty, Date().timeIntervalSince(value.started) >= Double(Self.maxHours * 3600) else { return nil }
+        value.status = "waiting_user"; value.checkpoint = "بلغت المهمة حد الوقت المحدد؛ التقدم محفوظ، ويمكن متابعة المهمة."; try? save(session, value)
+        return value.checkpoint
+    }
+    func refreshContext(_ prompt: String, session: String?) -> String {
+        var prompt = prompt
+        if let begin = prompt.range(of: "<zeus_task_state>"), let end = prompt.range(of: "</zeus_task_state>", range: begin.upperBound..<prompt.endIndex) { prompt.removeSubrange(begin.lowerBound..<end.upperBound) }
+        return prompt + context(session: session)
+    }
     static var definitions: [AgentToolDefinition] {
         let descriptions = [
+            "integration_accounts": "List the real linked integration accounts, IDs and default selections. Never invent an account or copy credentials into a message.",
+            "integration_tools": "Discover a linked account's actual MCP tools directly from this device. Without query returns names/descriptions; with query (a tool name or distinctive keyword) returns matching complete input schemas, limit default 10. Use account_id or provider. No Zeus/Codex server is needed.",
+            "integration_call": "Invoke a real tool for the specified linked account. Read integration_tools first, use its exact tool_name and a structured arguments OBJECT matching its inputSchema. The runtime validates the schema and does not replay an uncertain write.",
             "update_plan": "Create/update this conversation's real task plan. plan is an ARRAY of {step,status}; at most one in_progress step. Work yourself using the selected chat provider; never delegate to Codex. Use task_complete only after real verification.",
             "apply_patch": "Apply a context-checked multi-file patch to this device's project. Grammar: *** Begin Patch, *** Add File: relative/path with +lines; *** Update File: relative/path with @@ and context/+/− lines; *** Delete File: relative/path; optional *** Move to: relative/path; *** End Patch. Read files first. All paths/hunks validate before writes; ambiguous context is rejected.",
             "exec_command": "Start a REAL shell command in this conversation's local Linux environment. Returns a session_id and available output after yield_time_ms; use write_stdin to poll. workdir defaults to /var/minis/workspace. No Codex account/server is used. For interactive stdin use the original terminal tool; this tool captures noninteractive commands.",
@@ -81,7 +100,7 @@ import CryptoKit
         guard let session else { return nil }
         var value = state(session)
         guard value.status == "running", !value.plan.isEmpty, value.noToolContinuations < 2,
-              Date().timeIntervalSince(value.started) < 7200 else { return nil }
+              Date().timeIntervalSince(value.started) < Double(Self.maxHours * 3600) else { return nil }
         value.noToolContinuations += 1; try? save(session, value)
         return "Runtime continuation: this task is still active. A progress message is not completion. Inspect task_checkpoint, continue the pending steps using real structured tool calls, run task_verify, then task_complete. If blocked, record the actual blocker with task_complete(status:blocked). Do not repeat an uncertain mutation; inspect its result first."
     }
@@ -113,6 +132,7 @@ import CryptoKit
         if ["apply_patch", "exec_command", "task_verify"].contains(name) { try await prepareEnvironment(vm: vm) }
         let output = try await dispatch(name, args: args, session: session, vm: vm)
         results[session + ":" + callID] = output
+        if results.count > 100, let oldest = results.keys.first { results.removeValue(forKey: oldest) }
         return output
     }
     func prepareEnvironment(vm: AIChatViewModel) async throws {
@@ -128,11 +148,22 @@ import CryptoKit
     private func dispatch(_ name: String, args: [String: Any], session: String, vm: AIChatViewModel) async throws -> String {
         var value = state(session)
         switch name {
+        case "integration_accounts": return try Self.json(["accounts": ZeusConnections.shared.accountSummary()])
+        case "integration_tools":
+            let account = try ZeusConnections.shared.account(args["account_id"] as? String, provider: args["provider"] as? String)
+            let all = try await ZeusConnections.shared.listTools(account.id), query = args["query"] as? String ?? ""
+            let filtered = query.isEmpty ? all : all.filter { (($0["name"] as? String ?? "") + " " + ($0["description"] as? String ?? "")).localizedCaseInsensitiveContains(query) }
+            let selected: [[String: Any]] = query.isEmpty ? filtered.map { ["name": $0["name"] ?? "", "description": String(($0["description"] as? String ?? "").prefix(240))] } : Array(filtered.prefix(args["limit"] as? Int ?? 10))
+            return try Self.json(["account_id": account.id, "matching_tools": filtered.count, "tools": selected, "schema_hint": "Use query with an exact tool name to fetch its full inputSchema before calling it."])
+        case "integration_call":
+            let account = try ZeusConnections.shared.account(args["account_id"] as? String)
+            return try Self.json(try await ZeusConnections.shared.call(account.id, name: args["tool_name"] as! String, arguments: args["arguments"] as! [String: Any]))
         case "update_plan":
             let data = try JSONSerialization.data(withJSONObject: args["plan"]!)
             let plan = try JSONDecoder().decode([Step].self, from: data)
             guard plan.filter({ $0.status == "in_progress" }).count <= 1 else { throw ZeusPatch.failure("Only one plan step can be in_progress.") }
-            if value.status != "running" { value.started = Date(); value.checks = []; value.verificationCommands = []; value.generation = 0 }
+            if value.plan.isEmpty || value.status != "running" { value.started = Date() }
+            if value.status == "completed" { value.checks = []; value.verificationCommands = []; value.generation = 0 }
             if let commands = args["verification_commands"] as? [String], !commands.isEmpty {
                 guard value.verificationCommands.isEmpty || Set(value.verificationCommands).isSubset(of: Set(commands)) else { throw ZeusPatch.failure("Verification checks cannot be removed or weakened during an active task.") }
                 value.verificationCommands = commands
@@ -170,6 +201,10 @@ import CryptoKit
             return "Applied verified patch to \(changes.count) file(s):\n" + changes.map(\.path).joined(separator: "\n")
         case "exec_command":
             let command = args["cmd"] as! String, cwd = try directory(args), id = UUID().uuidString
+            guard jobs.values.filter({ $0.owner == session && $0.exitCode == nil }).count < 8 else { throw ZeusPatch.failure("Eight commands are already running. Poll or finish them before starting more.") }
+            let finished = jobs.values.filter({ $0.exitCode != nil }).sorted { $0.started < $1.started }
+            for old in finished.prefix(max(0, finished.count - 24)) { jobs.removeValue(forKey: old.id) }
+            value.commands = value.commands ?? [:]; value.commands?[id] = "running: started " + Date().ISO8601Format()
             value.generation += 1; try save(session, value)
             jobs[id] = Job(id: id, owner: session, command: command)
             let task = Task { @MainActor [weak self] in
@@ -178,9 +213,11 @@ import CryptoKit
                     guard var job = self?.jobs[id] else { return }
                     if job.output.isEmpty { job.output = String(result.output.suffix(100000)) }
                     job.exitCode = result.exitCode; job.task = nil; self?.jobs[id] = job
+                    self?.recordCommand(id, session: session, result: "exit_code=\(result.exitCode)")
                 } catch {
                     guard var job = self?.jobs[id] else { return }
                     job.error = error.localizedDescription; job.exitCode = -1; job.task = nil; self?.jobs[id] = job
+                    self?.recordCommand(id, session: session, result: "interrupted: " + error.localizedDescription)
                 }
             }
             jobs[id]?.task = task
@@ -239,6 +276,9 @@ import CryptoKit
         if job.output.count > 100000 { let excess = job.output.count - 100000; job.baseOffset += excess; job.output = String(job.output.suffix(100000)) }
         jobs[id] = job
     }
+    private func recordCommand(_ id: String, session: String, result: String) {
+        var value = state(session); value.commands = value.commands ?? [:]; value.commands?[id] = String(result.prefix(1000)); try? save(session, value)
+    }
     private func result(job id: String, session: String, offset: Int, limit: Int) throws -> String {
         guard let job = jobs[id], job.owner == session else { throw ZeusPatch.failure("Unknown command session.") }
         let start = min(max(offset - job.baseOffset, 0), job.output.count)
@@ -251,11 +291,14 @@ import CryptoKit
         return try Self.json(["goal": value.goal, "status": value.status, "generation": value.generation, "checkpoint": value.checkpoint,
             "plan": value.plan.map { ["step": $0.step, "status": $0.status] }, "verification_commands": value.verificationCommands,
             "checks": value.checks.map { ["command": $0.command, "exit_code": $0.exitCode, "generation": $0.generation] as [String: Any] },
-            "recorded_tool_calls": value.ledger.count, "local_commands": jobs.values.filter { $0.owner == session }.map { ["session_id": $0.id, "running": $0.exitCode == nil] as [String: Any] }])
+            "recorded_tool_calls": value.ledger.count, "command_records": (value.commands ?? [:]).mapValues { $0.hasPrefix("running:") ? "Possibly interrupted after restart; inspect process/files before retrying. " + $0 : $0 },
+            "local_commands": jobs.values.filter { $0.owner == session }.map { ["session_id": $0.id, "running": $0.exitCode == nil] as [String: Any] }])
     }
 }
 
 struct ZeusAgentRuntimeSettings: View {
+    @AppStorage("zeus.agent.maxTurns") private var maxTurns = 500
+    @AppStorage("zeus.agent.maxHours") private var maxHours = 2
     var body: some View {
         List {
             Section("المزوّد والنموذج") {
@@ -264,6 +307,11 @@ struct ZeusAgentRuntimeSettings: View {
             }
             Section("قدرات الوكيل") {
                 ForEach(["خطة محفوظة لكل محادثة", "رقع متعددة الملفات مع تحقق السياق", "جلسات أوامر ومتابعة المخرجات", "اختبارات فعلية قبل إعلان الإكمال", "نقاط استئناف بعد الانقطاع"], id: \.self) { Text($0) }
+            }
+            Section("حدود المهمة") {
+                Stepper("دورات النموذج: \(maxTurns)", value: $maxTurns, in: 100...2000, step: 100)
+                Stepper("الوقت: \(maxHours) ساعة", value: $maxHours, in: 1...12)
+                Text("يستمر التنفيذ المحلي أثناء إتاحة iOS للتطبيق. تُحفظ الخطة عند الانقطاع؛ لا تُعاد الأوامر تلقائياً بعد إغلاق التطبيق.").font(.caption).foregroundStyle(.secondary)
             }
             NavigationLink("المهارات الافتراضية") { ZeusDefaultSkillsView() }
             NavigationLink("الإضافات والحسابات") { ZeusPluginsSettingsView() }
