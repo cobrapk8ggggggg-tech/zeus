@@ -129,7 +129,7 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_mcp_form_answers_use_the_actual_typed_wire_protocol(self):
         params = {"requestedSchema": {"properties": {"name": {"type": "string"}, "count": {"type": "integer"}, "enabled": {"type": "boolean"}}, "required": ["name", "count", "enabled"]}}
-        answer = {"answers": {"name": {"answers": ["Zeus"]}, "count": {"answers": ["3"]}, "enabled": {"answers": ["true"]}}}
+        answer = {"answers": {"name": {"answers": ["Zeus"]}, "count": {"answers": ["3"]}, "enabled": {"answers": ["نعم"]}}}
         self.assertEqual(Worker.elicitation_content(params, answer), {"name": "Zeus", "count": 3, "enabled": True})
         answer["answers"]["count"]["answers"] = ["true"]
         with self.assertRaises(ValueError): Worker.elicitation_content(params, answer)

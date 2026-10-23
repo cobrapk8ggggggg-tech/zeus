@@ -1,5 +1,6 @@
 import asyncio
 import json
+import math
 import os
 from pathlib import Path
 import shutil
@@ -82,7 +83,7 @@ class Worker:
                 for key, field in schema["properties"].items():
                     options = [{"label": str(v), "description": ""} for v in field.get("enum", [])]
                     if field.get("type") == "boolean":
-                        options = [{"label": "true", "description": "نعم"}, {"label": "false", "description": "لا"}]
+                        options = [{"label": "نعم", "description": ""}, {"label": "لا", "description": ""}]
                     if key not in schema.get("required", []):
                         options.append({"label": "(الافتراضي)", "description": "عدم إرسال قيمة لهذا الحقل"})
                     questions.append({"id": key, "question": field.get("title") or field.get("description") or key, "options": options})
@@ -122,13 +123,18 @@ class Worker:
                 raw = values[0]
                 kind = field.get("type", "string")
                 try:
-                    value = json.loads(raw) if kind != "string" else raw
+                    if kind == "boolean" and raw in {"نعم", "لا"}:
+                        value = raw == "نعم"
+                    else:
+                        value = json.loads(raw) if kind != "string" else raw
                 except (ValueError, TypeError):
                     raise ValueError("قيمة غير صالحة للحقل: " + key)
                 valid = {"string": isinstance(value, str), "boolean": isinstance(value, bool),
                     "integer": isinstance(value, int) and not isinstance(value, bool),
                     "number": isinstance(value, (int, float)) and not isinstance(value, bool),
                     "array": isinstance(value, list)}.get(kind, False)
+                if isinstance(value, float) and not math.isfinite(value):
+                    valid = False
                 if not valid or "enum" in field and value not in field["enum"]:
                     raise ValueError("نوع الإجابة غير صالح للحقل: " + key)
                 content[key] = value
