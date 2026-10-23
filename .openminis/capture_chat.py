@@ -42,7 +42,7 @@ def capture(device, bundle, output):
     preferences.parent.mkdir(parents=True, exist_ok=True)
     preferences.write_bytes(plistlib.dumps(settings, fmt=plistlib.FMT_BINARY))
     arguments = ["xcrun", "simctl", "launch", "--terminate-running-process", device, bundle,
-                 "-AppleLanguages", "(ar)", "-AppleLocale", "ar_SA", "--zeus-native-fixture"]
+                 "-AppleLanguages", "(ar)", "-AppleLocale", "ar_SA", "-appearanceMode", "2", "-appLanguage", "ar", "--zeus-native-fixture"]
     if bundle != "com.openminis.app":
         arguments += ["--open-native-agent", "--layout=icab", "--uitesting"]
     try:

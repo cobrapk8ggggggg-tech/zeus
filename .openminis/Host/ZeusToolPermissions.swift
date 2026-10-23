@@ -125,6 +125,7 @@ struct ZeusInlineApprovalCard: View {
             .padding(16).frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18))
             .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Color.accentColor.opacity(0.35)))
+            .foregroundStyle(.primary).tint(.blue)
             .environment(\.layoutDirection, .rightToLeft)
             .accessibilityIdentifier("zeusInlineToolApproval")
         }

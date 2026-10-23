@@ -52,6 +52,7 @@ private struct OriginalPreferencesRoot: View {
     var body: some View {
         SettingsSheet(showTerminal: $showTerminal)
             .environmentObject(ShareCoordinator.shared)
+            .foregroundStyle(.primary)
             .tint(.blue)
             .preferredColorScheme(appearanceMode == 1 ? .light : appearanceMode == 2 ? .dark : nil)
             .sheet(isPresented: $showTerminal) { ISHTerminalView(showCloseButton: true) }
@@ -99,6 +100,8 @@ private struct OriginalAgentRoot: View {
     var body: some View {
         ContentView()
             .environmentObject(ShareCoordinator.shared)
+            .foregroundStyle(.primary)
+            .tint(.blue)
             .environment(\.locale, locale)
             .environment(\.layoutDirection, Locale.characterDirection(forLanguage: locale.language.languageCode?.identifier ?? "en") == .rightToLeft ? .rightToLeft : .leftToRight)
             .preferredColorScheme(appearanceMode == 1 ? .light : appearanceMode == 2 ? .dark : nil)
@@ -108,8 +111,14 @@ private struct OriginalAgentRoot: View {
 
 @MainActor
 private struct NativeAgentControllerView: UIViewControllerRepresentable {
+    @AppStorage("appearanceMode") private var appearanceMode = 0
     func makeUIViewController(context: Context) -> AgentContainerController { AgentContainerController() }
-    func updateUIViewController(_ controller: AgentContainerController, context: Context) { controller.attach() }
+    func updateUIViewController(_ controller: AgentContainerController, context: Context) {
+        let style: UIUserInterfaceStyle = appearanceMode == 1 ? .light : appearanceMode == 2 ? .dark : .unspecified
+        controller.overrideUserInterfaceStyle = style
+        OriginalAgentController.shared.controller.overrideUserInterfaceStyle = style
+        controller.attach()
+    }
     static func dismantleUIViewController(_ controller: AgentContainerController, coordinator: ()) { controller.detach() }
 }
 
