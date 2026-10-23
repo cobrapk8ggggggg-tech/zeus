@@ -1,4 +1,4 @@
-name: ZEUS native IPA (manual)
+name: ZEUS integrated unsigned IPA
 on:
   push:
     branches: [build/zeus-unsigned-ipa-repair-20261023]
@@ -47,7 +47,6 @@ jobs:
           brew install ninja llvm lld libarchive pkg-config meson
           echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
           echo "$(brew --prefix lld)/bin" >> "$GITHUB_PATH"
-          if ! command -v go >/dev/null 2>&1; then brew install go; fi
           if ! xcrun --sdk iphoneos metal --version; then
             xcodebuild -downloadComponent MetalToolchain
           fi
@@ -60,8 +59,7 @@ jobs:
             upstream/deps/resources
             upstream/deps/frameworks
             upstream/deps/lame-build
-            upstream/deps/build/rclone
-          key: openminis-6339bfcb-iphoneos-arm64-xcode263-with-rclone-v2
+          key: openminis-6339bfcb-iphoneos-arm64-xcode263-v1
       - name: Build real device dependencies and Linux rootfs
         if: steps.native.outputs.cache-hit != 'true'
         working-directory: upstream
@@ -71,7 +69,6 @@ jobs:
           bash deps/build_ffmpeg.sh 2>&1 | tee ../results/ffmpeg.log
           bash deps/build_ish.sh 2>&1 | tee ../results/ish.log
           bash deps/prepare_alpine_rootfs.sh 2>&1 | tee ../results/rootfs.log
-          bash deps/build_rclone_ios.sh 2>&1 | tee ../results/rclone.log
       - uses: actions/cache/save@v4
         if: steps.native.outputs.cache-hit != 'true'
         with:
@@ -86,7 +83,8 @@ jobs:
         run: |
           set -euo pipefail
           test -s upstream/deps/resources/alpine-rootfs.zip
-          test -d upstream/deps/frameworks/Rclone.xcframework
+          test -f upstream/deps/include/ish/ish.h
+          test -d upstream/deps/frameworks/FFmpeg.framework
       - name: Embed original native OpenMinis source
         run: |
           set -euo pipefail
