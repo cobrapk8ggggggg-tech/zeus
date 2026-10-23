@@ -14,7 +14,7 @@ permissions:
   contents: read
 concurrency:
   group: zeus-native-ipa-${{ inputs.source_ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   ipa:
     runs-on: macos-latest
