@@ -12,15 +12,18 @@ app = project.targets.find { |target| target.name == 'Minis' }
 raise 'Original app target missing' unless app
 raise 'Already embedded' if project.targets.any? { |target| target.name == 'ZEUSBrowser' }
 target = project.new_target(:static_library, 'ZEUSBrowser', :ios, '18.1')
+target.product_name = 'ZEUSBrowser'
+target.product_reference.path = 'libZEUSBrowser.a'
 group = project.main_group.new_group('ZEUS Browser Source')
 files = Dir.glob((browser + 'ZEUSNext/**/*.swift').to_s).reject do |path|
-  path.include?('/OpenMinis/') || %w[BrowserAgent.swift BrowserAgentTransport.swift ZEUSNextApp.swift].include?(File.basename(path))
+  Pathname.new(path).relative_path_from(browser + 'ZEUSNext').to_s.start_with?('OpenMinis/') || %w[BrowserAgent.swift BrowserAgentTransport.swift ZEUSNextApp.swift].include?(File.basename(path))
 end
+raise 'Browser source inventory unexpectedly empty' if files.length < 40
 files += Dir.glob((browser + '.openminis/build/*.swift').to_s)
 files.each { |path| target.source_build_phase.add_file_reference(group.new_file(path)) }
 target.build_configurations.each do |config|
   config.build_settings.merge!({
-    'PRODUCT_MODULE_NAME' => 'ZEUSBrowser', 'DEFINES_MODULE' => 'YES',
+    'PRODUCT_MODULE_NAME' => 'ZEUSBrowser', 'PRODUCT_NAME' => 'ZEUSBrowser', 'DEFINES_MODULE' => 'YES',
     'SWIFT_VERSION' => '5.0', 'SWIFT_STRICT_CONCURRENCY' => 'minimal',
     'SWIFT_ACTIVE_COMPILATION_CONDITIONS' => '$(inherited) ZEUS_NATIVE_HOST',
     'SWIFT_ENABLE_BARE_SLASH_REGEX' => 'YES', 'ENABLE_TESTABILITY' => 'YES',
@@ -67,6 +70,8 @@ project.targets.each do |other|
   end
 end
 tests = project.new_target(:unit_test_bundle, 'ZEUSBrowserIntegrationTests', :ios, '26.2')
+tests.product_name = 'ZEUSBrowserIntegrationTests'
+tests.product_reference.path = 'ZEUSBrowserIntegrationTests.xctest'
 tests.add_dependency(app)
 tests.add_dependency(target)
 tests.frameworks_build_phase.add_file_reference(target.product_reference)
@@ -75,6 +80,7 @@ tests.build_configurations.each do |config|
   config.build_settings.merge!({
     'SWIFT_VERSION' => '5.0', 'GENERATE_INFOPLIST_FILE' => 'YES',
     'PRODUCT_BUNDLE_IDENTIFIER' => 'tools.zeus.native.tests',
+    'PRODUCT_NAME' => 'ZEUSBrowserIntegrationTests', 'PRODUCT_MODULE_NAME' => 'ZEUSBrowserIntegrationTests',
     'TEST_HOST' => '$(BUILT_PRODUCTS_DIR)/Minis.app/Minis',
     'BUNDLE_LOADER' => '$(TEST_HOST)', 'CODE_SIGNING_ALLOWED' => 'NO',
     'SWIFT_ENABLE_BARE_SLASH_REGEX' => 'YES'
