@@ -288,6 +288,8 @@ def create_app(data_dir=None, api_token=None, codex_binary=None, public_url=None
             raise HTTPException(409, "انتهت صلاحية الطلب؛ حدّث حالة المهمة.")
         if not isinstance(values.get("allowed"), bool):
             raise ValueError("اختر السماح أو الرفض.")
+        if values["allowed"] and current["method"] == "mcpServer/elicitation/request":
+            worker.elicitation_content(current["details"], values)
         future = worker.approvals[identifier]
         store.update("approval", identifier, status="allowed" if values["allowed"] else "denied")
         if not future.done():

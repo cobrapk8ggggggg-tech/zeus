@@ -127,6 +127,13 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("independent-test-token", config.read_text())
         self.assertNotIn("independent-test-token", self.store.get("connection", "github")["encrypted"])
 
+    async def test_mcp_form_answers_use_the_actual_typed_wire_protocol(self):
+        params = {"requestedSchema": {"properties": {"name": {"type": "string"}, "count": {"type": "integer"}, "enabled": {"type": "boolean"}}, "required": ["name", "count", "enabled"]}}
+        answer = {"answers": {"name": {"answers": ["Zeus"]}, "count": {"answers": ["3"]}, "enabled": {"answers": ["true"]}}}
+        self.assertEqual(Worker.elicitation_content(params, answer), {"name": "Zeus", "count": 3, "enabled": True})
+        answer["answers"]["count"]["answers"] = ["true"]
+        with self.assertRaises(ValueError): Worker.elicitation_content(params, answer)
+
     async def test_approval_survives_requester_and_grants_only_requested_permissions(self):
         task = self.store.put("task", {"id": "task", "status": "running", "permission_mode": "consequential"})
         permissions = {"network": {"enabled": True}}

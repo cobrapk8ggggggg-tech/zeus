@@ -73,8 +73,22 @@ class Worker:
             if policy == "unrestricted":
                 return self.decision(method, True, params)
             kind = "approval"
-        else:
+        elif method == "mcpServer/elicitation/request":
             kind = "elicitation"
+            if params.get("requestedSchema", {}).get("properties"):
+                kind = "question"
+                questions = []
+                schema = params["requestedSchema"]
+                for key, field in schema["properties"].items():
+                    options = [{"label": str(v), "description": ""} for v in field.get("enum", [])]
+                    if field.get("type") == "boolean":
+                        options = [{"label": "true", "description": "نعم"}, {"label": "false", "description": "لا"}]
+                    if key not in schema.get("required", []):
+                        options.append({"label": "(الافتراضي)", "description": "عدم إرسال قيمة لهذا الحقل"})
+                    questions.append({"id": key, "question": field.get("title") or field.get("description") or key, "options": options})
+                params = {**params, "questions": questions, "reason": params.get("message", "")}
+        else:
+            raise ValueError("Unsupported Codex client request: " + method)
         identifier = str(uuid.uuid4())
         item = {"id": identifier, "task_id": task["id"], "kind": kind, "method": method,
             "details": params, "status": "pending", "created": time.time()}
@@ -86,15 +100,41 @@ class Worker:
         try:
             answer = await future
             self.store.update("task", task["id"], status="running")
+            if method == "mcpServer/elicitation/request":
+                return {"action": "accept" if answer["allowed"] else "decline", "content": self.elicitation_content(params, answer) if answer["allowed"] else None}
             if kind == "question":
                 return {"answers": answer.get("answers", {})}
-            if kind == "elicitation":
-                return {"action": "accept" if answer["allowed"] else "decline", "content": answer.get("content")}
             return self.decision(method, answer["allowed"], params)
         finally:
             self.approvals.pop(identifier, None)
             if self.store.get("approval", identifier)["status"] == "pending":
                 self.store.update("approval", identifier, status="expired")
+
+    @staticmethod
+    def elicitation_content(params, answer):
+        schema = params.get("requestedSchema", {})
+        if not schema:
+            return answer.get("content")
+        content = dict(answer.get("content") or {})
+        for key, field in schema.get("properties", {}).items():
+            values = answer.get("answers", {}).get(key, {}).get("answers", [])
+            if values and values[0] != "(الافتراضي)":
+                raw = values[0]
+                kind = field.get("type", "string")
+                try:
+                    value = json.loads(raw) if kind != "string" else raw
+                except (ValueError, TypeError):
+                    raise ValueError("قيمة غير صالحة للحقل: " + key)
+                valid = {"string": isinstance(value, str), "boolean": isinstance(value, bool),
+                    "integer": isinstance(value, int) and not isinstance(value, bool),
+                    "number": isinstance(value, (int, float)) and not isinstance(value, bool),
+                    "array": isinstance(value, list)}.get(kind, False)
+                if not valid or "enum" in field and value not in field["enum"]:
+                    raise ValueError("نوع الإجابة غير صالح للحقل: " + key)
+                content[key] = value
+        if any(key not in content for key in schema.get("required", [])):
+            raise ValueError("أكمل الحقول المطلوبة في طلب الأداة.")
+        return content
 
     @staticmethod
     def decision(method, allowed, params=None):
