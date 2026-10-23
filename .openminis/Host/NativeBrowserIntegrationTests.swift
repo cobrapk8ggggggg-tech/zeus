@@ -15,6 +15,23 @@ final class NativeBrowserIntegrationTests: XCTestCase {
         XCTAssertThrowsError(try ZeusToolInput.normalize(name: "fixture", args: ["limit": true], tools: [tool]))
         XCTAssertThrowsError(try ZeusToolInput.normalize(name: "fixture", args: ["action": "invented"], tools: [tool]))
     }
+    func testStoredBrowserToolCardsKeepTheirBrowserAndURLAfterRoundTrip() throws {
+        let parts: [ContentPart] = [
+            .toolUse(ToolUse(toolUseId: "auto1", name: "browser_use", input: #"{"action":"navigate","url":"https://automation.invalid"}"#, description: nil, thoughtSignature: nil)),
+            .toolResult(ToolResult(toolUseId: "auto1", output: "automation", success: true, mediaRef: nil, snapshot: nil, pageURL: "https://automation.invalid", status: "success")),
+            .toolUse(ToolUse(toolUseId: "user", name: "zeus_browser_read", input: "{}", description: nil, thoughtSignature: nil)),
+            .toolResult(ToolResult(toolUseId: "user", output: "user browser", success: true, mediaRef: nil, snapshot: nil, pageURL: "https://user.invalid", status: "success")),
+            .toolUse(ToolUse(toolUseId: "auto2", name: "browser_use", input: #"{"action":"get_state"}"#, description: nil, thoughtSignature: nil))
+        ]
+        let raw = RawMessage(id: UUID().uuidString, sessionId: "fixture", role: .assistant, parts: parts, createdAt: Date(), tokenUsage: nil, reasoningContent: nil)
+        let restored = try JSONDecoder().decode(RawMessage.self, from: JSONEncoder().encode(raw))
+        let message = restored.toChatMessage(mediaResolver: { _ in FileManager.default.temporaryDirectory })
+        XCTAssertEqual(message.blocks.count, 3)
+        if case .browserTool(let operation) = message.blocks[1].kind { XCTAssertEqual(operation, "browser_read") }
+        else { XCTFail("User browser history was restored as a different tool kind") }
+        XCTAssertEqual(message.blocks[1].browserURL, "https://user.invalid")
+        XCTAssertEqual(message.blocks[2].browserURL, "https://automation.invalid")
+    }
     func testProfileSwitchCancelsInlineBrowserApproval() async throws {
         let (browser, root) = model()
         defer { try? FileManager.default.removeItem(at: root) }

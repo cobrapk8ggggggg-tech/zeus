@@ -214,6 +214,26 @@ def embed(native, browser, report):
             return try await ZEUSNativeAgentBridge.shared.execute("{\\"operation\\":\\"browser_settings\\",\\"action\\":\\"read\\"}", sessionID: nil).text
         case "rpc.discover":''')
 
+    # Preserve native browser tool kinds when the original database rebuilds
+    # UI history after restart; automation and user-browser URLs stay separate.
+    history = source / "Agent/Chat/ChatStore.swift"
+    replace(history, '        var lastBrowserURL: String?', '        var lastBrowserURL: String?\n        var lastZeusBrowserURL: String?')
+    replace(history, '                case "browser_use":\n                    let action = extractStringParam("action", from: tu.input)', '''                case let name where name == "zeus_browser" || zeusBrowserOperation(name) != nil:
+                    let operation = zeusBrowserOperation(name) ?? extractStringParam("operation", from: tu.input)
+                    kind = .browserTool(action: operation)
+                    content = "ZEUS: \\(operation)"
+                    let argURL = extractStringParam("url", from: tu.input)
+                    if !argURL.isEmpty { lastZeusBrowserURL = argURL }
+                case "browser_use":
+                    let action = extractStringParam("action", from: tu.input)''')
+    replace(history, '                    block.browserURL = lastBrowserURL',
+        '                    block.browserURL = block.zeusIsUserBrowser ? lastZeusBrowserURL : lastBrowserURL')
+    replace(history, '                        lastBrowserURL = pageURL',
+        '                        if blocks[blockIdx].zeusIsUserBrowser { lastZeusBrowserURL = pageURL } else { lastBrowserURL = pageURL }')
+    replace(history, '        case "browser_use":\n            let action = str("action") ?? "browse"',
+        '        case let name where name == "browser_use" || name == "zeus_browser" || zeusBrowserOperation(name) != nil:\n            let action = zeusBrowserOperation(name) ?? str("operation") ?? str("action") ?? "browse"')
+    replace(history, 'return cap("browser_use \\(action)")', 'return cap("\\(name) \\(action)")')
+
     # Reviewed localization/branding overrides, preserving original localization
     # keys, command names, URL schemes and database identifiers.
     replace(source / "Agent/Session/SoulStore.swift", 'case "name":  if !value.isEmpty { meta.name = value }',

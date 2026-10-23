@@ -102,6 +102,23 @@ jobs:
           ${{ runner.temp }}/OpenMinisOriginal/ModuleCache.noindex
         key: zeus-native-deriveddata-263-v2-${{ github.run_id }}
         restore-keys: zeus-native-deriveddata-263-v2-
+    - name: Select available iPhone and iPad simulators
+      run: |
+        set -euo pipefail
+        python3 - <<'PY'
+        import json, os, subprocess
+        devices = json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','-j']))['devices']
+        all_devices = [d for group in devices.values() for d in group]
+        with open(os.environ['GITHUB_ENV'], 'a') as output:
+            for kind in ['iPhone', 'iPad']:
+                match = next(d for d in all_devices if kind in d['name'])
+                output.write(kind.upper() + '_SIMULATOR=' + match['udid'] + '\n')
+        PY
+      timeout-minutes: 4
+    - name: Start simulator boot before Swift compilation
+      timeout-minutes: 4
+      run: xcrun simctl boot "$IPHONE_SIMULATOR" || true
+      continue-on-error: true
     - name: Build the native browser and integration tests
       run: |
         set -euo pipefail
@@ -120,23 +137,14 @@ jobs:
           ${{ runner.temp }}/OpenMinisOriginal/SourcePackages
           ${{ runner.temp }}/OpenMinisOriginal/ModuleCache.noindex
         key: zeus-native-deriveddata-263-v2-${{ github.run_id }}
-    - name: Select available iPhone and iPad simulators
-      run: |
-        set -euo pipefail
-        python3 - <<'PY'
-        import json, os, subprocess
-        devices = json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','-j']))['devices']
-        all_devices = [d for group in devices.values() for d in group]
-        with open(os.environ['GITHUB_ENV'], 'a') as output:
-            for kind in ['iPhone', 'iPad']:
-                match = next(d for d in all_devices if kind in d['name'])
-                output.write(kind.upper() + '_SIMULATOR=' + match['udid'] + '\n')
-        PY
-      timeout-minutes: 4
     - name: 'IPHONE: Boot'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
-      timeout-minutes: 4
+      timeout-minutes: 10
       run: bash browser/.openminis/run_native_stage.sh boot IPHONE "${IPHONE_SIMULATOR}"
+    - name: 'IPHONE: Run browser and tool integration tests'
+      if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
+      timeout-minutes: 8
+      run: bash browser/.openminis/run_native_stage.sh tests IPHONE "${IPHONE_SIMULATOR}"
     - name: 'IPHONE: Capture original settings'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
       timeout-minutes: 5
@@ -145,18 +153,18 @@ jobs:
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
       timeout-minutes: 6
       run: bash browser/.openminis/run_native_stage.sh chat IPHONE "${IPHONE_SIMULATOR}"
-    - name: 'IPHONE: Run browser and tool integration tests'
-      if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
-      timeout-minutes: 8
-      run: bash browser/.openminis/run_native_stage.sh tests IPHONE "${IPHONE_SIMULATOR}"
     - name: 'IPHONE: Export diagnostics and shut down'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
       timeout-minutes: 2
       run: bash browser/.openminis/run_native_stage.sh attachments IPHONE "${IPHONE_SIMULATOR}"
     - name: 'IPAD: Boot'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
-      timeout-minutes: 4
+      timeout-minutes: 10
       run: bash browser/.openminis/run_native_stage.sh boot IPAD "${IPAD_SIMULATOR}"
+    - name: 'IPAD: Run browser and tool integration tests'
+      if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
+      timeout-minutes: 8
+      run: bash browser/.openminis/run_native_stage.sh tests IPAD "${IPAD_SIMULATOR}"
     - name: 'IPAD: Capture original settings'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
       timeout-minutes: 5
@@ -165,10 +173,6 @@ jobs:
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
       timeout-minutes: 6
       run: bash browser/.openminis/run_native_stage.sh chat IPAD "${IPAD_SIMULATOR}"
-    - name: 'IPAD: Run browser and tool integration tests'
-      if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
-      timeout-minutes: 8
-      run: bash browser/.openminis/run_native_stage.sh tests IPAD "${IPAD_SIMULATOR}"
     - name: 'IPAD: Export diagnostics and shut down'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
       timeout-minutes: 2

@@ -58,8 +58,11 @@ class NativeEmbeddingTests(unittest.TestCase):
                 for tool in ("Shell", "Editor", "Browser", "Memory"):
                     expected = expected.replace('return "Minis is using ' + tool + '"', 'return String(localized: "Minis is using ' + tool + '")')
                 self.assertEqual((native / "src/ios" / relative).read_text(), expected, str(relative))
-            for name in ("Agent/Chat/ChatStore.swift",):
-                self.assertNotIn(name, changed)
+            original_store = (UPSTREAM / "src/ios/Agent/Chat/ChatStore.swift").read_text()
+            adapted_store = (native / "src/ios/Agent/Chat/ChatStore.swift").read_text()
+            # Storage/protocol/sync methods after UI conversion remain untouched.
+            marker = "    func toAgentMessage("
+            self.assertEqual(adapted_store[adapted_store.index(marker):], original_store[original_store.index(marker):])
             execution = (native / "src/ios/Agent/Chat/AIChatViewModel+ConcurrentTools.swift").read_text()
             self.assertIn('name == "zeus_browser" || zeusBrowserOperation(name) != nil', execution)
             self.assertIn('case "browser_use":', execution)
