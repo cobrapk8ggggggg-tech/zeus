@@ -1,4 +1,5 @@
-name: ZEUS integrated unsigned IPA
+name: ZEUS integrated IPA - build and publish (no tests)
+run-name: IPA from ${{ github.ref_name }} (${{ github.sha }})
 on:
   push:
     branches: [build/zeus-unsigned-ipa-repair-20261023]
@@ -7,14 +8,11 @@ on:
     inputs:
       source_ref:
         description: Browser source branch, tag or commit to package
-        required: true
-        default: feature/openminis-native-20261023
+        required: false
+        default: build/zeus-unsigned-ipa-repair-20261023
         type: string
 permissions:
   contents: read
-concurrency:
-  group: zeus-native-ipa-${{ inputs.source_ref }}
-  cancel-in-progress: true
 jobs:
   ipa:
     runs-on: macos-latest
@@ -118,10 +116,10 @@ jobs:
           unzip -Z1 results/ZEUS-native-unsigned.ipa | grep -Fqx 'Payload/Minis.app/Info.plist'
           shasum -a 256 results/ZEUS-native-unsigned.ipa > results/ZEUS-native-unsigned.ipa.sha256
           rm -rf results/Payload
-      - name: Upload unsigned IPA and source provenance
+      - name: Publish IPA immediately after successful package verification
         uses: actions/upload-artifact@v4
         with:
-          name: zeus-native-ipa-${{ github.run_id }}
+          name: ZEUS-integrated-unsigned-IPA-${{ github.run_id }}
           path: |
             results/*.ipa
             results/*.sha256
@@ -129,9 +127,10 @@ jobs:
             results/native-adapters.json
             results/ipa-zip-check.txt
           retention-days: 14
+          compression-level: 0
           if-no-files-found: error
-      - name: Upload device build logs
-        if: always()
+      - name: Upload diagnostic logs only after failure
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: zeus-native-ipa-build-logs-${{ github.run_id }}
