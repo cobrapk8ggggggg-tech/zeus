@@ -9,6 +9,7 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
+import xml.etree.ElementTree as ET
 
 
 def prepare(root: Path, sdk: str) -> dict:
@@ -17,10 +18,9 @@ def prepare(root: Path, sdk: str) -> dict:
     if actual != expected["commit"]:
         raise RuntimeError(f"Source revision mismatch: {actual}")
     manifest = {}
-    for base in ("src/ios/Views", "src/ios/Agent", "src/ios/Providers", "src/ios/Shared"):
-        for file in sorted((root / base).rglob("*")):
-            if file.is_file():
-                manifest[str(file.relative_to(root))] = hashlib.sha256(file.read_bytes()).hexdigest()
+    for file in sorted((root / "src/ios").rglob("*")):
+        if file.is_file() and ".xcodeproj" not in str(file.relative_to(root)):
+            manifest[str(file.relative_to(root))] = hashlib.sha256(file.read_bytes()).hexdigest()
     if sdk == "iphonesimulator":
         # iSH's host C runtime and FFmpeg must be compiled for the simulator SDK.
         # Guest architecture stays aarch64; it is unrelated to the SDK platform.
@@ -35,14 +35,25 @@ def prepare(root: Path, sdk: str) -> dict:
                 # so make cannot reuse device objects in the simulator archive.
                 code = code.replace("make -j$(sysctl -n hw.ncpu)", "make clean\nmake -j$(sysctl -n hw.ncpu)")
             # Meson's generated compiler argument is single-quoted.
-            code = code.replace("'-miphoneos-version-min=$IOS_DEPLOYMENT_TARGET'", "'-target', 'arm64-apple-ios${IOS_DEPLOYMENT_TARGET}-simulator'")
-            code = code.replace("' -target", "'-target")
             # Shell double quotes expand this target before writing the cross file.
             code = code.replace("'-target arm64-apple-ios${IOS_DEPLOYMENT_TARGET}-simulator'", "'-target', 'arm64-apple-ios${IOS_DEPLOYMENT_TARGET}-simulator'")
             code = code.replace("<string>iPhoneOS</string>", "<string>iPhoneSimulator</string>")
             file.write_text(code)
     template = root / "src/ios/Configs/ProviderCustomization.xcconfig.example"
     template.with_suffix("").write_text(template.read_text())
+    # The upstream scheme also builds standalone command-line Swift scripts as
+    # part of MinisTests. Reference rendering uses its unchanged MinisUITests;
+    # select that target in the CI scheme rather than editing any test source.
+    scheme = root / "src/ios/Minis.xcodeproj/xcshareddata/xcschemes/Minis.xcscheme"
+    document = ET.parse(scheme)
+    testables = document.getroot().find("TestAction/Testables")
+    if testables is None:
+        raise RuntimeError("The original test scheme has no test targets")
+    for test in list(testables):
+        reference = test.find("BuildableReference")
+        if reference is None or reference.get("BlueprintName") != "MinisUITests":
+            testables.remove(test)
+    scheme.write_text(ET.tostring(document.getroot(), encoding="unicode"))
     return {"repository": expected["repository"], "commit": actual, "sdk": sdk,
             "applicationFilesSHA256": manifest}
 

@@ -1,0 +1,3845 @@
+{
+  "commit": "6339bfcb25190ebf80fd03086c4ead81cf9428ba",
+  "counts": {
+    "shared_instances": 113,
+    "storage_paths": 70,
+    "credential_boundaries": 58,
+    "defaults_namespaces": 345,
+    "detached_tasks": 83,
+    "webview_creation": 7
+  },
+  "note": "Inventory only. Matches require review; this does not establish isolation.",
+  "matches": {
+    "shared_instances": [
+      {
+        "file": "src/ios/Agent/Background/AgentLiveActivityManager.swift",
+        "line": 10,
+        "source": "static let shared = AgentLiveActivityManager()"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 16,
+        "source": "static let shared = BackgroundKeepAliveManager()"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 1630,
+        "source": "static let shared = BackgroundInterruptionTracker()"
+      },
+      {
+        "file": "src/ios/Agent/Background/CacheKeepAliveManager.swift",
+        "line": 16,
+        "source": "static let shared = CacheKeepAliveManager()"
+      },
+      {
+        "file": "src/ios/Agent/BrowserUse/BrowserHistory.swift",
+        "line": 32,
+        "source": "static let shared = BrowserHistoryStore()"
+      },
+      {
+        "file": "src/ios/Agent/BrowserUse/BrowserTabPool.swift",
+        "line": 21,
+        "source": "static let shared = BrowserTabPoolRegistry()"
+      },
+      {
+        "file": "src/ios/Agent/BrowserUse/BrowserUseManager.swift",
+        "line": 2492,
+        "source": "static let shared = BrowserDownloadCenter()"
+      },
+      {
+        "file": "src/ios/Agent/BrowserUse/CookieAuditLogger.swift",
+        "line": 22,
+        "source": "static let shared = CookieAuditLogger()"
+      },
+      {
+        "file": "src/ios/Agent/BrowserUse/CookieBackupStore.swift",
+        "line": 43,
+        "source": "static let shared = CookieBackupStore()"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatLifecycleSupport.swift",
+        "line": 13,
+        "source": "static let shared = SessionActivityTracker()"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatLifecycleSupport.swift",
+        "line": 191,
+        "source": "static let shared = KeepScreenAwakeController()"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatLifecycleSupport.swift",
+        "line": 291,
+        "source": "static let shared = SessionConcurrencyManager()"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatLifecycleSupport.swift",
+        "line": 350,
+        "source": "static let shared = ViewModelCache()"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 432,
+        "source": "static let shared = ChatStore()"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatURLBrokerage.swift",
+        "line": 31,
+        "source": "static let shared = MinisOpenURLBroker()"
+      },
+      {
+        "file": "src/ios/Agent/Chat/FileMentionIndex.swift",
+        "line": 96,
+        "source": "static let shared = FileMentionIndex()"
+      },
+      {
+        "file": "src/ios/Agent/ISH/ISHExecutionCoordinator.swift",
+        "line": 40,
+        "source": "static let shared = ISHExecutionCoordinator()"
+      },
+      {
+        "file": "src/ios/Agent/ISH/MinisFsRouter.swift",
+        "line": 17,
+        "source": "static let shared = MinisFsRouter()"
+      },
+      {
+        "file": "src/ios/Agent/ISH/ShellCommandRingBuffer.swift",
+        "line": 14,
+        "source": "static let shared = ShellCommandRingBuffer()"
+      },
+      {
+        "file": "src/ios/Agent/Intents/SendPromptIntent.swift",
+        "line": 380,
+        "source": "static let shared = NotificationNavigationStore()"
+      },
+      {
+        "file": "src/ios/Agent/Intents/SendPromptIntent.swift",
+        "line": 422,
+        "source": "static let shared = ShortcutNotificationDelegate()"
+      },
+      {
+        "file": "src/ios/Agent/Markdown/KaTeXRenderer.swift",
+        "line": 8,
+        "source": "static let shared = KaTeXRenderer()"
+      },
+      {
+        "file": "src/ios/Agent/Markdown/MathRenderScheduler.swift",
+        "line": 26,
+        "source": "static let shared = MathRenderScheduler()"
+      },
+      {
+        "file": "src/ios/Agent/MessageList/MessageListLayout.swift",
+        "line": 918,
+        "source": "static let shared = ScrollMetricsRecorder()"
+      },
+      {
+        "file": "src/ios/Agent/Offload/OffloadPermissionManager.swift",
+        "line": 122,
+        "source": "static let shared = OffloadPermissionManager()"
+      },
+      {
+        "file": "src/ios/Agent/Session/MCPOAuthController.swift",
+        "line": 54,
+        "source": "static let shared = MCPOAuthController()"
+      },
+      {
+        "file": "src/ios/Agent/Session/MCPStore.swift",
+        "line": 79,
+        "source": "static let shared = MCPStore()"
+      },
+      {
+        "file": "src/ios/Agent/Session/SessionForkManager.swift",
+        "line": 9,
+        "source": "static let shared = SessionForkManager()"
+      },
+      {
+        "file": "src/ios/Agent/Session/SessionLockStore.swift",
+        "line": 66,
+        "source": "static let shared = SessionLockStore()"
+      },
+      {
+        "file": "src/ios/Agent/Session/SkillStore.swift",
+        "line": 71,
+        "source": "static let shared = SkillStore()"
+      },
+      {
+        "file": "src/ios/Agent/Shell/OnDemandBash.swift",
+        "line": 18,
+        "source": "static let shared = OnDemandBash()"
+      },
+      {
+        "file": "src/ios/Agent/Speech/SpeechRecognitionManager.swift",
+        "line": 7,
+        "source": "static let shared = SpeechRecognitionManager()"
+      },
+      {
+        "file": "src/ios/Agent/Speech/TypedVocabularyBuilder.swift",
+        "line": 19,
+        "source": "static let shared = TypedVocabularyBuilder()"
+      },
+      {
+        "file": "src/ios/Agent/Speech/VocabularyFilter.swift",
+        "line": 158,
+        "source": "static let shared = BackgroundWordFrequency()"
+      },
+      {
+        "file": "src/ios/Agent/Speech/VoiceCorrectionEngine.swift",
+        "line": 14,
+        "source": "static let shared = VoiceCorrectionEngine()"
+      },
+      {
+        "file": "src/ios/Agent/Speech/VoiceCorrectionRecorder.swift",
+        "line": 20,
+        "source": "static let shared = VoiceCorrectionRecorder()"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 37,
+        "source": "static let shared = SyncLogStore()"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 226,
+        "source": "static let shared = CloudSyncEngine()"
+      },
+      {
+        "file": "src/ios/Agent/Sync/SyncDirtyScanner.swift",
+        "line": 27,
+        "source": "static let shared = SyncDirtyScanner()"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/ChatStoreSyncHydrators.swift",
+        "line": 1734,
+        "source": "static let shared = RefreshCoalescer()"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 58,
+        "source": "static let shared = MigrationEngine()"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/SessionFileChangeTracker.swift",
+        "line": 25,
+        "source": "static let shared = SessionFileChangeTracker()"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/SessionFileChangeTracker.swift",
+        "line": 365,
+        "source": "static let shared = SkillFilesystemNotifier()"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/SyncCore.swift",
+        "line": 32,
+        "source": "static let shared = SyncCore()"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/SyncCoreHydrators.swift",
+        "line": 20,
+        "source": "static let shared = SyncCoreHydrators()"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/SyncableTypeRegistry.swift",
+        "line": 65,
+        "source": "static let shared = SyncableTypeRegistry()"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/TombstoneManager.swift",
+        "line": 31,
+        "source": "static let shared = TombstoneManager()"
+      },
+      {
+        "file": "src/ios/Debug/AgentRequestTrace.swift",
+        "line": 54,
+        "source": "static let shared = AgentRequestTrace()"
+      },
+      {
+        "file": "src/ios/Debug/DebugAuth.swift",
+        "line": 19,
+        "source": "static let shared = DebugAuthenticator()"
+      },
+      {
+        "file": "src/ios/Debug/DebugJSONRPC.swift",
+        "line": 12,
+        "source": "static let shared = DebugScreenshotBuffer()"
+      },
+      {
+        "file": "src/ios/Debug/DebugLocalDispatch.swift",
+        "line": 22,
+        "source": "public static let shared = DebugLocalDispatch()"
+      },
+      {
+        "file": "src/ios/Debug/DebugViewOverlay.swift",
+        "line": 19,
+        "source": "static let shared = DebugViewOverlay()"
+      },
+      {
+        "file": "src/ios/Debug/MarkdownSnapshotCollector.swift",
+        "line": 17,
+        "source": "static let shared = MarkdownSnapshotCollector()"
+      },
+      {
+        "file": "src/ios/Debug/MarkdownSnapshotCollector.swift",
+        "line": 359,
+        "source": "static let shared = MessageListSnapshotCollector()"
+      },
+      {
+        "file": "src/ios/Debug/MinisDebugLogReader.swift",
+        "line": 29,
+        "source": "public static let shared = MinisDebugLogReader()"
+      },
+      {
+        "file": "src/ios/Debug/StreamingHangLogger.swift",
+        "line": 20,
+        "source": "static let shared = StreamingHangLogger()"
+      },
+      {
+        "file": "src/ios/Debug/VoiceInputCapture.swift",
+        "line": 160,
+        "source": "static let shared = VoiceInputCapture()"
+      },
+      {
+        "file": "src/ios/Diagnostics/BrowserResourceMonitor.swift",
+        "line": 53,
+        "source": "static let shared = BrowserResourceMonitor()"
+      },
+      {
+        "file": "src/ios/Diagnostics/CrashReporter.swift",
+        "line": 10,
+        "source": "static let shared = CrashReporter()"
+      },
+      {
+        "file": "src/ios/FileProvider/AppGroupChangeWatcher.swift",
+        "line": 19,
+        "source": "static let shared = AppGroupChangeWatcher()"
+      },
+      {
+        "file": "src/ios/NativeOffloads/AlarmOffloadBridge.swift",
+        "line": 370,
+        "source": "static let shared = AlarmLabelStore()"
+      },
+      {
+        "file": "src/ios/Providers/Anthropic/OAuth/ClaudeOAuthManager.swift",
+        "line": 12,
+        "source": "static let shared = ClaudeOAuthManager()"
+      },
+      {
+        "file": "src/ios/Providers/Anthropic/OAuthHTTPClient.swift",
+        "line": 59,
+        "source": "static let shared = LastAPIErrorBody()"
+      },
+      {
+        "file": "src/ios/Providers/Anthropic/OAuthHTTPClient.swift",
+        "line": 248,
+        "source": "static let shared = LastAPIRequestBody()"
+      },
+      {
+        "file": "src/ios/Providers/Anthropic/OAuthHTTPClient.swift",
+        "line": 493,
+        "source": "static let shared = TokenBoxRegistry()"
+      },
+      {
+        "file": "src/ios/Providers/Antigravity/OAuth/AntigravityOAuthManager.swift",
+        "line": 12,
+        "source": "static let shared = AntigravityOAuthManager()"
+      },
+      {
+        "file": "src/ios/Providers/Gemini/OAuth/GeminiOAuthManager.swift",
+        "line": 12,
+        "source": "static let shared = GeminiOAuthManager()"
+      },
+      {
+        "file": "src/ios/Providers/Kimi/OAuth/KimiOAuthManager.swift",
+        "line": 18,
+        "source": "static let shared = KimiOAuthManager()"
+      },
+      {
+        "file": "src/ios/Providers/OpenAI/OAuth/CodexOAuthManager.swift",
+        "line": 12,
+        "source": "static let shared = CodexOAuthManager()"
+      },
+      {
+        "file": "src/ios/Providers/OpenRouter/OAuth/OpenRouterOAuthManager.swift",
+        "line": 12,
+        "source": "static let shared = OpenRouterOAuthManager()"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 147,
+        "source": "static let shared = ProviderConfigStore()"
+      },
+      {
+        "file": "src/ios/Providers/ProviderInstance.swift",
+        "line": 316,
+        "source": "static let shared = ProviderCredentialCache()"
+      },
+      {
+        "file": "src/ios/Providers/Thinking/ThinkingRuleResolver.swift",
+        "line": 145,
+        "source": "static let shared = ThinkingRuleCache()"
+      },
+      {
+        "file": "src/ios/Providers/VisionGroupResolver.swift",
+        "line": 81,
+        "source": "static let shared = ConfiguredMirror()"
+      },
+      {
+        "file": "src/ios/Providers/Voice/AudioSessionCoordinator.swift",
+        "line": 27,
+        "source": "static let shared = AudioSessionCoordinator()"
+      },
+      {
+        "file": "src/ios/Providers/Voice/CorrectionSignalSource.swift",
+        "line": 149,
+        "source": "static let shared = VoiceCorrectionCollectionConsent()"
+      },
+      {
+        "file": "src/ios/Providers/Voice/PhoneticNormalizer.swift",
+        "line": 69,
+        "source": "static let shared = PinyinNormalizer()"
+      },
+      {
+        "file": "src/ios/Providers/Voice/SystemVoiceCatalog.swift",
+        "line": 242,
+        "source": "static let shared = SystemVoiceRoster()"
+      },
+      {
+        "file": "src/ios/Providers/Voice/VoiceCorrectionDB.swift",
+        "line": 27,
+        "source": "static let shared: VoiceCorrectionDB? = {"
+      },
+      {
+        "file": "src/ios/Providers/Voice/VoiceOutputPlayer.swift",
+        "line": 80,
+        "source": "static let shared = VoiceOutputPlayer()"
+      },
+      {
+        "file": "src/ios/Providers/Voice/VoiceProvider+System.swift",
+        "line": 14,
+        "source": "static let shared = SystemVoiceProvider()"
+      },
+      {
+        "file": "src/ios/Providers/Voice/VoiceProviderResolver.swift",
+        "line": 18,
+        "source": "static let shared = VoiceSelectionStore()"
+      },
+      {
+        "file": "src/ios/Providers/Voice/VoiceProviderResolver.swift",
+        "line": 31,
+        "source": "static let shared = VoiceModePreference()"
+      },
+      {
+        "file": "src/ios/Providers/Voice/VoiceProviderResolver.swift",
+        "line": 67,
+        "source": "static let shared = VoiceOutputState()"
+      },
+      {
+        "file": "src/ios/Providers/Voice/VoiceProviderResolver.swift",
+        "line": 203,
+        "source": "static let shared = SpeechCapsulePlacement()"
+      },
+      {
+        "file": "src/ios/Providers/xAI/OAuth/XAIOAuthManager.swift",
+        "line": 11,
+        "source": "static let shared = XAIOAuthManager()"
+      },
+      {
+        "file": "src/ios/Shared/BPETokenizer.swift",
+        "line": 8,
+        "source": "static let shared = BPETokenizer()"
+      },
+      {
+        "file": "src/ios/Shared/Config/Audit/ConfigAuditLog.swift",
+        "line": 15,
+        "source": "static let shared = ConfigAuditLog()"
+      },
+      {
+        "file": "src/ios/Shared/Config/ConfigRegistry.swift",
+        "line": 19,
+        "source": "static let shared = ConfigRegistry()"
+      },
+      {
+        "file": "src/ios/Shared/Config/Confirm/ConfigConfirmationGate.swift",
+        "line": 22,
+        "source": "static let shared = ConfigConfirmationGate()"
+      },
+      {
+        "file": "src/ios/Shared/Config/MinisConfigPermissionStore.swift",
+        "line": 20,
+        "source": "static let shared = MinisConfigPermissionStore()"
+      },
+      {
+        "file": "src/ios/Shared/DeepLinkCoordinator.swift",
+        "line": 33,
+        "source": "static let shared = DeepLinkCoordinator()"
+      },
+      {
+        "file": "src/ios/Shared/EnvVarPrivacyStore.swift",
+        "line": 15,
+        "source": "static let shared = EnvVarPrivacyStore()"
+      },
+      {
+        "file": "src/ios/Shared/EnvVarStore.swift",
+        "line": 38,
+        "source": "static let shared = EnvVarStore()"
+      },
+      {
+        "file": "src/ios/Shared/FontSettings.swift",
+        "line": 86,
+        "source": "static let shared = FontSettings()"
+      },
+      {
+        "file": "src/ios/Shared/LLMSessionRegistry.swift",
+        "line": 24,
+        "source": "static let shared = LLMSessionRegistry()"
+      },
+      {
+        "file": "src/ios/Shared/LoggingManager.swift",
+        "line": 4,
+        "source": "static let shared = LoggingManager()"
+      },
+      {
+        "file": "src/ios/Shared/NetworkMonitor.swift",
+        "line": 7,
+        "source": "static let shared = NetworkMonitor()"
+      },
+      {
+        "file": "src/ios/Shared/QuickActionRouter.swift",
+        "line": 37,
+        "source": "static let shared = QuickActionRouter()"
+      },
+      {
+        "file": "src/ios/Shared/QuickActionWorkflow.swift",
+        "line": 42,
+        "source": "static let shared = QuickActionWorkflow()"
+      },
+      {
+        "file": "src/ios/Shared/SessionBadgeStore.swift",
+        "line": 42,
+        "source": "static let shared = SessionBadgeStore()"
+      },
+      {
+        "file": "src/ios/Shared/ShareCoordinator.swift",
+        "line": 54,
+        "source": "static let shared = ShareCoordinator()"
+      },
+      {
+        "file": "src/ios/Shared/TextSegmenter.swift",
+        "line": 13,
+        "source": "public static let shared = TextSegmenter()"
+      },
+      {
+        "file": "src/ios/Shared/ThumbnailCache.swift",
+        "line": 7,
+        "source": "static let shared = ThumbnailCache()"
+      },
+      {
+        "file": "src/ios/Views/Chat/AssistantBlockView.swift",
+        "line": 705,
+        "source": "static let shared = ThinkingHitchMonitor()"
+      },
+      {
+        "file": "src/ios/Views/Chat/ChatTurnScreenshot.swift",
+        "line": 205,
+        "source": "static let shared = ImageSaver()"
+      },
+      {
+        "file": "src/ios/Views/Chat/Media/AudioPlayback.swift",
+        "line": 20,
+        "source": "static let shared = GlobalAudioPlayer()"
+      },
+      {
+        "file": "src/ios/Views/Chat/MinisMediaViews.swift",
+        "line": 13,
+        "source": "static let shared = MinisMediaCache()"
+      },
+      {
+        "file": "src/ios/Views/Chat/SelectableMarkdownView.swift",
+        "line": 134,
+        "source": "static let shared = NativeMediaImageCache()"
+      },
+      {
+        "file": "src/ios/Views/Rootfs/MirrorSpeedTestView.swift",
+        "line": 141,
+        "source": "static let shared = MirrorSpeedTestViewModel()"
+      },
+      {
+        "file": "src/ios/Views/Settings/MountedFoldersManager.swift",
+        "line": 129,
+        "source": "static let shared = MountedFoldersManager()"
+      },
+      {
+        "file": "src/ios/iSH/RootfsManager.swift",
+        "line": 13,
+        "source": "static let shared = RootfsManager()"
+      },
+      {
+        "file": "src/ios/iSH/Terminal/TerminalCanvasView.swift",
+        "line": 26,
+        "source": "static let shared: TerminalCellMetrics = {"
+      }
+    ],
+    "storage_paths": [
+      {
+        "file": "src/ios/Agent/BrowserUse/BrowserHistory.swift",
+        "line": 40,
+        "source": "let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Agent/BrowserUse/BrowserTabPool.swift",
+        "line": 1440,
+        "source": "let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Agent/BrowserUse/CookieAuditLogger.swift",
+        "line": 40,
+        "source": "let dir = FileManager.default.urls(for: .applicationSupportDirectory,"
+      },
+      {
+        "file": "src/ios/Agent/BrowserUse/CookieBackupStore.swift",
+        "line": 130,
+        "source": "let dir = FileManager.default.urls(for: .applicationSupportDirectory,"
+      },
+      {
+        "file": "src/ios/Agent/BrowserUse/CookieBackupStore.swift",
+        "line": 376,
+        "source": ".urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]"
+      },
+      {
+        "file": "src/ios/Agent/Chat/AIChatViewModel+Misc.swift",
+        "line": 126,
+        "source": "let lib = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Agent/Chat/AIChatViewModel+Offloading.swift",
+        "line": 619,
+        "source": "let lib = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Agent/Chat/AIChatViewModel.swift",
+        "line": 1705,
+        "source": "let library = fm.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 462,
+        "source": "let libraryURL = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 3557,
+        "source": "let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 4336,
+        "source": "let library = fm.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 6974,
+        "source": "let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 6991,
+        "source": "let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 6998,
+        "source": "let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Agent/Session/MCPStore.swift",
+        "line": 127,
+        "source": "FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]"
+      },
+      {
+        "file": "src/ios/Agent/Session/MCPStore.swift",
+        "line": 187,
+        "source": "let library = fm.urls(for: .libraryDirectory, in: .userDomainMask)[0]"
+      },
+      {
+        "file": "src/ios/Agent/Session/SkillStore.swift",
+        "line": 87,
+        "source": "let library = fm.urls(for: .libraryDirectory, in: .userDomainMask)[0]"
+      },
+      {
+        "file": "src/ios/Agent/Session/SkillStore.swift",
+        "line": 92,
+        "source": "let documents = fm.urls(for: .documentDirectory, in: .userDomainMask)[0]"
+      },
+      {
+        "file": "src/ios/Agent/Session/SkillStore.swift",
+        "line": 1609,
+        "source": "let documents = fm.urls(for: .documentDirectory, in: .userDomainMask)[0]"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 53,
+        "source": "let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 414,
+        "source": "let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 1147,
+        "source": "let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 1230,
+        "source": "let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 1260,
+        "source": "let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 1388,
+        "source": "let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 2274,
+        "source": "let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Agent/Sync/SyncDirtyScanner.swift",
+        "line": 194,
+        "source": "let library = fm.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/ChatStoreSyncHydrators.swift",
+        "line": 385,
+        "source": "let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/ChatStoreSyncHydrators.swift",
+        "line": 429,
+        "source": "let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/ChatStoreSyncHydrators.swift",
+        "line": 565,
+        "source": "let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/ChatStoreSyncHydrators.swift",
+        "line": 748,
+        "source": "let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/ICloudSharedZoneTransport.swift",
+        "line": 120,
+        "source": "FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/ICloudSharedZoneTransport.swift",
+        "line": 328,
+        "source": ".urls(for: .libraryDirectory, in: .userDomainMask)[0]"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 61,
+        "source": ".urls(for: .libraryDirectory, in: .userDomainMask)[0]"
+      },
+      {
+        "file": "src/ios/Debug/DebugAuth.swift",
+        "line": 70,
+        "source": "let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]"
+      },
+      {
+        "file": "src/ios/Debug/DebugJSONRPC.swift",
+        "line": 1794,
+        "source": "let library = fm.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Debug/DebugJSONRPC.swift",
+        "line": 1801,
+        "source": "let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Debug/DebugJSONRPC.swift",
+        "line": 1809,
+        "source": "if let container = fm.containerURL(forSecurityApplicationGroupIdentifier: \"group.com.openminis.app\") {"
+      },
+      {
+        "file": "src/ios/Debug/DebugJSONRPC.swift",
+        "line": 2175,
+        "source": "let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Debug/DebugJSONRPC.swift",
+        "line": 2178,
+        "source": "let library = fm.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Debug/DebugJSONRPC.swift",
+        "line": 2993,
+        "source": "let library = fm.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Diagnostics/CrashReporter.swift",
+        "line": 17,
+        "source": "let lib = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Diagnostics/CrashReporter.swift",
+        "line": 22,
+        "source": "let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]"
+      },
+      {
+        "file": "src/ios/Diagnostics/CrashReporter.swift",
+        "line": 27,
+        "source": "let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]"
+      },
+      {
+        "file": "src/ios/Diagnostics/CrashReporter.swift",
+        "line": 32,
+        "source": "let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]"
+      },
+      {
+        "file": "src/ios/Diagnostics/CrashReporter.swift",
+        "line": 83,
+        "source": "let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]"
+      },
+      {
+        "file": "src/ios/FileProvider/FileProviderExtension.swift",
+        "line": 74,
+        "source": "if let container = fm.containerURL(forSecurityApplicationGroupIdentifier: \"group.com.openminis.app\") {"
+      },
+      {
+        "file": "src/ios/FileProvider/FileProviderExtension.swift",
+        "line": 93,
+        "source": "guard let container = fm.containerURL(forSecurityApplicationGroupIdentifier: \"group.com.openminis.app\") else { return }"
+      },
+      {
+        "file": "src/ios/MinisApp.swift",
+        "line": 897,
+        "source": "let library = fm.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/MinisApp.swift",
+        "line": 947,
+        "source": "let containerURL = fm.containerURL(forSecurityApplicationGroupIdentifier: groupID)"
+      },
+      {
+        "file": "src/ios/NativeOffloads/AlarmOffloadBridge.swift",
+        "line": 379,
+        "source": ".urls(for: .libraryDirectory, in: .userDomainMask)[0]"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigDB.swift",
+        "line": 30,
+        "source": ".urls(for: .libraryDirectory, in: .userDomainMask)[0]"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 194,
+        "source": "let libraryURL = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Providers/Voice/VoiceCorrectionDB.swift",
+        "line": 40,
+        "source": ".urls(for: .libraryDirectory, in: .userDomainMask)[0]"
+      },
+      {
+        "file": "src/ios/Shared/Config/Audit/ConfigAuditLog.swift",
+        "line": 27,
+        "source": "let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Shared/EnvVarRedactor.swift",
+        "line": 75,
+        "source": "let libraryURL = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Shared/EnvVarStore.swift",
+        "line": 46,
+        "source": "let libraryURL = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Shared/EnvVarStore.swift",
+        "line": 447,
+        "source": "let libraryURL = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Shared/LoggingManager.swift",
+        "line": 18,
+        "source": "let lib = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Shared/SharedContainerStore.swift",
+        "line": 13,
+        "source": "FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID)"
+      },
+      {
+        "file": "src/ios/Shared/SharedContainerStore.swift",
+        "line": 20,
+        "source": "let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 4946,
+        "source": "let libBase = fm.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 5048,
+        "source": "let base = fm.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Views/Settings/StorageManagementView.swift",
+        "line": 39,
+        "source": "let libraryURL = self.fm.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Views/Settings/StorageManagementView.swift",
+        "line": 40,
+        "source": "let documentsURL = self.fm.urls(for: .documentDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Views/Settings/StorageManagementView.swift",
+        "line": 194,
+        "source": "let lib = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/Views/Settings/StorageManagementView.swift",
+        "line": 262,
+        "source": "let lib = fm.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/WebApp/WebAppIconCache.swift",
+        "line": 16,
+        "source": "let lib = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/WebApp/WebAppIconCache.swift",
+        "line": 33,
+        "source": "let lib = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!"
+      },
+      {
+        "file": "src/ios/iSH/RootfsManager.swift",
+        "line": 36,
+        "source": "let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]"
+      }
+    ],
+    "credential_boundaries": [
+      {
+        "file": "src/ios/Agent/Session/MCPOAuthController.swift",
+        "line": 97,
+        "source": "kSecAttrService as String: keychainService,"
+      },
+      {
+        "file": "src/ios/Agent/Session/MCPOAuthController.swift",
+        "line": 98,
+        "source": "kSecAttrAccount as String: account,"
+      },
+      {
+        "file": "src/ios/Agent/Session/MCPOAuthController.swift",
+        "line": 118,
+        "source": "kSecAttrService as String: keychainService,"
+      },
+      {
+        "file": "src/ios/Agent/Session/MCPOAuthController.swift",
+        "line": 119,
+        "source": "kSecAttrAccount as String: account,"
+      },
+      {
+        "file": "src/ios/Agent/Session/MCPOAuthController.swift",
+        "line": 131,
+        "source": "kSecAttrService as String: keychainService,"
+      },
+      {
+        "file": "src/ios/Agent/Session/MCPOAuthController.swift",
+        "line": 132,
+        "source": "kSecAttrAccount as String: account,"
+      },
+      {
+        "file": "src/ios/Providers/Anthropic/OAuth/ClaudeOAuthManager.swift",
+        "line": 271,
+        "source": "kSecAttrService as String: legacyKeychainService,"
+      },
+      {
+        "file": "src/ios/Providers/Anthropic/OAuth/ClaudeOAuthManager.swift",
+        "line": 272,
+        "source": "kSecAttrAccount as String: legacyKeychainAccount,"
+      },
+      {
+        "file": "src/ios/Providers/Anthropic/OAuth/ClaudeOAuthManager.swift",
+        "line": 285,
+        "source": "kSecAttrService as String: legacyKeychainService,"
+      },
+      {
+        "file": "src/ios/Providers/Anthropic/OAuth/ClaudeOAuthManager.swift",
+        "line": 286,
+        "source": "kSecAttrAccount as String: legacyKeychainAccount,"
+      },
+      {
+        "file": "src/ios/Providers/Gemini/OAuth/GeminiOAuthManager.swift",
+        "line": 226,
+        "source": "kSecAttrService as String: legacyKeychainService,"
+      },
+      {
+        "file": "src/ios/Providers/Gemini/OAuth/GeminiOAuthManager.swift",
+        "line": 227,
+        "source": "kSecAttrAccount as String: legacyKeychainAccount,"
+      },
+      {
+        "file": "src/ios/Providers/Gemini/OAuth/GeminiOAuthManager.swift",
+        "line": 240,
+        "source": "kSecAttrService as String: legacyKeychainService,"
+      },
+      {
+        "file": "src/ios/Providers/Gemini/OAuth/GeminiOAuthManager.swift",
+        "line": 241,
+        "source": "kSecAttrAccount as String: legacyKeychainAccount,"
+      },
+      {
+        "file": "src/ios/Providers/OpenAI/OAuth/CodexOAuthManager.swift",
+        "line": 198,
+        "source": "kSecAttrService as String: legacyKeychainService,"
+      },
+      {
+        "file": "src/ios/Providers/OpenAI/OAuth/CodexOAuthManager.swift",
+        "line": 199,
+        "source": "kSecAttrAccount as String: legacyKeychainAccount,"
+      },
+      {
+        "file": "src/ios/Providers/OpenAI/OAuth/CodexOAuthManager.swift",
+        "line": 212,
+        "source": "kSecAttrService as String: legacyKeychainService,"
+      },
+      {
+        "file": "src/ios/Providers/OpenAI/OAuth/CodexOAuthManager.swift",
+        "line": 213,
+        "source": "kSecAttrAccount as String: legacyKeychainAccount,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3030,
+        "source": "kSecAttrService as String: service,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3031,
+        "source": "kSecAttrAccount as String: account,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3055,
+        "source": "kSecAttrService as String: service,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3056,
+        "source": "kSecAttrAccount as String: account,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3071,
+        "source": "kSecAttrService as String: service,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3072,
+        "source": "kSecAttrAccount as String: account,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3091,
+        "source": "kSecAttrService as String: service,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3092,
+        "source": "kSecAttrAccount as String: account,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3125,
+        "source": "kSecAttrService as String: service,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3126,
+        "source": "kSecAttrAccount as String: acct,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3147,
+        "source": "kSecAttrService as String: service,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3148,
+        "source": "kSecAttrAccount as String: acct,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3163,
+        "source": "kSecAttrService as String: service,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3164,
+        "source": "kSecAttrAccount as String: acct,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3183,
+        "source": "kSecAttrService as String: service,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3184,
+        "source": "kSecAttrAccount as String: acct,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3200,
+        "source": "kSecAttrService as String: service,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3201,
+        "source": "kSecAttrAccount as String: account,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3221,
+        "source": "kSecAttrService as String: service,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3222,
+        "source": "kSecAttrAccount as String: account,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3237,
+        "source": "kSecAttrService as String: service,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3238,
+        "source": "kSecAttrAccount as String: account,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3256,
+        "source": "kSecAttrService as String: service,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3257,
+        "source": "kSecAttrAccount as String: account,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderMigration.swift",
+        "line": 274,
+        "source": "kSecAttrService as String: service,"
+      },
+      {
+        "file": "src/ios/Providers/ProviderMigration.swift",
+        "line": 275,
+        "source": "kSecAttrAccount as String: \"api-key\","
+      },
+      {
+        "file": "src/ios/Providers/ProviderMigration.swift",
+        "line": 305,
+        "source": "kSecAttrService as String: \"com.openminis.app.active-provider\","
+      },
+      {
+        "file": "src/ios/Providers/ProviderMigration.swift",
+        "line": 306,
+        "source": "kSecAttrAccount as String: \"auth-mode\","
+      },
+      {
+        "file": "src/ios/Shared/DeviceIdentity.swift",
+        "line": 200,
+        "source": "kSecAttrService as String: keychainService,"
+      },
+      {
+        "file": "src/ios/Shared/DeviceIdentity.swift",
+        "line": 201,
+        "source": "kSecAttrAccount as String: keychainAccount,"
+      },
+      {
+        "file": "src/ios/Shared/DeviceIdentity.swift",
+        "line": 216,
+        "source": "kSecAttrService as String: keychainService,"
+      },
+      {
+        "file": "src/ios/Shared/DeviceIdentity.swift",
+        "line": 217,
+        "source": "kSecAttrAccount as String: keychainAccount,"
+      },
+      {
+        "file": "src/ios/Shared/EnvVarStore.swift",
+        "line": 169,
+        "source": "kSecAttrService as String: keychainService,"
+      },
+      {
+        "file": "src/ios/Shared/EnvVarStore.swift",
+        "line": 170,
+        "source": "kSecAttrAccount as String: key,"
+      },
+      {
+        "file": "src/ios/Shared/EnvVarStore.swift",
+        "line": 213,
+        "source": "kSecAttrService as String: keychainService,"
+      },
+      {
+        "file": "src/ios/Shared/EnvVarStore.swift",
+        "line": 214,
+        "source": "kSecAttrAccount as String: key,"
+      },
+      {
+        "file": "src/ios/Shared/EnvVarStore.swift",
+        "line": 225,
+        "source": "kSecAttrService as String: keychainService,"
+      },
+      {
+        "file": "src/ios/Shared/EnvVarStore.swift",
+        "line": 226,
+        "source": "kSecAttrAccount as String: key,"
+      },
+      {
+        "file": "src/ios/Shared/EnvVarStore.swift",
+        "line": 238,
+        "source": "kSecAttrService as String: keychainService,"
+      },
+      {
+        "file": "src/ios/Shared/EnvVarStore.swift",
+        "line": 239,
+        "source": "kSecAttrAccount as String: key,"
+      }
+    ],
+    "defaults_namespaces": [
+      {
+        "file": "src/ios/Agent/Background/AgentLiveActivityManager.swift",
+        "line": 117,
+        "source": "(UserDefaults.standard.object(forKey: \"liveActivityEnabled\") as? Bool) ?? true"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 48,
+        "source": "@Published var enhancedBackgroundEnabled: Bool = UserDefaults.standard.bool(forKey: \"enhancedBackgroundExecution\") {"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 50,
+        "source": "UserDefaults.standard.set(enhancedBackgroundEnabled, forKey: \"enhancedBackgroundExecution\")"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 65,
+        "source": "@Published var locationTrackingEnabled: Bool = UserDefaults.standard.bool(forKey: \"locationTrackingEnabled\") {"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 66,
+        "source": "didSet { UserDefaults.standard.set(locationTrackingEnabled, forKey: \"locationTrackingEnabled\") }"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 75,
+        "source": "@Published var liveActivityEnabled: Bool = (UserDefaults.standard.object(forKey: \"liveActivityEnabled\") as? Bool) ?? true {"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 78,
+        "source": "UserDefaults.standard.set(liveActivityEnabled, forKey: \"liveActivityEnabled\")"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 88,
+        "source": "@Published var backgroundSpeakEnabled: Bool = UserDefaults.standard.bool(forKey: \"backgroundSpeakEnabled\") {"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 89,
+        "source": "didSet { UserDefaults.standard.set(backgroundSpeakEnabled, forKey: \"backgroundSpeakEnabled\") }"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 106,
+        "source": "UserDefaults.standard.object(forKey: \"backgroundNotificationsEnabled\") == nil"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 108,
+        "source": ": UserDefaults.standard.bool(forKey: \"backgroundNotificationsEnabled\")"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 110,
+        "source": "didSet { UserDefaults.standard.set(backgroundNotificationsEnabled, forKey: \"backgroundNotificationsEnabled\") }"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 126,
+        "source": "UserDefaults.standard.bool(forKey: \"liveActivityPrivacyMode\") {"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 127,
+        "source": "didSet { UserDefaults.standard.set(liveActivityPrivacyMode, forKey: \"liveActivityPrivacyMode\") }"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 133,
+        "source": "@Published var speechRate: Float = UserDefaults.standard.object(forKey: \"speechRate\") as? Float ?? AVSpeechUtteranceDefaultSpeechRate {"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 134,
+        "source": "didSet { UserDefaults.standard.set(speechRate, forKey: \"speechRate\") }"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 138,
+        "source": "@Published var speechPitch: Float = UserDefaults.standard.object(forKey: \"speechPitch\") as? Float ?? 1.0 {"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 139,
+        "source": "didSet { UserDefaults.standard.set(speechPitch, forKey: \"speechPitch\") }"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 143,
+        "source": "@Published var speechVolume: Float = UserDefaults.standard.object(forKey: \"speechVolume\") as? Float ?? 1.0 {"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 144,
+        "source": "didSet { UserDefaults.standard.set(speechVolume, forKey: \"speechVolume\") }"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 148,
+        "source": "@Published var speechVoiceZh: String = UserDefaults.standard.string(forKey: \"speechVoiceZh\") ?? \"\" {"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 149,
+        "source": "didSet { UserDefaults.standard.set(speechVoiceZh, forKey: \"speechVoiceZh\") }"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 153,
+        "source": "@Published var speechVoiceEn: String = UserDefaults.standard.string(forKey: \"speechVoiceEn\") ?? \"\" {"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 154,
+        "source": "didSet { UserDefaults.standard.set(speechVoiceEn, forKey: \"speechVoiceEn\") }"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 1647,
+        "source": "let stored = UserDefaults.standard.integer(forKey: Self.intervalKey)"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 1650,
+        "source": "set { UserDefaults.standard.set(newValue, forKey: Self.intervalKey) }"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 1656,
+        "source": "get { UserDefaults.standard.integer(forKey: Self.countKey) }"
+      },
+      {
+        "file": "src/ios/Agent/Background/BackgroundKeepAliveManager.swift",
+        "line": 1657,
+        "source": "set { UserDefaults.standard.set(newValue, forKey: Self.countKey) }"
+      },
+      {
+        "file": "src/ios/Agent/BrowserUse/BrowserTabPool.swift",
+        "line": 340,
+        "source": "if let raw = UserDefaults.standard.string(forKey: Self.uaProfileKey),"
+      },
+      {
+        "file": "src/ios/Agent/BrowserUse/BrowserTabPool.swift",
+        "line": 344,
+        "source": "if let custom = UserDefaults.standard.string(forKey: Self.uaCustomStringKey) {"
+      },
+      {
+        "file": "src/ios/Agent/BrowserUse/BrowserTabPool.swift",
+        "line": 348,
+        "source": "customViewportWidth = UserDefaults.standard.integer(forKey: Self.viewportWidthKey)"
+      },
+      {
+        "file": "src/ios/Agent/BrowserUse/BrowserTabPool.swift",
+        "line": 349,
+        "source": "customViewportHeight = UserDefaults.standard.integer(forKey: Self.viewportHeightKey)"
+      },
+      {
+        "file": "src/ios/Agent/BrowserUse/BrowserTabPool.swift",
+        "line": 1351,
+        "source": "UserDefaults.standard.set(customViewportWidth, forKey: Self.viewportWidthKey)"
+      },
+      {
+        "file": "src/ios/Agent/BrowserUse/BrowserTabPool.swift",
+        "line": 1352,
+        "source": "UserDefaults.standard.set(customViewportHeight, forKey: Self.viewportHeightKey)"
+      },
+      {
+        "file": "src/ios/Agent/BrowserUse/BrowserTabPool.swift",
+        "line": 1391,
+        "source": "UserDefaults.standard.set(profile.rawValue, forKey: Self.uaProfileKey)"
+      },
+      {
+        "file": "src/ios/Agent/BrowserUse/BrowserTabPool.swift",
+        "line": 1394,
+        "source": "UserDefaults.standard.set(customUserAgentString, forKey: Self.uaCustomStringKey)"
+      },
+      {
+        "file": "src/ios/Agent/Chat/AIChatViewModel+Offloading.swift",
+        "line": 662,
+        "source": "let previous = UserDefaults.standard.string(forKey: key)"
+      },
+      {
+        "file": "src/ios/Agent/Chat/AIChatViewModel+Offloading.swift",
+        "line": 667,
+        "source": "UserDefaults.standard.set(current, forKey: key)"
+      },
+      {
+        "file": "src/ios/Agent/Chat/AIChatViewModel+SlashCommands.swift",
+        "line": 273,
+        "source": "(UserDefaults.standard.dictionary(forKey: Self.slashUsageDefaultsKey) as? [String: Double]) ?? [:]"
+      },
+      {
+        "file": "src/ios/Agent/Chat/AIChatViewModel+SlashCommands.swift",
+        "line": 283,
+        "source": "UserDefaults.standard.set(usage, forKey: Self.slashUsageDefaultsKey)"
+      },
+      {
+        "file": "src/ios/Agent/Chat/AIChatViewModel+TitleGeneration.swift",
+        "line": 115,
+        "source": "let autoGroup = UserDefaults.standard.bool(forKey: \"autoGroupingEnabled\")"
+      },
+      {
+        "file": "src/ios/Agent/Chat/AIChatViewModel+TitleGeneration.swift",
+        "line": 673,
+        "source": "let userSelected = (UserDefaults.standard.string(forKey: \"appLanguage\") ?? \"\")"
+      },
+      {
+        "file": "src/ios/Agent/Chat/AIChatViewModel.swift",
+        "line": 853,
+        "source": "@Published var autoCompactEnabled: Bool = UserDefaults.standard.bool(forKey: \"autoCompactOnThreshold\") {"
+      },
+      {
+        "file": "src/ios/Agent/Chat/AIChatViewModel.swift",
+        "line": 856,
+        "source": "UserDefaults.standard.set(autoCompactEnabled, forKey: \"autoCompactOnThreshold\")"
+      },
+      {
+        "file": "src/ios/Agent/Chat/AIChatViewModel.swift",
+        "line": 1811,
+        "source": "+ \"Device languages: \\((UserDefaults.standard.object(forKey: \"AppleLanguages\") as? [String] ?? Locale.preferredLanguages).joined(separator: \", \")).\\n\\n\""
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatLifecycleSupport.swift",
+        "line": 265,
+        "source": "let enabled = UserDefaults.standard.bool(forKey: Self.userDefaultsKey)"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 656,
+        "source": "if !UserDefaults.standard.bool(forKey: zombieCleanupKey) {"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 665,
+        "source": "UserDefaults.standard.set(true, forKey: zombieCleanupKey)"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 704,
+        "source": "if !UserDefaults.standard.bool(forKey: partFlagsBackfillKey) {"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 713,
+        "source": "UserDefaults.standard.set(true, forKey: partFlagsBackfillKey)"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 1006,
+        "source": "let globalMemoryEnabled = (UserDefaults.standard.object(forKey: \"memory.global.enabled\") as? Bool) ?? true"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 1011,
+        "source": "let rawObj = UserDefaults.standard.object(forKey: \"memory.global.enabled\")"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 1362,
+        "source": "if UserDefaults.standard.bool(forKey: \"cloudSync.device.\\(deviceId).enabled\") {"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 2405,
+        "source": "let rawObj = UserDefaults.standard.object(forKey: \"memory.global.enabled\")"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 2413,
+        "source": "if let stored = UserDefaults.standard.object(forKey: \"memory.global.enabled\") as? Bool {"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 5009,
+        "source": "let v2Enabled = UserDefaults.standard.bool(forKey: \"cloudSync.v2.enabled\")"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 5010,
+        "source": "let migStatus = UserDefaults.standard.string(forKey: \"cloudSync.v2.migrationStatus\") ?? \"pending\""
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 5131,
+        "source": "let alreadyDone = UserDefaults.standard.bool(forKey: initialDoneKey)"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 5179,
+        "source": "UserDefaults.standard.set(oldestUpdatedAt.timeIntervalSince1970,"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 5182,
+        "source": "UserDefaults.standard.set(Date().timeIntervalSince1970,"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 5185,
+        "source": "UserDefaults.standard.set(true, forKey: initialDoneKey)"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 5239,
+        "source": "let prev = UserDefaults.standard.integer(forKey: key)"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 5240,
+        "source": "UserDefaults.standard.set(prev + fileCount, forKey: key)"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 5316,
+        "source": "if UserDefaults.standard.bool(forKey: cancelKey) {"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 5320,
+        "source": "let cursor = UserDefaults.standard.double(forKey: cursorKey)"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 5353,
+        "source": "UserDefaults.standard.set(0.0, forKey: cursorKey)"
+      },
+      {
+        "file": "src/ios/Agent/Chat/ChatStore.swift",
+        "line": 5363,
+        "source": "UserDefaults.standard.set(oldest, forKey: cursorKey)"
+      },
+      {
+        "file": "src/ios/Agent/Intents/SendPromptIntent.swift",
+        "line": 319,
+        "source": "guard UserDefaults.standard.object(forKey: \"backgroundNotificationsEnabled\") == nil"
+      },
+      {
+        "file": "src/ios/Agent/Intents/SendPromptIntent.swift",
+        "line": 320,
+        "source": "|| UserDefaults.standard.bool(forKey: \"backgroundNotificationsEnabled\") else { return }"
+      },
+      {
+        "file": "src/ios/Agent/Intents/ShortcutRunTracker.swift",
+        "line": 321,
+        "source": "let notificationsAllowed = UserDefaults.standard.object(forKey: \"backgroundNotificationsEnabled\") == nil"
+      },
+      {
+        "file": "src/ios/Agent/Intents/ShortcutRunTracker.swift",
+        "line": 322,
+        "source": "|| UserDefaults.standard.bool(forKey: \"backgroundNotificationsEnabled\")"
+      },
+      {
+        "file": "src/ios/Agent/Intents/ShortcutRunTracker.swift",
+        "line": 374,
+        "source": "private static var _notificationAuthCache: String = UserDefaults.standard.string(forKey: \"shortcutDiag.notificationAuthCache.v1\") ?? \"unknown\""
+      },
+      {
+        "file": "src/ios/Agent/Intents/ShortcutRunTracker.swift",
+        "line": 392,
+        "source": "UserDefaults.standard.set(value, forKey: \"shortcutDiag.notificationAuthCache.v1\")"
+      },
+      {
+        "file": "src/ios/Agent/Intents/ShortcutRunTracker.swift",
+        "line": 399,
+        "source": "guard let data = UserDefaults.standard.data(forKey: pendingRecordsKey),"
+      },
+      {
+        "file": "src/ios/Agent/Intents/ShortcutRunTracker.swift",
+        "line": 407,
+        "source": "UserDefaults.standard.removeObject(forKey: pendingRecordsKey)"
+      },
+      {
+        "file": "src/ios/Agent/Intents/ShortcutRunTracker.swift",
+        "line": 411,
+        "source": "UserDefaults.standard.set(encoded, forKey: pendingRecordsKey)"
+      },
+      {
+        "file": "src/ios/Agent/Intents/ShortcutRunTracker.swift",
+        "line": 416,
+        "source": "Set(UserDefaults.standard.stringArray(forKey: notifiedRunsKey) ?? [])"
+      },
+      {
+        "file": "src/ios/Agent/Intents/ShortcutRunTracker.swift",
+        "line": 421,
+        "source": "UserDefaults.standard.removeObject(forKey: notifiedRunsKey)"
+      },
+      {
+        "file": "src/ios/Agent/Intents/ShortcutRunTracker.swift",
+        "line": 423,
+        "source": "UserDefaults.standard.set(Array(ids), forKey: notifiedRunsKey)"
+      },
+      {
+        "file": "src/ios/Agent/Offload/OffloadPermissionManager.swift",
+        "line": 154,
+        "source": "private let defaults = UserDefaults.standard"
+      },
+      {
+        "file": "src/ios/Agent/Session/MCPStore.swift",
+        "line": 716,
+        "source": "(UserDefaults.standard.dictionary(forKey: fingerprintsKey) as? [String: String]) ?? [:]"
+      },
+      {
+        "file": "src/ios/Agent/Session/MCPStore.swift",
+        "line": 720,
+        "source": "UserDefaults.standard.set(fp, forKey: fingerprintsKey)"
+      },
+      {
+        "file": "src/ios/Agent/Session/MCPStore.swift",
+        "line": 909,
+        "source": "guard !UserDefaults.standard.bool(forKey: Self.legacyCleanupKey) else { return }"
+      },
+      {
+        "file": "src/ios/Agent/Session/MCPStore.swift",
+        "line": 920,
+        "source": "UserDefaults.standard.set(true, forKey: Self.legacyCleanupKey)"
+      },
+      {
+        "file": "src/ios/Agent/Session/SessionLockStore.swift",
+        "line": 297,
+        "source": "guard UserDefaults.standard.bool(forKey: SessionLockDefaultsKey.appLockEnabled) else { return false }"
+      },
+      {
+        "file": "src/ios/Agent/Session/SkillStore.swift",
+        "line": 399,
+        "source": "guard !UserDefaults.standard.bool(forKey: key) else { return }"
+      },
+      {
+        "file": "src/ios/Agent/Session/SkillStore.swift",
+        "line": 400,
+        "source": "UserDefaults.standard.set(true, forKey: key)"
+      },
+      {
+        "file": "src/ios/Agent/Shell/OnDemandBash.swift",
+        "line": 114,
+        "source": "let d = UserDefaults.standard"
+      },
+      {
+        "file": "src/ios/Agent/Shell/OnDemandBash.swift",
+        "line": 127,
+        "source": "let d = UserDefaults.standard"
+      },
+      {
+        "file": "src/ios/Agent/Shell/OnDemandBash.swift",
+        "line": 133,
+        "source": "let d = UserDefaults.standard"
+      },
+      {
+        "file": "src/ios/Agent/Speech/SpeechRecognitionManager.swift",
+        "line": 40,
+        "source": "UserDefaults.standard.set(locale.identifier, forKey: Self.savedLocaleKey)"
+      },
+      {
+        "file": "src/ios/Agent/Speech/SpeechRecognitionManager.swift",
+        "line": 60,
+        "source": "UserDefaults.standard.string(forKey: inputModePreferenceKey) == \"voice\""
+      },
+      {
+        "file": "src/ios/Agent/Speech/SpeechRecognitionManager.swift",
+        "line": 64,
+        "source": "guard UserDefaults.standard.string(forKey: inputModePreferenceKey) != mode else { return }"
+      },
+      {
+        "file": "src/ios/Agent/Speech/SpeechRecognitionManager.swift",
+        "line": 65,
+        "source": "UserDefaults.standard.set(mode, forKey: inputModePreferenceKey)"
+      },
+      {
+        "file": "src/ios/Agent/Speech/SpeechRecognitionManager.swift",
+        "line": 114,
+        "source": "if let savedId = UserDefaults.standard.string(forKey: Self.savedLocaleKey),"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 319,
+        "source": "UserDefaults.standard.set(isEnabled, forKey: \"cloudSync.enabled\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 334,
+        "source": "didSet { UserDefaults.standard.set(syncSessions, forKey: \"cloudSync.syncSessions\") }"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 337,
+        "source": "didSet { UserDefaults.standard.set(syncFiles, forKey: \"cloudSync.syncFiles\") }"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 340,
+        "source": "didSet { UserDefaults.standard.set(syncSkills, forKey: \"cloudSync.syncSkills\") }"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 343,
+        "source": "didSet { UserDefaults.standard.set(syncProviders, forKey: \"cloudSync.syncProviders\") }"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 346,
+        "source": "didSet { UserDefaults.standard.set(syncEnvironments, forKey: \"cloudSync.syncEnvironments\") }"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 352,
+        "source": "didSet { UserDefaults.standard.set(maxSyncFileSize, forKey: \"cloudSync.maxSyncFileSize\") }"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 370,
+        "source": "UserDefaults.standard.bool(forKey: \"cloudSync.device.\\(deviceId).enabled\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 376,
+        "source": "let ud = UserDefaults.standard"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 393,
+        "source": "UserDefaults.standard.bool(forKey: \"cloudSync.device.\\(deviceId).sync\\(type)\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 398,
+        "source": "UserDefaults.standard.set(enabled, forKey: \"cloudSync.device.\\(deviceId).sync\\(type)\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 419,
+        "source": "self.isEnabled = UserDefaults.standard.bool(forKey: \"cloudSync.enabled\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 421,
+        "source": "let ud = UserDefaults.standard"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 474,
+        "source": "UserDefaults.standard.removeObject(forKey: \"cloudSync.backfillDone.v1\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 510,
+        "source": "if !UserDefaults.standard.bool(forKey: backfillKey) {"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 512,
+        "source": "UserDefaults.standard.set(true, forKey: backfillKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/ChatStoreSyncHydrators.swift",
+        "line": 1786,
+        "source": "UserDefaults.standard.object(forKey: key) as? Bool ?? true"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/ChatStoreSyncHydrators.swift",
+        "line": 1789,
+        "source": "UserDefaults.standard.set(enabled, forKey: key)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/ICloudSharedZoneTransport.swift",
+        "line": 608,
+        "source": "if let lastTs = UserDefaults.standard.object(forKey: Self.recentFetchLastKey) as? Double, lastTs > 0 {"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/ICloudSharedZoneTransport.swift",
+        "line": 622,
+        "source": "!UserDefaults.standard.bool(forKey: Self.configTypeAnchoredKey(type)) {"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/ICloudSharedZoneTransport.swift",
+        "line": 773,
+        "source": "UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: Self.recentFetchLastKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/ICloudSharedZoneTransport.swift",
+        "line": 794,
+        "source": "where !UserDefaults.standard.bool(forKey: Self.configTypeAnchoredKey(type)) {"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/ICloudSharedZoneTransport.swift",
+        "line": 803,
+        "source": "UserDefaults.standard.set(true, forKey: Self.configTypeAnchoredKey(type))"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/ICloudSharedZoneTransport.swift",
+        "line": 1621,
+        "source": "let prev = UserDefaults.standard.integer(forKey: \"cloudSync.v2.pushedCumulative\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/ICloudSharedZoneTransport.swift",
+        "line": 1622,
+        "source": "UserDefaults.standard.set(prev + sent.savedRecords.count, forKey: \"cloudSync.v2.pushedCumulative\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/ICloudSharedZoneTransport.swift",
+        "line": 1870,
+        "source": "let prev = UserDefaults.standard.integer(forKey: Self.v1DeletedKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/ICloudSharedZoneTransport.swift",
+        "line": 1871,
+        "source": "UserDefaults.standard.set(prev + successCount, forKey: Self.v1DeletedKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/ICloudSharedZoneTransport.swift",
+        "line": 1919,
+        "source": "UserDefaults.standard.set(count, forKey: v1DeletePendingKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 91,
+        "source": "let raw = UserDefaults.standard.string(forKey: statusKey) ?? MigrationStatus.pending.rawValue"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 141,
+        "source": "UserDefaults.standard.set(dropped, forKey: \"cloudSync.v2.migrationCanceledRemaining\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 158,
+        "source": "UserDefaults.standard.set(true, forKey: \"cloudSync.v2.backlogScanCanceled\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 161,
+        "source": "UserDefaults.standard.set(MigrationStatus.completed.rawValue, forKey: statusKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 175,
+        "source": "UserDefaults.standard.removeObject(forKey: \"cloudSync.v2.migrationCanceledRemaining\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 184,
+        "source": "UserDefaults.standard.set(false, forKey: \"cloudSync.v2.backlogScanCanceled\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 219,
+        "source": "UserDefaults.standard.set(MigrationStatus.pending.rawValue, forKey: statusKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 247,
+        "source": "UserDefaults.standard.removeObject(forKey: statusKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 251,
+        "source": "UserDefaults.standard.removeObject(forKey: \"cloudSync.v2.initialBacklogMarked\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 252,
+        "source": "UserDefaults.standard.removeObject(forKey: \"cloudSync.v2.backlogScanCursorAt\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 253,
+        "source": "UserDefaults.standard.set(false, forKey: \"cloudSync.v2.backlogScanCanceled\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 256,
+        "source": "UserDefaults.standard.removeObject(forKey: \"cloudSync.v2.pushedCumulative\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 257,
+        "source": "UserDefaults.standard.removeObject(forKey: \"cloudSync.v2.v1RecordsDeleted\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 258,
+        "source": "UserDefaults.standard.removeObject(forKey: \"cloudSync.v2.v1RecordsDeletePending\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 259,
+        "source": "UserDefaults.standard.removeObject(forKey: \"cloudSync.v2.estimatedExtraSessionFiles\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 260,
+        "source": "UserDefaults.standard.removeObject(forKey: \"cloudSync.v2.migrationCanceledRemaining\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 261,
+        "source": "UserDefaults.standard.removeObject(forKey: Self.suspendedKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 275,
+        "source": "let canceledRemaining = UserDefaults.standard.integer(forKey: \"cloudSync.v2.migrationCanceledRemaining\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 292,
+        "source": "let pushed = UserDefaults.standard.integer(forKey: \"cloudSync.v2.pushedCumulative\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 323,
+        "source": "let v1Del = UserDefaults.standard.integer(forKey: \"cloudSync.v2.v1RecordsDeleted\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 324,
+        "source": "let cumulative = UserDefaults.standard.integer(forKey: \"cloudSync.v2.pushedCumulative\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 355,
+        "source": "let estimatedFiles = UserDefaults.standard.integer("
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 372,
+        "source": "let v1Deleted = UserDefaults.standard.integer(forKey: \"cloudSync.v2.v1RecordsDeleted\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 373,
+        "source": "let v1Pending = UserDefaults.standard.integer(forKey: \"cloudSync.v2.v1RecordsDeletePending\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 399,
+        "source": "isSuspended: UserDefaults.standard.bool(forKey: Self.suspendedKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 501,
+        "source": "UserDefaults.standard.set(MigrationStatus.pending.rawValue, forKey: statusKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 522,
+        "source": "UserDefaults.standard.set(MigrationStatus.inProgress.rawValue, forKey: statusKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 534,
+        "source": "UserDefaults.standard.set(false, forKey: Self.suspendedKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 547,
+        "source": "UserDefaults.standard.set(true, forKey: Self.suspendedKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 558,
+        "source": "UserDefaults.standard.set(MigrationStatus.failed.rawValue, forKey: statusKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 572,
+        "source": "UserDefaults.standard.set(MigrationStatus.failed.rawValue, forKey: statusKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 581,
+        "source": "UserDefaults.standard.set(MigrationStatus.completed.rawValue, forKey: statusKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/MigrationEngine.swift",
+        "line": 589,
+        "source": "UserDefaults.standard.removeObject(forKey: statusKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/SyncCore.swift",
+        "line": 132,
+        "source": "let t = UserDefaults.standard.double(forKey: Self.pauseUntilKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/SyncCore.swift",
+        "line": 139,
+        "source": "UserDefaults.standard.set(d.timeIntervalSince1970, forKey: Self.pauseUntilKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/SyncCore.swift",
+        "line": 141,
+        "source": "UserDefaults.standard.removeObject(forKey: Self.pauseUntilKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/SyncV2Bootstrap.swift",
+        "line": 46,
+        "source": "if UserDefaults.standard.object(forKey: key) == nil {"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/SyncV2Bootstrap.swift",
+        "line": 54,
+        "source": "if let v1 = UserDefaults.standard.object(forKey: v1Key) as? Bool {"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/SyncV2Bootstrap.swift",
+        "line": 61,
+        "source": "UserDefaults.standard.set(inherited, forKey: key)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/SyncV2Bootstrap.swift",
+        "line": 64,
+        "source": "return UserDefaults.standard.bool(forKey: key)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/SyncV2Bootstrap.swift",
+        "line": 68,
+        "source": "let prev = UserDefaults.standard.object(forKey: \"cloudSync.v2.enabled\") as? Bool ?? true"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/SyncV2Bootstrap.swift",
+        "line": 69,
+        "source": "UserDefaults.standard.set(enabled, forKey: \"cloudSync.v2.enabled\")"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/SyncV2Bootstrap.swift",
+        "line": 108,
+        "source": "UserDefaults.standard.bool(forKey: migrationRequestedKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/SyncV2Bootstrap.swift",
+        "line": 111,
+        "source": "UserDefaults.standard.set(requested, forKey: migrationRequestedKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/UploadPolicy.swift",
+        "line": 76,
+        "source": "if UserDefaults.standard.object(forKey: cat.defaultsKey) == nil {"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/UploadPolicy.swift",
+        "line": 77,
+        "source": "UserDefaults.standard.set(true, forKey: cat.defaultsKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/UploadPolicy.swift",
+        "line": 80,
+        "source": "return UserDefaults.standard.bool(forKey: cat.defaultsKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/UploadPolicy.swift",
+        "line": 84,
+        "source": "UserDefaults.standard.set(enabled, forKey: cat.defaultsKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/UploadPolicy.swift",
+        "line": 114,
+        "source": "let v = UserDefaults.standard.integer(forKey: maxFileSizeKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/UploadPolicy.swift",
+        "line": 117,
+        "source": "set { UserDefaults.standard.set(newValue, forKey: maxFileSizeKey) }"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/UploadPolicy.swift",
+        "line": 133,
+        "source": "get { UserDefaults.standard.string(forKey: deviceNameKey) }"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/UploadPolicy.swift",
+        "line": 136,
+        "source": "UserDefaults.standard.set(s, forKey: deviceNameKey)"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/UploadPolicy.swift",
+        "line": 138,
+        "source": "UserDefaults.standard.removeObject(forKey: deviceNameKey)"
+      },
+      {
+        "file": "src/ios/Debug/DebugAuth.swift",
+        "line": 59,
+        "source": "UserDefaults.standard.object(forKey: \"debug.auth.required\") as? Bool ?? true"
+      },
+      {
+        "file": "src/ios/Debug/DebugAuth.swift",
+        "line": 63,
+        "source": "UserDefaults.standard.set(required, forKey: \"debug.auth.required\")"
+      },
+      {
+        "file": "src/ios/Debug/DebugJSONRPC.swift",
+        "line": 1111,
+        "source": "let migrated = UserDefaults.standard.bool(forKey: \"cloudSync.providerV3.migrationCompleted\")"
+      },
+      {
+        "file": "src/ios/Debug/DebugRPCProviderChat.swift",
+        "line": 1472,
+        "source": "UserDefaults.standard.set(mode, forKey: \"appearanceMode\")"
+      },
+      {
+        "file": "src/ios/Debug/DebugRPCProviderChat.swift",
+        "line": 1505,
+        "source": "UserDefaults.standard.set(enabled, forKey: \"autoGroupingEnabled\")"
+      },
+      {
+        "file": "src/ios/Diagnostics/CrashReporter.swift",
+        "line": 56,
+        "source": "let d = UserDefaults.standard"
+      },
+      {
+        "file": "src/ios/Diagnostics/CrashReporter.swift",
+        "line": 60,
+        "source": "set { UserDefaults.standard.set(newValue, forKey: toolBreadcrumbDefaultsKey) }"
+      },
+      {
+        "file": "src/ios/Diagnostics/CrashReporter.swift",
+        "line": 230,
+        "source": "return UserDefaults.standard.bool(forKey: Self.crashLoopTriggeredKey)"
+      },
+      {
+        "file": "src/ios/Diagnostics/CrashReporter.swift",
+        "line": 254,
+        "source": "UserDefaults.standard.removeObject(forKey: Self.crashLoopTriggeredKey)"
+      },
+      {
+        "file": "src/ios/Diagnostics/CrashReporter.swift",
+        "line": 262,
+        "source": "let defaults = UserDefaults.standard"
+      },
+      {
+        "file": "src/ios/Diagnostics/CrashReporter.swift",
+        "line": 282,
+        "source": "let defaults = UserDefaults.standard"
+      },
+      {
+        "file": "src/ios/MinisApp.swift",
+        "line": 65,
+        "source": "UserDefaults.standard.removeObject(forKey: \"AppleLanguages\")"
+      },
+      {
+        "file": "src/ios/MinisApp.swift",
+        "line": 69,
+        "source": "UserDefaults.standard.set([code], forKey: \"AppleLanguages\")"
+      },
+      {
+        "file": "src/ios/MinisApp.swift",
+        "line": 109,
+        "source": "@AppStorage(\"appearanceMode\") private var appearanceMode: Int = 0"
+      },
+      {
+        "file": "src/ios/MinisApp.swift",
+        "line": 110,
+        "source": "@AppStorage(\"appLanguage\") private var appLanguage: String = \"\""
+      },
+      {
+        "file": "src/ios/MinisApp.swift",
+        "line": 146,
+        "source": "let lang = UserDefaults.standard.string(forKey: \"appLanguage\") ?? \"\""
+      },
+      {
+        "file": "src/ios/MinisApp.swift",
+        "line": 601,
+        "source": "let defaults = UserDefaults.standard"
+      },
+      {
+        "file": "src/ios/Providers/OpenAI/OpenAIAgentProvider.swift",
+        "line": 521,
+        "source": "if UserDefaults.standard.bool(forKey: OpenAIProvider.fastModeDefaultsKey),"
+      },
+      {
+        "file": "src/ios/Providers/OpenAI/OpenAIProvider.swift",
+        "line": 857,
+        "source": "if UserDefaults.standard.bool(forKey: Self.fastModeDefaultsKey),"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 270,
+        "source": "let migratedFlag = UserDefaults.standard.bool(forKey: \"cloudSync.providerV3.migrationCompleted\")"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 277,
+        "source": "UserDefaults.standard.set(true, forKey: \"cloudSync.providerV3.migrationCompleted\")"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 455,
+        "source": "let alreadyMigrated = UserDefaults.standard.bool(forKey: migratedKey)"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 460,
+        "source": "UserDefaults.standard.set(true, forKey: migratedKey)"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 743,
+        "source": "let migratedFlag = UserDefaults.standard.bool(forKey: \"cloudSync.providerV3.migrationCompleted\")"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 2377,
+        "source": "UserDefaults.standard.bool(forKey: Self.voiceShadowDisabledKey(instanceId))"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 2380,
+        "source": "UserDefaults.standard.set(disabled, forKey: Self.voiceShadowDisabledKey(instanceId))"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 2524,
+        "source": "guard !UserDefaults.standard.bool(forKey: Self.voiceModalityMigrationKey) else { return }"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 2525,
+        "source": "UserDefaults.standard.set(true, forKey: Self.voiceModalityMigrationKey)"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 2556,
+        "source": "let lastRefresh = UserDefaults.standard.object(forKey: key) as? Date"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 2572,
+        "source": "UserDefaults.standard.set(Date(), forKey: key)"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3011,
+        "source": "let ud = UserDefaults.standard"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3022,
+        "source": "UserDefaults.standard.set(date, forKey: apiKeySavedAtUDKey(instanceId: instanceId))"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 3100,
+        "source": "UserDefaults.standard.removeObject(forKey: apiKeySavedAtUDKey(instanceId: instanceId))"
+      },
+      {
+        "file": "src/ios/Providers/ProviderMigration.swift",
+        "line": 17,
+        "source": "if !UserDefaults.standard.bool(forKey: migrationKey) {"
+      },
+      {
+        "file": "src/ios/Providers/ProviderMigration.swift",
+        "line": 20,
+        "source": "UserDefaults.standard.set(true, forKey: migrationKey)"
+      },
+      {
+        "file": "src/ios/Providers/ProviderMigration.swift",
+        "line": 24,
+        "source": "if !UserDefaults.standard.bool(forKey: oauthMigrationKey) {"
+      },
+      {
+        "file": "src/ios/Providers/ProviderMigration.swift",
+        "line": 26,
+        "source": "UserDefaults.standard.set(true, forKey: oauthMigrationKey)"
+      },
+      {
+        "file": "src/ios/Providers/ProviderMigration.swift",
+        "line": 58,
+        "source": "if let email = UserDefaults.standard.string(forKey: GeminiOAuthManager.legacyEmailKey) {"
+      },
+      {
+        "file": "src/ios/Providers/ProviderMigration.swift",
+        "line": 60,
+        "source": "UserDefaults.standard.removeObject(forKey: GeminiOAuthManager.legacyEmailKey)"
+      },
+      {
+        "file": "src/ios/Providers/ProviderMigration.swift",
+        "line": 62,
+        "source": "if let projectID = UserDefaults.standard.string(forKey: GeminiOAuthManager.legacyProjectIDKey) {"
+      },
+      {
+        "file": "src/ios/Providers/ProviderMigration.swift",
+        "line": 64,
+        "source": "UserDefaults.standard.removeObject(forKey: GeminiOAuthManager.legacyProjectIDKey)"
+      },
+      {
+        "file": "src/ios/Providers/ProviderMigration.swift",
+        "line": 293,
+        "source": "guard let data = UserDefaults.standard.data(forKey: key),"
+      },
+      {
+        "file": "src/ios/Providers/Voice/CorrectionSignalSource.swift",
+        "line": 155,
+        "source": "didSet { UserDefaults.standard.set(isEnabled, forKey: Self.enabledKey) }"
+      },
+      {
+        "file": "src/ios/Providers/Voice/CorrectionSignalSource.swift",
+        "line": 161,
+        "source": "didSet { UserDefaults.standard.set(hasPrompted, forKey: Self.promptedKey) }"
+      },
+      {
+        "file": "src/ios/Providers/Voice/CorrectionSignalSource.swift",
+        "line": 165,
+        "source": "isEnabled = UserDefaults.standard.bool(forKey: Self.enabledKey)   // default false"
+      },
+      {
+        "file": "src/ios/Providers/Voice/CorrectionSignalSource.swift",
+        "line": 166,
+        "source": "hasPrompted = UserDefaults.standard.bool(forKey: Self.promptedKey)"
+      },
+      {
+        "file": "src/ios/Providers/Voice/CorrectionSignalSource.swift",
+        "line": 173,
+        "source": "UserDefaults.standard.bool(forKey: enabledKey)"
+      },
+      {
+        "file": "src/ios/Providers/Voice/SystemVoiceCatalog.swift",
+        "line": 26,
+        "source": "get { UserDefaults.standard.object(forKey: pitchKey) as? Float ?? 1.0 }"
+      },
+      {
+        "file": "src/ios/Providers/Voice/SystemVoiceCatalog.swift",
+        "line": 27,
+        "source": "set { UserDefaults.standard.set(newValue, forKey: pitchKey) }"
+      },
+      {
+        "file": "src/ios/Providers/Voice/SystemVoiceCatalog.swift",
+        "line": 32,
+        "source": "get { UserDefaults.standard.object(forKey: volumeKey) as? Float ?? 1.0 }"
+      },
+      {
+        "file": "src/ios/Providers/Voice/SystemVoiceCatalog.swift",
+        "line": 33,
+        "source": "set { UserDefaults.standard.set(newValue, forKey: volumeKey) }"
+      },
+      {
+        "file": "src/ios/Providers/Voice/VoiceOutputPlayer.swift",
+        "line": 12,
+        "source": "get { UserDefaults.standard.bool(forKey: key) }"
+      },
+      {
+        "file": "src/ios/Providers/Voice/VoiceOutputPlayer.swift",
+        "line": 13,
+        "source": "set { UserDefaults.standard.set(newValue, forKey: key) }"
+      },
+      {
+        "file": "src/ios/Providers/Voice/VoiceOutputPlayer.swift",
+        "line": 23,
+        "source": "let v = UserDefaults.standard.object(forKey: speedKey) as? Float ?? 1.0"
+      },
+      {
+        "file": "src/ios/Providers/Voice/VoiceOutputPlayer.swift",
+        "line": 26,
+        "source": "set { UserDefaults.standard.set(newValue, forKey: speedKey) }"
+      },
+      {
+        "file": "src/ios/Providers/Voice/VoiceOutputPlayer.swift",
+        "line": 33,
+        "source": "get { UserDefaults.standard.bool(forKey: mutedKey) }"
+      },
+      {
+        "file": "src/ios/Providers/Voice/VoiceOutputPlayer.swift",
+        "line": 34,
+        "source": "set { UserDefaults.standard.set(newValue, forKey: mutedKey) }"
+      },
+      {
+        "file": "src/ios/Providers/Voice/VoiceOutputPlayer.swift",
+        "line": 48,
+        "source": "let d = UserDefaults.standard"
+      },
+      {
+        "file": "src/ios/Providers/Voice/VoiceOutputPlayer.swift",
+        "line": 53,
+        "source": "let d = UserDefaults.standard"
+      },
+      {
+        "file": "src/ios/Shared/Config/ConfigRegistry+Builtins.swift",
+        "line": 764,
+        "source": "return .bool(UserDefaults.standard.bool(forKey: \"cloudSync.enabled\"))"
+      },
+      {
+        "file": "src/ios/Shared/Config/ConfigRegistry+Builtins.swift",
+        "line": 782,
+        "source": "UserDefaults.standard.set(on, forKey: \"cloudSync.enabled\")"
+      },
+      {
+        "file": "src/ios/Shared/Config/ConfigRegistry+Builtins.swift",
+        "line": 833,
+        "source": "let v1On = UserDefaults.standard.bool(forKey: \"cloudSync.enabled\")"
+      },
+      {
+        "file": "src/ios/Shared/Config/Fields/AppStorageFields.swift",
+        "line": 21,
+        "source": "if UserDefaults.standard.object(forKey: userDefaultsKey) == nil {"
+      },
+      {
+        "file": "src/ios/Shared/Config/Fields/AppStorageFields.swift",
+        "line": 24,
+        "source": "return .bool(UserDefaults.standard.bool(forKey: userDefaultsKey))"
+      },
+      {
+        "file": "src/ios/Shared/Config/Fields/AppStorageFields.swift",
+        "line": 29,
+        "source": "UserDefaults.standard.set(b, forKey: userDefaultsKey)"
+      },
+      {
+        "file": "src/ios/Shared/Config/Fields/AppStorageFields.swift",
+        "line": 47,
+        "source": "if UserDefaults.standard.object(forKey: userDefaultsKey) == nil {"
+      },
+      {
+        "file": "src/ios/Shared/Config/Fields/AppStorageFields.swift",
+        "line": 50,
+        "source": "return .int(UserDefaults.standard.integer(forKey: userDefaultsKey))"
+      },
+      {
+        "file": "src/ios/Shared/Config/Fields/AppStorageFields.swift",
+        "line": 55,
+        "source": "UserDefaults.standard.set(i, forKey: userDefaultsKey)"
+      },
+      {
+        "file": "src/ios/Shared/Config/Fields/AppStorageFields.swift",
+        "line": 73,
+        "source": "if UserDefaults.standard.object(forKey: userDefaultsKey) == nil {"
+      },
+      {
+        "file": "src/ios/Shared/Config/Fields/AppStorageFields.swift",
+        "line": 76,
+        "source": "return .double(UserDefaults.standard.double(forKey: userDefaultsKey))"
+      },
+      {
+        "file": "src/ios/Shared/Config/Fields/AppStorageFields.swift",
+        "line": 86,
+        "source": "UserDefaults.standard.set(d, forKey: userDefaultsKey)"
+      },
+      {
+        "file": "src/ios/Shared/Config/Fields/AppStorageFields.swift",
+        "line": 104,
+        "source": ".string(UserDefaults.standard.string(forKey: userDefaultsKey) ?? defaultValue)"
+      },
+      {
+        "file": "src/ios/Shared/Config/Fields/AppStorageFields.swift",
+        "line": 109,
+        "source": "UserDefaults.standard.set(s, forKey: userDefaultsKey)"
+      },
+      {
+        "file": "src/ios/Shared/Config/Fields/AppStorageFields.swift",
+        "line": 129,
+        "source": "let raw = UserDefaults.standard.string(forKey: userDefaultsKey) ?? defaultValue"
+      },
+      {
+        "file": "src/ios/Shared/Config/Fields/AppStorageFields.swift",
+        "line": 135,
+        "source": "UserDefaults.standard.set(s, forKey: userDefaultsKey)"
+      },
+      {
+        "file": "src/ios/Shared/Config/Fields/AppStorageFields.swift",
+        "line": 157,
+        "source": "if UserDefaults.standard.object(forKey: userDefaultsKey) == nil {"
+      },
+      {
+        "file": "src/ios/Shared/Config/Fields/AppStorageFields.swift",
+        "line": 160,
+        "source": "idx = UserDefaults.standard.integer(forKey: userDefaultsKey)"
+      },
+      {
+        "file": "src/ios/Shared/Config/Fields/AppStorageFields.swift",
+        "line": 171,
+        "source": "UserDefaults.standard.set(idx, forKey: userDefaultsKey)"
+      },
+      {
+        "file": "src/ios/Shared/Config/MinisConfigPermissionStore.swift",
+        "line": 26,
+        "source": "UserDefaults.standard.set(enabled, forKey: Self.userDefaultsKey)"
+      },
+      {
+        "file": "src/ios/Shared/Config/MinisConfigPermissionStore.swift",
+        "line": 33,
+        "source": "if UserDefaults.standard.object(forKey: Self.userDefaultsKey) == nil {"
+      },
+      {
+        "file": "src/ios/Shared/Config/MinisConfigPermissionStore.swift",
+        "line": 36,
+        "source": "self.enabled = UserDefaults.standard.bool(forKey: Self.userDefaultsKey)"
+      },
+      {
+        "file": "src/ios/Shared/EnvVarPrivacyStore.swift",
+        "line": 25,
+        "source": "UserDefaults.standard.set(enabled, forKey: Self.userDefaultsKey)"
+      },
+      {
+        "file": "src/ios/Shared/EnvVarPrivacyStore.swift",
+        "line": 30,
+        "source": "let d = UserDefaults.standard"
+      },
+      {
+        "file": "src/ios/Shared/EnvVarPrivacyStore.swift",
+        "line": 39,
+        "source": "let d = UserDefaults.standard"
+      },
+      {
+        "file": "src/ios/Shared/EnvVarStore.swift",
+        "line": 75,
+        "source": "guard !UserDefaults.standard.bool(forKey: Self.legacyCleanupKey) else { return }"
+      },
+      {
+        "file": "src/ios/Shared/EnvVarStore.swift",
+        "line": 89,
+        "source": "UserDefaults.standard.set(true, forKey: Self.legacyCleanupKey)"
+      },
+      {
+        "file": "src/ios/Shared/FontSettings.swift",
+        "line": 93,
+        "source": "UserDefaults.standard.set(chatInputScale.rawValue, forKey: Keys.chatInput)"
+      },
+      {
+        "file": "src/ios/Shared/FontSettings.swift",
+        "line": 99,
+        "source": "UserDefaults.standard.set(messageBaseScale.rawValue, forKey: Keys.messageBase)"
+      },
+      {
+        "file": "src/ios/Shared/FontSettings.swift",
+        "line": 108,
+        "source": "UserDefaults.standard.set(appBaseScale.rawValue, forKey: Keys.appBase)"
+      },
+      {
+        "file": "src/ios/Shared/FontSettings.swift",
+        "line": 141,
+        "source": "let ud = UserDefaults.standard"
+      },
+      {
+        "file": "src/ios/Shared/LoggingManager.swift",
+        "line": 8,
+        "source": "UserDefaults.standard.set(isEnabled, forKey: \"loggingEnabled\")"
+      },
+      {
+        "file": "src/ios/Shared/LoggingManager.swift",
+        "line": 82,
+        "source": "isEnabled = UserDefaults.standard.bool(forKey: \"loggingEnabled\")"
+      },
+      {
+        "file": "src/ios/Shared/SessionBadgeStore.swift",
+        "line": 240,
+        "source": "UserDefaults.standard.set(data, forKey: Self.storageKey)"
+      },
+      {
+        "file": "src/ios/Shared/SessionBadgeStore.swift",
+        "line": 253,
+        "source": "UserDefaults.standard.set(data, forKey: Self.timestampsKey)"
+      },
+      {
+        "file": "src/ios/Shared/SessionBadgeStore.swift",
+        "line": 258,
+        "source": "guard let data = UserDefaults.standard.data(forKey: Self.storageKey),"
+      },
+      {
+        "file": "src/ios/Shared/SessionBadgeStore.swift",
+        "line": 269,
+        "source": "if let tsData = UserDefaults.standard.data(forKey: Self.timestampsKey),"
+      },
+      {
+        "file": "src/ios/Shared/SharedContainerStore.swift",
+        "line": 37,
+        "source": "UserDefaults(suiteName: appGroupID)"
+      },
+      {
+        "file": "src/ios/Views/Chat/AIChatView.swift",
+        "line": 349,
+        "source": "@AppStorage(\"cloudSync.v2.enabled\") private var iCloudSyncEnabled: Bool = false"
+      },
+      {
+        "file": "src/ios/Views/Chat/AIChatView.swift",
+        "line": 353,
+        "source": "@AppStorage(OpenAIProvider.fastModeDefaultsKey) private var codexFastModeEnabled: Bool = false"
+      },
+      {
+        "file": "src/ios/Views/Chat/AIChatView.swift",
+        "line": 361,
+        "source": "@AppStorage(\"appLanguage\") private var observedAppLanguage: String = \"\""
+      },
+      {
+        "file": "src/ios/Views/Chat/AIChatView.swift",
+        "line": 399,
+        "source": "@AppStorage(\"chat.composer.heightFraction\") private var composerHeightFraction: Double = 0"
+      },
+      {
+        "file": "src/ios/Views/Chat/AIChatView.swift",
+        "line": 772,
+        "source": "UserDefaults.standard.set(true, forKey: \"enhancedCacheConfirmed\")"
+      },
+      {
+        "file": "src/ios/Views/Chat/AIChatView.swift",
+        "line": 1455,
+        "source": "let autoFocusEnabled = (UserDefaults.standard.object(forKey: \"chat.autoFocusAfterReply\") as? Bool) ?? true"
+      },
+      {
+        "file": "src/ios/Views/Chat/AIChatView.swift",
+        "line": 1758,
+        "source": "if newValue && !UserDefaults.standard.bool(forKey: \"enhancedCacheConfirmed\") {"
+      },
+      {
+        "file": "src/ios/Views/Chat/AssistantBlockView.swift",
+        "line": 947,
+        "source": "let autoExpand = (UserDefaults.standard.object(forKey: \"chat.autoExpandThinking\") as? Bool) ?? true"
+      },
+      {
+        "file": "src/ios/Views/Chat/ChatInputBar.swift",
+        "line": 1222,
+        "source": "return UserDefaults.standard.integer(forKey: \"returnKeyBehavior\") == 1"
+      },
+      {
+        "file": "src/ios/Views/Chat/ChatInputBar.swift",
+        "line": 1229,
+        "source": "if UserDefaults.standard.integer(forKey: \"returnKeyBehavior\") == 1 {"
+      },
+      {
+        "file": "src/ios/Views/Chat/ChatInputBar.swift",
+        "line": 1418,
+        "source": "tv.returnKeyType = UserDefaults.standard.integer(forKey: \"returnKeyBehavior\") == 1 ? .send : .default"
+      },
+      {
+        "file": "src/ios/Views/Chat/ChatInputBar.swift",
+        "line": 1605,
+        "source": "let desiredReturnKey: UIReturnKeyType = UserDefaults.standard.integer(forKey: \"returnKeyBehavior\") == 1 ? .send : .default"
+      },
+      {
+        "file": "src/ios/Views/Chat/ChatInputBar.swift",
+        "line": 1820,
+        "source": "let behavior = UserDefaults.standard.integer(forKey: \"returnKeyBehavior\")"
+      },
+      {
+        "file": "src/ios/Views/Chat/MinisMediaViews.swift",
+        "line": 1068,
+        "source": "@AppStorage(\"appearanceMode\") private var appearanceMode: Int = 0"
+      },
+      {
+        "file": "src/ios/Views/Chat/SelectableMarkdownView.swift",
+        "line": 156,
+        "source": "if let raw = UserDefaults.standard.dictionary(forKey: Self.defaultsKey) as? [String: String] {"
+      },
+      {
+        "file": "src/ios/Views/Chat/SelectableMarkdownView.swift",
+        "line": 230,
+        "source": "UserDefaults.standard.set(encoded, forKey: Self.defaultsKey)"
+      },
+      {
+        "file": "src/ios/Views/Chat/ToolLiveSheet.swift",
+        "line": 219,
+        "source": "@AppStorage(\"toolPreviewEnabled\") private var toolPreviewEnabled: Bool = true"
+      },
+      {
+        "file": "src/ios/Views/Chat/Voice/VoiceInputPanel.swift",
+        "line": 1241,
+        "source": "let saved = UserDefaults.standard.string(forKey: lastUsedKey) ?? \"\""
+      },
+      {
+        "file": "src/ios/Views/Chat/Voice/VoiceInputPanel.swift",
+        "line": 1247,
+        "source": "set { UserDefaults.standard.set(newValue, forKey: lastUsedKey) }"
+      },
+      {
+        "file": "src/ios/Views/Chat/WebPreviewSheet.swift",
+        "line": 89,
+        "source": "let defaults = UserDefaults.standard"
+      },
+      {
+        "file": "src/ios/Views/Chat/WebPreviewSheet.swift",
+        "line": 214,
+        "source": "let defaults = UserDefaults.standard"
+      },
+      {
+        "file": "src/ios/Views/Chat/WebPreviewSheet.swift",
+        "line": 569,
+        "source": "@AppStorage(\"appearanceMode\") private var appearanceMode: Int = 0"
+      },
+      {
+        "file": "src/ios/Views/Chat/WebPreviewSheet.swift",
+        "line": 711,
+        "source": "@AppStorage(\"appearanceMode\") private var appearanceMode: Int = 0"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 888,
+        "source": "Set(UserDefaults.standard.stringArray(forKey: \"collapsedFolderIds\") ?? [])"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 1035,
+        "source": "@AppStorage(\"launchScreen\") private var launchScreen: Int = 0"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 1037,
+        "source": "@AppStorage(\"fabOnLeft\") private var fabOnLeft = false"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 1044,
+        "source": "@AppStorage(\"cloudSync.v2.enabled\") private var iCloudSyncEnabled: Bool = false"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 1286,
+        "source": "if UserDefaults.standard.string(forKey: \"pendingSettingsReopen\") != nil {"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 2352,
+        "source": "UserDefaults.standard.set(Array(collapsedFolderIds), forKey: \"collapsedFolderIds\")"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 3562,
+        "source": "let lang = UserDefaults.standard.string(forKey: \"appLanguage\") ?? \"\""
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 6009,
+        "source": "return UserDefaults.standard.bool(forKey: \"cloudSync.v2.enabled\")"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 6900,
+        "source": "@AppStorage(\"appearanceMode\") private var appearanceMode: Int = 0"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 6901,
+        "source": "@AppStorage(\"appIconMode\") private var appIconMode: Int = 0"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 6902,
+        "source": "@AppStorage(\"appLanguage\") private var appLanguage: String = \"\""
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 6903,
+        "source": "@AppStorage(\"launchScreen\") private var launchScreen: Int = 0  // 0=Auto, 1=Last Session, 2=New Chat, 3=Home"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 6904,
+        "source": "@AppStorage(\"toolPreviewEnabled\") private var toolPreviewEnabled: Bool = true"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 6906,
+        "source": "@AppStorage(\"returnKeyBehavior\") private var returnKeyBehavior: Int = 0"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 6909,
+        "source": "@AppStorage(\"keepScreenAwakeDuringTasks\") private var keepScreenAwakeDuringTasks: Bool = false"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 6916,
+        "source": "@AppStorage(\"chat.autoFocusAfterReply\") private var autoFocusAfterReply: Bool = true"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 6921,
+        "source": "@AppStorage(\"chat.autoExpandThinking\") private var autoExpandThinking: Bool = true"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 7117,
+        "source": "UserDefaults.standard.set(\"appearance\", forKey: \"pendingSettingsReopen\")"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 7167,
+        "source": "get: { UserDefaults.standard.bool(forKey: \"autoGroupingEnabled\") },"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 7168,
+        "source": "set: { UserDefaults.standard.set($0, forKey: \"autoGroupingEnabled\") }"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 7231,
+        "source": "@AppStorage(\"appearanceMode\") private var appearanceMode: Int = 0"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 7587,
+        "source": "if let dest = UserDefaults.standard.string(forKey: \"pendingSettingsReopen\") {"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 7588,
+        "source": "UserDefaults.standard.removeObject(forKey: \"pendingSettingsReopen\")"
+      },
+      {
+        "file": "src/ios/Views/Providers/AddProviderView.swift",
+        "line": 90,
+        "source": "UserDefaults.standard.set(true, forKey: aiDataSharingConsentKey)"
+      },
+      {
+        "file": "src/ios/Views/Providers/AddProviderView.swift",
+        "line": 182,
+        "source": "UserDefaults.standard.bool(forKey: aiDataSharingConsentKey)"
+      },
+      {
+        "file": "src/ios/Views/Providers/ModelGroupsView.swift",
+        "line": 11,
+        "source": "@AppStorage(\"cloudSync.v2.enabled\") private var iCloudSyncEnabled: Bool = false"
+      },
+      {
+        "file": "src/ios/Views/Providers/ProviderInstancesView.swift",
+        "line": 13,
+        "source": "@AppStorage(\"cloudSync.v2.enabled\") private var iCloudSyncEnabled: Bool = false"
+      },
+      {
+        "file": "src/ios/Views/Rootfs/FileBrowserView.swift",
+        "line": 35,
+        "source": "@AppStorage(\"fileBrowser.sortKey\") private var sortKeyRaw: String = FileSortKey.name.rawValue"
+      },
+      {
+        "file": "src/ios/Views/Rootfs/FileBrowserView.swift",
+        "line": 36,
+        "source": "@AppStorage(\"fileBrowser.sortAscending\") private var sortAscending: Bool = true"
+      },
+      {
+        "file": "src/ios/Views/Rootfs/FileBrowserView.swift",
+        "line": 37,
+        "source": "@AppStorage(\"fileBrowser.foldersFirst\") private var foldersFirst: Bool = true"
+      },
+      {
+        "file": "src/ios/Views/Rootfs/FileBrowserView.swift",
+        "line": 42,
+        "source": "@AppStorage(\"fileBrowser.showHidden\") private var showHidden: Bool = false"
+      },
+      {
+        "file": "src/ios/Views/Rootfs/MirrorSpeedTestView.swift",
+        "line": 161,
+        "source": "let ud = UserDefaults.standard"
+      },
+      {
+        "file": "src/ios/Views/Rootfs/MirrorSpeedTestView.swift",
+        "line": 172,
+        "source": "let ud = UserDefaults.standard"
+      },
+      {
+        "file": "src/ios/Views/Rootfs/MirrorSpeedTestView.swift",
+        "line": 186,
+        "source": "let ud = UserDefaults.standard"
+      },
+      {
+        "file": "src/ios/Views/Settings/FaceIDProtectionSettingsView.swift",
+        "line": 17,
+        "source": "@AppStorage(SessionLockDefaultsKey.enabled) private var enabled: Bool = false"
+      },
+      {
+        "file": "src/ios/Views/Settings/FaceIDProtectionSettingsView.swift",
+        "line": 18,
+        "source": "@AppStorage(SessionLockDefaultsKey.idleSeconds) private var idleSeconds: Int = 300"
+      },
+      {
+        "file": "src/ios/Views/Settings/FaceIDProtectionSettingsView.swift",
+        "line": 19,
+        "source": "@AppStorage(SessionLockDefaultsKey.appLockEnabled) private var appLockEnabled: Bool = false"
+      },
+      {
+        "file": "src/ios/Views/Settings/FaceIDProtectionSettingsView.swift",
+        "line": 20,
+        "source": "@AppStorage(SessionLockDefaultsKey.appLockIdleSeconds) private var appLockIdleSeconds: Int = -1"
+      },
+      {
+        "file": "src/ios/Views/Settings/MemoryManagementView.swift",
+        "line": 13,
+        "source": "@AppStorage(\"cloudSync.v2.enabled\") private var iCloudSyncEnabled: Bool = false"
+      },
+      {
+        "file": "src/ios/Views/Settings/MemoryManagementView.swift",
+        "line": 19,
+        "source": "@AppStorage(\"memory.global.enabled\") private var memoryGlobalEnabled: Bool = true"
+      },
+      {
+        "file": "src/ios/Views/Settings/SharedFolderVisibility.swift",
+        "line": 32,
+        "source": "UserDefaults(suiteName: appGroupID) ?? .standard"
+      },
+      {
+        "file": "src/ios/Views/Settings/SoulSettingsView.swift",
+        "line": 22,
+        "source": "@AppStorage(\"cloudSync.v2.enabled\") private var iCloudSyncEnabled: Bool = false"
+      },
+      {
+        "file": "src/ios/Views/Skills/SkillsManagementView.swift",
+        "line": 37,
+        "source": "@AppStorage(\"cloudSync.v2.enabled\") private var iCloudSyncEnabled: Bool = false"
+      },
+      {
+        "file": "src/ios/Views/Skills/SkillsManagementView.swift",
+        "line": 38,
+        "source": "@AppStorage(\"skillsList.sortKey\") private var sortKeyRaw: String = SkillSortKey.name.rawValue"
+      },
+      {
+        "file": "src/ios/Views/Skills/SkillsManagementView.swift",
+        "line": 39,
+        "source": "@AppStorage(\"skillsList.sortAscending\") private var sortAscending: Bool = true"
+      },
+      {
+        "file": "src/ios/Views/Skills/SkillsManagementView.swift",
+        "line": 430,
+        "source": "@AppStorage(\"cloudSync.v2.enabled\") private var iCloudSyncEnabled: Bool = false"
+      },
+      {
+        "file": "src/ios/Views/Sync/SyncMigrationDetailView.swift",
+        "line": 36,
+        "source": "@AppStorage(\"cloudSync.v2.v1ZoneForceDeletedAt\") private var v1ZoneForceDeletedAtTs: Double = 0"
+      },
+      {
+        "file": "src/ios/Views/Sync/SyncMigrationDetailView.swift",
+        "line": 38,
+        "source": "@AppStorage(\"cloudSync.v2.tipsDismissed\") private var tipsDismissed: Bool = false"
+      },
+      {
+        "file": "src/ios/iSH/RootfsManager.swift",
+        "line": 100,
+        "source": "UserDefaults.standard.set(true, forKey: \"rootfs.freshInstall\")"
+      }
+    ],
+    "detached_tasks": [
+      {
+        "file": "src/ios/Agent/Chat/AIChatViewModel+Offloading.swift",
+        "line": 776,
+        "source": "Task.detached(priority: .utility) {"
+      },
+      {
+        "file": "src/ios/Agent/Chat/AIChatViewModel+Offloading.swift",
+        "line": 780,
+        "source": "Task.detached(priority: .utility) {"
+      },
+      {
+        "file": "src/ios/Agent/Chat/AIChatViewModel.swift",
+        "line": 2212,
+        "source": "Task.detached(priority: .background) {"
+      },
+      {
+        "file": "src/ios/Agent/Session/SkillStore.swift",
+        "line": 746,
+        "source": "Task.detached(priority: .utility) { [weak self] in"
+      },
+      {
+        "file": "src/ios/Agent/Speech/VoiceCorrectionEngine.swift",
+        "line": 64,
+        "source": "Task.detached(priority: .utility) {"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 574,
+        "source": "let (records, deleteIDs) = await Task.detached { [weak self] () -> ([CKRecord], [CKRecord.ID]) in"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 646,
+        "source": "try await Task.detached { [engine] in"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 671,
+        "source": "try await Task.detached { [engine] in"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 854,
+        "source": "let zones = try await Task.detached { try await db.allRecordZones() }.value"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 858,
+        "source": "_ = try await Task.detached {"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 1576,
+        "source": "let newZoneIDs: [CKRecordZone.ID] = try await Task.detached {"
+      },
+      {
+        "file": "src/ios/Agent/Sync/CloudSyncEngine.swift",
+        "line": 2623,
+        "source": "Task.detached { [weak self] in"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/ForceSyncHelper.swift",
+        "line": 42,
+        "source": "Task.detached {"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/ICloudSharedZoneTransport.swift",
+        "line": 354,
+        "source": "Task.detached(priority: .utility) { [weak self, url = self.etagCacheURL] in"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/ICloudSharedZoneTransport.swift",
+        "line": 459,
+        "source": "Task.detached { [weak self] in"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/ICloudSharedZoneTransport.swift",
+        "line": 714,
+        "source": "outcome = await Task.detached(priority: .utility) { [self] () -> Result<[(CKRecord, PortableRecord?)], Error> in"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/ICloudSharedZoneTransport.swift",
+        "line": 1064,
+        "source": "Task.detached { [weak self] in"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/ICloudSharedZoneTransport.swift",
+        "line": 1195,
+        "source": "Task.detached {"
+      },
+      {
+        "file": "src/ios/Agent/Sync/V2/SessionFileChangeTracker.swift",
+        "line": 309,
+        "source": "Task.detached(priority: .utility) {"
+      },
+      {
+        "file": "src/ios/Debug/DebugLocalDispatch.swift",
+        "line": 73,
+        "source": "Task.detached {"
+      },
+      {
+        "file": "src/ios/Debug/DebugServer.swift",
+        "line": 133,
+        "source": "Task.detached { [weak self] in"
+      },
+      {
+        "file": "src/ios/Debug/DebugServer.swift",
+        "line": 141,
+        "source": "let parsed: (method: String, path: String, accept: String, body: String)? = await Task.detached { [weak self] in"
+      },
+      {
+        "file": "src/ios/MinisApp.swift",
+        "line": 450,
+        "source": "Task.detached(priority: .utility) {"
+      },
+      {
+        "file": "src/ios/NativeOffloads/ConfigOffloadBridge.swift",
+        "line": 24,
+        "source": "Task.detached { @MainActor in"
+      },
+      {
+        "file": "src/ios/NativeOffloads/ConfigOffloadBridge.swift",
+        "line": 63,
+        "source": "Task.detached { @MainActor in"
+      },
+      {
+        "file": "src/ios/NativeOffloads/ConfigOffloadBridge.swift",
+        "line": 78,
+        "source": "Task.detached { @MainActor in"
+      },
+      {
+        "file": "src/ios/NativeOffloads/ConfigOffloadBridge.swift",
+        "line": 305,
+        "source": "Task.detached { @MainActor in"
+      },
+      {
+        "file": "src/ios/NativeOffloads/ConfigOffloadBridge.swift",
+        "line": 328,
+        "source": "Task.detached { @MainActor in"
+      },
+      {
+        "file": "src/ios/NativeOffloads/ConfigOffloadBridge.swift",
+        "line": 361,
+        "source": "Task.detached { @MainActor in"
+      },
+      {
+        "file": "src/ios/NativeOffloads/ConfigOffloadBridge.swift",
+        "line": 924,
+        "source": "Task.detached { @MainActor in"
+      },
+      {
+        "file": "src/ios/NativeOffloads/ConfigOffloadBridge.swift",
+        "line": 948,
+        "source": "Task.detached { @MainActor in"
+      },
+      {
+        "file": "src/ios/NativeOffloads/ConfigOffloadBridge.swift",
+        "line": 1005,
+        "source": "Task.detached { @MainActor in"
+      },
+      {
+        "file": "src/ios/NativeOffloads/SessionsOffloadBridge.swift",
+        "line": 32,
+        "source": "Task.detached {"
+      },
+      {
+        "file": "src/ios/NativeOffloads/SessionsOffloadBridge.swift",
+        "line": 79,
+        "source": "Task.detached {"
+      },
+      {
+        "file": "src/ios/NativeOffloads/SessionsOffloadBridge.swift",
+        "line": 137,
+        "source": "Task.detached {"
+      },
+      {
+        "file": "src/ios/NativeOffloads/SessionsOffloadBridge.swift",
+        "line": 432,
+        "source": "Task.detached {"
+      },
+      {
+        "file": "src/ios/Providers/Anthropic/OAuthHTTPClient.swift",
+        "line": 476,
+        "source": "Task.detached {"
+      },
+      {
+        "file": "src/ios/Providers/ModelsDevAPI.swift",
+        "line": 482,
+        "source": "Task.detached(priority: .utility) {"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 325,
+        "source": "Task.detached {"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 446,
+        "source": "Task.detached {"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 607,
+        "source": "Task.detached {"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 2095,
+        "source": "Task.detached(priority: .utility) {"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 2113,
+        "source": "Task.detached {"
+      },
+      {
+        "file": "src/ios/Providers/ProviderConfigStore.swift",
+        "line": 2344,
+        "source": "Task.detached { await db.setLegacyUuidMapKV(json) }"
+      },
+      {
+        "file": "src/ios/Views/Chat/AIChatView.swift",
+        "line": 1223,
+        "source": "Task.detached(priority: .utility) {"
+      },
+      {
+        "file": "src/ios/Views/Chat/AIChatView.swift",
+        "line": 3294,
+        "source": "Task.detached(priority: .utility) {"
+      },
+      {
+        "file": "src/ios/Views/Chat/ChatInputBar.swift",
+        "line": 415,
+        "source": "Task.detached(priority: .userInitiated) {"
+      },
+      {
+        "file": "src/ios/Views/Chat/Media/AudioPlayback.swift",
+        "line": 90,
+        "source": "Task.detached(priority: .userInitiated) {"
+      },
+      {
+        "file": "src/ios/Views/Chat/Media/AudioPreview.swift",
+        "line": 331,
+        "source": "Task.detached(priority: .userInitiated) {"
+      },
+      {
+        "file": "src/ios/Views/Chat/MinisMediaViews.swift",
+        "line": 442,
+        "source": "Task.detached(priority: .utility) {"
+      },
+      {
+        "file": "src/ios/Views/Chat/MinisMediaViews.swift",
+        "line": 503,
+        "source": "Task.detached(priority: .utility) {"
+      },
+      {
+        "file": "src/ios/Views/Chat/MinisMediaViews.swift",
+        "line": 555,
+        "source": "Task.detached(priority: .utility) {"
+      },
+      {
+        "file": "src/ios/Views/Chat/MinisMediaViews.swift",
+        "line": 730,
+        "source": "let image = await Task.detached(priority: .userInitiated) {"
+      },
+      {
+        "file": "src/ios/Views/Chat/MinisMediaViews.swift",
+        "line": 922,
+        "source": "let content: String = await Task.detached(priority: .userInitiated) {"
+      },
+      {
+        "file": "src/ios/Views/Chat/MinisMediaViews.swift",
+        "line": 1052,
+        "source": "let content: String = await Task.detached(priority: .userInitiated) {"
+      },
+      {
+        "file": "src/ios/Views/Chat/PaginatedMarkdownView.swift",
+        "line": 90,
+        "source": "let split = await Task.detached(priority: .userInitiated) {"
+      },
+      {
+        "file": "src/ios/Views/Chat/SelectableMarkdownView.swift",
+        "line": 3594,
+        "source": "Task.detached(priority: .utility) {"
+      },
+      {
+        "file": "src/ios/Views/Chat/SelectableMarkdownView.swift",
+        "line": 3711,
+        "source": "Task.detached(priority: .userInitiated) {"
+      },
+      {
+        "file": "src/ios/Views/Chat/SelectableMarkdownView.swift",
+        "line": 4012,
+        "source": "Task.detached(priority: .userInitiated) {"
+      },
+      {
+        "file": "src/ios/Views/Chat/SelectableMarkdownView.swift",
+        "line": 4370,
+        "source": "Task.detached(priority: .userInitiated) {"
+      },
+      {
+        "file": "src/ios/Views/Chat/ToolLiveSheet.swift",
+        "line": 2291,
+        "source": "Task.detached(priority: .utility) {"
+      },
+      {
+        "file": "src/ios/Views/Chat/Voice/InlineVoiceInputView.swift",
+        "line": 983,
+        "source": "Task.detached(priority: .utility) {"
+      },
+      {
+        "file": "src/ios/Views/Chat/Voice/VoiceInputPanel.swift",
+        "line": 1099,
+        "source": "Task.detached(priority: .utility) {"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 4752,
+        "source": "let info = await Task.detached {"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 4829,
+        "source": "let info = await Task.detached {"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 5088,
+        "source": "Task.detached(priority: .userInitiated) {"
+      },
+      {
+        "file": "src/ios/Views/ContentView.swift",
+        "line": 5746,
+        "source": "await Task.detached(priority: .utility) {"
+      },
+      {
+        "file": "src/ios/Views/Rootfs/FileBrowserView.swift",
+        "line": 527,
+        "source": "let result: LoadState = await Task.detached(priority: .userInitiated) {"
+      },
+      {
+        "file": "src/ios/Views/Rootfs/FileBrowserView.swift",
+        "line": 601,
+        "source": "let result: MarkdownFilePreview.LoadState = await Task.detached(priority: .userInitiated) {"
+      },
+      {
+        "file": "src/ios/Views/Rootfs/FileBrowserView.swift",
+        "line": 1159,
+        "source": "Task.detached(priority: .utility) {"
+      },
+      {
+        "file": "src/ios/Views/Rootfs/FileBrowserView.swift",
+        "line": 1694,
+        "source": "Task.detached(priority: .userInitiated) {"
+      },
+      {
+        "file": "src/ios/Views/Rootfs/ISHTerminalView.swift",
+        "line": 351,
+        "source": "Task.detached {"
+      },
+      {
+        "file": "src/ios/Views/Settings/ConfigAuditView.swift",
+        "line": 209,
+        "source": "let bridgeResult = await Task.detached { () -> NSDictionary in"
+      },
+      {
+        "file": "src/ios/Views/Settings/LogManagementView.swift",
+        "line": 229,
+        "source": "let loaded = await Task.detached(priority: .userInitiated) {"
+      },
+      {
+        "file": "src/ios/Views/Settings/MountedFoldersManager.swift",
+        "line": 410,
+        "source": "Task.detached(priority: .userInitiated) {"
+      },
+      {
+        "file": "src/ios/Views/Settings/MountedFoldersManager.swift",
+        "line": 447,
+        "source": "let resolveTask = Task.detached(priority: .userInitiated) { () -> (URL, Bool) in"
+      },
+      {
+        "file": "src/ios/Views/Settings/MountedFoldersManager.swift",
+        "line": 458,
+        "source": "let timeoutTask = Task.detached(priority: .utility) { () -> (URL, Bool)? in"
+      },
+      {
+        "file": "src/ios/Views/Settings/MountedFoldersManager.swift",
+        "line": 579,
+        "source": "Task.detached(priority: .userInitiated) {"
+      },
+      {
+        "file": "src/ios/Views/Settings/MountedFoldersManager.swift",
+        "line": 756,
+        "source": "Task.detached(priority: .utility) {"
+      },
+      {
+        "file": "src/ios/Views/Settings/MountedFoldersManager.swift",
+        "line": 841,
+        "source": "Task.detached(priority: .utility) {"
+      },
+      {
+        "file": "src/ios/Views/Settings/StorageManagementView.swift",
+        "line": 36,
+        "source": "Task.detached(priority: .userInitiated) { [weak self] in"
+      },
+      {
+        "file": "src/ios/Views/Settings/StorageManagementView.swift",
+        "line": 260,
+        "source": "Task.detached(priority: .userInitiated) {"
+      },
+      {
+        "file": "src/ios/WebApp/WebAppAddToHomeSheet.swift",
+        "line": 188,
+        "source": "let parsedMeta = await Task.detached(priority: .userInitiated) {"
+      }
+    ],
+    "webview_creation": [
+      {
+        "file": "src/ios/Agent/BrowserUse/BrowserUseManager.swift",
+        "line": 99,
+        "source": "let wv = WKWebView(frame: CGRect(x: 0, y: 0, width: vp.width, height: vp.height), configuration: configuration)"
+      },
+      {
+        "file": "src/ios/Agent/BrowserUse/BrowserUseManager.swift",
+        "line": 166,
+        "source": "let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: vp.width, height: vp.height), configuration: config)"
+      },
+      {
+        "file": "src/ios/Agent/Markdown/KaTeXRenderer.swift",
+        "line": 103,
+        "source": "let wv = WKWebView(frame: CGRect(x: -2048, y: -2048, width: 1024, height: 256), configuration: config)"
+      },
+      {
+        "file": "src/ios/Views/Chat/WebPreviewSheet.swift",
+        "line": 63,
+        "source": "webView = WKWebView(frame: .zero, configuration: config)"
+      },
+      {
+        "file": "src/ios/Views/Rootfs/FileBrowserView.swift",
+        "line": 560,
+        "source": "let webView = WKWebView(frame: .zero, configuration: config)"
+      },
+      {
+        "file": "src/ios/Views/Skills/SkillsManagementView.swift",
+        "line": 1095,
+        "source": "let webView = WKWebView(frame: .zero, configuration: config)"
+      },
+      {
+        "file": "src/ios/WebApp/WebAppWebViewController.swift",
+        "line": 68,
+        "source": "let wv = WKWebView(frame: view.bounds, configuration: cfg)"
+      }
+    ]
+  },
+  "sourceFilesSHA256": {
+    "src/ios/Agent/Background/AgentLiveActivityManager.swift": "4675bd4fdc61bcb26e71602387c439ea1ad619478df3f1a4495ba4139081fde2",
+    "src/ios/Agent/Background/BackgroundKeepAliveManager.swift": "29d70c91036077c48d0d0927848f974769fad85f8afc1f46582869cf4145fefc",
+    "src/ios/Agent/Background/CacheKeepAliveManager.swift": "4951aa1ecae0695e538cfb3db7ddafd00cd8bd5e002dea88f78a30883705b28b",
+    "src/ios/Agent/BrowserUse/BrowserHistory.swift": "bebac0ad80f70ea19a68112a36903696849d21d5da6a87b2afbfddfc17d1e30b",
+    "src/ios/Agent/BrowserUse/BrowserManagementView.swift": "37e76ad2ca72c3c2f59409f0b25407206bd424a6577e88802ebc6aad50e86b91",
+    "src/ios/Agent/BrowserUse/BrowserSheetView.swift": "cf6d62e75c89f3360e5eb7f47b02e4ea8d0b27d5bf2c4adeb54cfcfff7d56ae9",
+    "src/ios/Agent/BrowserUse/BrowserTabPool.swift": "aa9466a7ce08dc3c643f88e4a84fd00c4f32cc472c862b56bd03228319f45b4b",
+    "src/ios/Agent/BrowserUse/BrowserUseActions.swift": "eb2e105d7d923c09702cea5611e38456888ace8c62b45351a818965ddfa633b7",
+    "src/ios/Agent/BrowserUse/BrowserUseJavaScript.swift": "e73938fb84e6fc5db7768045a31e3b366b1cbca5db1021d2edef9bdd30cc5bdb",
+    "src/ios/Agent/BrowserUse/BrowserUseManager.swift": "1293d592956e4d4e39bd15a6f22bced97811c4cc653898cd463b1ce5f09ec246",
+    "src/ios/Agent/BrowserUse/BrowserWebView.swift": "86573edfffeea23f18cfa0768ac12c585db87840d15c9f472b8e13a435ad68f3",
+    "src/ios/Agent/BrowserUse/CookieAuditLogger.swift": "2f9493ed51af9cb46da907f831ddceefae4964583b1d4183b27f26cc762d6b88",
+    "src/ios/Agent/BrowserUse/CookieBackupStore.swift": "73ba40dbffa5cec10e2a206ee0c445f3a6b693d757abd09e91f32e2355370dd6",
+    "src/ios/Agent/Chat/AIChatViewModel+Attachments.swift": "271c38c1de68d65086513db91e2c62ad80da028aaf0954533811bb5a71167ea0",
+    "src/ios/Agent/Chat/AIChatViewModel+BackgroundTask.swift": "c519593a9a9ab96c0f3440c9669071ba1d13ddf5c498369531b866fdd4d6b108",
+    "src/ios/Agent/Chat/AIChatViewModel+Compaction.swift": "b87f403632247162d865b6100fef43a63e74c5236b089108955530b67a023d57",
+    "src/ios/Agent/Chat/AIChatViewModel+ConcurrentTools.swift": "0a1b97cd2a868e3df0313226afdc25a9f563029326d174e7a460eca8fb0b7d0a",
+    "src/ios/Agent/Chat/AIChatViewModel+Fallback.swift": "2f8b0dc0898eec5395d4e2a390ced93f49c88fd72d8452375d2c124e081d5ec6",
+    "src/ios/Agent/Chat/AIChatViewModel+FileTools.swift": "878f05402cb8d4ece58f841b3ba6bf78f5b940072470436e6daefbbe8e449b6f",
+    "src/ios/Agent/Chat/AIChatViewModel+ISHCommand.swift": "3364255cfab98922731a540a87e6298c724f078e5d77e746c40eec1b8be7397c",
+    "src/ios/Agent/Chat/AIChatViewModel+MemoryTools.swift": "6667feb50dd661ba9df7b61d8d1ae84b7a5cfa98f826fb40acb71e2a00556469",
+    "src/ios/Agent/Chat/AIChatViewModel+MentionMenu.swift": "e5276c1c0c236899d11cc56366ecc141ad07179de164983374b1036c04c50622",
+    "src/ios/Agent/Chat/AIChatViewModel+Misc.swift": "01a4651ac0b6d60e6287a3c8c3361a5e7fa50a1b2b1a6e02c63fc2dce0d9daa7",
+    "src/ios/Agent/Chat/AIChatViewModel+Offloading.swift": "9867af1c749f4d052fb2e4eab0044992d11dd07c2eb2e70bb465609507ca3ca5",
+    "src/ios/Agent/Chat/AIChatViewModel+Persistence.swift": "7a792bfb9e0c7f37b9029947143e8fbe2bfd4327d21e2fadbbf9d16dfb84c779",
+    "src/ios/Agent/Chat/AIChatViewModel+ProviderFactory.swift": "086cda5f7ac8e06c1883ec6289bb7726e13c90da46bb687641d44f22622ef9d2",
+    "src/ios/Agent/Chat/AIChatViewModel+RequestBudget.swift": "d755222936c989c1a01379bf08c1b66855222a974de996a39dab647436093f0b",
+    "src/ios/Agent/Chat/AIChatViewModel+SSEStream.swift": "441043f355eff8d0c2fb37987c2d358a842293c7c0b59781c7644800e9005daf",
+    "src/ios/Agent/Chat/AIChatViewModel+SlashCommands.swift": "5b1c6d07dbbd762cdccb37b30e6e62f7cac08bcc5e60c89b52c1e3d80cbd46a2",
+    "src/ios/Agent/Chat/AIChatViewModel+TitleGeneration.swift": "ca4e0fdffe55e07c17eb73c948d570eb889f7cf5198f60ef492f6d2550f92aff",
+    "src/ios/Agent/Chat/AIChatViewModel+ToolDefinitions.swift": "de45c79faf90b13e548d8085b10bbe7a6e1ef5295abbc2979eb5cab8e719f95b",
+    "src/ios/Agent/Chat/AIChatViewModel+ToolPreflight.swift": "6b6475f7a8260100791f365a78a1f985062df3625563019bf5c8c07361e39826",
+    "src/ios/Agent/Chat/AIChatViewModel.swift": "2b3188b57e7bae03a0b277bfc7efe60cb36aec14e4819145260aafa05c740d82",
+    "src/ios/Agent/Chat/ChatLifecycleSupport.swift": "c4e108fc31713d348bdf6096e9e07ea351ccb20be0f0f329bb0363108c9c6df1",
+    "src/ios/Agent/Chat/ChatModels.swift": "81d44acfc239fe380dbcc1672b9a685a25defa6e08ed9bde1f498f1ab5239ee5",
+    "src/ios/Agent/Chat/ChatStore.swift": "0c62478b5b47d13c90d0b3e08d817052c7ce3b826b2f9621c2140622268747d0",
+    "src/ios/Agent/Chat/ChatURLBrokerage.swift": "21300eb626e63f5473ea2013ee0fd00714edd88a5cb7b8d0e9f7eb2521e3f5be",
+    "src/ios/Agent/Chat/ContextPolicy.swift": "9507fc5b831452dc91308d51b3890643a5201554239b407777f7a7cc009ffb09",
+    "src/ios/Agent/Chat/FileMentionIndex.swift": "60c71f6db64832419217507be840a70f6ab72010ce77d17eb6c17cf9cd1b612a",
+    "src/ios/Agent/Chat/MinisURLPathDecoding.swift": "9445c0edda5531536e66ee7bf17643962c35bb35b6060f07ddfeefabcefc940b",
+    "src/ios/Agent/ISH/ISHExecutionCoordinator.swift": "f7f65d716dce76cfd7f73b11a8f4a4e6aac2f45053c3c5e24e3953b352cbd95d",
+    "src/ios/Agent/ISH/MinisFsRouter.swift": "8e0bc13bdea890f74fd411306ba07a861ebf82646dfc29cc1c4dddf88eecb5d3",
+    "src/ios/Agent/ISH/ShellCommandRingBuffer.swift": "5ad60bf8b337cd832b67a3b2834b4ca64f6be4c600b9faa24e93a4b32560d8d0",
+    "src/ios/Agent/Intents/AskMinisIntent.swift": "0fa3853375f155fc509374c475522e05e92ca568c27b61a1cfa9766fd32334a9",
+    "src/ios/Agent/Intents/FollowUpSessionIntent.swift": "d70c14a6008eb588cdc37e73f58de8e05fc8d97957a398c55c707ffd7a0e4780",
+    "src/ios/Agent/Intents/GetSessionStatusIntent.swift": "72d5e825bc7f00568704e7423acbf8305c17c36cd7264e46f48ec4a7c234bbcc",
+    "src/ios/Agent/Intents/ListSessionsIntent.swift": "6fbfef8c93161afba7c789a791c87571497b28acc614dd3cec3471e50d7db3e4",
+    "src/ios/Agent/Intents/MinisShortcutsProvider.swift": "c5fe787303803768962dd727035835d8a8d5fc05c637487a14f20ad033bb1a76",
+    "src/ios/Agent/Intents/ModelSelectionEntity.swift": "5111e876ea3c2f3a318491787d2a0672b877311785d27cbdad68d25446e9464d",
+    "src/ios/Agent/Intents/OpenSessionIntent.swift": "fabf65907df19975df780cdf1577dac5a4a605b7f9a18d98d130b25439b91104",
+    "src/ios/Agent/Intents/QuickTaskIntent.swift": "dbaef5645e2ff8a7591d06b08c19c898606e31a439eafc8abcc4cd72b61f44c3",
+    "src/ios/Agent/Intents/RetryRunIntent.swift": "dc24cdbf3c4b00c25e814a946bc54f73c31a7ddbcd9a08e8783d2c5239f6f3b7",
+    "src/ios/Agent/Intents/SendPromptIntent.swift": "c1f073530c7aa0a0f06e64a538cb6a0636e694c381f38f4ead24f440c44e8a79",
+    "src/ios/Agent/Intents/SendPromptResult.swift": "0780f5bcd4cc3162002acc125a3223a024084c11157822038ff8a9243d8c6b5f",
+    "src/ios/Agent/Intents/SessionEntity.swift": "17c2b1fe10dab7233be49944f3e958ae5781fae45c359b01149f4bc3f93ac5cb",
+    "src/ios/Agent/Intents/ShortcutRunTracker.swift": "d06ba3ce23616fcabb03028a6e043d098dedbd22148eae16b1385111413bc463",
+    "src/ios/Agent/Intents/UserMessageEntity.swift": "e7d50c38617baa905e6c3ea024c14fe634ebe566ad094f7b339de2299ba7a711",
+    "src/ios/Agent/Markdown/KaTeXRenderer.swift": "f23ca132d8bd16515a0dc138e238e9d1661dca0d3e498477fc887844beb333c1",
+    "src/ios/Agent/Markdown/MathRenderScheduler.swift": "40019b747634792114d690dd546a0f1e56fedd167debbee9484fa68e953d4a35",
+    "src/ios/Agent/Markdown/MinisMarkdownParser.swift": "c5b611ad79817ded95a44f5d74ee5dde6c1e843197ecfca123f9b83429488d85",
+    "src/ios/Agent/Markdown/SwiftMathRenderer.swift": "80e82b7c47c931a8986167d059bb9e469704882a65e66f14be9460d8597ea9ee",
+    "src/ios/Agent/MessageList/CollectionViewMessageListV3.swift": "b1ff9062dcd819503cef7432ca010baac2ef9195f11113ad2367887795a0d7ae",
+    "src/ios/Agent/MessageList/MessageListInfrastructure.swift": "8c99afb2a2a28f653b2171c3feaf56499fa14eac0544f853d9ce14fd193b9be1",
+    "src/ios/Agent/MessageList/MessageListLayout.swift": "cdd56b44bd79d09345ae78d31f83e9db25cde1734a985efbe6c73f7bad1eac09",
+    "src/ios/Agent/Offload/OffloadPermissionManager.swift": "ba57a9e95e2e9e34ffbd0e12ccd6edc214d5e3132476f5f35cdbf70f96c93060",
+    "src/ios/Agent/Session/MCPOAuthController.swift": "d71778b251c4f4e203dd6a0243e2c7a4da3a80ff64539bcce695f37bc5ee4cb6",
+    "src/ios/Agent/Session/MCPStore.swift": "9877a3b8068f68aa838ddabbb720e7ec1fd718b34f2ef97b450e296cda73a46d",
+    "src/ios/Agent/Session/SessionForkManager.swift": "81e20d4da6424152df9585d9453b5f9b4e461acbb3330dcc81f3028e8745aa8d",
+    "src/ios/Agent/Session/SessionLockStore.swift": "95f7b88086438be43ebc15224ed155a1746b3e667f6f7fb08fa3ce852689095e",
+    "src/ios/Agent/Session/SkillStore.swift": "a3f876efb37e4c21398b0e96350f9946613f9dfce56e098c7f4b4ced51db9053",
+    "src/ios/Agent/Session/SoulStore.swift": "5b2daba28b02af5b4dc9319eb7824f4d15bd2ce21f0f09914a22958b81210095",
+    "src/ios/Agent/Shell/BashismDetector.swift": "9e497ed1185d80612536a396baf4025407f85fd35b34dc5c5d50ada6bd93c4ca",
+    "src/ios/Agent/Shell/BashismReminder.swift": "7e97108aa02d4f7895845c68dde009d5ca412ec2910956c05f6c8185f9a976d6",
+    "src/ios/Agent/Shell/OnDemandBash.swift": "58d62e64a10718d5fd71f4e5555c9b47cea67a5c90260bf89975cb2d827bf3ab",
+    "src/ios/Agent/Speech/ConversationContextTruncator.swift": "d7a17e00503e947d88d7764494ae1fa624d57922d84cff4bc1220036f26f4e84",
+    "src/ios/Agent/Speech/CorrectionAdmission.swift": "909dd250399706583806fe7256b3544c3dc39e881bafc3a1b6093278d06792a2",
+    "src/ios/Agent/Speech/CorrectionContextBuilder.swift": "35bab1e199c46d6508308e564c12f0b110cbeefb04e4fdf0d0a60a57ff2e387a",
+    "src/ios/Agent/Speech/SpeechRecognitionManager.swift": "234a2ed224178cf8f6b729db939111e5afd2ecf7532e9f16e5145aba5d506374",
+    "src/ios/Agent/Speech/TypedVocabularyBuilder.swift": "48fda5cb527653ed691a1bfb9770c5a7e71653627b7ca44af6c09c766da5f95a",
+    "src/ios/Agent/Speech/VocabularyFilter.swift": "cf76f41132f619287a9a4e96845ae5164bf09b9f8b3bb266799ee12f83f889fb",
+    "src/ios/Agent/Speech/VoiceCorrectionDiff.swift": "e0d56f9f2d29f2c57912e59043ae107e8a84f92b9a60170a2495149015202f0c",
+    "src/ios/Agent/Speech/VoiceCorrectionEngine.swift": "9495bff227ef940952f72e87949380d99867f228268febebccefd5a35121ebff",
+    "src/ios/Agent/Speech/VoiceCorrectionRecorder.swift": "816543ca11d9c53732098ce286b1f9e6f94b4bb4ea25cc5ed2bf5e0fe828103f",
+    "src/ios/Agent/Sync/CloudSyncEngine.swift": "75137a947eabe74e7bb3c60b6ef1843e95cd1a640df64a776aa299bfb5134bcc",
+    "src/ios/Agent/Sync/SyncDirtyScanner.swift": "ba0331e05ad2972fd996381e39e0e06e465b70858a6d38ea28d5b7116848954a",
+    "src/ios/Agent/Sync/V2/ChatStoreSyncHydrators.swift": "cf76289d4edf247ca7476cc3ee467760ee3d501ebd9546659494b43cc58d6e99",
+    "src/ios/Agent/Sync/V2/ForceSyncHelper.swift": "613ce79dc730b1d0ab12ef4b18d1a60c2abcfdc7cee2612e33d2b231a3be995e",
+    "src/ios/Agent/Sync/V2/ICloudSharedZoneTransport.swift": "0214b146bc1a1b2783e0dbf95a1bd0ace43687a589e6cf15475faf4ce7373fa5",
+    "src/ios/Agent/Sync/V2/LANTransport.swift": "044af54b9cc1830dd30ba151ed3c9c50d864e31e306b5f1d8c5729cdaac310d7",
+    "src/ios/Agent/Sync/V2/MigrationEngine.swift": "fb6e732351da65643fbe8c29a6ac6c20096fff8a31a94b5b11d922f4405fdaa0",
+    "src/ios/Agent/Sync/V2/PortableRecord.swift": "395860a79b6f2555859eea9bb9d0a5b05dd7ba9d7409b0a8ee3045df671c3934",
+    "src/ios/Agent/Sync/V2/SessionFileChangeTracker.swift": "59bf3b31992727852097a999f7b34efe5df41de98a029ee4760de85c6bc92b8a",
+    "src/ios/Agent/Sync/V2/SyncCore.swift": "5a081961787cf9ef891a956f3256590ba71397cd0fd5d72bb65127765bcd9c0c",
+    "src/ios/Agent/Sync/V2/SyncCoreHydrators.swift": "e4d6d86a1ff83ea61481901aee7d83cebc89ecb9eba9179ca0d6fc9b1adf2345",
+    "src/ios/Agent/Sync/V2/SyncTransport.swift": "296d4e425bbbac8e2ab1545f678dc47844f3085bdbe4710e1823bb6df68d65d3",
+    "src/ios/Agent/Sync/V2/SyncV2Bootstrap.swift": "64f38c37378637d9b475e557b283e81470e793b41ec6182cf570e6a493e166cf",
+    "src/ios/Agent/Sync/V2/Syncable.swift": "be626e0e3dbd9f17ac5035fadd10bdabd6d6300421b2738b7f6ee0a6d20c82f5",
+    "src/ios/Agent/Sync/V2/SyncableTypeRegistry.swift": "06c299d2a73ead27b8296b5b9eb17bb207d0dac6c4b9bef051c6e147c6a2b9ff",
+    "src/ios/Agent/Sync/V2/SyncedTypes.swift": "6511e37e865067b3321a7d67cfa7fcffe7954a911ff88cea798c700cff825f4d",
+    "src/ios/Agent/Sync/V2/TombstoneManager.swift": "f0c8caeb98939cc49e67b979444d7ced2a29fb401423d4e98273f9ca51134a1e",
+    "src/ios/Agent/Sync/V2/UploadPolicy.swift": "b6744cf0cc97e932ca9f820b03c38e33fc98f3096bd885127ee27307a26dd260",
+    "src/ios/Agent/ToolLoopDetector.swift": "231b4642d38941a4d0ce8f7d0c52fd32674dae00e849e48e98baede6143206e7",
+    "src/ios/AgentWidget/AgentLiveActivityWidget.swift": "f0c1c6f8c0489d42115411a713bb0cd8c4b6f0ee3dfb0885e638f11233517669",
+    "src/ios/AgentWidget/AgentWidgetBundle.swift": "4b70c6b718f5f023f0b68b8f1e48eb2a91988abd47d3ae5bc6490410fd21b690",
+    "src/ios/AppDelegate.swift": "5e5f5700e883fa33ab94e9ebff3b75a4b64f3b9bf7d2918995bfa90efb59e792",
+    "src/ios/Debug/AgentRequestTrace.swift": "ef8c99dabaadc98b1f37f3df530196e119d72d59e3a44fb369494a7b7a9f3611",
+    "src/ios/Debug/AttributeQueryRecorder.h": "1642b9f57cb5bb19f1d49fd75de96f6c26bd499ce5597c429ae6f8a452f71aad",
+    "src/ios/Debug/AttributeQueryRecorder.m": "30db5b9ec2d0702bdb8857182cfb6249d47ef2ba0d1fa95200b094c18105d4e0",
+    "src/ios/Debug/AutoTouch.h": "adf295c215cedbadf338076adfb9790ab549f0de7254b836a6af3ae1e4931328",
+    "src/ios/Debug/AutoTouch.m": "4557bdecc63982d878e194932cc7f42180d8e614cf0513a32f48c84aabde4332",
+    "src/ios/Debug/BrowserBenchTestView.swift": "1d7444a8efd71f8bd5b789f231f44082288c1915692a102e2d98d6d9f51e0c35",
+    "src/ios/Debug/DebugAuth.swift": "cbd0e80ba7dedc5c5ed06ba3e8c69e1fe4ea38cfe71aae437c9e4c7f00822858",
+    "src/ios/Debug/DebugJSONRPC.swift": "f3587d38194ca6ae072e46e65b86f61a04efbc33597b0a26c31f8b15e71cf4ea",
+    "src/ios/Debug/DebugLocalDispatch.swift": "cac31d512152d50fc29a21ab6b61b007cb19116e493e7298060da7f273b07f74",
+    "src/ios/Debug/DebugMethodRegistry.swift": "bee43681798ed8eb50bfe7af14a06b48c80bd58275afd6b0a616cb4c708ae8d4",
+    "src/ios/Debug/DebugRPCConfig.swift": "5ea18f3deb085d653ac6bec118c9c5a6e1ce436040343b69ed9f5ebe2d38e623",
+    "src/ios/Debug/DebugRPCHangDetector.swift": "41b45977f184a609e2acf0f4ef52bcc4758e9e1b054891164a397a1a0084ae60",
+    "src/ios/Debug/DebugRPCMCP.swift": "3fdbf785c19881cbc16d653a6b1fde1a95ae0adb80d08e078ff08d116e08ba26",
+    "src/ios/Debug/DebugRPCPerfTrace.swift": "df9dad49187bd8d7a7feee00948aa13a093d35cc73d548684e6f6912fb73dc3c",
+    "src/ios/Debug/DebugRPCProviderChat.swift": "cf46bc73426d7a8113fc1d4af60634760684ae7996dc20a601c4345bb347d466",
+    "src/ios/Debug/DebugServer.swift": "34a6525a8c0b49cdae1163e5d961d04a50e2ae30fcd306a049fd3d80148ea004",
+    "src/ios/Debug/DebugViewInspector.swift": "3ab54cfbced34deff8d20dfb12d28a506f54455c7b53659c85905edba2db55bd",
+    "src/ios/Debug/DebugViewOverlay.swift": "07dd18a9fa88131cc965ea6d5f467dae0a1fbea4572c70bc211fcd97d8ec60b1",
+    "src/ios/Debug/HangDetector.h": "334c64e5fd7ae3656b9002605070eb75c720af46d8eb36336b6336578629e3b0",
+    "src/ios/Debug/HangDetector.m": "0db079cc703c203c9b2f83c6ace364843c2c0d6b19c78b6b12060dcd6cce4204",
+    "src/ios/Debug/MarkdownSnapshotCollector.swift": "5cd01d7bbeed61a0fecf9f063f7a7c0aefd0ca0d827c6af6db0daa2f15bb90e9",
+    "src/ios/Debug/MessageListTestView.swift": "45cabe4ea7d1fc00af2c85c75a7a7c1276585a57ada3eff61b2d9709a3f9ed14",
+    "src/ios/Debug/MinisDebugLogReader.swift": "b7ef92de26c862d35fcd7c2cc7d811f192505c728b17cbdb0cd9a6d83269b80a",
+    "src/ios/Debug/PerfTrace.swift": "5682180f023f7080fea8b7a4cf6d851e7d30eb3a54c457654c922afddd2478da",
+    "src/ios/Debug/SessionDataSimulator.swift": "1031cba5b53544b301defe51c3490fdfcd9797ef4cb83ae176a96c7ced0ac85f",
+    "src/ios/Debug/StreamingHangLogger.swift": "1e9c4d0b302cbf6a2100b7599576f1799b1698303de8eaa372cb08dfdeaad53e",
+    "src/ios/Debug/VoiceCorrectionDebugRPC.swift": "4df0a007469390ca3fb8206e7be1a023f6ebce5f044678d4c84bab7e787cea3a",
+    "src/ios/Debug/VoiceInputCapture.swift": "f7c3dea9f21a828fc653513ef2cb9049014db56ebed506512a7d4fa707c6c128",
+    "src/ios/Diagnostics/BrowserResourceMonitor.swift": "be4058b7db4b538ff021811e0bdbe70ddf7754ca86189977f99ce7ac68a0e755",
+    "src/ios/Diagnostics/CrashReporter.swift": "6d986602c5005594327a601d96bab7f8fccc4be3cab11845f9d6cd94cbc2531d",
+    "src/ios/Diagnostics/CrashSignalHandler.h": "8308e735445b9261580cfce928cb6fb41aed15ee77d181391bbb7c03db087348",
+    "src/ios/Diagnostics/CrashSignalHandler.m": "2bb1b43f3243df2e1dd3e921628c9f1f5f8cb30bf1310bd7a1a8f71927bc1d8f",
+    "src/ios/FileProvider/AppGroupChangeWatcher.swift": "9cdeb42d8730df0176ca7cc94c84e0d32895671bb2156970ef0f3f6acadd0815",
+    "src/ios/FileProvider/FPSyncTraceLog.swift": "1c1f3807e8c971482bd5c39bf399be2a5222c04c8a2e51f92a0cf715ae6bc49a",
+    "src/ios/FileProvider/FileProviderEnumerator.swift": "d0f6e231bfc45efa567436bff58c584b8216dff18edc572c69b02898f8dd718e",
+    "src/ios/FileProvider/FileProviderExtension.swift": "ed6abff1fdae5551f07a5fff724812df28e9a24d230d407df048025908388e44",
+    "src/ios/FileProvider/FileProviderItem.swift": "ce7ba077395701ef564930001f881c80c3e132795f1904847ba8af770a9708ba",
+    "src/ios/ISHCommandExecutionExample.swift": "07cfcfe8c9ad80b71a1aa15eb21493589a14c9942633d5de68fa22f71e2e11b1",
+    "src/ios/MinisApp-Bridging-Header.h": "2f033e5e9981462b21fb44d7e24175de8d6cc8ace1c89128e144a07d85029ef4",
+    "src/ios/MinisApp.swift": "03cba71d9cd4b52cde954106ca91944025001719bd124a8af69a245452c32adc",
+    "src/ios/NativeOffloads/AlarmOffload.h": "f8b6bc9f229e5a7b6a81c4d551bf0dd411e972b7a1dbdb68a8c7966d7806db3c",
+    "src/ios/NativeOffloads/AlarmOffload.m": "c7c858011c2f495f0e02481b82491b5cde28e214de1997233ac0eb81370decd2",
+    "src/ios/NativeOffloads/AlarmOffloadBridge.swift": "0dc661795e6cc0061936599fee2dd87f6d9c681a0e94e7d5bbf3dbdb3616657e",
+    "src/ios/NativeOffloads/BluetoothOffload.h": "16397a6a11606b726d928796246d49fbf7c47a7e91601c7a222c6fc3596e72f8",
+    "src/ios/NativeOffloads/BluetoothOffload.m": "5cf94be1ff6a6d151eaab76cbf05c38a24cbe5a978aa1649d18286a4cca67cae",
+    "src/ios/NativeOffloads/BrowserUseOffload.h": "e8408d9bf05981e0e5603ad098a85b934ed69ece5d6319638ad7a1993f6a899d",
+    "src/ios/NativeOffloads/BrowserUseOffload.m": "484bc9d255de92a5fef575ebd31b7f1bd71ad022afe6f8d7ac6f7ca5e598c933",
+    "src/ios/NativeOffloads/BrowserUseOffloadBridge.swift": "fb0c5162745edecfe1d82d9a946faaa9cb20aa9a13fc0385fd83583dbb05449f",
+    "src/ios/NativeOffloads/CalendarOffload.h": "1c20795751fc87de029f253c2d4903c753ffe459a649e2dbf8335abfae2b12b7",
+    "src/ios/NativeOffloads/CalendarOffload.m": "0fe97911056eced4b010e36972ba5dd689a2e24412c6f14d8c0f2e5cd33b31b4",
+    "src/ios/NativeOffloads/ClipboardOffload.h": "52a9a9ed0a7367f882ff5060d27dd56cdc7b3d4c2aeaab1a0d97789405bf640a",
+    "src/ios/NativeOffloads/ClipboardOffload.m": "c193685ede56fb9807fcbc88f87d398ca8a6b4909f6bea90f8b253604e6e7a95",
+    "src/ios/NativeOffloads/ConfigOffload.h": "7c637938c5cea170004279537455270d913e423e86629cf1408799da46c0f028",
+    "src/ios/NativeOffloads/ConfigOffload.m": "6086b2756f09e031e6c34b163ea753b9b1ea8a87ada881349d6fd89e8e19dd2c",
+    "src/ios/NativeOffloads/ConfigOffloadBridge.swift": "4b76d3778478f92db3d34032e6e8299d7173a229e1a7977c0c6a0f34fae497e4",
+    "src/ios/NativeOffloads/CoordinateUtils.h": "692e03e6f0990e81d34c2711907a52b32b80b6cc68f871b4b909f4fe073ec8c4",
+    "src/ios/NativeOffloads/DebugOffload.h": "430a9a72fefe76c4500a10013328116c2a13f38a8885fa26b999a26dfe8e6690",
+    "src/ios/NativeOffloads/DebugOffload.m": "df4ffb474fa7bb90affc522ffefbe2376885767a9366cff8ad16d62a911533c9",
+    "src/ios/NativeOffloads/DeviceOffload.h": "6de801356bf4822198aa1a76efc2240695479c9accf0744f827f36013a23e2d6",
+    "src/ios/NativeOffloads/DeviceOffload.m": "c2fc914b933184e13f76d588b7ef2d36afeeb3d6cfcf5819bb1ad9d08131fff3",
+    "src/ios/NativeOffloads/FFmpegOffload.h": "ac98b60d00eb811a6bc90b366f2419c8ec7ff0937d8f726b9e998d801062200f",
+    "src/ios/NativeOffloads/FFmpegOffload.m": "ed99e32e9859cab1cc5bdb980f506e6fbb4eefe29dfee993977a68198d45ce10",
+    "src/ios/NativeOffloads/HealthKitOffload.h": "50fe315ec34b6e3a4fca11e6ce58111f1fe75eccd46a188cfd7dbe40bbb1da1b",
+    "src/ios/NativeOffloads/HealthKitOffload.m": "6fe001ba0c9a189890c5d298fc5672f8cd8f96a442d64543fa6a3d83ce99fac3",
+    "src/ios/NativeOffloads/HomeKitOffload.h": "689c784bf236112d6ffa73ba6f81f49e8f050030233986499cd47aa0f24b4b6f",
+    "src/ios/NativeOffloads/HomeKitOffload.m": "af219e2a71eba4315cfd505c904c3a0fef20c29469b3d3bf256f6c11cab79c05",
+    "src/ios/NativeOffloads/LocationOffload.h": "7859fa9c10d703e4dab952f3479016d9011c773d012cbc51f1bd666401e036f1",
+    "src/ios/NativeOffloads/LocationOffload.m": "254fe230407321f6e12bfdb803255aa5a0d202fcca85d9f9ab6e729352c8bb32",
+    "src/ios/NativeOffloads/MapsOffload.h": "bdffd4449111279631066e11d2e83c9c298c8389ab8ccbd23444bb75e13137a5",
+    "src/ios/NativeOffloads/MapsOffload.m": "faccd708ae7b1382a5291ed34ba0a66de45153d4cefa705377a2e1a4aea6b9fb",
+    "src/ios/NativeOffloads/MediaOffload.h": "b20536bb80e380851fddd509c4184ca12ca0768f21eabc409fd34dea984bff13",
+    "src/ios/NativeOffloads/MediaOffload.m": "02fa6a4a01948356c7ffaa29329822cbadb81935784447b9eb0d17db22242765",
+    "src/ios/NativeOffloads/ModelUseOffload.h": "c63f3b77e1212e541e2d4b1920eb1cd1c9665d890d7fba24d29af11fdfd76d89",
+    "src/ios/NativeOffloads/ModelUseOffload.m": "fd7ad6a1a749297feab50510dfabc336bc782f5b183673965581d83e9b64f122",
+    "src/ios/NativeOffloads/ModelUseOffloadBridge.swift": "a1bd02d13de9d78df00815bda54d87eddad3b27762fa96107a0a9dbdb9fbcdce",
+    "src/ios/NativeOffloads/NFCOffload.h": "a251b0eadcecca0b48717d733a42cd897ef10c75e97e2d242abec56f7ce787d2",
+    "src/ios/NativeOffloads/NFCOffload.m": "55a5ec610831443a4cc2a8a60369bc53714c324a575615e71d94d26f8d98e86e",
+    "src/ios/NativeOffloads/NLPOffload.h": "bc29710aaa6645423d25c61e7947fe0a203c458f2332304b67575d3a84ed80f2",
+    "src/ios/NativeOffloads/NLPOffload.m": "10599b0b09c8a0fed5a7af64d5678535cb637d6811d4c4b854d827b02b73c105",
+    "src/ios/NativeOffloads/NativeOffloadUtils.h": "44c90c9e5ca45c061614c986db4bb469f3e93da9490f19ec340bb17c31ecbbd1",
+    "src/ios/NativeOffloads/NativeOffloadUtils.m": "e3531ab594fed83e8a0f17d35e964a57e7069639319ed8d036b46426d9e8846c",
+    "src/ios/NativeOffloads/NotificationOffload.h": "514507dc5f873fc7101977f17639187ba3ddd2893102f6f39e40dfc92d8cc0b4",
+    "src/ios/NativeOffloads/NotificationOffload.m": "3008d448d7223fd17022fb7c94b26e8437286051022f4dcaf7ec0931f931d296",
+    "src/ios/NativeOffloads/OpenOffload.h": "150476953a631b43fcf00e84572bcc2d50eb54f1e831c46ac7d88198103b8921",
+    "src/ios/NativeOffloads/OpenOffload.m": "59a188b3c94c7b11a05abdae4f1c8796fc75a03d16e49f60cab706cfd008b44f",
+    "src/ios/NativeOffloads/PhotosOffload.h": "0997569dff223c3eb635c5429b28e609320b9ed01aba6378a95dcda7027d2ef7",
+    "src/ios/NativeOffloads/PhotosOffload.m": "3a1dc9f780e229cbcd82c04d93750ba147f176052fe021b55ab3e1362f8384d8",
+    "src/ios/NativeOffloads/PlayerOffload.h": "ac15ba69186f88e19edc70024ca712a6a3b075a5461984f91efe585ac89ed870",
+    "src/ios/NativeOffloads/PlayerOffload.m": "cdd6f91947c34c55adb6e902a2c8f1418dbec9c3ed20696b01b2b307a72d3a1a",
+    "src/ios/NativeOffloads/PlayerOffloadBridge.swift": "9286be8f363c5401bebfe91096b3f8ba3941997bd272b515136e25a979f05371",
+    "src/ios/NativeOffloads/RemindersOffload.h": "b3f81e0ab807b27ecb3c051d7159d2dfe9812da70f1a85e492e3aac4465c9a67",
+    "src/ios/NativeOffloads/RemindersOffload.m": "18b9411635c3c882a903f7d7975b60d91a3758a586af1e553014a374cd68a37c",
+    "src/ios/NativeOffloads/SessionsOffload.h": "38fbb8ffcdc815eb149363c06e64f5e393a1df39c9f478780141fb0896878695",
+    "src/ios/NativeOffloads/SessionsOffload.m": "6bf4726c1d5b749cecf860c91b8584476f64543ab36b2ec45b0a2bffcd1bcff5",
+    "src/ios/NativeOffloads/SessionsOffloadBridge.swift": "77f818ea34c71804531839d98cbc554ed3c45c8d6438569413ebdadb256019ce",
+    "src/ios/NativeOffloads/SpeakOffload.h": "41d3e965abc935b52bb37ec51a9f57487bf03d2fa306488adb3d8503755ed3a4",
+    "src/ios/NativeOffloads/SpeakOffload.m": "b3ebb0cd303353e72341ec946737c7cce9b8295ac00d72071b0be03d7fa76802",
+    "src/ios/NativeOffloads/SpeechOffload.h": "68c944634df39ee1d674e0773c64d10e337b0aa35617ae3846a2efd6ce23d504",
+    "src/ios/NativeOffloads/SpeechOffload.m": "8fef157e6f80e9fc31c8da45ad1645a38ff0f0af68f3ad3c4ae8801ed543b970",
+    "src/ios/NativeOffloads/VisionOffload.h": "9be41c7fa881249ef5be387cd17db7398690193a6bf8bc6f8f5e9391484f03f4",
+    "src/ios/NativeOffloads/VisionOffload.m": "6cb748e3d7af370ac3efe9d8f293b4ea388d4e73c3b4751daba109ad4cf429a3",
+    "src/ios/NativeOffloads/WeatherOffload.h": "f1ef8eb59059a419348010cda560f371d43634998b18a5924675a42c1a050dac",
+    "src/ios/NativeOffloads/WeatherOffload.m": "adb266ed2514ab4a62b405323a14f816a61f74152c072416291115f557141d3d",
+    "src/ios/NativeOffloads/WeatherOffloadBridge.swift": "0dd57b4adbc4088a023c755a93672f26e499ba648fff93bbd934db127fb1e5dd",
+    "src/ios/Providers/AgentProvider.swift": "13b681988ec2f60c117c12eaba89d94d2f4da7c4f1c962cca2c6164d4ec80913",
+    "src/ios/Providers/Anthropic/AnthropicAgentProvider.swift": "948d02caf725266140736e7b66d9bf8c0bd8b0c4ab4b103efa00f0eaee7ff2df",
+    "src/ios/Providers/Anthropic/AnthropicModelsAPI.swift": "c4ee474e653ec91f8d5f33422357baf76722f9976c66c6aaa8ec65a5baa27960",
+    "src/ios/Providers/Anthropic/AnthropicProvider.swift": "af1237002ea320f22715097f09acd7b9e897cf19767d5f2e95d7234bf0835945",
+    "src/ios/Providers/Anthropic/OAuth/ClaudeOAuthManager.swift": "9166496117349a78afc1d092f95ac5e6b52cb805862e61ecaf11445c60fa4749",
+    "src/ios/Providers/Anthropic/OAuth/ClaudeOAuthRefreshCoordinator.swift": "840892ea594c513d3a1ac18e77e33318d165584fe1c13ebb8b772b8c318f9c4e",
+    "src/ios/Providers/Anthropic/OAuthHTTPClient.swift": "0ae120590574ea6a70ce02cf16190ffd6e88c7e3ced71c6f50ca9e4b43600cbf",
+    "src/ios/Providers/Antigravity/AntigravityAgentProvider.swift": "e477ac58659f9612fa68b114bfb29b7c23862d2b59890f4bbf673dda7d470e28",
+    "src/ios/Providers/Antigravity/AntigravityModelsAPI.swift": "8d64cbd2fbc6ebb1cd016c1cb90ca2eb5c67482192cd43b1466f8212d8275ffa",
+    "src/ios/Providers/Antigravity/AntigravityProvider.swift": "69054b0bedc366e97e2fa6bb1840bd406b81b45988b45b6fce086f74865ffd4a",
+    "src/ios/Providers/Antigravity/OAuth/AntigravityOAuthManager.swift": "2eba74232fcde754cf6bb8c376d3fdc5b9df42a010572b32ed7434417dfd8bb4",
+    "src/ios/Providers/Gemini/GeminiAgentProvider.swift": "c65e62ea83d9fcb30d04c2ddf17af86fbc1a6d85b5554116ace34ed0593f26ab",
+    "src/ios/Providers/Gemini/GeminiModelsAPI.swift": "dd973f661704bd132c1fd96df320a0bc721c7b4f31edd9750d789cafca594de2",
+    "src/ios/Providers/Gemini/GeminiProvider.swift": "0a3d62f55a38198cf7081311d378c7357de6c1de7df667fa72ab08d53a57554b",
+    "src/ios/Providers/Gemini/GeminiWireFormat.swift": "ebcae3cf454ec211972c953cb0cfbeb8a19c1bf278d997bb57c3e0f61f32a4ed",
+    "src/ios/Providers/Gemini/OAuth/GeminiOAuthManager.swift": "4ab72796ceea0dacd28e3b1efc8fb0430562ff855bce3d4f0d25d579ca134119",
+    "src/ios/Providers/Kimi/KimiModelsAPI.swift": "a5b64e8f7e90bc6afec514533c92dda61eefbcae91fb567cae539cfd16b80be5",
+    "src/ios/Providers/Kimi/OAuth/KimiDeviceFlow.swift": "af88c5eb07429f765782a2ff6e23aef347be2a5e4c753904cb76db15f3585d42",
+    "src/ios/Providers/Kimi/OAuth/KimiOAuthManager.swift": "2c2ccbf8c0a36945ea1639f2d573e14fb460b3c7a8c0d0ff504d4fd54a9f43a3",
+    "src/ios/Providers/Kimi/OAuth/KimiOAuthRefreshCoordinator.swift": "e1cafed9bbd74b1ddc67f18f73b3d5245a1ed3c745163da44e7a28dcbffc13be",
+    "src/ios/Providers/LLMError.swift": "ded70e7bb1b0e37b377336c923d448551507c58ae7d68a99982cdb82d41892b4",
+    "src/ios/Providers/LLMProvider.swift": "b58645eaba486c77fcd4c1b0a7a1459d71d4fa8cb6f855de7445a9b9246f5c1c",
+    "src/ios/Providers/LLMProviderFactory.swift": "3d3a2817848bbdf7e40766f15bd75008c1944d08d9ebda6c004872bc4d252ea9",
+    "src/ios/Providers/LLMTypes.swift": "b6db6dec6afac510ba5c087aeb66ce96dde88865bbd9a46bc10fefc9fa6bb99d",
+    "src/ios/Providers/ModelEntry.swift": "f277068c368308caa2231b41f60abddcac4cf142d16af3bf8635f1f0486792ef",
+    "src/ios/Providers/ModelGroup.swift": "46ac696c85e68b39bf44a1d40f4951367523948d6e8426a43a44efb9257b8335",
+    "src/ios/Providers/ModelGroupRouter.swift": "5bb2ee2d48f84f175aac0645939ffbca519a9c7adf25ea645d8e99292f03a084",
+    "src/ios/Providers/ModelReleaseIndex.swift": "14d0c22b74bd11518768d771874f9b85898a9f13302bfa05c35facfc69fa8675",
+    "src/ios/Providers/ModelsDevAPI.swift": "92c48837eb5467e75291c649e28a7f081f0a80b0076aef342247f81ffb111f38",
+    "src/ios/Providers/OAuthRefreshCoordinator.swift": "69eef5ebd2f72404eaf6c0630a1e56820cf5edc283c8f19443562a2c48c46690",
+    "src/ios/Providers/OAuthRefreshSingleFlight.swift": "16b08a079889301f9f2ac10faa06b6a0d529382ffa6953e28341319abbd17838",
+    "src/ios/Providers/OpenAI/OAuth/CodexOAuthManager.swift": "287963f5fcd4cbc0ce163fe53a5c223157a824e73d3b714bf8cc7eab8427958e",
+    "src/ios/Providers/OpenAI/OpenAIAgentProvider.swift": "9225f88b50cfea9207016e7644e56e5554cf4fbf49c33bf81ccaf9cfa1d8f4e6",
+    "src/ios/Providers/OpenAI/OpenAIModelsAPI.swift": "c2038cfd4fce8a4ba4a0fffe4a68e82bb65cccb00b4e17e03ef6d2e19ff9e2da",
+    "src/ios/Providers/OpenAI/OpenAIProvider.swift": "533f9dc8ce84eda336bbacc29174af5e9225dbb40fdaa10808f96b1aa16d4e11",
+    "src/ios/Providers/OpenRouter/OAuth/OpenRouterOAuthManager.swift": "dbaf6a42683365f13dee9cd0d8ad3ec2c635a13959d22ff9f2e4698671edb813",
+    "src/ios/Providers/OpenRouter/OpenRouterModelsAPI.swift": "4ef73675ce81f50e51cac1f467524f47a8c6841a7542c18d9b4dca88b0e2356c",
+    "src/ios/Providers/ProviderConfigDB.swift": "e2e13b091965d9e77a56f95b128ad901b15c78e92d03a820700a6749e41151c1",
+    "src/ios/Providers/ProviderConfigStore.swift": "5de831b9b21fb7b985233cb569f6506280147837136adef972edaabc2b7d528e",
+    "src/ios/Providers/ProviderInstance.swift": "47edb100d2f8de92adc276bc8381c617d33d1fdc8c01de7482240fe8c42ea87a",
+    "src/ios/Providers/ProviderMigration.swift": "31e11a86f7d3a945a89840cdae91cb3b0bbc0fd884bc8473f2cc3c717a86672e",
+    "src/ios/Providers/ProviderTypes.swift": "8c0d1dd617206138321418c479b8f321ab94785f4e294a2db2be8703af3fa32b",
+    "src/ios/Providers/Thinking/ThinkingRule.swift": "09a21c62c0bb8510f6d57377a33d50c9259e76d6ec6c65b71f5755818fdbaf25",
+    "src/ios/Providers/Thinking/ThinkingRuleCoding.swift": "97529e83800a3cffc47e4745c700d7704d74f4cc02c707234dcc2c78e117dd7b",
+    "src/ios/Providers/Thinking/ThinkingRuleResolver.swift": "31b5378e5b6f869152f7c6c82c76f79218e30278632ca58bcff3d40076ecefb7",
+    "src/ios/Providers/Thinking/ThinkingWireFormat.swift": "ba810d49b81d7fc594da97215a3231482aefb37d342840b30a166bf2f43914f3",
+    "src/ios/Providers/ThinkingLevelCatalog.swift": "20f0dfe64d7737f30e00b37bbee7d3b0caa1db5e5fb62b55740aa1b3fafc8e87",
+    "src/ios/Providers/URLBuilding.swift": "4ea2386c5182796ebeff8c3abcdd92eb12eb47e327704fb9edd7ae25129186c7",
+    "src/ios/Providers/VisionGroupResolver.swift": "9329bbc27bd6fbf9e20f5804d715de15340f8a3e912c1912fe3575663b7073b6",
+    "src/ios/Providers/Voice/AudioSessionCoordinator.swift": "6748befbacd2145b8dbe4fa0200da52dcbfa9a348d6d9b056ec864324e9cc19f",
+    "src/ios/Providers/Voice/CorrectionSignalSource.swift": "c88446ffc1fd6a4da1bbf47bdb1ac7349cd459224a44e33dfa3fc68cf989433d",
+    "src/ios/Providers/Voice/CorrectionStrategy.swift": "1410403d1fbe8c65c48488688ce93320993bd4e3ea958c45461c32c0157b7f68",
+    "src/ios/Providers/Voice/PhoneticNormalizer.swift": "709475f27c6ae5af1919043e3cb19d519d3277a5033704d6aa830afcbcdd8cec",
+    "src/ios/Providers/Voice/SystemVoiceCatalog.swift": "6d7bd624519e4a64bbae7590c7436d724ffa2cbcedb141f6642e5e57dcab31ff",
+    "src/ios/Providers/Voice/VoiceActivityDetector.swift": "b2a629b52b8c46c5a1ac7aba71e396d73a9d59d8a63d2b6ce8318e32c44cf551",
+    "src/ios/Providers/Voice/VoiceCorrectionDB.swift": "065e25992ea60111478f65709d76c08f244e81e447d1b9b69c3259d3da7feb9b",
+    "src/ios/Providers/Voice/VoiceInputModels.swift": "92d2bc318fc363f02960c3e91884b81c2c091dd3166f7b6f7a92450889746da7",
+    "src/ios/Providers/Voice/VoiceLog.swift": "0d05adddf60894b454eb66f54a801308e1ec2ed7756eea1553683bd4dedd06f6",
+    "src/ios/Providers/Voice/VoiceOutputPlayer.swift": "34f9bcba07d01b059b65ab6ddd84f56f7e93fb8b2f51f9dab9d26e109515c40a",
+    "src/ios/Providers/Voice/VoiceProvider+System.swift": "da226ec31ee1e9dbf4d86623823e5a5cfe7b3e77d9f38208bb600b7a63cfa3c5",
+    "src/ios/Providers/Voice/VoiceProvider+Vendors.swift": "2c64be8c0e16005affd8d3e69ba6d424d79305ac79af2fe38b7752cdc3f4b718",
+    "src/ios/Providers/Voice/VoiceProvider.swift": "6ab72e7f34e95b822994f96aeab9567a449d33a1eb9b5b8507a4c4d8110b138c",
+    "src/ios/Providers/Voice/VoiceProviderFactory.swift": "eb7e4856237540e6930e22832bc22ccefc42ad654fcd88d5e23684ac97776d8e",
+    "src/ios/Providers/Voice/VoiceProviderResolver.swift": "58834f1664a0b6efea4a4a40d814166ca8195941471d65a2693df06dc54d7462",
+    "src/ios/Providers/Voice/VoiceProviderTemplate.swift": "ebaff8860853a9feea7517f6e44717625f52e5bd0f97c77faea2c4c0d31be76e",
+    "src/ios/Providers/Voice/VoiceTextSanitizer.swift": "f6cbd7f0fa7170b4d85abbc049b0434ab506f5a9d7292a3b46af23dea2fb3cea",
+    "src/ios/Providers/xAI/OAuth/XAIOAuthManager.swift": "f8b9e68538e5336ce41040a571166eb696fcf4781c7e1cd24057a833a063119c",
+    "src/ios/Providers/xAI/OAuth/XAITokenStorage.swift": "6a62d4c39418785b29d89240cdf0fe7babc416ed816ca08dc917bf635e13b15b",
+    "src/ios/Providers/xAI/xAIModelsAPI.swift": "ee4932a5096448a3e6dc684f9761bfa1c35d6c1382fe1643e2733400c4e4caa6",
+    "src/ios/ShareExtension/ShareViewController.swift": "a7f48c54510293e7678af1f05e4095a982f7379c3341af1da9789e3da862ec24",
+    "src/ios/ShareExtension/ShareViewModel.swift": "9bf73f8ac31b4845d2040f614cad1e5d8bff3d1170d0cb0f44898dd489f81ecf",
+    "src/ios/Shared/AgentActivityAttributes.swift": "da3569bff59e960e297774a3ef57b014e9ebbf6c36f747a40a1c38273fdca9cb",
+    "src/ios/Shared/AppLogger.swift": "34182122cd03ddf2ed59dcd11bd5737584b6873b062efa4257e4c050f6ba8edf",
+    "src/ios/Shared/AudioTogglePlaybackIntent.swift": "2557a7071e00b40fbe31a39335d778e015d31cb0168f61f4b1b36492adbd2eca",
+    "src/ios/Shared/BPETokenizer.swift": "f5187e02890fd3742f05fddd533ab66ef72d1d779be6e5c23724c925382c2ef5",
+    "src/ios/Shared/Config/Audit/ConfigAuditEntry.swift": "79444d01f831eb6476e84ce59ff4aeefec8dd6ae8209f40c5c34b5e36ea5b201",
+    "src/ios/Shared/Config/Audit/ConfigAuditLog.swift": "ca8d48589a76caea2191c70e00e93415acc43078513fefb24b11b796c1ac687e",
+    "src/ios/Shared/Config/Collections/EnvVarsCollection.swift": "a76f8a3fcc6d878cee0bb4871b4b9df14e3a00251c1c6bd51f9b2b2e4e1174af",
+    "src/ios/Shared/Config/Collections/GroupsCollection.swift": "14595a0802b5cb630b26f1812b6b3269cb89a825a75cf7530ed369db9329967b",
+    "src/ios/Shared/Config/Collections/ModelsCollection.swift": "b2528968c738066201b2638db5949167b6b85d5ece303e4161b4026271fd79d1",
+    "src/ios/Shared/Config/Collections/ProvidersCollection.swift": "744f121266318b09222f2ca7c7c3bf5e4b0bc76562de3650b1a7829ca8d25d87",
+    "src/ios/Shared/Config/Collections/ThinkingRulesCollection.swift": "add6de3fed640b0244d32c4b27fcd621d598d01de8616d764994711f454d455f",
+    "src/ios/Shared/Config/ConfigError.swift": "026e7363842ec8ec826a1e0f108c4f629195e4383284213e4773ed8ea9a14f86",
+    "src/ios/Shared/Config/ConfigField.swift": "d1b1981d7b1cec5ea01956267ab2e825c89efb8fafc526362d80d41daa8a5b46",
+    "src/ios/Shared/Config/ConfigRegistry+Builtins.swift": "cebea880225e93c0fbe1749bedab0c8fd815ed82e68ebf04c5202d6a5557faa4",
+    "src/ios/Shared/Config/ConfigRegistry.swift": "8b23646532f5ff91344eac324c4150f544857c7f04b4396c495da911711bf5f8",
+    "src/ios/Shared/Config/Confirm/ConfigConfirmSheet.swift": "cab6d0cab2b28828ff019408c2074ff0d93974862ec721f46a9049365c44fe5e",
+    "src/ios/Shared/Config/Confirm/ConfigConfirmationGate.swift": "cea0536557c09507c4eedc0956f8c53ee351f55355b23357e6ab8070d9d36081",
+    "src/ios/Shared/Config/Confirm/PendingConfigChange.swift": "1f735503968d292ca30423aef3889bfe4a53863b6296d17dca317d133d8018b5",
+    "src/ios/Shared/Config/Fields/AppStorageFields.swift": "5caa5211d971b4fbc2fe801c589ad7d6830cff574eec64ebaa35d337cf942d7f",
+    "src/ios/Shared/Config/Fields/ClosureField.swift": "ba2abae33d625e601b2255541285a88416eb73d821d6d2ed1a4db642d9b8a6f2",
+    "src/ios/Shared/Config/Fields/ConfigCollection.swift": "ed7c96fbd0256b4536f59ac46d04e6904fea71f623fc80e317714d22db40c3e4",
+    "src/ios/Shared/Config/MinisConfigPermissionStore.swift": "39a92638e63587be273eee63cfa0990804aa9dccb323e76da92892fa28a8fd1d",
+    "src/ios/Shared/DeepLinkCoordinator.swift": "ee1afbf4776c39f8b6aeeb8fbe4901f937742f7c856ef954778580d20f5fc779",
+    "src/ios/Shared/DeepLinkRouter.swift": "0a415471dd6cddbb3c9c4266d4d0d8edca874c1bd1497686fe22ce44c2054391",
+    "src/ios/Shared/DeviceIdentity.swift": "02a6a2210edc51ba60bdec6d64a2c95558fd75c88ac98f5ad4962f7e3d0ed1c0",
+    "src/ios/Shared/EnvVarPrivacyStore.swift": "ec143632657758c47033dad7d9bbbf4a1aa1f3f530cda4a6708fbb30472105a3",
+    "src/ios/Shared/EnvVarRedactor.swift": "9bef677e7db998936720c31f9904236a083094ab390369d8539bbfb66b157029",
+    "src/ios/Shared/EnvVarStore.swift": "a27b59fd7586a0cb38d42b1c0d231ded034f879619ebd739b35a78ed732fdee1",
+    "src/ios/Shared/Environment/ChatSessionIdEnvironment.swift": "badb58c3bce5c3933ea4705dcab35a47a02728a3ea773076676cf269cf05a727",
+    "src/ios/Shared/ExternalFileImporter.swift": "8b24f1ab6ed47f0ee2ed24c78c8adbd9d0d441eeab9160101a3e5753c059f3f4",
+    "src/ios/Shared/FileHandleSafeWrite.h": "58ffdf7da66598fdb72ec68b9749c016cdecdd9a05e74ea0720dac1af6f37720",
+    "src/ios/Shared/FileHandleSafeWrite.m": "dc822f12a4ab365425f02c771874606eb49cd003efbade3a5dbd64ff2e380253",
+    "src/ios/Shared/FontSettings.swift": "bb991fa5ad738dc2d459df828d7006d7256164325ea684a5668b4e6fed8d5225",
+    "src/ios/Shared/JiebaWrapper.h": "23d242627d5d2822a90f3df149fe53d2d72c3abbc4c5bc7517864bb5098a6fda",
+    "src/ios/Shared/JiebaWrapper.mm": "df88b05f427b178d4b0294df713b9a5d15aa076ea7f286aeb6fbb90c8ed98c52",
+    "src/ios/Shared/LLMSessionRegistry.swift": "9a0eaf7e79cd2e352bfb9cb91a570de44c4cb5c0be007941363243506f71f5ad",
+    "src/ios/Shared/LoggingManager.swift": "eb4873bac79657309982366465242b820fe1b4ab0ef5e9a8d4e988489964994e",
+    "src/ios/Shared/MarkdownStripper.swift": "25fc8a3786d0aef75da494280f35ddff8fdb263be7bc0a90cdbf96ccdf28981c",
+    "src/ios/Shared/MinisUserAgent.swift": "6a5b40747cffea0479ad7732f884ef2fd3ac0ef249f69d866fad8a7d11f8d653",
+    "src/ios/Shared/NSTextContainerSetSizeGuard.h": "b36aca24178e047ab3dd4a1655836a83caef9494b415af0c4d7525c7fb3677c7",
+    "src/ios/Shared/NSTextContainerSetSizeGuard.m": "ed23e1894cc0aed3b7a4f06363c5a623a43a1f4f16385962d0d46f0794bda080",
+    "src/ios/Shared/NetworkMonitor.swift": "52ede12aba4a3ebc5064f36816be7affa1c0707788c49fda79e14ce06f93f3e3",
+    "src/ios/Shared/ObjCExceptionCatcher.h": "32ea7a356b5f9f5481110840006bdfafd25f4f4243da20872f73317c8853a5c9",
+    "src/ios/Shared/ObjCExceptionCatcher.m": "0a0ac333b02bafef4ec424c396d134648312d15304bc6e5351517b974286adbe",
+    "src/ios/Shared/PendingShare.swift": "e0fb7e3c35dfe7d150ae8a72197dcc9fe0b46aa1d9e3d45990ded7eadc5cd708",
+    "src/ios/Shared/QuickActionRouter.swift": "e4baffc51cb084cf30a662d9fabde88ac11bc3e78a904e947577519d17b03bee",
+    "src/ios/Shared/QuickActionWorkflow.swift": "b38fe385281bde2aa71ddf95a07cfb1dad609cf7fa3a29eab05607a022007ccf",
+    "src/ios/Shared/SafeKVCSetTrue.h": "38391d484b8217e120942be47781935d7b77c4087a606829ea06397b2f4d5a17",
+    "src/ios/Shared/SafeKVCSetTrue.m": "24382a79b36860ec27f30f3d7c49ccd5c9b5447b2d2ad74d3d98c3eb9c276190",
+    "src/ios/Shared/SentenceSplitter.swift": "ccd040d89c66349dc21965cdcc9aa9eeeb0130ce0b93c2fbd287d94d81cdced8",
+    "src/ios/Shared/SessionBadgeStore.swift": "0b151b8e0c33e0a9a577be7b89e8047653cfe2f49a7e63cba4f6c1b806d9bd54",
+    "src/ios/Shared/ShareCoordinator.swift": "5c91a56c81ba969cc021c48d5192f588fda4a05d1fa3b50be12fa5b12ab16a1c",
+    "src/ios/Shared/SharedContainerStore.swift": "f6f9f68a0fce7a5567b0dc260f32d1ed1eb72eae5c4f2cc4381532905a9c935f",
+    "src/ios/Shared/TextSegmenter.swift": "4fab0ddca98ee4db4bcca5ff02cd478388787ae8a045ae0b7fa6a23708eb41cc",
+    "src/ios/Shared/ThumbnailCache.swift": "e723d95250cb3f57ba3c4c1869b64d33205b938cbbbb73fcef815e7a4ed6b9fa",
+    "src/ios/Views/Alarms/AlarmListView.swift": "4395339127c933b5c47539b26626696d98871926b57bf443dc9b33931d7d68a9",
+    "src/ios/Views/Chat/AIChatView.swift": "cf38d8c2993dc21c018a6fc920090530b0d7c4e3a8d627fac8ccf6a0dcac683c",
+    "src/ios/Views/Chat/AssistantBlockView.swift": "159b7d59562e52146db31f060ef9a3654b25fb026ad2114cd5eb853224c548ba",
+    "src/ios/Views/Chat/AudioWaveformView.swift": "3da92b7ec6dc07cb74d96e456ad48aa08a844d8482cdb4bde49d78962aa635ee",
+    "src/ios/Views/Chat/ChatInputBar.swift": "e059db8f3869b46f088a42ceac72b2c3971a758a064ac52673e52a4400336f9f",
+    "src/ios/Views/Chat/ChatMessageViews.swift": "cd20a694bd9b91097239ed18a7874f0f6b11f47deda018eb83ef38db49e5bff8",
+    "src/ios/Views/Chat/ChatTurnScreenshot.swift": "ee3b8ce8a0a7ef20b7f37ada80827eb7479b6d1b2203f1acab6b8d5e1fa6df1e",
+    "src/ios/Views/Chat/EquatableContextMenu.swift": "98c990508de81d0a874e777258710041b68d3e9ca40ee6ef7e4ab5ba16ee73e0",
+    "src/ios/Views/Chat/MarkdownPrepRegex.swift": "632ce56290747425aa42fecbe2ea582b2c19802ea0ef051f06a52efb934cdd7c",
+    "src/ios/Views/Chat/MarkdownRenderView.swift": "2bee6da21ae37052e203472a2fa61ef1bc0e56594e6600c31fab6c0e3564813e",
+    "src/ios/Views/Chat/Media/AudioPlayback.swift": "37e6f05271fbaf426966c4232d2dff470ccf3aa6ca749f2fd066f2690c904ac0",
+    "src/ios/Views/Chat/Media/AudioPreview.swift": "cb924bf35968b4d1b2233238743d60f5a162e3bd8ca34fc9f9dd3dbdaa599d6c",
+    "src/ios/Views/Chat/Media/ImagePreview.swift": "3747b639374ab2f8f045b5c567fa6ca4415bd557b84c85c62f5919a4c181dd03",
+    "src/ios/Views/Chat/Media/MessageImageGallery.swift": "ea2cd09b4d7a37e873506bf1d9146f1c5f5ee9b5ac2dea009caee790c95899cc",
+    "src/ios/Views/Chat/Media/VideoPlayer.swift": "9f19f6d0768fb0dab7cebd02611d7e239bb0aafb8b722bdc49d326c6f5f9b43c",
+    "src/ios/Views/Chat/MemoryWriteRevoker.swift": "36de3940c39993d136b0192527d07cbac246ec6af7cb45e417987578b62fbff5",
+    "src/ios/Views/Chat/MinisMediaViews.swift": "155f52a31781b88dc8982688eb7fca162d3413a1b3e852fa89f3f553f15a5ce5",
+    "src/ios/Views/Chat/MinisShareSheet.swift": "d59c5aabbbb6057d91c560153af23455f5846dd9b06e64cda24096f2999d0704",
+    "src/ios/Views/Chat/OffloadPermissionDialog.swift": "3951c2b1553219509a9980a331e0ca6b4dbd7c627ec9fec2ec60665633785801",
+    "src/ios/Views/Chat/PaginatedMarkdownView.swift": "7db3e1389c6a933b75bb3d1e796cd2924cef5774926d1c32f350850199de2582",
+    "src/ios/Views/Chat/PrintHelper.swift": "6cfdbbddf2192ba4a993f018332c962825e742ace628c94922790b6e240d98ad",
+    "src/ios/Views/Chat/SelectableMarkdownView.swift": "9d8c1d4363da2a23ecd7a547354af188db65c7e31b3a3fc020810a64742b4b69",
+    "src/ios/Views/Chat/SessionMemoryView.swift": "390eb2d320880ecb0e3edf6809eea4a61c1ad3fe6b5cc0f2a9726459cc4500a0",
+    "src/ios/Views/Chat/SessionSkillsView.swift": "eccdebfaae1cf4c1246e50adfe59f6c9a8108b4c19b261c9fab7561b090e1243",
+    "src/ios/Views/Chat/TextFadeAnimator.swift": "20b5219e89aaea3bb07c5e016ceda61ca68ce50d5ef231a97766c2557b13c3fa",
+    "src/ios/Views/Chat/ToolLiveSheet.swift": "ebf4c423c41368548da852f0eac5224741b413f2d4e8a976a0a83fc10da16611",
+    "src/ios/Views/Chat/UsageStatsView.swift": "5218ffb1bcea848743e5004f4d13ee9055941b1e1aec7fec6ca18a5beb20c578",
+    "src/ios/Views/Chat/Voice/InlineVoiceInputView.swift": "b242d9d61fc056cbaed25f6105a2cee99990c629d23bce2f0c487b6fb7486418",
+    "src/ios/Views/Chat/Voice/SpeechPlayerControl.swift": "a0d212c4b8f18a8088e9e93ec5afcf0c86ed9058c2c5f17017214229394f7e68",
+    "src/ios/Views/Chat/Voice/VoiceInputPanel.swift": "2534cbf7d01ad228015c2fd9f02d92e22a4a3f58ba239b347d96691b210a3385",
+    "src/ios/Views/Chat/Voice/VoiceWaveformView.swift": "3e18d1bd2a1de8673b84ba95589e9c69d11c94b369f6d2febcc2215bef5a2836",
+    "src/ios/Views/Chat/WebLoadError.swift": "deb94453664d61fb9f1d2548fb41ab977561d70f35c97c089db620633ac63442",
+    "src/ios/Views/Chat/WebPreviewSheet.swift": "e9acaae9e4e8b42ae465b6ad456220bee3371a979e7ec5638403d0536d22f4bc",
+    "src/ios/Views/ContentView.swift": "f33dad627cfe26dfbef985077f9adf9fffe8b247c7eeb974fa2b6a9bb0a97b22",
+    "src/ios/Views/MCP/MCPFormSheet.swift": "82cdeabb49bea065e7d11e63d35f4ef5c1ead26e62e31bfd107f932c1b770347",
+    "src/ios/Views/MCP/MCPIntegrationsView.swift": "77c2074f4974b2346174de0d16f9c2c951535931a9ed4eb9fec1846247843c6b",
+    "src/ios/Views/MCP/MCPJSONImportSheet.swift": "373ca4d5d4e2f913904040a795b69632ba395cacd6b8053fa6926dbc9d03333b",
+    "src/ios/Views/MCP/SessionMCPsView.swift": "5f1a1842b4db0bf5207672b3532377348dc2c3c68f7746b790ae1d442f514136",
+    "src/ios/Views/Providers/AddProviderView.swift": "64d97e9b5107dde4ddedaedc09f6354789623a4164672d76cabc0bb19b113daa",
+    "src/ios/Views/Providers/AgentLoopModelsView.swift": "fee0ccbeeb6c7db44e515fe0a465468ff23ee7a3db6c641960c0e24f2e66b936",
+    "src/ios/Views/Providers/GroupSlotPicker.swift": "88f13a7b2fe8ecdcb0860d8dc4a4283ff09c920b5df5b02b1d1997b46d2cba26",
+    "src/ios/Views/Providers/GroupVoiceModelsView.swift": "6f63cf02f28bb4db866e635c64a3962d0d965050550a6f7d5936cf6b2d6d4bd4",
+    "src/ios/Views/Providers/KimiDeviceLoginSheet.swift": "90ccfe8def1fe65fd253bf32c37f1d9fc27f225ed69941b07ab91bfc1584695e",
+    "src/ios/Views/Providers/ModelDisplayTraits.swift": "fb451ad75f7d9320cc1beebd8b8f4e6dcfe6b3c2cbb6e958f55cf97354c302c5",
+    "src/ios/Views/Providers/ModelGroupDetailView.swift": "9ccea7c23f0adb112b85b66c0d4795f7fb982fd06ae67643b1069de5db78a341",
+    "src/ios/Views/Providers/ModelGroupsView.swift": "e660b561cb027a7e5ad9e97dfe2ce48c2d1e02baa27634bc1c06c47a3bca759a",
+    "src/ios/Views/Providers/ModelQuickTestSheet.swift": "252590849725748c56dc42d4d7e21368edea5b01f009d0fc86a4fef3630eb586",
+    "src/ios/Views/Providers/OnboardingModelSelectionView.swift": "7b08a6b094d579d173d524da41c64fd17487614f488671e93508d1efd9a6ea38",
+    "src/ios/Views/Providers/ProviderInstanceDetailView.swift": "dd9acdb2bec7ee95571ce7fe247aa2872a84c9bd90f27c97c4acb07e6702e418",
+    "src/ios/Views/Providers/ProviderInstancesView.swift": "4ee275d4ef1fef6f9684b2f2b554c3e35f91b327699b911c8902960dce559823",
+    "src/ios/Views/Providers/SessionModelPicker.swift": "d102d2f7b34d7db9b1c94f03a9425b79bd8e3d7bdccd84b9d1c703b162917c50",
+    "src/ios/Views/Providers/ShadowVoiceProviderDetailView.swift": "dde1ea72efebcadeac468f9f2958ccdd21ae1fe67017294d01b19628e5de1648",
+    "src/ios/Views/Providers/ThinkingRuleEditorView.swift": "4faf0921dbb80698c81b1f827e335fb4f422b240dc226f61e755a939a5b57040",
+    "src/ios/Views/Providers/ThinkingRulesSection.swift": "d59a2878ff05d8ed1a15817050656a0c82b5339c501548e5b9dd7f40e261e7aa",
+    "src/ios/Views/Providers/UnifiedModelPicker.swift": "785f1c6b284f4b8b2f6a39ad7806c132d2a5bd93ef9ad87047f8c4db04e880f3",
+    "src/ios/Views/Rootfs/FileBrowserView.swift": "6ff77f6874910a6431c2e10b2e001bf0cfe24f47ea81d671fca9a5cda6005e5a",
+    "src/ios/Views/Rootfs/ISHTerminalView.swift": "c4619c3d8ce2ea84fcc8a8d24b26742e52ad34da5df62c9347401a204baff484",
+    "src/ios/Views/Rootfs/MirrorSpeedTestView.swift": "7acf62b4c8577fc6d16e6484858ea5026addc27d3f2f6f3582a9d057f2517174",
+    "src/ios/Views/Rootfs/RootfsManagementView.swift": "59fcb7ad59ccb6adea9ecedd0e3131b9fa7378126c013c0f40c90f5355a14f73",
+    "src/ios/Views/Rootfs/RootfsResetButton.swift": "1b355fcf8e60273c55809ffd7f7ceb4c5657499fdda08ab6db4ef2bf5e85b290",
+    "src/ios/Views/Settings/AboutView.swift": "6a2131af1e555276121bb438293701fef70f5b07512092c39ada6b0d88af5387",
+    "src/ios/Views/Settings/AppLockOverlay.swift": "cf355d1f471978ab3bce37c3cc5b51a5aa324b480b966afc87530062b80427c6",
+    "src/ios/Views/Settings/CloudSyncSettingsView.swift": "d143161272754b7c8dad5e1d87ab8313d36f2f5c0276f1ae76b4630e04125034",
+    "src/ios/Views/Settings/ConfigAuditView.swift": "fd94f02eec8f3a04f50e682cc59080358dc70bdc1cc4e75748b664f01f6415fd",
+    "src/ios/Views/Settings/EnhancedBackgroundSettingsView.swift": "9354e4a1b2ff7f181fc735dc009e9efb5396ed63abac866fb660dd020e8a71c0",
+    "src/ios/Views/Settings/EnvironmentVariablesView.swift": "89ee580d4181249930ba0259dd42d0f1d124edf947be0bd5eaed4e4963a433e5",
+    "src/ios/Views/Settings/FaceIDProtectionSettingsView.swift": "ddcbf62640680ccbd5d5a39a3a58c1a140d179912954699ceafcaf16e8b30ccb",
+    "src/ios/Views/Settings/LogManagementView.swift": "567b54c5cfe53c82ddf99450e33a5a8b3cc6228e26fec3b5a7a2889c7b3b7d55",
+    "src/ios/Views/Settings/MemoryManagementView.swift": "67287c823e683cf9d1019d8afd46f97159c8a5cfe3959a75b81c459b4e31d8a5",
+    "src/ios/Views/Settings/MountDetailView.swift": "8fbad8e1cc9b2f697d4659067d2fae091228a666ea4e9ce152b9e2f5eea422b7",
+    "src/ios/Views/Settings/MountedFolderCoordinator.swift": "fbad84d9308698ad96c7f1efa4ca758f1da6dba8779a19c205805f90633507a3",
+    "src/ios/Views/Settings/MountedFoldersManager.swift": "77427042f3ef29a9e2a3e3b61b9dbc7874206a7c3b372f8b5810d5732d371717",
+    "src/ios/Views/Settings/MountedFoldersSettingsView.swift": "5c028796041dbc16d9aaf7819c761794aef28d0b4d4486f3cc7a5bb4519e0074",
+    "src/ios/Views/Settings/OffloadPermissionSettingsView.swift": "de436faa0f5abd240a6f3382d838112dcb4bdd49117512f0d66a05aea63442f0",
+    "src/ios/Views/Settings/SharedFolderVisibility.swift": "86a8f81d3fa006e801fd6a0f881824e0dde4ab47d47c4a0eb3793d87f98061d5",
+    "src/ios/Views/Settings/SharedFoldersSettingsView.swift": "4363c160e707ded95cf9ad9bcc2ec2924696c05d2d96663eb7e50d78dc3261ee",
+    "src/ios/Views/Settings/SoulSettingsView.swift": "00a0b21dcd26b393d8fcfae00ff9baca748ea85d5577b48451388ec4fad38ea5",
+    "src/ios/Views/Settings/StorageManagementView.swift": "f48c7a5fe5020c34b907f1e11ea73a113525e87799ddd7759cdc844876a1f10a",
+    "src/ios/Views/Skills/SkillsManagementView.swift": "5abcfef5aee53f540e39cfcbd0e015562c73c3a8b789f2610338dc2ea03c6a1f",
+    "src/ios/Views/Sync/CloudSyncSettingsV2View.swift": "e5b963a0ed5ff2f54619899cef17612577671672327da61c342a23964805ea63",
+    "src/ios/Views/Sync/SyncMigrationDetailView.swift": "6801e32b62fb63cc18bf75ad48de6fc71db0ebb463d32a70f5f9efa879a8bea3",
+    "src/ios/WebApp/WebAppAddToHomeSheet.swift": "e0f09207ed0074e2331e46260592c0d79aaa644075a77d67d9492282821a1d70",
+    "src/ios/WebApp/WebAppHtmlMetadata.swift": "a7474d8b5862c27a9ecbd8c63cdda518fa2ce1893c282b8743ebcd8ddd14797d",
+    "src/ios/WebApp/WebAppIconCache.swift": "347da249bdb89bb6c2ba2d87442a77ad2780095819930f52d0d7f5ac68d44a08",
+    "src/ios/WebApp/WebAppPathClassifier.swift": "7062948c79b4f234212eadcd9aca67064fcb6b174dea712bd0424eb0079bd9eb",
+    "src/ios/WebApp/WebAppPathResolver.swift": "8561907b01569336f02ff798100cd4c8176b40e03569aa4e9264e4d710a7cef5",
+    "src/ios/WebApp/WebAppShortcut.swift": "8704b8c2b68d96619b70c2b07b50c720aab7ae5d15cba3d61e878f2764c6ee0b",
+    "src/ios/WebApp/WebAppWebViewController.swift": "a8902a74ba374c9175aff65054feebb9bd243fc45c513863f285cc9c53e98d06",
+    "src/ios/iSH/CurrentRoot.h": "6bd62a7dcf8ed1b7680273d40a2f0789010c612188d0842698beeb2af73a105e",
+    "src/ios/iSH/CurrentRoot.m": "6481488e9bd52197e7ef919289c16a98c3b20b380fb33b055c828ab56ff62918",
+    "src/ios/iSH/ISHKernel.h": "f5187944b72678b96b4ba5775caabbfd8d009318e6eb326bb20fa6abaf7f5c10",
+    "src/ios/iSH/ISHKernel.m": "3e41612e83f9f237e544d88ba5424cf90771eb1c007e6bda4dbed8ce73a7b9c7",
+    "src/ios/iSH/ISHShellExecutor.h": "e6ec5e57279c3e92e46cba694e44ad0ac4bd4d4cacd7d9d1a5bfdc1c4e04da62",
+    "src/ios/iSH/ISHShellExecutor.m": "c844f7859252826d20048e32d8d4747d4f8a0505a473ef51433e56b99a9f205a",
+    "src/ios/iSH/RootfsManager.swift": "501aa6654875ac344587cd059a394901bde4a9bdfbf8aef8d409f74d2bd32bc8",
+    "src/ios/iSH/Terminal/ANSIParser.swift": "8711fd9b24f75e533b59adba810ae0b19fd575acb2f8e9e8b4b2e8d4886499b1",
+    "src/ios/iSH/Terminal/TerminalBuffer.swift": "aacdaa9b529211365db7b894b1948b7c6c329603864739a1db6c80088c3e11af",
+    "src/ios/iSH/Terminal/TerminalCanvasView.swift": "a0b41090604e38b2085f4f292cf90a100b7dd76ca353e9fe201fc0f9d5278dfe",
+    "src/ios/iSH/Terminal/TerminalEmulator.swift": "1812720b0f4eb68bd873e4016d9d5fd9f76ba9d10ee42b43d63811ed2001bc35",
+    "src/ios/iSH/Terminal/TerminalInputView.swift": "8b937bdb0dbabfb5bf73ddbe410cc8c5e6d8a7c901007f33b519ec5092442cc4",
+    "src/ios/iSH/Terminal/TerminalKeyboardAccessory.swift": "98f358ac6326c970fb1197bc59b0dbbbde1e11ec251ea49eb6953f180b90a0db",
+    "src/ios/iSH/Terminal/TerminalTypes.swift": "4b4231a7a61ec40467123a1a1f9994406473ea198c89a039f9cfc5ce77ce67ba"
+  }
+}

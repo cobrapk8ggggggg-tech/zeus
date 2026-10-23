@@ -37,7 +37,7 @@ jobs:
           if ! xcrun --sdk iphonesimulator metal --version; then
             xcodebuild -downloadComponent MetalToolchain
           fi
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
         id: native
         with:
           path: |
@@ -56,6 +56,16 @@ jobs:
           bash deps/build_ffmpeg.sh 2>&1 | tee ../results/ffmpeg.log
           bash deps/build_ish.sh 2>&1 | tee ../results/ish.log
           bash deps/prepare_alpine_rootfs.sh 2>&1 | tee ../results/rootfs.log
+      - uses: actions/cache/save@v4
+        if: steps.native.outputs.cache-hit != 'true'
+        with:
+          path: |
+            upstream/deps/libs
+            upstream/deps/include
+            upstream/deps/resources
+            upstream/deps/frameworks
+            upstream/deps/lame-build
+          key: openminis-6339bfcb-simulator-arm64-xcode263-v2
       - name: Build the original application and its original UI tests
         run: |
           set -euo pipefail
@@ -64,6 +74,8 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/OpenMinisOriginal" \
             build-for-testing CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ARCHS=arm64 \
             2>&1 | tee results/original-build.log
+      - name: Verify unchanged original application source
+        run: python3 .openminis/verify_source.py upstream results/original-source.json
       - name: Run the original renderer tests on iPad and iPhone
         run: |
           set -euo pipefail
@@ -79,13 +91,14 @@ jobs:
       - name: Capture and test both device sizes
         run: |
           set -euo pipefail
+          tests_failed=0
           for kind in IPHONE IPAD; do
             if [ "$kind" = IPHONE ]; then device="$IPHONE_SIMULATOR"; else device="$IPAD_SIMULATOR"; fi
             xcrun simctl boot "$device" || true
             xcrun simctl bootstatus "$device" -b
-            xcrun simctl install "$device" "$RUNNER_TEMP/OpenMinisOriginal/Build/Products/Debug-iphonesimulator/Minis.app"
-            xcrun simctl launch "$device" com.openminis.app -AppleLanguages '(ar)' -AppleLocale ar_SA
-            xcrun simctl io "$device" screenshot "results/original-$kind.png"
+            python3 .openminis/capture_reference.py "$device" \
+              "$RUNNER_TEMP/OpenMinisOriginal/Build/Products/Debug-iphonesimulator/Minis.app" \
+              "results/screens-$kind" || tests_failed=1
             xcodebuild -project upstream/src/ios/Minis.xcodeproj -scheme Minis \
               -configuration Debug -destination "platform=iOS Simulator,id=$device" \
               -derivedDataPath "$RUNNER_TEMP/OpenMinisOriginal" \
@@ -93,9 +106,12 @@ jobs:
               -only-testing:MinisUITests/MessageListV3UITests/testLongContentMultiBundleRendering \
               -only-testing:MinisUITests/MessageListV3UITests/testStreamingAutoScrollFollowsBottom \
               test-without-building CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
-              2>&1 | tee "results/original-$kind-tests.log"
+              2>&1 | tee "results/original-$kind-tests.log" || tests_failed=1
+            xcrun xcresulttool export attachments --path "results/original-$kind.xcresult" \
+              --output-path "results/attachments-$kind" || true
             xcrun simctl shutdown "$device"
           done
+          exit "$tests_failed"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
