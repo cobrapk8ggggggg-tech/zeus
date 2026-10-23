@@ -81,9 +81,11 @@ struct ConsoleSheet: View {
     private func execute() {
         guard model.data.settings.developerTools, model.profile.account?.allowDeveloperTools != false, !command.isEmpty else { return }
         let source = String(command.prefix(100_000)); command = ""
-        model.console.append(ConsoleEntry(text: "> " + source, kind: "command"))
+        let owner = model.profile.id, tabID = model.current?.id
+        model.console.append(ConsoleEntry(text: "> " + source, kind: "command", tabID: tabID))
         model.webView?.evaluateJavaScript(source) { value, error in
-            model.console.append(ConsoleEntry(text: String(describing: error?.localizedDescription ?? value.map { String(describing: $0) } ?? "undefined"), kind: error == nil ? "result" : "error"))
+            guard model.profile.id == owner else { return }
+            model.console.append(ConsoleEntry(text: String(describing: error?.localizedDescription ?? value.map { String(describing: $0) } ?? "undefined"), kind: error == nil ? "result" : "error", tabID: tabID))
             if model.console.count > 300 { model.console.removeFirst(model.console.count - 300) }
         }
     }

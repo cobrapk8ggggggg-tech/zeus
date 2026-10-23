@@ -88,7 +88,7 @@ private final class NativeToolCapture { var imageFilePath: String? }
         }
         let call = AgentToolCall(name: operation, arguments: arguments)
         let destination = (call.object["url"] as? String).flatMap(URL.init(string:))?.host
-        let globalOperations = ["browser_tabs", "browser_profile", "browser_library", "browser_debug", "browser_console"]
+        let globalOperations = ["browser_tabs", "browser_profile", "browser_library", "browser_debug"]
         let target = globalOperations.contains(operation) || operation == "browser_open" || operation == "browser_download" ? nil : try tab(call.object)
         let targetURL = target?.url
         let host = destination ?? targetURL.flatMap { URL(string: $0)?.host } ?? browser?.currentHost ?? ""
@@ -167,9 +167,11 @@ private final class NativeToolCapture { var imageFilePath: String? }
             return try NativeBrowserInspector.encode(["enabled": enabled, "reload": "Active page is being reloaded with the selected inspector/console configuration."])
         case "browser_console":
             guard browser.profile.account?.allowDeveloperTools != false else { throw AccountError.permission }
+            let selected = try tab(args), entries = browser.console.filter { $0.tabID == selected.id }
             return try NativeBrowserInspector.encode(["captureEnabled": browser.data.settings.developerTools,
-                "coverage": "Collected console messages from enabled tabs in the current profile only.",
-                "entries": browser.console.suffix(100).map { ["kind": $0.kind, "text": $0.text, "date": $0.date.timeIntervalSince1970] as [String: Any] }])
+                "coverage": "Collected messages for this tab only, maximum 50 recent entries and 1000 characters per entry.",
+                "tab_id": selected.id.uuidString, "totalEntries": entries.count,
+                "entries": entries.suffix(50).map { ["kind": $0.kind, "text": String($0.text.prefix(1000)), "truncated": $0.text.count > 1000, "date": $0.date.timeIntervalSince1970] as [String: Any] }])
         case "browser_dom", "browser_evaluate", "browser_cookies", "browser_storage", "browser_network":
             guard browser.profile.account?.allowDeveloperTools != false else { throw AccountError.permission }
             let view = try await webView(tab(args))

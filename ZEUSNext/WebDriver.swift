@@ -134,7 +134,7 @@ import UIKit
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let model, let tab, model.current?.id == tab.id, model.data.settings.developerTools, message.frameInfo.isMainFrame,
               let body = message.body as? [String: String], let text = body["message"] else { return }
-        model.console.append(ConsoleEntry(text: String(text.prefix(4000)), kind: body["type"] ?? "log"))
+        model.console.append(ConsoleEntry(text: String(text.prefix(4000)), kind: body["type"] ?? "log", tabID: tab.id))
         if model.console.count > 300 { model.console.removeFirst(model.console.count - 300) }
     }
 }
