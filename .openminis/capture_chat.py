@@ -44,12 +44,13 @@ def capture(device, bundle, output):
     settings["zeus.agent.permissionMode"] = "consequential"
     preferences.parent.mkdir(parents=True, exist_ok=True)
     preferences.write_bytes(plistlib.dumps(settings, fmt=plistlib.FMT_BINARY))
-    arguments = ["xcrun", "simctl", "launch", "--terminate-running-process", device, bundle,
-                 "-AppleLanguages", "(ar)", "-AppleLocale", "ar_SA", "-appearanceMode", "2", "-appLanguage", "ar", "--zeus-native-fixture"]
+    arguments = ["xcrun", "simctl", "launch", "--console", "--terminate-running-process", device, bundle,
+                 "-AppleLanguages", "(ar)", "-AppleLocale", "ar_SA", "-appearanceMode", "2", "-appLanguage", "ar", "-loggingEnabled", "YES", "--zeus-native-fixture"]
     if bundle != "com.openminis.app":
         arguments += ["--open-native-agent", "--layout=icab", "--uitesting"]
+    console = (output / "simulator-console.log").open("w")
+    launch = subprocess.Popen(arguments, stdout=console, stderr=subprocess.STDOUT)
     try:
-        run(*arguments)
         deadline = time.monotonic() + 40
         while True:
             try:
@@ -120,6 +121,7 @@ def capture(device, bundle, output):
             time.sleep(1.5)
             run("xcrun", "simctl", "io", device, "screenshot", str(output / (route.replace("/", "-") + ".png")))
     finally:
+        console.flush()
         logs = container / "Library/Logs"
         if logs.exists():
             shutil.copytree(logs, output / "application-logs", dirs_exist_ok=True)
@@ -128,6 +130,11 @@ def capture(device, bundle, output):
             if crash.name.startswith(("ZEUS", "Minis")):
                 shutil.copy2(crash, output / crash.name)
         run("xcrun", "simctl", "terminate", device, bundle, check=False)
+        try:
+            launch.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            launch.terminate()
+        console.close()
         current = plistlib.loads(preferences.read_bytes()) if preferences.exists() else settings
         if prior is None:
             current.pop("debug.auth.required", None)

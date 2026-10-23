@@ -5,6 +5,26 @@ import WebKit
 
 @MainActor
 final class NativeBrowserIntegrationTests: XCTestCase {
+    func testActualNativeModelLoopStreamsAndVerifiesAProject() async throws {
+        let store = ProviderConfigStore.shared
+        for _ in 0..<200 where !store.zeusFixtureLoadFinished { try await Task.sleep(for: .milliseconds(100)) }
+        XCTAssertTrue(store.zeusFixtureLoadFinished)
+        let created = try DebugRPCProvider.instancesCreate(params: ["providerType": "openAI", "label": "Native loop fixture " + UUID().uuidString, "apiKey": "local-fixture-only", "customBaseURL": "http://127.0.0.1:8765/v1", "appendV1Suffix": false, "seedBuiltInModels": false])
+        let instance = try XCTUnwrap(created["instance"] as? [String: Any]), id = try XCTUnwrap(instance["id"] as? String)
+        defer { _ = try? DebugRPCProvider.instancesDelete(params: ["instanceId": id]) }
+        let stream = try DebugRPCProvider.modelsAdd(params: ["instanceId": id, "modelId": "fixture-native-stream", "displayName": "Native full loop", "contextWindow": 128000, "maxOutputTokens": 16000])
+        let response = try await DebugRPCChat.prompt(params: ["prompt": "اعرض النص كاملًا كما يرسله مزود الاختبار.", "modelEntryId": stream["id"]!, "thinkingLevel": "off", "wait": true, "waitTimeout": 60])
+        XCTAssertTrue((response["responseText"] as? String ?? "").hasSuffix("نهاية الرسالة NATIVE_STREAM_END"))
+        let project = try DebugRPCProvider.modelsAdd(params: ["instanceId": id, "modelId": "fixture-native-harness-" + UUID().uuidString, "displayName": "Native project loop", "contextWindow": 128000, "maxOutputTokens": 4000])
+        let prior = ZeusToolPermissions.shared.mode; ZeusToolPermissions.shared.mode = .unrestricted
+        defer { ZeusToolPermissions.shared.mode = prior }
+        let completed = try await DebugRPCChat.prompt(params: ["prompt": "أنشئ المشروع، شغّل الفحص وأصلح الخطأ وتحقق منه فعلياً.", "modelEntryId": project["id"]!, "thinkingLevel": "off", "wait": true, "waitTimeout": 60])
+        XCTAssertTrue((completed["responseText"] as? String ?? "").contains("NATIVE_HARNESS_VERIFIED"))
+        let session = try XCTUnwrap(completed["sessionId"] as? String)
+        XCTAssertEqual(ZeusAgentHarness.shared.state(session).status, "completed")
+        await ChatStore.shared.deleteSession(session)
+        if let session = response["sessionId"] as? String { await ChatStore.shared.deleteSession(session) }
+    }
     func testNativeMCPUsesRealHTTPPaginationNestedSchemasAndIsolatedAccounts() async throws {
         let key = "zeus.integration.fixture." + UUID().uuidString
         defer { UserDefaults.standard.removeObject(forKey: key) }
