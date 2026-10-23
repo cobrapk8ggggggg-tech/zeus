@@ -10,6 +10,7 @@ RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca npm install -g @openai/codex@0.163.0 @playwright/mcp@0.0.83; else npm install -g @openai/codex@0.163.0 @playwright/mcp@0.0.83; fi
 COPY Runtime/agent_service ./agent_service
 COPY Runtime/skills ./skills
+COPY .openminis/ZEUSDefaultSkills ./official-skills
 COPY Runtime/entrypoint.sh /opt/zeus/entrypoint.sh
 ENV PATH="/opt/venv/bin:${PATH}" ZEUS_DATA_DIR=/data PORT=8080
 RUN useradd --uid 10001 --create-home zeus && mkdir /data && chown zeus:zeus /data && chmod -R a+rX /opt/zeus && chmod 755 /opt/zeus/entrypoint.sh

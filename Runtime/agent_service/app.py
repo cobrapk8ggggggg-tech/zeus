@@ -48,6 +48,19 @@ def create_app(data_dir=None, api_token=None, codex_binary=None, public_url=None
     bundled = Path(__file__).resolve().parent.parent / "skills"
     if bundled.exists():
         shutil.copytree(bundled, store.root / "codex/skills", dirs_exist_ok=True)
+    official = Path(__file__).resolve().parents[2] / ".openminis/ZEUSDefaultSkills"
+    if not official.exists():
+        official = Path(__file__).resolve().parent.parent / "official-skills"
+    if official.exists():
+        catalog = json.loads((official / "manifest.json").read_text())
+        for entry in catalog["skills"]:
+            skill = official / entry["directory"]
+            if skill.is_dir() and (skill / "SKILL.md").exists():
+                target = store.root / "codex/skills" / entry["installedName"]
+                if not target.exists():
+                    shutil.copytree(skill, target)
+                    original = (target / "SKILL.md").read_text()
+                    (target / "SKILL.md").write_text(re.sub(r"(?m)^name:.*$", "name: " + entry["installedName"], original, count=1))
     connections = Connections(store, public_url or os.environ.get("ZEUS_PUBLIC_URL", ""), token, port or int(os.environ.get("PORT", "8080")))
     worker = Worker(store, connections, codex_binary or os.environ.get("ZEUS_CODEX_BINARY", "codex"))
     accounts = Accounts(store, connections, worker.codex_binary)
@@ -92,7 +105,8 @@ def create_app(data_dir=None, api_token=None, codex_binary=None, public_url=None
         if binary:
             _, version = await command([binary, "--version"], store.root, timeout=10)
         return {"codex_installed": bool(binary), "codex_version": version.strip(),
-            "auth_configured": bool(os.environ.get("CODEX_API_KEY") or (store.root / "codex/auth.json").exists()),
+            "auth_configured": bool(connections.engine_provider().get("mode") == "custom" or os.environ.get("CODEX_API_KEY") or (store.root / "codex/auth.json").exists()),
+            "model_provider": connections.engine_provider().get("mode", "openai"),
             "durable_jobs": True, "platform": os.uname().sysname,
             "xcode_available": bool(shutil.which("xcodebuild")),
             "headless_browser_available": bool(shutil.which("chromium") and shutil.which("playwright-mcp")),
@@ -120,6 +134,16 @@ def create_app(data_dir=None, api_token=None, codex_binary=None, public_url=None
     @app.get("/v1/models", dependencies=authorized)
     async def models():
         return await accounts.models()
+
+    @app.get("/v1/account/provider", dependencies=authorized)
+    async def engine_provider():
+        return connections.engine_provider()
+
+    @app.put("/v1/account/provider", dependencies=authorized)
+    async def configure_engine(values: dict):
+        if any(task["status"] in {"running", "waiting_user", "queued"} for task in store.all("task")):
+            raise HTTPException(409, "أكمل المهام الحالية أو ألغها قبل تغيير مزود المحرك.")
+        return connections.configure_engine(values)
 
     @app.get("/v1/github/repositories", dependencies=authorized)
     async def github_repositories():

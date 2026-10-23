@@ -5,6 +5,36 @@ import WebKit
 
 @MainActor
 final class NativeBrowserIntegrationTests: XCTestCase {
+    func testOfficialSkillsInstallOfflineWithTheirOriginalAssets() async throws {
+        await ZeusDefaultSkills.shared.install()
+        XCTAssertNil(ZeusDefaultSkills.shared.error)
+        XCTAssertEqual(ZeusDefaultSkills.shared.entries.count, 59)
+        for entry in ZeusDefaultSkills.shared.entries {
+            let skill = try XCTUnwrap(SkillStore.shared.skills.first { $0.name == entry.installedName })
+            XCTAssertTrue(FileManager.default.fileExists(atPath: SkillStore.shared.skillDirectoryURL(for: skill.id).appendingPathComponent("SKILL.md").path))
+        }
+    }
+    func testDirectIntegrationCatalogDoesNotRequireAProjectServer() async throws {
+        let plugins = ZeusPlugins.shared
+        await plugins.refresh()
+        XCTAssertEqual(Set(plugins.plugins.map(\.id)), ["github", "railway", "vercel"])
+        XCTAssertNil(plugins.error)
+        XCTAssertEqual(ZeusPlugins.directCatalog.first(where: { $0.0 == "github" })?.2, "https://api.githubcopilot.com/mcp/")
+    }
+    func testProgressTextAndQuotedJSONNeverBecomeToolCalls() async throws {
+        let model = LLMModel(id: "fixture-native-progress-tool", displayName: "Progress fixture", provider: "openai")
+        let provider = OpenAIAgentProvider(provider: OpenAIProvider(apiKey: "fixture", model: model, customBaseURL: "http://127.0.0.1:8765/v1", appendV1Suffix: false))
+        let stream = try await provider.streamAgentMessage(messages: [AgentMessage(role: .user, parts: [.text("Inspect")])], systemPrompt: nil, tools: [ZEUSNativeAgentBridge.definition], maxTokens: 1000, thinkingLevel: .off)
+        var text = "", calls: [String] = []
+        for try await event in stream {
+            if case .textDelta(let delta) = event { text += delta }
+            if case .toolCallComplete(_, let name, let args, _) = event {
+                calls.append(name); XCTAssertEqual(args["operation"] as? String, "browser_tabs")
+            }
+        }
+        XCTAssertTrue(text.contains("مستجد")); XCTAssertTrue(text.contains("shell_execute"))
+        XCTAssertEqual(calls, ["zeus_browser"])
+    }
     func testCoreToolTypesAreNormalizedBeforeExecution() throws {
         let tool = AgentToolDefinition(name: "fixture", description: "fixture", parameters: ["enabled": AgentToolParam(type: .boolean, description: "flag"), "limit": AgentToolParam(type: .integer, description: "count"), "arguments": AgentToolParam(type: .string, description: "JSON arguments"), "action": AgentToolParam(type: .string, description: "action", enumValues: ["read", "write"])], required: [])
         let result = try ZeusToolInput.normalize(name: "fixture", args: ["enabled": "false", "limit": "25", "arguments": ["key": "value"], "action": "read"], tools: [tool])

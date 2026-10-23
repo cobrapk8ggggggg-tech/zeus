@@ -5,6 +5,7 @@ name: ZEUS native browser integration tests
     - build/zeus-unsigned-ipa-repair-20261023
     - fix/zeus-agent-tools-permissions-20261023
     - feature/zeus-project-agent-20261023
+    - feature/zeus-direct-integrations-20261023
     paths:
     - ZEUSNext/**
     - .openminis/**

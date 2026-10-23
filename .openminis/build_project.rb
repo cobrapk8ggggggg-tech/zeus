@@ -53,10 +53,14 @@ project.targets.each do |item|
     config.build_settings['LD_MAP_FILE_PATH'] = '$(TARGET_TEMP_DIR)/$(PRODUCT_NAME)-LinkMap-$(CURRENT_ARCH).txt'
   end
 end
-%w[ZEUSNativeIntegration.swift ZeusToolPermissions.swift ZeusProjects.swift ZeusPlugins.swift ZeusCodexAccount.swift].each do |name|
+%w[ZEUSNativeIntegration.swift ZeusToolPermissions.swift ZeusProjects.swift ZeusPlugins.swift ZeusCodexAccount.swift ZeusDefaultSkills.swift].each do |name|
   bridge = project.main_group.new_file((native + 'src/ios' + name).to_s)
   app.source_build_phase.add_file_reference(bridge)
 end
+
+skills = project.main_group.new_file((browser + '.openminis/ZEUSDefaultSkills').to_s)
+skills.last_known_file_type = 'folder'
+app.resources_build_phase.add_file_reference(skills)
 
 # Browser resources are resolved by Bundle.main from inside the static module.
 Dir.glob((browser + 'ZEUSNext/Resources/*').to_s).each do |path|

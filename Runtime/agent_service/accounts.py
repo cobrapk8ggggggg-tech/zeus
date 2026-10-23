@@ -1,6 +1,7 @@
 """Use Codex's own public account protocol; never reuse host ChatGPT cookies."""
 import asyncio
 import os
+import httpx
 from .codex import CodexRPC
 
 
@@ -59,6 +60,14 @@ class Accounts:
                 self.state = {"status": "expired"}
 
     async def models(self):
+        provider = self.connections.engine_provider()
+        if provider.get("mode") == "custom":
+            key = self.connections.credentials("codex-custom")["access_token"]
+            async with httpx.AsyncClient(timeout=25) as client:
+                response = await client.get(provider["base_url"] + "/models", headers={"Authorization": "Bearer " + key})
+                response.raise_for_status()
+                items = response.json().get("data", [])
+            return {"data": [{"id": item["id"], "model": item["id"], "displayName": item["id"]} for item in items if isinstance(item, dict) and isinstance(item.get("id"), str)]}
         rpc = await self.open()
         try:
             result = await rpc.call("model/list", {"limit": 100})

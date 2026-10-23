@@ -1,7 +1,7 @@
 name: ZEUS project service tests
 on:
   push:
-    branches: [feature/zeus-project-agent-20261023]
+    branches: [feature/zeus-project-agent-20261023, feature/zeus-direct-integrations-20261023]
     paths: [Runtime/**, .github/workflows/zeus-agent-service-tests.yml]
   workflow_dispatch:
 permissions:

@@ -6,6 +6,9 @@ struct ZeusCodexAccountView: View {
     @State private var models: [[String: Any]] = []
     @State private var busy = false
     @State private var error: String?
+    @State private var customURL = ""
+    @State private var customModel = ""
+    @State private var customKey = ""
     var body: some View {
         Form {
             Section("حساب Codex المستقل") {
@@ -23,8 +26,22 @@ struct ZeusCodexAccountView: View {
                 Button("جلب النماذج") { Task { await loadModels() } }.disabled(busy)
                 ForEach(models, id: \.zeusID) { model in Text(model["displayName"] as? String ?? model["model"] as? String ?? model.zeusID) }
             }
+            Section("مزود Codex مخصص · Responses API") {
+                TextField("Base URL", text: $customURL).textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
+                TextField("معرّف النموذج", text: $customModel).textInputAutocapitalization(.never).autocorrectionDisabled()
+                SecureField("مفتاح المزود", text: $customKey).textInputAutocapitalization(.never).autocorrectionDisabled()
+                Button("استخدام المزود المخصص") { Task { await configure(custom: true) } }.disabled(busy || customURL.isEmpty || customModel.isEmpty || customKey.isEmpty)
+                Button("استخدام حساب OpenAI") { Task { await configure(custom: false) } }.disabled(busy)
+            }
             if let error { Text(error).foregroundStyle(.red) }
         }.navigationTitle("حساب Codex")
+    }
+    private func configure(custom: Bool) async {
+        busy = true; defer { busy = false }
+        do {
+            _ = try await ZeusProjects.shared.object("v1/account/provider", method: "PUT", body: ["mode": custom ? "custom" : "openai", "base_url": customURL, "model": customModel, "api_key": customKey])
+            customKey = ""; error = nil
+        } catch { self.error = error.localizedDescription }
     }
     private func login(_ type: String) async {
         busy = true; defer { busy = false }

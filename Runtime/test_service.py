@@ -127,6 +127,23 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("independent-test-token", config.read_text())
         self.assertNotIn("independent-test-token", self.store.get("connection", "github")["encrypted"])
 
+    async def test_custom_model_provider_is_independent_encrypted_and_responses_only(self):
+        import tomllib
+        value = self.connections.configure_engine({"mode": "custom", "base_url": "https://models.example.org/v1", "model": "coding-model", "api_key": "private-custom-model-key"})
+        config = tomllib.loads((self.store.root / "codex/config.toml").read_text())
+        self.assertEqual(config["model_provider"], "zeus-custom")
+        self.assertEqual(config["model_providers"]["zeus-custom"]["wire_api"], "responses")
+        self.assertFalse(config["model_providers"]["zeus-custom"]["requires_openai_auth"])
+        self.assertEqual(self.connections.environment()["ZEUS_CUSTOM_API_KEY"], "private-custom-model-key")
+        self.assertNotIn("private-custom-model-key", str(value))
+        self.assertNotIn("private-custom-model-key", (self.store.root / "codex/config.toml").read_text())
+        self.assertNotIn("private-custom-model-key", self.store.get("connection", "codex-custom")["encrypted"])
+        with self.assertRaises(ValueError):
+            self.connections.configure_engine({"mode": "custom", "base_url": "http://unsafe.example.org", "model": "m", "api_key": "long-enough"})
+        self.connections.configure_engine({"mode": "openai"})
+        self.assertNotIn("ZEUS_CUSTOM_API_KEY", self.connections.environment())
+        self.assertNotIn("model_providers.zeus-custom", (self.store.root / "codex/config.toml").read_text())
+
     async def test_mcp_form_answers_use_the_actual_typed_wire_protocol(self):
         params = {"requestedSchema": {"properties": {"name": {"type": "string"}, "count": {"type": "integer"}, "enabled": {"type": "boolean"}}, "required": ["name", "count", "enabled"]}}
         answer = {"answers": {"name": {"answers": ["Zeus"]}, "count": {"answers": ["3"]}, "enabled": {"answers": ["نعم"]}}}

@@ -7,3 +7,6 @@
 !Runtime/agent_service/*.py
 !Runtime/skills/
 !Runtime/skills/**
+!.openminis/
+!.openminis/ZEUSDefaultSkills/
+!.openminis/ZEUSDefaultSkills/**

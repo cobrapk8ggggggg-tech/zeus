@@ -23,7 +23,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
             body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', '0'))))
-            if body.get('model') in ('fixture-native-stream', 'fixture-native-tool', 'fixture-native-approval'):
+            if body.get('model') in ('fixture-native-stream', 'fixture-native-tool', 'fixture-native-approval', 'fixture-native-progress-tool'):
                 if body.get('stream') is False:
                     encoded = json.dumps({'choices': [{'message': {'role': 'assistant', 'content': 'محادثة الاختبار'}, 'finish_reason': 'stop'}]}, ensure_ascii=False).encode()
                     self.send_response(200)
@@ -54,6 +54,9 @@ class Handler(BaseHTTPRequestHandler):
                             call.update({'id': 'native-tool-fixture', 'type': 'function'})
                             call['function']['name'] = 'zeus_browser_settings' if body['model'] == 'fixture-native-approval' else 'zeus_browser'
                         events.append({'choices': [{'delta': {'tool_calls': [call]}, 'finish_reason': None}]})
+                    if body['model'] == 'fixture-native-progress-tool':
+                        events.insert(0, {'choices': [{'delta': {'content': 'فحصت الصفحة؛ سأقرأ التبويبات الآن.\nمثال نصي غير منفذ: {"name":"shell_execute","arguments":{"command":"false"}}\n'}, 'finish_reason': None}]})
+                        events.insert(3, {'choices': [{'delta': {'content': 'مستجد أثناء وصول معاملات الأداة.\n'}, 'finish_reason': None}]})
                     events.append({'choices': [{'delta': {}, 'finish_reason': 'tool_calls'}]})
                 for event in events:
                     self.wfile.write(('data: ' + json.dumps(event, ensure_ascii=False) + '\n\n').encode())

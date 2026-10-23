@@ -181,6 +181,10 @@ class Connections:
         directory = self.store.root / "codex"
         directory.mkdir(exist_ok=True)
         text = '# Generated ZEUS MCP proxies; no provider credentials in this file.\n'
+        provider = self.engine_provider()
+        if provider.get("mode") == "custom":
+            text += 'model_provider = "zeus-custom"\nmodel = ' + json.dumps(provider["model"]) + '\n'
+            text += '\n[model_providers.zeus-custom]\nname = "Zeus custom Responses provider"\nbase_url = ' + json.dumps(provider["base_url"]) + '\nwire_api = "responses"\nenv_key = "ZEUS_CUSTOM_API_KEY"\nrequires_openai_auth = false\n'
         if shutil.which("playwright-mcp") and shutil.which("chromium"):
             output = self.store.root / "browser-artifacts"
             output.mkdir(exist_ok=True)
@@ -189,6 +193,32 @@ class Connections:
             if item["installed"] and item["connected"] and item.get("mcp_url"):
                 text += f'\n[mcp_servers.{item["id"]}]\nurl = "http://127.0.0.1:{self.port}/mcp/{item["id"]}"\nbearer_token_env_var = "ZEUS_MCP_{item["id"].upper()}"\n'
         (directory / "config.toml").write_text(text)
+
+    def engine_provider(self):
+        try:
+            return self.store.get("engine-provider", "current")
+        except KeyError:
+            return {"id": "current", "mode": "openai"}
+
+    def configure_engine(self, values):
+        mode = values.get("mode")
+        if mode not in {"openai", "custom"}:
+            raise ValueError("اختر OpenAI أو مزود Responses مخصصاً.")
+        if mode == "custom":
+            address = values.get("base_url", "").rstrip("/")
+            parsed = urlparse(address)
+            if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
+                raise ValueError("استخدم Base URL بعنوان HTTPS دون بيانات دخول أو معاملات.")
+            model, key = values.get("model", ""), values.get("api_key", "")
+            if not isinstance(model, str) or not 1 <= len(model.strip()) <= 200 or not isinstance(key, str) or not 8 <= len(key) <= 20000:
+                raise ValueError("أدخل اسم النموذج ومفتاح المزود.")
+            self.save_token("codex-custom", {"access_token": key})
+            result = {"id": "current", "mode": mode, "base_url": address, "model": model.strip(), "wire_api": "responses"}
+        else:
+            result = {"id": "current", "mode": mode}
+        self.store.put("engine-provider", result)
+        self.write_codex_config()
+        return result
 
     def environment(self):
         allowed = {"PATH", "HOME", "LANG", "TMPDIR", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "SSL_CERT_FILE", "NODE_EXTRA_CA_CERTS", "CODEX_API_KEY", "OPENAI_API_KEY", "CODEX_PROXY_CERT"}
@@ -201,4 +231,6 @@ class Connections:
             environment["GH_TOKEN"] = github["access_token"]
         except KeyError:
             pass
+        if self.engine_provider().get("mode") == "custom":
+            environment["ZEUS_CUSTOM_API_KEY"] = self.credentials("codex-custom")["access_token"]
         return environment
