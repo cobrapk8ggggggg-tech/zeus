@@ -178,31 +178,48 @@ final class NativeBrowserIntegrationTests: XCTestCase {
         XCTAssertFalse(empty.contains("42"))
     }
     func testPageReadSuppliesTabIDAndOldElementIDsSurviveAnotherRead() async throws {
+        var step = "load first document"
+        do {
         let (browser, root) = model(); defer { try? FileManager.default.removeItem(at: root) }
         let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600))
         let loader = NativeInspectorFixture()
         try await loader.load("<input id='name' aria-label='Name'><div contenteditable='true' aria-label='Message' style='width:200px;height:80px'></div><p>Real interaction fixture.</p>", view: view)
         let tab = try XCTUnwrap(browser.current); tab.url = "https://example.com"; tab.webView = view
         let session = NativeBrowserSession(browser: browser); session.authorization = { _ in true }
+        step = "read first document"
         let first = try await session.execute(operation: "browser_read", arguments: "{}", sessionID: nil)
         let data = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(first.text.utf8)) as? [String: Any])
         XCTAssertEqual(data["tab_id"] as? String, tab.id.uuidString)
         let elements = try XCTUnwrap(data["elements"] as? [[String: Any]])
         let input = try XCTUnwrap(elements.first { $0["label"] as? String == "Name" }?["element_id"] as? String)
         let editor = try XCTUnwrap(elements.first { $0["label"] as? String == "Message" }?["element_id"] as? String)
+        step = "read same document again"
         _ = try await session.execute(operation: "browser_read", arguments: "{}", sessionID: nil)
         func args(_ id: String, _ text: String) throws -> String {
             String(decoding: try JSONSerialization.data(withJSONObject: ["tab_id": tab.id.uuidString, "element_id": id, "text": text]), as: UTF8.self)
         }
+        step = "type input using first-read ID"
         _ = try await session.execute(operation: "browser_type", arguments: args(input, "Alice"), sessionID: nil)
+        step = "type contenteditable using first-read ID"
         _ = try await session.execute(operation: "browser_type", arguments: args(editor, "A real editable message"), sessionID: nil)
+        step = "verify real DOM values"
         let actual = try await view.callAsyncJavaScript("return {name:document.querySelector('#name').value,message:document.querySelector('[contenteditable]').textContent}", arguments: [:], in: nil, contentWorld: .page) as? [String: String]
         XCTAssertEqual(actual?["name"], "Alice")
         XCTAssertEqual(actual?["message"], "A real editable message")
+        step = "load replacement document"
         try await loader.load("<input id='replacement' value='unchanged'>", view: view)
+        step = "reject previous-document ID"
         do { _ = try await session.execute(operation: "browser_type", arguments: args(input, "must not type"), sessionID: nil); XCTFail("Previous-document IDs must be rejected") } catch {}
+        step = "verify replacement document was not edited"
         let unchanged = try await view.callAsyncJavaScript("return document.querySelector('#replacement').value", arguments: [:], in: nil, contentWorld: .page) as? String
         XCTAssertEqual(unchanged, "unchanged")
+        } catch {
+            // XCTest's async wrapper can replace a thrown WebKit error with an
+            // unhelpful InvalidTransition(deinit). Keep its actual operation,
+            // domain/code and JavaScript details in the assertion/report.
+            let detail = error as NSError
+            XCTFail("Page interaction failed at \(step): \(detail.domain) \(detail.code) \(detail.userInfo)")
+        }
     }
     func testInspectorCookiesIncludeHttpOnlyButStayWithinTheSelectedSite() async throws {
         let config = WKWebViewConfiguration(); config.websiteDataStore = .nonPersistent()
