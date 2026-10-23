@@ -35,6 +35,7 @@ class Connections:
         self.key = keyfile.read_bytes()
         self.cipher = Fernet(self.key)
         self.locks = {}
+        self.write_codex_config()
 
     def catalog(self):
         result = []
@@ -180,6 +181,10 @@ class Connections:
         directory = self.store.root / "codex"
         directory.mkdir(exist_ok=True)
         text = '# Generated ZEUS MCP proxies; no provider credentials in this file.\n'
+        if shutil.which("playwright-mcp") and shutil.which("chromium"):
+            output = self.store.root / "browser-artifacts"
+            output.mkdir(exist_ok=True)
+            text += '\n[mcp_servers.zeus-browser]\ncommand = "playwright-mcp"\nargs = ' + json.dumps(["--headless", "--no-sandbox", "--isolated", "--executable-path", shutil.which("chromium"), "--output-dir", str(output)]) + '\nstartup_timeout_sec = 60\ntool_timeout_sec = 120\n'
         for item in self.catalog():
             if item["installed"] and item["connected"] and item.get("mcp_url"):
                 text += f'\n[mcp_servers.{item["id"]}]\nurl = "http://127.0.0.1:{self.port}/mcp/{item["id"]}"\nbearer_token_env_var = "ZEUS_MCP_{item["id"].upper()}"\n'

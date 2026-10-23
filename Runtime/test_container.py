@@ -6,6 +6,7 @@ import subprocess
 import time
 import uuid
 import sys
+from pathlib import Path
 
 
 def run(*arguments, **options):
@@ -45,6 +46,8 @@ print(urllib.request.urlopen(r,timeout=15).read().decode())'''
         uid = run("exec", name, "sh", "-c", "awk '/^Uid:/{print $2}' /proc/1/status")
         assert uid == "10001", uid
         print(json.dumps({"container_health": True, "codex_version": capabilities["codex_version"], "volume_persistence_after_restart": True, "worker_uid": uid}, indent=2))
+        script = (Path(__file__).parent / "test_browser.py").read_text()
+        print(run("exec", "-i", name, "python", "-", input=script))
     except BaseException as error:
         if isinstance(error, subprocess.CalledProcessError):
             print(error.stderr, file=sys.stderr)

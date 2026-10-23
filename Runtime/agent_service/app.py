@@ -95,6 +95,7 @@ def create_app(data_dir=None, api_token=None, codex_binary=None, public_url=None
             "auth_configured": bool(os.environ.get("CODEX_API_KEY") or (store.root / "codex/auth.json").exists()),
             "durable_jobs": True, "platform": os.uname().sysname,
             "xcode_available": bool(shutil.which("xcodebuild")),
+            "headless_browser_available": bool(shutil.which("chromium") and shutil.which("playwright-mcp")),
             "permission_note": "Codex approvals cover the engine's command/file/permission requests. Internal read operations are not individually exposed as approval requests.",
             "single_owner": True}
 

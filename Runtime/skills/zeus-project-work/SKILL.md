@@ -32,6 +32,14 @@ real navigation and inspect screenshots. For iOS use simulator tests and
 screenshots on a Mac runner. Document checks that cannot run and the missing
 account, runner, permission or resource. Never fabricate test results.
 
+The `zeus-browser` MCP server provides actual headless Chromium on the worker:
+navigation, accessibility snapshots, click/fill, console/network observations,
+Playwright execution and screenshots. Exercise the running local project and
+verify resulting UI state. This is the WORKER browser with its own isolated
+session, separate from both the user's phone tabs and the phone automation
+browser. It continues without the phone. Do not assume the user's site login
+exists here or transfer cookies without an explicit request.
+
 Use configured approval policy. Explain consequential requests and options via
 the engine's approval/input mechanism; wait for the recorded answer. Do not
 invent permission or perform uncertain writes again after a disconnect. Resume
