@@ -137,7 +137,11 @@ final class NativeBrowserIntegrationTests: XCTestCase {
         let folder = browser.profiles.folder(for: browser.profile)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         // A directory in place of the data file reliably fails atomic writes.
-        try FileManager.default.createDirectory(at: folder.appendingPathComponent("browser.json"), withIntermediateDirectories: true)
+        let blockedDataFile = folder.appendingPathComponent("browser.json")
+        if FileManager.default.fileExists(atPath: blockedDataFile.path) {
+            try FileManager.default.removeItem(at: blockedDataFile)
+        }
+        try FileManager.default.createDirectory(at: blockedDataFile, withIntermediateDirectories: true)
         var imported = ProfileData()
         imported.tabs = [SavedTab(title: "Must not replace live tab", url: "https://example.com")]
         XCTAssertThrowsError(try browser.importProfileData(imported, restoreOpenTabs: true))
