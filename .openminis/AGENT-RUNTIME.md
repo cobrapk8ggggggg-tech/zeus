@@ -106,6 +106,13 @@ host result in the separate pinned dependency checkout for both SDKs.
 and exercises an overlong hostname and failed host uname. Dependency caches are
 versioned so the affected static libraries are rebuilt, not reused.
 
+After that fix, real iPhone shell execution exposed two further adapter issues:
+new conversations need their session-owned workspace buckets created before the
+first guest mkdir, and iSH exit notifications carry Linux wait status (`256`
+for shell exit `1`). The host adapters now prepare those directories, pass the
+conversation ID into native path resolution and decode wait status once in the
+shell executor. Tests keep the original failing check and also exercise `exit 7`.
+
 Use the exact commit recorded by each workflow, not merely the branch name.
 `zeus-native-integration.yml` checks simulator behavior; `zeus-ipa-download.yml`
 packages an unsigned device IPA separately. Successful packaging is not a

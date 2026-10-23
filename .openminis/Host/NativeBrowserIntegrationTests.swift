@@ -147,7 +147,9 @@ final class NativeBrowserIntegrationTests: XCTestCase {
         try await runtime.prepareEnvironment(vm: vm)
         let dir = "/var/minis/workspace/native-harness-" + UUID().uuidString
         let result = try await vm.executeCommand("mkdir -p " + ZeusAgentHarness.quote(dir), timeout: 30) { _ in }
-        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertEqual(result.exitCode, 0, result.output)
+        let nonzero = try await vm.executeCommand("exit 7", timeout: 30) { _ in }
+        XCTAssertEqual(nonzero.exitCode, 7, nonzero.output)
         let check = "test \"$(cat value.txt)\" = correct"
         _ = try await runtime.execute("update_plan", args: ["plan": [["step": "Implement and verify", "status": "in_progress"]], "verification_commands": [check]], callID: "plan", vm: vm)
         _ = try await runtime.execute("apply_patch", args: ["workdir": dir, "patch": "*** Begin Patch\n*** Add File: value.txt\n+wrong\n*** Add File: README.md\n+Native runtime project\n*** End Patch"], callID: "create", vm: vm)

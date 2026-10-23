@@ -171,6 +171,16 @@ jobs:
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
       timeout-minutes: 6
       run: bash browser/.openminis/run_native_stage.sh chat IPHONE "${IPHONE_SIMULATOR}"
+    - name: 'IPHONE: Save conversation diagnostics immediately'
+      if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: zeus-iphone-conversation-diagnostics
+        path: |
+          results/embedded-conversation-IPHONE
+          results/fixture-server-IPHONE-chat.log
+        retention-days: 14
+        if-no-files-found: warn
     - name: 'IPHONE: Export diagnostics and shut down'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
       timeout-minutes: 2

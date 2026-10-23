@@ -147,14 +147,22 @@ import CryptoKit
         return output
     }
     func prepareEnvironment(vm: AIChatViewModel) async throws {
+        if let session = vm.sessionId { try Self.prepareWorkspace(session: session) }
         vm.ensureKernelBooted()
         for _ in 0..<300 {
-            if ISHKernel.shared.isBooted { return }
+            if ISHKernel.shared.isBooted { vm.ensureParentDirsInMetaDB(for: "/var/minis/workspace"); return }
             try Task.checkCancellation()
             if case .failed(let reason) = vm.kernelStatus { throw ZeusPatch.failure(reason) }
             try await Task.sleep(for: .milliseconds(100))
         }
         throw ZeusPatch.failure("Local execution environment did not finish starting. No command was launched.")
+    }
+    static func prepareWorkspace(session: String) throws {
+        guard !session.isEmpty, !session.contains("/"), session != ".", session != ".." else { throw ZeusPatch.failure("Invalid conversation storage identifier.") }
+        let base = AIChatViewModel.minisPersistentBase.appendingPathComponent(session, isDirectory: true)
+        for directory in ["workspace", "attachments", "offloads", "browser"] {
+            try FileManager.default.createDirectory(at: base.appendingPathComponent(directory, isDirectory: true), withIntermediateDirectories: true)
+        }
     }
     private func dispatch(_ name: String, args: [String: Any], session: String, vm: AIChatViewModel) async throws -> String {
         var value = state(session)

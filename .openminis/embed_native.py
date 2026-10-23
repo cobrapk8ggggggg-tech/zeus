@@ -144,6 +144,10 @@ def embed(native, browser, report):
     file_tools = source / "Agent/Chat/AIChatViewModel+FileTools.swift"
     replace(file_tools, 'ISHExecutionCoordinator.shared.hostURL(for: linuxPath)', 'ISHExecutionCoordinator.shared.hostURL(for: linuxPath, sessionId: self.sessionId)')
     replace(file_tools, 'ISHExecutionCoordinator.shared.hostURL(for: path)', 'ISHExecutionCoordinator.shared.hostURL(for: path, sessionId: self.sessionId)')
+    replace(source / "Agent/Chat/AIChatViewModel+ISHCommand.swift", '        let bashism = BashismDetector.detect(command)', '        try ZeusAgentHarness.prepareWorkspace(session: sid)\n        ensureParentDirsInMetaDB(for: "/var/minis/workspace")\n        let bashism = BashismDetector.detect(command)')
+    replace(source / "iSH/ISHShellExecutor.m", '    int exitCode = [notification.userInfo[@"code"] intValue];', '''    // The iSH exit hook reports Linux wait(2) status, not a shell exit code.
+    int waitStatus = [notification.userInfo[@"code"] intValue];
+    int exitCode = waitStatus < 0 ? waitStatus : ((waitStatus & 0x7f) == 0 ? ((waitStatus >> 8) & 0xff) : 128 + (waitStatus & 0x7f));''')
     replace(source / "Agent/Chat/AIChatViewModel.swift", "                break\n            }\n\n            // Build assistant RawMessage now but defer DB write", '''                if !canResume, !Task.isCancelled, let reminder = ZeusAgentHarness.shared.continuation(session: sessionId) {
                     agentHistory.append(AgentMessage(role: .user, parts: [.text("<zeus_runtime_instruction source='application'>" + reminder + "</zeus_runtime_instruction>")]))
                     continue
