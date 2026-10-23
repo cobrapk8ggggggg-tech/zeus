@@ -5,6 +5,68 @@ import WebKit
 
 @MainActor
 final class NativeBrowserIntegrationTests: XCTestCase {
+    func testNativeRuntimeAcceptsNestedSchemasAndRejectsMalformedArguments() throws {
+        let schema = try XCTUnwrap(ZeusAgentSchemas.schema("update_plan"))
+        try ZeusAgentSchemas.validate(["plan": [["step": "Build", "status": "in_progress"]]], schema: schema)
+        let badCases: [[String: Any]] = [
+            ["plan": "[{\"step\":\"Build\"}]"], ["plan": [["step": "Build", "status": "invented"]]],
+            ["plan": [["step": "Build"]]], ["plan": [], "unknown": true]
+        ]
+        for bad in badCases { XCTAssertThrowsError(try ZeusAgentSchemas.validate(bad, schema: schema)) }
+        XCTAssertThrowsError(try ZeusAgentSchemas.validate(["cmd": "pwd", "timeout_seconds": true], schema: ZeusAgentSchemas.schema("exec_command")!))
+    }
+    func testPatchPrevalidatesAllFilesAndRejectsAmbiguousOrEscapingPaths() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try "first\nold\nlast\n".write(to: root.appendingPathComponent("one.txt"), atomically: true, encoding: .utf8)
+        let patch = "*** Begin Patch\n*** Update File: one.txt\n@@\n first\n-old\n+new\n last\n*** Add File: two.txt\n+created\n*** End Patch"
+        let changes = try ZeusPatch.prepare(patch, root: root)
+        XCTAssertEqual(changes.count, 2)
+        XCTAssertEqual(String(data: changes[0].after!, encoding: .utf8), "first\nnew\nlast\n")
+        XCTAssertEqual(try String(contentsOf: root.appendingPathComponent("one.txt"), encoding: .utf8), "first\nold\nlast\n")
+        XCTAssertThrowsError(try ZeusPatch.prepare(patch.replacingOccurrences(of: "+created", with: "bad"), root: root))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("two.txt").path))
+        XCTAssertThrowsError(try ZeusPatch.prepare("*** Begin Patch\n*** Add File: ../escape\n+x\n*** End Patch", root: root))
+        try "old\nold\n".write(to: root.appendingPathComponent("one.txt"), atomically: true, encoding: .utf8)
+        XCTAssertThrowsError(try ZeusPatch.prepare("*** Begin Patch\n*** Update File: one.txt\n@@\n-old\n+new\n*** End Patch", root: root))
+    }
+    func testRuntimePlanLedgerAndIncompleteWorkSurviveReloadWithoutReplaying() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let runtime = ZeusAgentHarness(root: root), vm = AIChatViewModel(); vm.sessionId = UUID().uuidString
+        let plan: [String: Any] = ["plan": [["step": "Implement", "status": "in_progress"], ["step": "Verify", "status": "pending"]]]
+        let first = try await runtime.execute("update_plan", args: plan, callID: "same", vm: vm)
+        let repeated = try await runtime.execute("update_plan", args: plan, callID: "same", vm: vm)
+        XCTAssertEqual(first, repeated)
+        do { _ = try await runtime.execute("task_complete", args: ["status": "completed", "summary": "Done"], callID: "premature", vm: vm); XCTFail("Unfinished work must not complete") } catch {}
+        let restored = ZeusAgentHarness(root: root)
+        XCTAssertEqual(restored.state(vm.sessionId!).plan.count, 2)
+        XCTAssertNotNil(restored.continuation(session: vm.sessionId))
+        do { _ = try await restored.execute("update_plan", args: plan, callID: "same", vm: vm); XCTFail("A persisted call must never replay") } catch {}
+        XCTAssertFalse(restored.context(session: vm.sessionId).contains("ledger"))
+    }
+    func testNativeRuntimeReallyEditsTestsRepairsAndVerifiesAProject() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let runtime = ZeusAgentHarness(root: root), vm = AIChatViewModel(); vm.sessionId = "harness-" + UUID().uuidString
+        try await runtime.prepareEnvironment(vm: vm)
+        let dir = "/var/minis/workspace/native-harness-" + UUID().uuidString
+        let result = try await vm.executeCommand("mkdir -p " + ZeusAgentHarness.quote(dir), timeout: 30) { _ in }
+        XCTAssertEqual(result.exitCode, 0)
+        let check = "test \"$(cat value.txt)\" = correct"
+        _ = try await runtime.execute("update_plan", args: ["plan": [["step": "Implement and verify", "status": "in_progress"]], "verification_commands": [check]], callID: "plan", vm: vm)
+        _ = try await runtime.execute("apply_patch", args: ["workdir": dir, "patch": "*** Begin Patch\n*** Add File: value.txt\n+wrong\n*** Add File: README.md\n+Native runtime project\n*** End Patch"], callID: "create", vm: vm)
+        let failed = try await runtime.execute("task_verify", args: ["workdir": dir, "commands": [check]], callID: "failing-check", vm: vm)
+        XCTAssertTrue(failed.contains("\"exitCode\":1"))
+        do { _ = try await runtime.execute("task_verify", args: ["workdir": dir, "commands": ["true"]], callID: "weaken", vm: vm); XCTFail("Cannot weaken a failed check") } catch {}
+        _ = try await runtime.execute("apply_patch", args: ["workdir": dir, "patch": "*** Begin Patch\n*** Update File: value.txt\n@@\n-wrong\n+correct\n*** End Patch"], callID: "repair", vm: vm)
+        _ = try await runtime.execute("task_verify", args: ["workdir": dir, "commands": [check]], callID: "passing-check", vm: vm)
+        _ = try await runtime.execute("update_plan", args: ["plan": [["step": "Implement and verify", "status": "completed"]]], callID: "finish-plan", vm: vm)
+        _ = try await runtime.execute("task_complete", args: ["status": "completed", "summary": "Actual files and shell checks passed"], callID: "finish", vm: vm)
+        XCTAssertEqual(runtime.state(vm.sessionId!).status, "completed")
+        _ = try await vm.executeCommand("rm -rf -- " + ZeusAgentHarness.quote(dir), timeout: 30) { _ in }
+    }
     func testOfficialSkillsInstallOfflineWithTheirOriginalAssets() async throws {
         await ZeusDefaultSkills.shared.install()
         XCTAssertNil(ZeusDefaultSkills.shared.error)

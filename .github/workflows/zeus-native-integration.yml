@@ -6,6 +6,7 @@ name: ZEUS native browser integration tests
     - fix/zeus-agent-tools-permissions-20261023
     - feature/zeus-project-agent-20261023
     - feature/zeus-direct-integrations-20261023
+    - feature/zeus-native-agent-harness-20261023
     paths:
     - ZEUSNext/**
     - .openminis/**

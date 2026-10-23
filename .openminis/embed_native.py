@@ -39,7 +39,7 @@ def embed(native, browser, report):
     # The application remains OpenMinis' original @main/AppDelegate/root setup;
     # its root content now embeds the browser with the original AI UI alongside.
     replace(source / "MinisApp.swift", "                ContentView()", "                ZEUSBrowserRootEntry()")
-    for name in ("ZEUSNativeIntegration.swift", "ZeusToolPermissions.swift", "ZeusProjects.swift", "ZeusPlugins.swift", "ZeusCodexAccount.swift", "ZeusDefaultSkills.swift"):
+    for name in ("ZEUSNativeIntegration.swift", "ZeusToolPermissions.swift", "ZeusProjects.swift", "ZeusPlugins.swift", "ZeusCodexAccount.swift", "ZeusDefaultSkills.swift", "ZeusAgentSchemas.swift", "ZeusPatch.swift", "ZeusAgentHarness.swift"):
         shutil.copyfile(browser / ".openminis/Host" / name, source / name)
     # Reuse the exact native settings sheet from the browser's AI settings row.
     # Only its file-private visibility changes; its body is untouched.
@@ -65,7 +65,7 @@ def embed(native, browser, report):
 
     definitions = source / "Agent/Chat/AIChatViewModel+ToolDefinitions.swift"
     replace(definitions, "        return tools", """        tools.append(contentsOf: ZEUSNativeAgentBridge.definitions)
-        tools.append(contentsOf: ZeusProjectTools.definitions)
+        tools.append(contentsOf: ZeusAgentHarness.definitions)
         return tools.map { tool in
             var parameters = tool.parameters
             parameters["approval_reason"] = AgentToolParam(type: .string, description: "For consequential actions, explain what you intend to change and why in the user language. The app displays this on an inline approval card.")
@@ -96,9 +96,11 @@ def embed(native, browser, report):
             }
 
 '''
-    adapter += '''        case let name where name.hasPrefix("zeus_project_"):
-            toolOutput = try await ZeusProjectTools.execute(name, args: toolArgs, callID: tu.id)
-            toolSuccess = true
+    adapter += '''        case let name where ZeusAgentSchemas.names.contains(name):
+            toolOutput = try await ZeusAgentHarness.shared.execute(name, args: toolArgs, callID: tu.id, vm: self)
+            if let object = try? JSONSerialization.jsonObject(with: Data(toolOutput.utf8)) as? [String: Any], let code = object["exit_code"] as? Int { toolSuccess = code == 0 }
+            else if name == "task_verify", let checks = try? JSONSerialization.jsonObject(with: Data(toolOutput.utf8)) as? [[String: Any]] { toolSuccess = checks.allSatisfy { $0["exitCode"] as? Int == 0 } }
+            else { toolSuccess = true }
 
 '''
     execution.write_text(parts[0] + adapter + anchor + parts[1] + ''.join('        case let name where name == "browser_use" || name == "zeus_browser" || zeusBrowserOperation(name) != nil:' + p for p in parts[2:]))
@@ -123,11 +125,27 @@ def embed(native, browser, report):
     replace(source / "Agent/Chat/AIChatViewModel+ToolPreflight.swift", '        "file_edit": ["new_string"],',
         '        "file_edit": ["new_string"],\n        "zeus_browser_type": ["text"],')
     replace(execution, 'tu.name == "file_write" || tu.name == "file_edit" {',
-        'tu.name == "file_write" || tu.name == "file_edit" || tu.name == "zeus_browser" || zeusBrowserOperation(tu.name) != nil {')
+        'tu.name == "file_write" || tu.name == "file_edit" || tu.name == "zeus_browser" || zeusBrowserOperation(tu.name) != nil || ZeusAgentSchemas.names.contains(tu.name) {')
     replace(execution, '            let modelMessage = """\n            Error: This call was NOT executed.',
         '            let modelMessage = (tu.name == "zeus_browser" || zeusBrowserOperation(tu.name) != nil) ? "Error: Browser call NOT executed: the provider truncated its arguments. Send a complete smaller call. Inspect the current page/state before retrying any mutation." : """\n            Error: This call was NOT executed.')
     replace(source / "Agent/Chat/AIChatViewModel.swift", "        var userSystemPrompt = baseSystemPrompt",
-        '        var userSystemPrompt = baseSystemPrompt + "\\n\\n" + ZEUSNativeAgentBridge.context')
+        '        var userSystemPrompt = baseSystemPrompt + "\\n\\n" + ZEUSNativeAgentBridge.context + ZeusAgentHarness.shared.context(session: sessionId)')
+    replace(execution, "        let snapshotItem = ToolSnapshotItem(", "        ZeusAgentHarness.shared.observe(session: sessionId, tool: tu.name, success: toolSuccess)\n        let snapshotItem = ToolSnapshotItem(")
+    replace(source / "Agent/Chat/AIChatViewModel.swift", "    func cancel() {", "    func cancel() {\n        ZeusAgentHarness.shared.cancel(session: sessionId)")
+    replace(source / "Agent/Chat/AIChatViewModel.swift", "                break\n            }\n\n            // Build assistant RawMessage now but defer DB write", '''                if !canResume, !Task.isCancelled, let reminder = ZeusAgentHarness.shared.continuation(session: sessionId) {
+                    agentHistory.append(AgentMessage(role: .user, parts: [.text("<zeus_runtime_instruction source='application'>" + reminder + "</zeus_runtime_instruction>")]))
+                    continue
+                }
+                break
+            }
+
+            // Build assistant RawMessage now but defer DB write''')
+    openai = source / "Providers/OpenAI/OpenAIAgentProvider.swift"
+    replace(openai, '                    "parameters": [\n                        "type": "object",\n                        "properties": properties,\n                        "required": tool.required,\n                    ] as [String: Any],', '                    "parameters": ZeusAgentSchemas.schema(tool.name) ?? ["type": "object", "properties": properties, "required": tool.required],')
+    replace(openai, '                "parameters": [\n                    "type": "object",\n                    "properties": properties,\n                    "required": tool.required,\n                ] as [String: Any],', '                "parameters": ZeusAgentSchemas.schema(tool.name) ?? ["type": "object", "properties": properties, "required": tool.required],')
+    replace(source / "Providers/Gemini/GeminiAgentProvider.swift", '                parameters: params\n', '                parameters: ZeusAgentSchemas.schema(tool.name).map(ZeusAgentSchemas.gemini) ?? params\n')
+    replace(source / "Providers/Anthropic/OAuthHTTPClient.swift", '        if let body = request.httpBody, !body.isEmpty { return }', '        if let body = request.httpBody, !body.isEmpty { ZeusAgentSchemas.patchAnthropic(request); return }')
+    replace(source / "Providers/Anthropic/OAuthHTTPClient.swift", '        // Always set httpBody (even if empty) since the stream is now consumed\n        request.httpBody = data\n', '        // Always set httpBody (even if empty) since the stream is now consumed\n        request.httpBody = data\n        ZeusAgentSchemas.patchAnthropic(request)\n')
     # The card is inserted into the ORIGINAL self-sizing tool cell. The original
     # transcript/composer/Markdown remain unchanged; only this extension is new.
     list_file = source / "Agent/MessageList/CollectionViewMessageListV3.swift"
@@ -289,8 +307,8 @@ def embed(native, browser, report):
     (generated / "BrowserFixtureFactory.swift").write_text("import SwiftUI\n@MainActor enum BrowserFixtureFactory {\n" + factory + "}\n")
 
     apply_text_only(source, browser)
-    replace(source / "Views/ContentView.swift", '                Section("Agent Runtime") {', '''                Section("مشاريع Zeus") {
-                    NavigationLink { ZeusProjectsSettingsView() } label: { Label("المشاريع والبيئات", systemImage: "folder.badge.gearshape") }
+    replace(source / "Views/ContentView.swift", '                Section("Agent Runtime") {', '''                Section("وكيل ZEUS") {
+                    NavigationLink { ZeusAgentRuntimeSettings() } label: { Label("أدوات الوكيل وتنفيذه", systemImage: "terminal") }
                     NavigationLink { ZeusPluginsSettingsView() } label: { Label("الإضافات", systemImage: "puzzlepiece.extension") }
                 }
                 Section("Agent Runtime") {''')

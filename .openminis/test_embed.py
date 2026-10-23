@@ -47,8 +47,8 @@ class NativeEmbeddingTests(unittest.TestCase):
                     continue
                 expected = file.read_text().replace("group.com.openminis.app", "group.tools.zeus.openminis").replace("iCloud.com.openminis.app", "iCloud.tools.zeus.openminis")
                 if str(relative) == "Views/ContentView.swift":
-                    expected = expected.replace('                Section("Agent Runtime") {', '''                Section("مشاريع Zeus") {
-                    NavigationLink { ZeusProjectsSettingsView() } label: { Label("المشاريع والبيئات", systemImage: "folder.badge.gearshape") }
+                    expected = expected.replace('                Section("Agent Runtime") {', '''                Section("وكيل ZEUS") {
+                    NavigationLink { ZeusAgentRuntimeSettings() } label: { Label("أدوات الوكيل وتنفيذه", systemImage: "terminal") }
                     NavigationLink { ZeusPluginsSettingsView() } label: { Label("الإضافات", systemImage: "puzzlepiece.extension") }
                 }
                 Section("Agent Runtime") {''')
