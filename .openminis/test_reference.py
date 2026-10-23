@@ -48,10 +48,14 @@ class OriginalReferenceTests(unittest.TestCase):
             self.assertIn("'-target', 'arm64-apple-ios${IOS_DEPLOYMENT_TARGET}-simulator'", cross)
             self.assertIn("make clean\nmake -j", (root / "deps/build_lame.sh").read_text())
             for name in report["applicationFilesSHA256"]:
-                if not name.endswith(".xcconfig"):
+                if not name.endswith(".xcconfig") and name != "src/ios/MinisApp.swift":
                     self.assertEqual((root / name).read_bytes(), (UPSTREAM / name).read_bytes())
             tests = ET.parse(root / "src/ios/Minis.xcodeproj/xcshareddata/xcschemes/Minis.xcscheme").getroot().find("TestAction/Testables")
             self.assertEqual([t.find("BuildableReference").get("BlueprintName") for t in tests], ["MinisUITests"])
+            app = (root / "src/ios/MinisApp.swift").read_text()
+            self.assertIn("MessageListTestView()", app)
+            self.assertIn("else { ContentView() }", app)
+            self.assertEqual(report["testEntryAdapters"]["src/ios/MinisApp.swift"], hashlib.sha256((root / "src/ios/MinisApp.swift").read_bytes()).hexdigest())
 
     def test_device_dependencies_are_not_modified(self):
         with tempfile.TemporaryDirectory() as directory:

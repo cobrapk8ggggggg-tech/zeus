@@ -29,6 +29,9 @@ enum BrowserAction: String, CaseIterable, Identifiable {
 
 struct BrowserRoot: View {
     @ObservedObject var model: BrowserModel
+    #if ZEUS_NATIVE_HOST
+    var nativeAssistant: NativeAssistantFactory? = nil
+    #endif
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var sizeClass
     @AppStorage("showCurrentUserAvatar") private var showCurrentUserAvatar = false
@@ -87,7 +90,13 @@ struct BrowserRoot: View {
         .onReceive(model.downloads.objectWillChange) { model.changed() }
         .onReceive(model.downloads.$message) { if let text = $0 { model.downloads.message = nil; model.notify(text) } }
         .onReceive(model.profiles.$errorMessage) { if let text = $0 { model.profiles.errorMessage = nil; model.notify(text) } }
-        .task { draft = model.address; await model.ensureCurrentLoaded() }
+        .task {
+            draft = model.address
+            await model.ensureCurrentLoaded()
+            #if DEBUG && ZEUS_NATIVE_HOST
+            if CommandLine.arguments.contains("--open-native-agent"), !assistantVisible { perform(.assistant) }
+            #endif
+        }
     }
     private var browsingSurface: some View {
         ZStack {
@@ -110,10 +119,18 @@ struct BrowserRoot: View {
             if !visible { if sizeClass == .regular { assistantExpanded = false } else { assistantVisible = false } }
         })
     }
-    private func assistant(_ agent: BrowserAgent, fullScreen: Bool) -> some View {
+    @ViewBuilder private func assistant(_ agent: BrowserAgent, fullScreen: Bool) -> some View {
+        #if ZEUS_NATIVE_HOST
+        if let nativeAssistant {
+            nativeAssistant(agent, NativeAssistantPresentation(fullScreen: fullScreen, canResize: sizeClass == .regular,
+                close: { withAnimation { assistantVisible = false; assistantExpanded = false } },
+                resize: { assistantExpanded.toggle() }))
+        }
+        #else
         AIChatView(vm: agent, fullScreen: fullScreen, canResize: sizeClass == .regular,
                    close: { withAnimation { assistantVisible = false; assistantExpanded = false } },
                    resize: { assistantExpanded.toggle() }).id(model.profile.id)
+        #endif
     }
     @ViewBuilder private var browserContent: some View {
         if model.secondary != nil { TwinBrowserSurface(model: model) }
@@ -223,6 +240,9 @@ struct BrowserRoot: View {
         withAnimation { toolbarVisible = false; topTray = false }
         switch action {
         case .assistant:
+            #if ZEUS_NATIVE_HOST
+            guard nativeAssistant != nil else { return }
+            #endif
             if model.agent == nil { model.agent = BrowserAgent(browser: model) }
             assistantVisible = true
         case .translate: model.current?.translation?.translate()

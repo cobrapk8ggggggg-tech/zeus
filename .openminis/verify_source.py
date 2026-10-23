@@ -6,15 +6,17 @@ from pathlib import Path
 
 
 def verify(checkout: Path, manifest: Path) -> int:
-    original = json.loads(manifest.read_text())["applicationFilesSHA256"]
+    report = json.loads(manifest.read_text())
+    original = report["applicationFilesSHA256"]
+    adapters = report.get("testEntryAdapters", {})
     differences = []
     for name, expected in original.items():
         file = checkout / name
-        if not file.is_file() or hashlib.sha256(file.read_bytes()).hexdigest() != expected:
+        if not file.is_file() or hashlib.sha256(file.read_bytes()).hexdigest() != adapters.get(name, expected):
             differences.append(name)
     if differences:
         raise RuntimeError("Reference application source changed: " + ", ".join(differences))
-    return len(original)
+    return len(original) - len(adapters)
 
 
 if __name__ == "__main__":
@@ -22,4 +24,4 @@ if __name__ == "__main__":
     parser.add_argument("checkout", type=Path)
     parser.add_argument("manifest", type=Path)
     args = parser.parse_args()
-    print(f"Verified {verify(args.checkout, args.manifest)} unchanged original application files")
+    print(f"Verified {verify(args.checkout, args.manifest)} unchanged original application files; declared Debug entry adapter verified separately")

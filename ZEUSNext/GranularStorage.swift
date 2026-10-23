@@ -143,13 +143,17 @@ struct AgentStoragePage: View {
     private var root: URL { context.model.profiles.folder(for: context.profile).appendingPathComponent("OpenMinis") }
     private func refresh() {
         guard context.permitted else { return }
-        if context.isActive, let agent = context.model.agent { agent.save(); sessions = agent.sessions }
-        else { sessions = BrowserDisk.read(AgentArchive.self, from: root.appendingPathComponent("agent.json"))?.sessions ?? [] }
+        #if !ZEUS_NATIVE_HOST
+        if context.isActive, let agent = context.model.agent { agent.save() }
+        #endif
+        sessions = BrowserDisk.read(AgentArchive.self, from: root.appendingPathComponent("agent.json"))?.sessions ?? []
     }
     private func removeSelected() {
         guard context.permitted else { return }
-        if context.isActive, let agent = context.model.agent { for id in selected { agent.delete(id) } }
-        else if var archive = BrowserDisk.read(AgentArchive.self, from: root.appendingPathComponent("agent.json")) {
+        #if !ZEUS_NATIVE_HOST
+        if context.isActive, let agent = context.model.agent { for id in selected { agent.delete(id) }; selected = []; refresh(); return }
+        #endif
+        if var archive = BrowserDisk.read(AgentArchive.self, from: root.appendingPathComponent("agent.json")) {
             archive.sessions.removeAll { selected.contains($0.id) }
             if let id = archive.selected, selected.contains(id) { archive.selected = nil }
             for id in selected { try? FileManager.default.removeItem(at: root.appendingPathComponent(id.uuidString)) }

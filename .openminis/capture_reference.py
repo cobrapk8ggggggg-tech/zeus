@@ -10,13 +10,16 @@ def run(*arguments):
     return subprocess.run(arguments, text=True, check=True, capture_output=True, timeout=60).stdout
 
 
-def capture(device, app, output):
+def capture(device, app, output, bundle="com.openminis.app"):
     output.mkdir(parents=True, exist_ok=True)
     run("xcrun", "simctl", "install", device, str(app))
     run("xcrun", "simctl", "status_bar", device, "override", "--time", "9:41", "--batteryState", "charged", "--batteryLevel", "100")
-    launch = run("xcrun", "simctl", "launch", "--terminate-running-process", device,
-                 "com.openminis.app", "-AppleLanguages", "(ar)", "-AppleLocale", "ar_SA",
-                 "-appearanceMode", "2", "-appLanguage", "ar")
+    arguments = ["xcrun", "simctl", "launch", "--terminate-running-process", device,
+                 bundle, "-AppleLanguages", "(ar)", "-AppleLocale", "ar_SA",
+                 "-appearanceMode", "2", "-appLanguage", "ar"]
+    if bundle != "com.openminis.app":
+        arguments += ["--open-native-agent", "--layout=icab", "--uitesting"]
+    launch = run(*arguments)
     (output / "launch.txt").write_text(launch)
     time.sleep(3)
     pages = ["home", "settings", "settings/providers", "settings/model-groups",
@@ -40,5 +43,6 @@ if __name__ == "__main__":
     parser.add_argument("device")
     parser.add_argument("app", type=Path)
     parser.add_argument("output", type=Path)
+    parser.add_argument("--bundle", default="com.openminis.app")
     args = parser.parse_args()
-    capture(args.device, args.app, args.output)
+    capture(args.device, args.app, args.output, args.bundle)

@@ -223,7 +223,10 @@ struct WebDialog: Identifiable {
         guard !switching, target.account?.enabled != false, target.id != profile.id || requiresUnlock else { return }; switching = true; defer { switching = false }
         if target.requiresPassword, !(await AccountVault.verify(password, id: target.id)) { notify(AccountError.password.localizedDescription); return }
         if target.locked, !(await authenticate(reason: "فتح مساحة \(target.name)")) { return }
-        agent?.cancel(); agent = nil; OpenMinisMedia.root = nil
+        agent?.cancel(); agent = nil
+        #if !ZEUS_NATIVE_HOST
+        OpenMinisMedia.root = nil
+        #endif
         transitionEpoch = UUID()
         let previous = profile; twinTabID = nil; twinFocused = false; if !requiresUnlock { persist() }
         for tab in tabs { tab.dispose() }; console.removeAll(); pendingPopup = nil

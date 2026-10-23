@@ -54,8 +54,33 @@ def prepare(root: Path, sdk: str) -> dict:
         if reference is None or reference.get("BlueprintName") != "MinisUITests":
             testables.remove(test)
     scheme.write_text(ET.tostring(document.getroot(), encoding="unicode"))
+    # Upstream ships the original renderer harness and its UI tests, but its
+    # App entry does not route the tests' launch flag to that harness. Wire only
+    # that Debug entry point; normal launches still show the stock ContentView.
+    app = root / "src/ios/MinisApp.swift"
+    code = app.read_text()
+    anchor = "                ContentView()"
+    if code.count(anchor) != 1:
+        raise RuntimeError("Original app entry anchor changed")
+    code = code.replace(anchor, "                OpenMinisReferenceRoot()")
+    code += '''
+// Reference-test entry only; both branches use untouched upstream views.
+private struct OpenMinisReferenceRoot: View {
+    @ViewBuilder var body: some View {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--uitest-message-list") {
+            MessageListTestView()
+        } else { ContentView() }
+        #else
+        ContentView()
+        #endif
+    }
+}
+'''
+    app.write_text(code)
     return {"repository": expected["repository"], "commit": actual, "sdk": sdk,
-            "applicationFilesSHA256": manifest}
+            "applicationFilesSHA256": manifest,
+            "testEntryAdapters": {"src/ios/MinisApp.swift": hashlib.sha256(app.read_bytes()).hexdigest()}}
 
 
 if __name__ == "__main__":
