@@ -34,6 +34,7 @@ def apply(source: Path, browser: Path):
 final class VoiceActivityDetector: NSObject {
     weak var delegate: VoiceActivityDelegate?
     private(set) var isRunning = false
+    var isCapturing: Bool { false }
     private(set) var isSpeaking = false
     var maxSegmentSeconds: Double = 60
     var currentSessionId: String? { nil }

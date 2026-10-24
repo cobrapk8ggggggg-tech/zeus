@@ -239,7 +239,7 @@ def embed(native, browser, report):
     static func storeTokensForZeus(_ stored: StoredTokens, server: String, oauth: MCPOAuthConfig) throws {
         keychainSet(try JSONEncoder().encode(stored), account: "\\(server)#tokens")
         guard tokens(server: server)?.accessToken == stored.accessToken else { throw OAuthError.exchangeFailed("تعذر حفظ تفويض الحساب في Keychain؛ لم يكتمل الربط.") }
-        materializeBridge(server: server, oauth: oauth, tokens: stored)
+        try materializeBridge(server: server, oauth: oauth, tokens: stored)
     }
 
     static func refreshAccessTokenForZeus(server: String, oauth: MCPOAuthConfig) async throws -> String {
@@ -260,7 +260,7 @@ def embed(native, browser, report):
         stored.refreshToken = object["refresh_token"] as? String ?? stored.refreshToken
         stored.expiresAt = Date().timeIntervalSince1970 + ((object["expires_in"] as? NSNumber)?.doubleValue ?? 3600)
         keychainSet(try JSONEncoder().encode(stored), account: "\\(server)#tokens")
-        materializeBridge(server: server, oauth: oauth, tokens: stored)
+        try materializeBridge(server: server, oauth: oauth, tokens: stored)
         return access
     }
 

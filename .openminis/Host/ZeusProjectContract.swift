@@ -100,7 +100,10 @@ struct ZeusProjectContract: Codable {
         func duplicates(_ values: [String]) -> [String] { Dictionary(grouping: values, by: { $0 }).filter { $0.value.count > 1 }.keys.sorted() }
         let duplicateFeatures = duplicates(p.features.map(\.id)), duplicateChecks = duplicates(p.checks.map(\.id)), duplicateSteps = duplicates(p.steps)
         guard duplicateFeatures.isEmpty, duplicateChecks.isEmpty, duplicateSteps.isEmpty else {
-            throw ZeusPatch.failure("PROJECT_PLAN_INVALID: duplicate feature IDs=" + duplicateFeatures.joined(separator: ",") + "; duplicate check IDs=" + duplicateChecks.joined(separator: ",") + "; duplicate steps=" + duplicateSteps.joined(separator: ",") + ". Rename only these duplicates and retain the requested features.")
+            let details = ["duplicate feature IDs=" + duplicateFeatures.joined(separator: ","),
+                           "duplicate check IDs=" + duplicateChecks.joined(separator: ","),
+                           "duplicate steps=" + duplicateSteps.joined(separator: ",")].joined(separator: "; ")
+            throw ZeusPatch.failure("PROJECT_PLAN_INVALID: \(details). Rename only these duplicates and retain the requested features.")
         }
         let featureIDs = Set(p.features.map(\.id))
         var issues: [String] = []
