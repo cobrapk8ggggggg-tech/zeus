@@ -104,7 +104,7 @@ import UIKit
         let runtime = ZeusAgentHarness(root: root), session = UUID().uuidString
         runtime.registerUserRequest("Build an iOS application", session: session)
         XCTAssertNotNil(runtime.state(session).project)
-        for name in ["zeus_browser", "browser_use"] {
+        for name in ["zeus_browser", "browser_use", "zeus_browser_indexeddb"] {
             XCTAssertNoThrow(try runtime.projectGate(tool: name, args: ["operation": "browser_evaluate", "action": "evaluate"], session: session))
             XCTAssertTrue(ZeusToolPermissions.isConsequential(tool: name, args: ["operation": "browser_evaluate", "action": "evaluate"]))
         }
@@ -298,6 +298,19 @@ import UIKit
         let secondIdentity = try await client.object(accountID: "second", path: "/user")
         XCTAssertEqual(firstIdentity["login"] as? String, "fixture-owner")
         XCTAssertEqual(secondIdentity["login"] as? String, "other-owner")
+        let inspectionArgs: [String: Any] = ["account_id": "first", "repository": "fixture-owner/project", "branch": "feature/project", "action": "tree", "limit": 1]
+        let inspected = try await client.inspectProject(inspectionArgs)
+        XCTAssertEqual(inspected["head_sha"] as? String, String(repeating: "1", count: 40))
+        XCTAssertEqual(inspected["has_more"] as? Bool, true)
+        XCTAssertEqual(inspected["next_offset"] as? Int, 1)
+        XCTAssertEqual((inspected["entries"] as? [[String: Any]])?.first?["project_instruction"] as? Bool, true)
+        var nextInspection = inspectionArgs; nextInspection["offset"] = 1
+        let next = try await client.inspectProject(nextInspection)
+        XCTAssertEqual((next["entries"] as? [[String: Any]])?.first?["build_or_test_entry"] as? Bool, true)
+        var difference = inspectionArgs; difference["action"] = "diff"; difference["base"] = "main"
+        let changes = try await client.inspectProject(difference)
+        XCTAssertEqual((changes["entries"] as? [[String: Any]])?.first?["patch_truncated"] as? Bool, true)
+        XCTAssertTrue((changes["files_coverage"] as? String ?? "").contains("300"))
         let logs = try await client.request(accountID: "first", path: "/repos/fixture-owner/project/actions/jobs/123/logs")
         XCTAssertTrue((logs["data"] as? String ?? "").contains("App.swift:12: missing symbol"))
         XCTAssertEqual(logs["authorization_forwarded"] as? Bool, false)

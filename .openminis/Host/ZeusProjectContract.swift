@@ -318,7 +318,7 @@ struct ZeusProjectProgressCard: View {
         var value = state(session)
         guard let project = value.project, project.required else { return }
         if ["project_environment", "propose_project_plan", "integration_accounts", "integration_tools", "task_checkpoint", "update_plan", "task_complete", "file_read", "read_image", "memory_read", "memory_get"].contains(tool) { return }
-        if tool == "github_read_file" { return }
+        if ["github_read_file", "github_project_inspect"].contains(tool) { return }
         if tool == "github_request", ["GET", "HEAD"].contains(args["method"] as? String ?? "GET") { return }
         if tool == "integration_call", ZeusConnections.shared.isReadOnly(args["account_id"] as? String ?? "", tool: args["tool_name"] as? String ?? "") { return }
         // Browser actions have their own permission gate. A product-plan gate

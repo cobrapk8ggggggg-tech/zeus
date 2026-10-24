@@ -372,3 +372,56 @@ private final class ZeusGitHubNoRedirect: NSObject, URLSessionTaskDelegate {
         }
     }
 }
+
+
+@MainActor extension ZeusGitHubTools {
+    func inspectProject(_ args: [String: Any]) async throws -> [String: Any] {
+        try ZeusAgentSchemas.validate(args, schema: ZeusAgentSchemas.schema("github_project_inspect")!)
+        let account = args["account_id"] as! String, repo = args["repository"] as! String
+        let branch = args["branch"] as! String, action = args["action"] as! String
+        let offset = args["offset"] as? Int ?? 0, limit = args["limit"] as? Int ?? 20
+        try Self.relativePath("/repos/" + repo + "/git/ref/heads/" + branch)
+        let ref = try await object(accountID: account, path: "/repos/" + repo + "/git/ref/heads/" + branch)
+        guard let head = (ref["object"] as? [String: Any])?["sha"] as? String, head.range(of: "^[0-9a-fA-F]{40}$", options: .regularExpression) != nil else { throw ZeusPatch.failure("GitHub did not return an actual branch commit SHA.") }
+        var payload: [String: Any] = ["repository": repo, "branch": branch, "head_sha": head, "read_only": true]
+        let entries: [[String: Any]]
+        if action == "tree" {
+            let tree: String
+            if let subtree = args["tree_sha"] as? String { tree = subtree }
+            else {
+                let commit = try await object(accountID: account, path: "/repos/" + repo + "/git/commits/" + head)
+                guard let id = (commit["tree"] as? [String: Any])?["sha"] as? String else { throw ZeusPatch.failure("Commit tree missing from the GitHub response.") }
+                tree = id
+            }
+            let object = try await self.object(accountID: account, path: "/repos/" + repo + "/git/trees/" + tree, query: args["recursive"] as? Bool == true ? ["recursive": "1"] : [:])
+            guard let items = object["tree"] as? [[String: Any]] else { throw ZeusPatch.failure("GitHub did not return a file tree.") }
+            entries = items.map { item in
+                var row = item.filter { ["path", "type", "sha", "size"].contains($0.key) }
+                let path = item["path"] as? String ?? ""
+                row["project_instruction"] = path.hasSuffix("AGENTS.md")
+                row["build_or_test_entry"] = ["Package.swift", "package.json", "pyproject.toml", "Cargo.toml", "Makefile", "Gemfile", "project.pbxproj"].contains(URL(fileURLWithPath: path).lastPathComponent) || path.contains(".github/workflows/")
+                return row
+            }
+            payload["tree_sha"] = tree; payload["server_truncated"] = object["truncated"] as? Bool ?? false
+        } else {
+            guard let base = args["base"] as? String, !base.contains(".."), !base.contains("?"), !base.contains("#") else { throw ZeusPatch.failure("Diff inspection requires a valid base branch or commit SHA.") }
+            let diff = try await object(accountID: account, path: "/repos/" + repo + "/compare/" + base + "..." + head, query: ["per_page": "1"])
+            guard let items = diff["files"] as? [[String: Any]] else { throw ZeusPatch.failure("GitHub did not return a comparison file list.") }
+            entries = items.map { item in
+                var row = item.filter { ["filename", "previous_filename", "status", "additions", "deletions", "changes", "sha"].contains($0.key) }
+                if let patch = item["patch"] as? String { row["patch_preview"] = String(patch.prefix(500)); row["patch_truncated"] = patch.count > 500 }
+                else { row["patch_unavailable"] = true }
+                return row
+            }
+            payload["base"] = base; payload["comparison_status"] = diff["status"]
+            payload["files_coverage"] = "GitHub Compare exposes at most 300 files. Patches are previews and can be absent for binary/large changes. Use source reads for complete inspection."
+            payload["server_truncated"] = items.count >= 300
+        }
+        guard offset <= entries.count else { throw ZeusPatch.failure("Offset exceeds this snapshot; restart at zero if the branch changed.") }
+        var page = Array(entries.dropFirst(offset).prefix(limit))
+        while page.count > 1, (try JSONSerialization.data(withJSONObject: page)).count > 10000 { page.removeLast() }
+        payload["entries"] = page; payload["available_entries"] = entries.count
+        payload["next_offset"] = offset + page.count; payload["has_more"] = offset + page.count < entries.count
+        return payload
+    }
+}

@@ -59,6 +59,13 @@ def github_response(handler, method, body=None):
         elif method == 'GET' and '/contents/' in path:
             source = SOURCES.get((repo, path.split('/contents/', 1)[1]), '')
             result = {'type': 'file', 'encoding': 'base64', 'sha': SHA, 'content': base64.b64encode(source.encode()).decode()}
+        elif method == 'GET' and '/git/trees/' in path:
+            result = {'sha': 'a' * 40, 'truncated': False, 'tree': [
+                {'path': 'AGENTS.md', 'type': 'blob', 'sha': 'b' * 40, 'size': 100},
+                {'path': 'Package.swift', 'type': 'blob', 'sha': 'c' * 40, 'size': 200},
+                {'path': 'Sources', 'type': 'tree', 'sha': 'd' * 40}]}
+        elif method == 'GET' and '/compare/' in path:
+            result = {'status': 'ahead', 'files': [{'filename': 'Sources/App.swift', 'status': 'modified', 'additions': 2, 'deletions': 1, 'patch': '+' + 'real-source-change' * 100}]}
         elif method == 'POST' and path.endswith('/git/blobs'):
             if body.get('encoding') != 'utf-8':
                 status, result = 400, {'message': 'Source commits must use native plain UTF-8 text'}

@@ -411,6 +411,36 @@ final class NativeBrowserIntegrationTests: XCTestCase {
         XCTAssertGreaterThan(partials, 1)
         XCTAssertTrue(complete)
     }
+    func testTypedIndexedDBDiscoveryPaginationAndMissingDatabaseNeverCreatesOne() async throws {
+        let config = WKWebViewConfiguration(); config.websiteDataStore = .nonPersistent()
+        let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: config)
+        let loader = NativeInspectorFixture()
+        try await loader.load("<main>IndexedDB fixture</main>", view: view)
+        _ = try await view.callAsyncJavaScript(#"""
+        await new Promise((resolve,reject)=>{
+          const req=indexedDB.open('ZeusInspectorFixture',1);
+          req.onupgradeneeded=()=>req.result.createObjectStore('auth');req.onerror=()=>reject(req.error);
+          req.onsuccess=()=>{const db=req.result,tx=db.transaction('auth','readwrite');
+            tx.objectStore('auth').put({fixtureToken:'local-test-only'},'first');
+            tx.objectStore('auth').put({count:2},'second');
+            tx.oncomplete=()=>{db.close();resolve(true)};tx.onerror=()=>reject(tx.error);};
+        });return true;
+        """#, arguments: [:], in: nil, contentWorld: .page)
+        let databases = try await NativeBrowserInspector.execute("browser_indexeddb", args: ["action": "databases"], view: view)
+        XCTAssertTrue(databases.contains("ZeusInspectorFixture"))
+        let stores = try await NativeBrowserInspector.execute("browser_indexeddb", args: ["action": "stores", "database": "ZeusInspectorFixture"], view: view)
+        XCTAssertTrue(stores.contains("auth"))
+        let first = try await NativeBrowserInspector.execute("browser_indexeddb", args: ["action": "read", "database": "ZeusInspectorFixture", "store": "auth", "limit": 1], view: view)
+        XCTAssertTrue(first.contains("local-test-only")); XCTAssertTrue(first.contains("\"has_more\":true"))
+        let second = try await NativeBrowserInspector.execute("browser_indexeddb", args: ["action": "read", "database": "ZeusInspectorFixture", "store": "auth", "limit": 1, "offset": 1], view: view)
+        XCTAssertTrue(second.contains("second")); XCTAssertFalse(second.contains("local-test-only"))
+        do {
+            _ = try await NativeBrowserInspector.execute("browser_indexeddb", args: ["action": "stores", "database": "MustNotBeCreated"], view: view)
+            XCTFail("Unknown database must not be created")
+        } catch { }
+        let after = try await NativeBrowserInspector.execute("browser_indexeddb", args: ["action": "databases"], view: view)
+        XCTAssertFalse(after.contains("MustNotBeCreated"))
+    }
     func testInspectorRunsAgainstRealDOMAndOriginStorage() async throws {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .nonPersistent()

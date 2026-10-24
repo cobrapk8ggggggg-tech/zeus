@@ -131,7 +131,7 @@ private final class NativeToolCapture { var imageFilePath: String? }
         let target = globalOperations.contains(operation) || operation == "browser_open" || operation == "browser_download" ? nil : try tab(call.object)
         let targetURL = target?.url
         let host = destination ?? targetURL.flatMap { URL(string: $0)?.host } ?? browser?.currentHost ?? ""
-        let permanent = !["browser_click", "browser_type", "browser_close_tab", "browser_evaluate", "browser_cookies", "browser_storage", "browser_debug"].contains(operation) && browser?.profile.isPrivate == false
+        let permanent = !["browser_click", "browser_type", "browser_close_tab", "browser_evaluate", "browser_cookies", "browser_storage", "browser_indexeddb", "browser_debug"].contains(operation) && browser?.profile.isPrivate == false
         let title = Self.tools.first { $0.name == operation }?.title ?? operation
         guard let authorization, await authorization(NativeBrowserApproval(operation: operation,
                 profile: profileIdentifier, profileName: browser?.profile.name ?? "", host: host,
@@ -145,7 +145,7 @@ private final class NativeToolCapture { var imageFilePath: String? }
         }
         // Navigation/read operations may legitimately follow HTTP redirects. Bind
         // sensitive origin inspection to the approved host, not ordinary reads.
-        authorizedHost = ["browser_evaluate", "browser_cookies", "browser_storage", "browser_dom", "browser_network"].contains(operation) ? host.lowercased() : nil
+        authorizedHost = ["browser_evaluate", "browser_cookies", "browser_storage", "browser_indexeddb", "browser_dom", "browser_network"].contains(operation) ? host.lowercased() : nil
         defer { authorizedHost = nil }
         approved.insert(call.id); defer { approved.remove(call.id) }
         selectedID = sessionID.flatMap(UUID.init(uuidString:))
@@ -227,7 +227,7 @@ private final class NativeToolCapture { var imageFilePath: String? }
                 "coverage": "Collected messages for this tab only, maximum 50 recent entries and 1000 characters per entry.",
                 "tab_id": selected.id.uuidString, "totalEntries": entries.count,
                 "entries": entries.suffix(50).map { ["kind": $0.kind, "text": String($0.text.prefix(1000)), "truncated": $0.text.count > 1000, "date": $0.date.timeIntervalSince1970] as [String: Any] }])
-        case "browser_dom", "browser_evaluate", "browser_cookies", "browser_storage", "browser_network":
+        case "browser_dom", "browser_evaluate", "browser_cookies", "browser_storage", "browser_indexeddb", "browser_network":
             guard browser.profile.account?.allowDeveloperTools != false else { throw AccountError.permission }
             let view = try await webView(tab(args))
             return try await NativeBrowserInspector.execute(call.name, args: args, view: view)

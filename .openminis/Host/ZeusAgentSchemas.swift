@@ -4,7 +4,7 @@ import CoreFoundation
 /// Provider-independent JSON schemas for the native execution runtime.
 /// These are real nested schemas, not JSON encoded inside string parameters.
 enum ZeusAgentSchemas {
-    static let names: Set<String> = ["update_plan", "apply_patch", "exec_command", "write_stdin", "task_checkpoint", "task_verify", "task_verify_mcp", "task_complete", "integration_accounts", "integration_tools", "integration_call", "project_environment", "propose_project_plan", "github_request", "task_verify_github", "github_download_artifact", "github_read_file", "github_write_files"]
+    static let names: Set<String> = ["update_plan", "apply_patch", "exec_command", "write_stdin", "task_checkpoint", "task_verify", "task_verify_mcp", "task_complete", "integration_accounts", "integration_tools", "integration_call", "project_environment", "propose_project_plan", "github_request", "task_verify_github", "github_download_artifact", "github_read_file", "github_write_files", "github_project_inspect"]
     static func schema(_ name: String) -> [String: Any]? {
         var fields: [String: Any] = ["tool_title": ["type": "string"], "approval_reason": ["type": "string"]]
         var requiredFields: [String] = []
@@ -32,6 +32,17 @@ enum ZeusAgentSchemas {
                 fields["files"] = ["type": "array", "minItems": 1, "maxItems": 30, "items": file]
                 requiredFields += ["message", "files"]
             }
+        case "github_project_inspect":
+            fields["account_id"] = ["type": "string"]
+            fields["repository"] = ["type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"]
+            fields["branch"] = ["type": "string", "minLength": 1, "maxLength": 240]
+            fields["action"] = ["type": "string", "enum": ["tree", "diff"]]
+            fields["base"] = ["type": "string", "minLength": 1, "maxLength": 240]
+            fields["tree_sha"] = ["type": "string", "pattern": "^[0-9a-fA-F]{40}$"]
+            fields["recursive"] = ["type": "boolean"]
+            fields["offset"] = ["type": "integer", "minimum": 0]
+            fields["limit"] = ["type": "integer", "minimum": 1, "maximum": 20]
+            requiredFields = ["account_id", "repository", "branch", "action"]
         case "github_request":
             fields["account_id"] = ["type": "string"]
             fields["method"] = ["type": "string", "enum": ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"]]
