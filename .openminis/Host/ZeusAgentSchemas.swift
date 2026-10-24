@@ -24,6 +24,8 @@ enum ZeusAgentSchemas {
             requiredFields = ["account_id", "repository", "branch"]
             if name == "github_read_file" {
                 fields["path"] = ["type": "string", "minLength": 1, "maxLength": 500]; requiredFields += ["path"]
+                fields["offset"] = ["type": "integer", "minimum": 0]
+                fields["max_chars"] = ["type": "integer", "minimum": 1, "maximum": 10000]
             } else {
                 fields["message"] = ["type": "string", "minLength": 1, "maxLength": 500]
                 let file: [String: Any] = ["type": "object", "properties": ["path": ["type": "string", "minLength": 1, "maxLength": 500], "content": ["type": "string", "maxLength": 120000], "delete": ["type": "boolean"]], "required": ["path"], "additionalProperties": false]

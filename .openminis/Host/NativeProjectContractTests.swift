@@ -156,6 +156,9 @@ import UIKit
         let logs = try await client.request(accountID: "first", path: "/repos/fixture-owner/project/actions/jobs/123/logs")
         XCTAssertTrue((logs["data"] as? String ?? "").contains("App.swift:12: missing symbol"))
         XCTAssertEqual(logs["authorization_forwarded"] as? Bool, false)
+        let longLog = try await client.request(accountID: "first", path: "/repos/fixture-owner/project/actions/jobs/124/logs")
+        XCTAssertTrue((longLog["data"] as? String ?? "").contains("FINAL_COMPILER_ERROR"))
+        XCTAssertTrue(try ZeusAgentHarness.json(longLog).count < AIChatViewModel.kMaxToolResultChars, "Keep the compiler error tail inside the original conversation result budget")
         let runtime = ZeusAgentHarness.shared, vm = AIChatViewModel()
         let created = try DebugRPCProvider.instancesCreate(params: ["providerType": "openAI", "label": "Contract vision fixture", "apiKey": "local-fixture-only", "customBaseURL": "http://127.0.0.1:8765/v1", "appendV1Suffix": false, "seedBuiltInModels": false])
         let instance = try XCTUnwrap(created["instance"] as? [String: Any]), providerID = try XCTUnwrap(instance["id"] as? String)
@@ -197,6 +200,13 @@ import UIKit
         XCTAssertTrue(commitReceipt.contains("written_directly_to_github"))
         let read = try await client.readSource(accountID: "first", repository: "fixture-owner/project", branch: "feature/project", path: "App.swift")
         XCTAssertEqual(read["content"] as? String, source)
+        var offset = 0, reconstructed = ""
+        repeat {
+            let chunk = try await client.readSource(accountID: "first", repository: "fixture-owner/project", branch: "feature/project", path: "App.swift", offset: offset, maxChars: 20)
+            reconstructed += chunk["content"] as? String ?? ""
+            offset = chunk["next_offset"] as? Int ?? source.count
+        } while offset < source.count
+        XCTAssertEqual(reconstructed, source, "Native source pagination must preserve Unicode and the complete file")
         let requests = try await client.object(accountID: "first", path: "/requests")
         let recorded = requests["requests"] as? [[String: Any]] ?? []
         let treeWrites = recorded.filter { ($0["path"] as? String)?.hasSuffix("/git/trees") == true }

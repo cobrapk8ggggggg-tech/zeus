@@ -33,7 +33,7 @@ def github_response(handler, method, body=None):
     path = parsed.path[len('/github-rest-fixture'):]
     token = handler.headers.get('Authorization', '')
     if path.startswith('/download/'):
-        data = (b'Build failed: App.swift:12: missing symbol\nRepair the source and rerun the workflow.' if path.endswith('.log') else screenshot_zip()) if not token else b'Credentials must not be forwarded to the download'
+        data = ((b'Build log header\n' + b'ordinary compiler output\n' * 3000 + b'FINAL_COMPILER_ERROR: fix App.swift line 12') if path.endswith('large.log') else (b'Build failed: App.swift:12: missing symbol\nRepair the source and rerun the workflow.' if path.endswith('.log') else screenshot_zip())) if not token else b'Credentials must not be forwarded to the download'
         handler.send_response(200 if not token else 400)
         handler.send_header('Content-Type', 'application/zip'); handler.send_header('Content-Length', str(len(data))); handler.end_headers()
         handler.wfile.write(data)
@@ -88,7 +88,7 @@ def github_response(handler, method, body=None):
         elif method == 'POST' and path.endswith('/dispatches'):
             status = 204
         elif '/actions/jobs/' in path and path.endswith('/logs'):
-            status, headers = 302, {'Location': 'http://' + handler.headers['Host'] + '/github-rest-fixture/download/job.log'}
+            status, headers = 302, {'Location': 'http://' + handler.headers['Host'] + '/github-rest-fixture/download/' + ('large.log' if '/124/' in path else 'job.log')}
         elif '/git/ref/heads/' in path:
             result = {'ref': 'refs/heads/feature/project', 'object': {'sha': '2' * 40 if repo.endswith('/stale') else SHA}}
         elif '/actions/artifacts/' in path:

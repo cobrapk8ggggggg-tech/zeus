@@ -99,9 +99,16 @@ private final class ZeusGitHubNoRedirect: NSObject, URLSessionTaskDelegate {
             throw ZeusPatch.failure("Job log retrieval failed or exceeded 16MB. Inspect the failed job's step annotations and smaller log outputs.")
         }
         let log = String(decoding: try Data(contentsOf: temporary), as: UTF8.self)
-        let truncated = log.count > 100000
-        let visible = truncated ? String(log.prefix(40000)) + "\n[Middle of large job log omitted]\n" + String(log.suffix(60000)) : log
-        return ["status": 200, "data": visible, "log_truncated": truncated, "authorization_forwarded": false]
+        var budget = 10000
+        while budget >= 100 {
+            let truncated = log.count > budget
+            let visible = truncated ? String(log.prefix(budget / 5)) + "\n[Middle of large job log omitted]\n" + String(log.suffix(budget * 4 / 5)) : log
+            let result: [String: Any] = ["status": 200, "data": visible, "log_truncated": truncated, "authorization_forwarded": false]
+            let encoded = try JSONSerialization.data(withJSONObject: result)
+            if String(decoding: encoded, as: UTF8.self).count <= 13000 { return result }
+            budget /= 2
+        }
+        throw ZeusPatch.failure("This log cannot fit the conversation tool budget. Inspect smaller job step annotations.")
     }
     func object(accountID: String, path: String, query: [String: String] = [:]) async throws -> [String: Any] {
         guard let object = try await request(accountID: accountID, path: path, query: query)["data"] as? [String: Any] else { throw ZeusPatch.failure("GitHub returned no structured JSON object for verification.") }
@@ -275,13 +282,23 @@ private final class ZeusGitHubNoRedirect: NSObject, URLSessionTaskDelegate {
             throw ZeusPatch.failure("Source paths must be repository-relative regular file paths without traversal or .git metadata.")
         }
     }
-    func readSource(accountID: String, repository: String, branch: String, path: String) async throws -> [String: Any] {
+    func readSource(accountID: String, repository: String, branch: String, path: String, offset: Int = 0, maxChars: Int = 8000) async throws -> [String: Any] {
         try Self.sourcePath(path)
         let result = try await object(accountID: accountID, path: "/repos/" + repository + "/contents/" + path, query: ["ref": branch])
         guard result["type"] as? String == "file", result["encoding"] as? String == "base64",
-              let encoded = result["content"] as? String, let bytes = Data(base64Encoded: encoded, options: .ignoreUnknownCharacters), bytes.count <= 240000,
+              let encoded = result["content"] as? String, let bytes = Data(base64Encoded: encoded, options: .ignoreUnknownCharacters), bytes.count <= 1_000_000,
               let text = String(data: bytes, encoding: .utf8) else { throw ZeusPatch.failure("This source is binary, too large or unavailable. Use smaller text files; inspect actual GitHub errors.") }
-        return ["path": path, "branch": branch, "sha": result["sha"] ?? NSNull(), "content": text]
+        guard offset >= 0, offset <= text.count, maxChars > 0, maxChars <= 10000 else { throw ZeusPatch.failure("Use offset from next_offset and max_chars between 1 and 10000.") }
+        let start = text.index(text.startIndex, offsetBy: offset)
+        var count = min(maxChars, text.count - offset)
+        repeat {
+            let end = text.index(start, offsetBy: count)
+            let payload: [String: Any] = ["path": path, "branch": branch, "sha": result["sha"] ?? NSNull(), "content": String(text[start..<end]), "next_offset": offset + count, "total_chars": text.count, "truncated": offset + count < text.count]
+            let encoded = try JSONSerialization.data(withJSONObject: payload)
+            if String(decoding: encoded, as: UTF8.self).count <= 13000 { return payload }
+            count /= 2
+        } while count > 0
+        throw ZeusPatch.failure("This source has an oversized character sequence; request a smaller text file.")
     }
     func writeSources(accountID: String, repository: String, branch: String, message: String, files: [[String: Any]]) async throws -> [String: Any] {
         guard !files.isEmpty, files.count <= 30, Set(files.compactMap { $0["path"] as? String }).count == files.count else { throw ZeusPatch.failure("A commit needs 1–30 unique file paths.") }
@@ -324,7 +341,7 @@ private final class ZeusGitHubNoRedirect: NSObject, URLSessionTaskDelegate {
         if let proposal = state(session).project?.proposal, state(session).project?.decision == "approved" {
             guard proposal.github_account_id == nil || proposal.github_account_id == args["account_id"] as? String else { throw ZeusPatch.failure("Use the approved GitHub account.") }
         }
-        return try Self.json(try await client.readSource(accountID: args["account_id"] as! String, repository: args["repository"] as! String, branch: args["branch"] as! String, path: args["path"] as! String))
+        return try Self.json(try await client.readSource(accountID: args["account_id"] as! String, repository: args["repository"] as! String, branch: args["branch"] as! String, path: args["path"] as! String, offset: args["offset"] as? Int ?? 0, maxChars: args["max_chars"] as? Int ?? 8000))
     }
     func githubWriteFiles(_ args: [String: Any], session: String, client: ZeusGitHubTools = .shared) async throws -> String {
         let id = args["account_id"] as! String, repository = args["repository"] as! String, branch = args["branch"] as! String
