@@ -168,7 +168,10 @@ enum ZeusAgentSchemas {
 enum ZeusToolRecovery {
     static let marker = "ZEUS_TOOL_REPAIR_REQUIRED:"
     static func candidate(_ text: String, tools: Set<String>) -> String? {
-        let input = String(text.prefix(12000))
+        let input = String(text.prefix(12000)).trimmingCharacters(in: .whitespacesAndNewlines)
+        // Recover bare protocol envelopes, never normal prose or fenced code
+        // examples that happen to mention a registered function name.
+        guard input.hasPrefix("{") || input.hasPrefix("<tool_call>") else { return nil }
         guard input.contains("\"tool_calls\"") || input.contains("<tool_call>") else { return nil }
         guard let expression = try? NSRegularExpression(pattern: #""name"\s*:\s*"([a-zA-Z0-9_]+)""#),
               let match = expression.firstMatch(in: input, range: NSRange(input.startIndex..., in: input)),

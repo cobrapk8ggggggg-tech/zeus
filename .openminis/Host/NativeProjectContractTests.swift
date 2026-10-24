@@ -51,6 +51,8 @@ import UIKit
         XCTAssertNil(runtime.recoverToolText(text, tools: tools, session: session)?.instruction)
         XCTAssertEqual(runtime.state(session).status, "waiting_user")
         XCTAssertNil(ZeusToolRecovery.candidate("A normal progress update", tools: tools))
+        XCTAssertNil(ZeusToolRecovery.candidate("A quoted API example: " + text, tools: tools))
+        XCTAssertNil(ZeusToolRecovery.candidate("```json\n" + text + "\n```", tools: tools))
     }
     func testRepeatedProviderIDsAreScopedToTheirOriginalToolSlotWithoutReplayingIt() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
