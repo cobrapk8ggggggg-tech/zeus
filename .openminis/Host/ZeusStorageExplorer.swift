@@ -35,15 +35,22 @@ enum ZeusStorageFiles {
         let parent = url.deletingLastPathComponent().resolvingSymlinksInPath().standardizedFileURL.path
         guard parent == root || parent.hasPrefix(root + "/") else { throw failure("المسار خارج مساحة التطبيق.") }
     }
-    static func delete(_ url: URL, container: URL, protected: [URL]) throws {
+    static func validateDeletion(_ url: URL, container: URL, protected: [URL], structuralRoots: [URL]) throws {
         try validate(url, container: container)
         let path = url.deletingLastPathComponent().resolvingSymlinksInPath().appendingPathComponent(url.lastPathComponent).standardizedFileURL.path
+        guard !structuralRoots.contains(where: { $0.resolvingSymlinksInPath().standardizedFileURL.path == path }) else {
+            throw failure("لا يمكن حذف جذر بيئة التنفيذ كملف عادي. استخدم إعادة ضبط البيئة من إعداداتها؛ يمكنك حذف الملفات والمجلدات داخلها بشكل انتقائي.")
+        }
         for item in protected {
             let p = item.resolvingSymlinksInPath().standardizedFileURL.path
             if path == p || path.hasPrefix(p + "/") || p.hasPrefix(path + "/") {
                 throw failure("هذا العنصر قيد الاستخدام أو تديره قاعدة بيانات. أوقف المهمة، أو استخدم إدارة المحادثات أو بيانات المواقع لحذفه.")
             }
         }
+    }
+    static func delete(_ url: URL, container: URL, protected: [URL]) throws {
+        try validateDeletion(url, container: container, protected: protected, structuralRoots: [RootfsManager.shared.dataPath])
+        let path = url.deletingLastPathComponent().resolvingSymlinksInPath().appendingPathComponent(url.lastPathComponent).standardizedFileURL.path
         try FileManager.default.removeItem(at: url)
         let guestRoot = RootfsManager.shared.dataPath.resolvingSymlinksInPath().standardizedFileURL.path
         if path.hasPrefix(guestRoot + "/") {

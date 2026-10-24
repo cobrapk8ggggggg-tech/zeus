@@ -118,6 +118,8 @@ import UIKit
         defer { try? FileManager.default.removeItem(at: root); try? FileManager.default.removeItem(at: outside) }
         let keep = root.appendingPathComponent("database"), remove = root.appendingPathComponent("cache")
         try Data("keep".utf8).write(to: keep); try Data("delete".utf8).write(to: remove)
+        XCTAssertThrowsError(try ZeusStorageFiles.validateDeletion(root.appendingPathComponent("system"), container: root, protected: [], structuralRoots: [root.appendingPathComponent("system")]))
+        XCTAssertNoThrow(try ZeusStorageFiles.validateDeletion(root.appendingPathComponent("system/cache"), container: root, protected: [], structuralRoots: [root.appendingPathComponent("system")]))
         XCTAssertThrowsError(try ZeusStorageFiles.delete(keep, container: root, protected: [keep]))
         try ZeusStorageFiles.delete(remove, container: root, protected: [keep])
         XCTAssertTrue(FileManager.default.fileExists(atPath: keep.path))
