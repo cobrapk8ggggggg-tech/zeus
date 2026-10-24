@@ -67,7 +67,10 @@ def github_response(handler, method, body=None):
                 BLOBS[digest] = body['content']; result = {'sha': digest}
         elif method == 'POST' and path.endswith('/git/trees'):
             for item in body['tree']:
-                if item.get('sha') is None: SOURCES.pop((repo, item['path']), None)
+                if 'content' in item:
+                    assert 'sha' not in item, 'Git tree content and sha are mutually exclusive'
+                    SOURCES[(repo, item['path'])] = item['content']
+                elif item.get('sha') is None: SOURCES.pop((repo, item['path']), None)
                 else: SOURCES[(repo, item['path'])] = BLOBS[item['sha']]
             result = {'sha': 'fixture-tree'}
         elif method == 'POST' and path.endswith('/git/commits'):

@@ -71,7 +71,7 @@ with the original image tool and have design notes before proposing the UI.
 
 `github_read_file` decodes actual repository text natively. `github_write_files`
 accepts normal UTF-8 source for up to 30 files and creates blobs/tree/commit,
-then updates the approved branch without force and checks its HEAD. The model
+using one Git Trees request with inline content for all files, then updates the approved branch without force and checks its HEAD. The model
 does not generate Base64, clone or push locally. Job log redirects are read
 natively with no account token forwarded to the temporary host.
 

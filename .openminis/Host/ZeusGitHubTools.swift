@@ -303,9 +303,10 @@ private final class ZeusGitHubNoRedirect: NSObject, URLSessionTaskDelegate {
         for file in files {
             let path = file["path"] as! String
             if file["delete"] as? Bool == true { entries.append(["path": path, "mode": "100644", "type": "blob", "sha": NSNull()]); continue }
-            let result = try await request(accountID: accountID, method: "POST", path: prefix + "/git/blobs", body: ["content": file["content"] as! String, "encoding": "utf-8"])
-            guard let sha = (result["data"] as? [String: Any])?["sha"] as? String else { throw ZeusPatch.failure("GitHub did not confirm the source blob. Inspect the result before retrying.") }
-            entries.append(["path": path, "mode": "100644", "type": "blob", "sha": sha])
+            // Git Trees accepts inline UTF-8 content and creates its blobs on
+            // the server. Batch every file into one request instead of making
+            // a separate network round trip per source file.
+            entries.append(["path": path, "mode": "100644", "type": "blob", "content": file["content"] as! String])
         }
         let tree = try await request(accountID: accountID, method: "POST", path: prefix + "/git/trees", body: ["base_tree": baseTree, "tree": entries])
         guard let treeSHA = (tree["data"] as? [String: Any])?["sha"] as? String else { throw ZeusPatch.failure("GitHub did not confirm the source tree.") }

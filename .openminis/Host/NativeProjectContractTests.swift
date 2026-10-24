@@ -195,6 +195,12 @@ import UIKit
         XCTAssertTrue(commitReceipt.contains("written_directly_to_github"))
         let read = try await client.readSource(accountID: "first", repository: "fixture-owner/project", branch: "feature/project", path: "App.swift")
         XCTAssertEqual(read["content"] as? String, source)
+        let requests = try await client.object(accountID: "first", path: "/requests")
+        let recorded = requests["requests"] as? [[String: Any]] ?? []
+        let treeWrites = recorded.filter { ($0["path"] as? String)?.hasSuffix("/git/trees") == true }
+        let postedFiles = (treeWrites.last?["body"] as? [String: Any])?["tree"] as? [[String: Any]]
+        XCTAssertEqual(postedFiles?.count, 2, "Source files should be batched into one Git Trees request")
+        XCTAssertEqual(postedFiles?.first?["content"] as? String, source)
         XCTAssertThrowsError(try ZeusGitHubTools.sourcePath("../escape.swift"))
         _ = try await runtime.githubProjectRequest(["account_id": "first", "method": "POST", "path": "/repos/fixture-owner/project/actions/workflows/ci.yml/dispatches", "body": ["ref": "feature/project"]], session: sid, client: client)
         let sha = String(repeating: "1", count: 40)
