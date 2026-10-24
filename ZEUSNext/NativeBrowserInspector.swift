@@ -50,7 +50,7 @@ import WebKit
             if(v instanceof ArrayBuffer||ArrayBuffer.isView(v))return {bytes:v.byteLength,binary_preview_only:true};
             if(v&&typeof v==='object'){if(seen.has(v))return '[Circular]';seen.add(v);}return v;
           }) ?? 'null';
-          const keyEncoded=JSON.stringify(cursor.key), row={key:keyEncoded.length>2000?keyEncoded.slice(0,2000):cursor.key,key_truncated:keyEncoded.length>2000,value_preview:encoded.slice(0,4000),value_truncated:encoded.length>4000};
+          const keyEncoded=JSON.stringify(cursor.key), row={key:keyEncoded.length>2000?keyEncoded.slice(0,2000):JSON.parse(keyEncoded),key_truncated:keyEncoded.length>2000,value_preview:encoded.slice(0,4000),value_truncated:encoded.length>4000};
           while(JSON.stringify(row).length>8000&&row.value_preview.length>128){row.value_preview=row.value_preview.slice(0,Math.floor(row.value_preview.length/2));row.value_truncated=true;}
           if(records.length&&JSON.stringify(records).length+JSON.stringify(row).length>10000){resolve({database,store,offset,records,next_offset:offset+records.length,has_more:true,read_only:true});return;}
           records.push(row);cursor.continue();
