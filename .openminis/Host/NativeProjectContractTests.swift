@@ -33,6 +33,15 @@ import UIKit
         }
         XCTFail("Inline plan approval did not appear")
     }
+    func testPersistentPathsRemainAvailableWithoutAnAppGroupEntitlement() throws {
+        let container = SharedContainerStore.containerURLForMainAppStorage
+        XCTAssertTrue(FileManager.default.fileExists(atPath: container.path))
+        XCTAssertTrue(AIChatViewModel.minisAppGroupRoot.path.hasPrefix(container.path + "/"))
+        XCTAssertTrue(AIChatViewModel.minisConfigRoot.path.hasPrefix(container.path + "/"))
+        if !SharedContainerStore.hasAppGroupAccess {
+            XCTAssertEqual(container.lastPathComponent, "MinisSharedContainer", "Keep the exact previously installed fallback to preserve user data")
+        }
+    }
     func testOfficialGeminiTransportCarriesNestedSchemasVisionAndNativeToolRepair() async throws {
         let provider = GeminiAgentProvider(provider: GeminiProvider(apiKey: "local-fixture-only", customBasePath: "http://127.0.0.1:8765/gemini-fixture"))
         let image = UIGraphicsImageRenderer(size: CGSize(width: 16, height: 16)).image { ctx in
