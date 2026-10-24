@@ -53,7 +53,7 @@ project.targets.each do |item|
     config.build_settings['LD_MAP_FILE_PATH'] = '$(TARGET_TEMP_DIR)/$(PRODUCT_NAME)-LinkMap-$(CURRENT_ARCH).txt'
   end
 end
-%w[ZEUSNativeIntegration.swift ZeusToolPermissions.swift ZeusDefaultSkills.swift ZeusAgentSchemas.swift ZeusPatch.swift ZeusAgentHarness.swift ZeusConnections.swift ZeusGitHubAuthorization.swift].each do |name|
+%w[ZEUSNativeIntegration.swift ZeusToolPermissions.swift ZeusDefaultSkills.swift ZeusAgentSchemas.swift ZeusPatch.swift ZeusAgentHarness.swift ZeusConnections.swift ZeusGitHubAuthorization.swift ZeusProjectContract.swift ZeusGitHubTools.swift ZeusStorageExplorer.swift ZeusTaskDashboard.swift].each do |name|
   bridge = project.main_group.new_file((native + 'src/ios' + name).to_s)
   app.source_build_phase.add_file_reference(bridge)
 end
@@ -92,8 +92,8 @@ app.build_configurations.each do |config|
   config.build_settings['CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]'] = 'ZeusSimulator.entitlements'
   config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'tools.rea.ZEUSBrowserAnalysis'
   config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '18.1'
-  config.build_settings['MARKETING_VERSION'] = '2.9.1'
-  config.build_settings['CURRENT_PROJECT_VERSION'] = '15'
+  config.build_settings['MARKETING_VERSION'] = '3.1.0'
+  config.build_settings['CURRENT_PROJECT_VERSION'] = '26'
   config.build_settings['INFOPLIST_KEY_CFBundleDisplayName'] = 'ZEUS'
 end
 # A device `build` (unlike archive/install) did not strip the original app's
@@ -123,6 +123,7 @@ tests.add_dependency(app)
 tests.add_dependency(target)
 tests.frameworks_build_phase.add_file_reference(target.product_reference)
 tests.source_build_phase.add_file_reference(group.new_file((browser + '.openminis/Host/NativeBrowserIntegrationTests.swift').to_s))
+tests.source_build_phase.add_file_reference(group.new_file((browser + '.openminis/Host/NativeProjectContractTests.swift').to_s))
 tests.build_configurations.each do |config|
   app_config = app.build_configurations.find { |candidate| candidate.name == config.name }
   %w[HEADER_SEARCH_PATHS FRAMEWORK_SEARCH_PATHS LIBRARY_SEARCH_PATHS].each do |key|

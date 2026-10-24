@@ -7,10 +7,11 @@ name: ZEUS native browser integration tests
     - feature/zeus-project-agent-20261023
     - feature/zeus-direct-integrations-20261023
     - feature/zeus-native-agent-harness-20261023
+    - feature/zeus-project-contract-20261024
     paths:
     - ZEUSNext/**
     - .openminis/**
-    - .zeus-ci/fixture_server.py
+    - .zeus-ci/**
     - .github/workflows/zeus-native-integration.yml
   workflow_dispatch:
     inputs:
@@ -42,8 +43,8 @@ jobs:
         git -C browser rev-parse HEAD > results/browser-commit.txt
     - uses: actions/checkout@v4
       with:
-        repository: naruto00o9n-max/OpenMinis
-        ref: 6339bfcb25190ebf80fd03086c4ead81cf9428ba
+        repository: OpenMinis/OpenMinis
+        ref: b4c0661d5631ebab4d1a2e6f3fd4c805d4030a6c
         path: upstream
         submodules: recursive
         persist-credentials: false
@@ -53,6 +54,10 @@ jobs:
     - name: Test original UI adapters and actual iSH hostname handling
       timeout-minutes: 4
       run: ZEUS_OPENMINIS_SOURCE="$PWD/upstream" python3 -m unittest discover -v -s browser/.openminis -p 'test_*.py'
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.25.0'
+        cache-dependency-path: upstream/deps/rclone-mobile/go.sum
     - name: Prepare the original source for the simulator SDK
       run: |
         test "$(uname -m)" = arm64
@@ -72,7 +77,7 @@ jobs:
           upstream/deps/resources
           upstream/deps/frameworks
           upstream/deps/lame-build
-        key: openminis-6339bfcb-simulator-arm64-xcode263-v3-uname
+        key: openminis-b4c0661-simulator-arm64-xcode263-v2-114-hook-inode
     - name: Build the actual native dependencies and Linux rootfs
       if: steps.native.outputs.cache-hit != 'true'
       working-directory: upstream
@@ -82,6 +87,7 @@ jobs:
         bash deps/build_ffmpeg.sh 2>&1 | tee ../results/ffmpeg.log
         bash deps/build_ish.sh 2>&1 | tee ../results/ish.log
         bash deps/prepare_alpine_rootfs.sh 2>&1 | tee ../results/rootfs.log
+        bash deps/build_rclone_ios.sh 2>&1 | tee ../results/rclone.log
     - uses: actions/cache/save@v4
       if: steps.native.outputs.cache-hit != 'true'
       with:
@@ -91,7 +97,7 @@ jobs:
           upstream/deps/resources
           upstream/deps/frameworks
           upstream/deps/lame-build
-        key: openminis-6339bfcb-simulator-arm64-xcode263-v3-uname
+        key: openminis-b4c0661-simulator-arm64-xcode263-v2-114-hook-inode
     - name: Verify unchanged original application source
       run: python3 browser/.openminis/verify_source.py upstream results/original-source.json
     - name: Embed the original native application in the browser

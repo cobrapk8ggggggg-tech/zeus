@@ -14,8 +14,12 @@ def verify(checkout: Path, manifest: Path) -> int:
         file = checkout / name
         if not file.is_file() or hashlib.sha256(file.read_bytes()).hexdigest() != adapters.get(name, expected):
             differences.append(name)
+    for name, expected in report.get("dependencyAdaptersSHA256", {}).items():
+        file = checkout / name
+        if not file.is_file() or hashlib.sha256(file.read_bytes()).hexdigest() != expected:
+            differences.append(name)
     if differences:
-        raise RuntimeError("Reference application source changed: " + ", ".join(differences))
+        raise RuntimeError("Reference application/dependency source changed: " + ", ".join(differences))
     return len(original) - len(adapters)
 
 

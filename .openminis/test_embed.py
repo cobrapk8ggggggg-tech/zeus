@@ -34,6 +34,7 @@ class NativeEmbeddingTests(unittest.TestCase):
             (browser / "ZEUSNext").mkdir()
             shutil.copyfile(HERE.parent / "ZEUSNext/ZEUSNextApp.swift", browser / "ZEUSNext/ZEUSNextApp.swift")
             shutil.copyfile(HERE / "arabic-overrides.json", browser / ".openminis/arabic-overrides.json")
+            shutil.copyfile(HERE / "arabic-base.json", browser / ".openminis/arabic-base.json")
             report = root / "adapters.json"
             revision = json.loads((HERE / "source.lock.json").read_text())["commit"]
             with patch.object(MODULE.subprocess, "check_output", return_value=revision + "\n"):
@@ -44,7 +45,7 @@ class NativeEmbeddingTests(unittest.TestCase):
             # addition to the existing permission card and app-group constants.
             for file in (UPSTREAM / "src/ios/Views").rglob("*.swift"):
                 relative = file.relative_to(UPSTREAM / "src/ios")
-                if str(relative) in {"Views/Chat/OffloadPermissionDialog.swift", "Views/Chat/AIChatView.swift", "Views/Chat/ToolLiveSheet.swift", "Views/Settings/OffloadPermissionSettingsView.swift", "Views/Chat/SelectableMarkdownView.swift"}:
+                if str(relative) in {"Views/Chat/OffloadPermissionDialog.swift", "Views/Chat/AIChatView.swift", "Views/Chat/ToolLiveSheet.swift", "Views/Settings/OffloadPermissionSettingsView.swift", "Views/Chat/SelectableMarkdownView.swift", "Views/Settings/StorageManagementView.swift"}:
                     continue
                 expected = file.read_text().replace("group.com.openminis.app", "group.tools.zeus.openminis").replace("iCloud.com.openminis.app", "iCloud.tools.zeus.openminis")
                 if str(relative) == "Views/ContentView.swift":
@@ -74,6 +75,10 @@ class NativeEmbeddingTests(unittest.TestCase):
                 for tool in ("Shell", "Editor", "Browser", "Memory"):
                     expected = expected.replace('return "Minis is using ' + tool + '"', 'return String(localized: "Minis is using ' + tool + '")')
                 self.assertEqual((native / "src/ios" / relative).read_text(), expected, str(relative))
+            storage = (native / "src/ios/Views/Settings/StorageManagementView.swift").read_text()
+            self.assertIn("ZeusStorageCategoryView(category: label)", storage)
+            self.assertIn("ZeusStorageDirectoryView(root: minisURL)", storage)
+            self.assertTrue((native / "src/ios/ZeusStorageExplorer.swift").exists())
             original_store = (UPSTREAM / "src/ios/Agent/Chat/ChatStore.swift").read_text()
             adapted_store = (native / "src/ios/Agent/Chat/ChatStore.swift").read_text()
             # Storage/protocol/sync methods after UI conversion remain untouched.
@@ -86,6 +91,10 @@ class NativeEmbeddingTests(unittest.TestCase):
             self.assertIn("ContentView()", (native / "src/ios/ZEUSNativeIntegration.swift").read_text())
             self.assertIn("return model", (browser / ".openminis/build/BrowserFixtureFactory.swift").read_text())
             localized = json.loads((native / "src/ios/Localizable.xcstrings").read_text())["strings"]
+            base = json.loads((HERE / "arabic-base.json").read_text())["localizations"]
+            self.assertGreater(len(base), 1700)
+            self.assertTrue(all("ar" in localized[key].get("localizations", {}) for key in base if key in localized))
+            self.assertTrue(all("ar" in entry.get("localizations", {}) for entry in localized.values()))
             self.assertFalse(any(entry.get("localizations", {}).get("ar", {}).get("stringUnit", {}).get("value") == "خيار" for entry in localized.values()))
             for key, entry in localized.items():
                 self.assertLessEqual(set(entry.get("localizations", {})), {"ar"})
