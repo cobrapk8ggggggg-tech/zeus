@@ -45,6 +45,10 @@ enum ZeusStorageFiles {
             }
         }
         try FileManager.default.removeItem(at: url)
+        let guestRoot = RootfsManager.shared.dataPath.resolvingSymlinksInPath().standardizedFileURL.path
+        if path.hasPrefix(guestRoot + "/") {
+            RootfsManager.shared.removeFakefsPath(String(path.dropFirst(guestRoot.count)))
+        }
     }
     static func failure(_ text: String) -> NSError { NSError(domain: "ZeusStorage", code: 1, userInfo: [NSLocalizedDescriptionKey: text]) }
     static func format(_ bytes: Int64) -> String { ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file) }
@@ -60,6 +64,8 @@ enum ZeusStorageFiles {
         // WebKit databases are live; use the browser's per-site data manager.
         paths.append(library.appendingPathComponent("WebKit"))
         paths.append(library.appendingPathComponent("HTTPStorages"))
+        let shell = documents.appendingPathComponent("alpine-rootfs")
+        paths += ["meta.db", "meta.db-wal", "meta.db-shm", ".arch"].map { shell.appendingPathComponent($0) }
         let active = SessionActivityTracker.shared.activeSessions
         if !active.isEmpty { paths.append(documents.appendingPathComponent("alpine-rootfs")) }
         paths += active.map { library.appendingPathComponent("MinisChat/minis/" + $0) }
