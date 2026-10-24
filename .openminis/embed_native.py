@@ -340,6 +340,19 @@ def embed(native, browser, report):
     replace(source / "Views/Chat/AssistantBlockView.swift", 'case .browserTool:   toolName = "browser_use"',
         'case .browserTool:   toolName = block.zeusIsUserBrowser ? "zeus_browser" : "browser_use"')
 
+    # Original 1.14 Debug statistics mix UInt64/Double ternaries in one large
+    # dictionary. Assign explicitly typed fields to bound Swift's solver work.
+    debug_rpc = source / "Debug/DebugJSONRPC.swift"
+    code = debug_rpc.read_text()
+    start = code.index('        return [\n            "clusterCalls": calls,')
+    end = code.index('\n        ]', start) + len('\n        ]')
+    original_stats = code[start:end]
+    assignments = []
+    for line in original_stats.splitlines()[1:-1]:
+        key, value = line.strip().rstrip(',').split(': ', 1)
+        assignments.append('        stats[' + key + '] = ' + value)
+    replace(debug_rpc, original_stats, '        var stats: [String: Any] = [:]\n' + '\n'.join(assignments) + '\n        return stats')
+
     # Existing DEBUG RPC only, restricted to explicit isolated fixture launches.
     # These cases are compiled out of Release together with the upstream server.
     replace(source / "Debug/DebugJSONRPC.swift", '        case "rpc.discover":', '''        case "zeus.fixture.permission":
