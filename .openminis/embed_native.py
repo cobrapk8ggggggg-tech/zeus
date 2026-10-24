@@ -80,6 +80,8 @@ def embed(native, browser, report):
     replace(storage, '            Text(label)\n', '            Text(ZeusStorageScope.title(label))\n')
     replace(storage, '                .foregroundStyle(.secondary)\n        }\n    }\n}\n\n// MARK: - Session Storage Detail View', '                .foregroundStyle(.secondary)\n        }\n        }\n    }\n}\n\n// MARK: - Session Storage Detail View')
     replace(storage, 'FileBrowserView(rootPath: minisURL)', 'ZeusStorageDirectoryView(root: minisURL)')
+    replace(storage, '.disabled(!hasFiles || isClearing)', '.disabled(!hasFiles || isClearing || !SessionActivityTracker.shared.activeSessions.isDisjoint(with: Set([session.id] + session.descendantIds)))')
+    replace(storage, '    private func clearFiles() {\n        isClearing = true', '    private func clearFiles() {\n        guard SessionActivityTracker.shared.activeSessions.isDisjoint(with: Set([session.id] + session.descendantIds)) else { return }\n        isClearing = true')
 
     # Reuse the exact native settings sheet from the browser's AI settings row.
     # Only its file-private visibility changes; its body is untouched.

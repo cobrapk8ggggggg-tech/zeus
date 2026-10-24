@@ -241,8 +241,11 @@ struct ZeusStorageConversationsView: View {
                 guard let session = pending else { return }
                 pending = nil
                 Task {
-                    let descendants = await ChatStore.shared.childSessionIds(of: session.id)
-                    if !SessionActivityTracker.shared.activeSessions.isDisjoint(with: Set([session.id] + descendants)) {
+                    let all = await ChatStore.shared.listSessions()
+                    var children: [String: [String]] = [:]
+                    for item in all { if let parent = item.parentSessionId { children[parent, default: []].append(item.id) } }
+                    let family = SessionTree.withDescendants([session.id]) { children[$0] ?? [] }
+                    if !SessionActivityTracker.shared.activeSessions.isDisjoint(with: Set(family)) {
                         error = "أوقف المهمة النشطة قبل حذف المحادثة."
                     } else {
                         await ChatStore.shared.deleteSession(session.id)
