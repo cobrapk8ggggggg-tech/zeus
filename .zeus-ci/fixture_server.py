@@ -108,6 +108,23 @@ class Handler(BaseHTTPRequestHandler):
                 data = json.dumps(result).encode()
                 self.send_response(200); self.send_header('Content-Type', 'application/json'); self.send_header('Content-Length', str(len(data))); self.end_headers(); self.wfile.write(data); return
             body = json.loads(raw)
+            if self.path.startswith('/gemini-fixture/models/'):
+                if 'streamGenerateContent' not in self.path or 'alt=sse' not in self.path: raise ValueError('Expected the official Gemini streaming endpoint')
+                declarations = body.get('tools', [{}])[0].get('functionDeclarations', [])
+                plan = next(d for d in declarations if d.get('name') == 'propose_project_plan')
+                shape = plan.get('parametersJsonSchema', {}).get('properties', {}).get('proposal', {})
+                if shape.get('type') != 'object' or shape.get('properties', {}).get('checks', {}).get('type') != 'array': raise ValueError('Gemini lost nested JSON schema')
+                contents = body.get('contents', [])
+                parts = [p for c in contents for p in c.get('parts', [])]
+                if not any(p.get('inlineData', {}).get('mimeType') == 'image/png' and p['inlineData'].get('data') for p in parts): raise ValueError('Native vision pixels were not delivered')
+                if not any(p.get('functionResponse', {}).get('name') == 'read_image' for p in parts): raise ValueError('Native tool result was not delivered')
+                expected = {'mode': 'ANY', 'allowedFunctionNames': ['propose_project_plan']}
+                if body.get('toolConfig', {}).get('functionCallingConfig') != expected: raise ValueError('Gemini repair must select only the advertised function')
+                proposal = backend_proposal('gemini-native-wire', 'test value = value')
+                proposal['checks'][-1]['covers'] = ['*']
+                event = {'candidates': [{'content': {'role': 'model', 'parts': [{'functionCall': {'name': 'propose_project_plan', 'args': {'proposal': proposal}}}]}, 'finishReason': 'STOP'}]}
+                encoded = ('data: ' + json.dumps(event) + '\n\n').encode()
+                self.send_response(200); self.send_header('Content-Type', 'text/event-stream'); self.send_header('Content-Length', str(len(encoded))); self.end_headers(); self.wfile.write(encoded); return
             if self.path.startswith('/mcp-fixture/'):
                 account = self.path.rsplit('/', 1)[-1]
                 if self.headers.get('Authorization') != 'Bearer fixture-' + account:

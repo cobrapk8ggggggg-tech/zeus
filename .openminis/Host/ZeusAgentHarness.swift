@@ -24,6 +24,7 @@ import CryptoKit
         var ledger: [String: String] = [:]
         var commands: [String: String]? = [:]
         var project: ZeusProjectContract?
+        var lastEnvironment: ZeusProjectContract.Environment?
         var toolTextRepairs: Int?
     }
     struct Job: Identifiable {
@@ -212,6 +213,9 @@ import CryptoKit
     }
     func execute(_ name: String, args: [String: Any], callID: String, vm: AIChatViewModel) async throws -> String {
         guard let session = vm.sessionId else { throw ZeusPatch.failure("No active conversation.") }
+        if name == "propose_project_plan", isUtilityTask(session: session) {
+            return try Self.json(["project_plan_required": false, "next": "This is a utility/script task. Execute the requested tools directly, without a project approval card. A simple update_plan checklist is optional."])
+        }
         guard let shape = ZeusAgentSchemas.schema(name) else { throw ZeusPatch.failure("Unknown native runtime tool.") }
         try ZeusAgentSchemas.validate(args, schema: shape)
         try projectGate(tool: name, args: args, session: session)

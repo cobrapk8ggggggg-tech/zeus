@@ -4,7 +4,9 @@ import CoreFoundation
 /// The original tool model advertises primitive types. Enforce those types for
 /// every registered tool, not only WebKit operations, before it gets permission.
 enum ZeusToolInput {
-    static func normalize(name: String, args: [String: Any], tools: [AgentToolDefinition]) throws -> [String: Any] {
+    static func normalize(name: String, args: [String: Any], tools: [AgentToolDefinition], utility: Bool = false) throws -> [String: Any] {
+        if name == "propose_project_plan", utility { return args } // Harmless no-op; the runtime explains that scripts need no project card.
+        let args = name == "propose_project_plan" ? ZeusProjectContract.normalizedArguments(args) : args
         if let schema = ZeusAgentSchemas.schema(name) { try ZeusAgentSchemas.validate(args, schema: schema); return args }
         guard let definition = tools.first(where: { $0.name == name }) else { return args }
         var result = args
@@ -101,6 +103,7 @@ enum ZeusPermissionMode: String, CaseIterable {
         try Task.checkCancellation()
         var plan: ZeusProjectContract.Proposal?
         if tool == "propose_project_plan" {
+            if ZeusAgentHarness.shared.isUtilityTask(session: sessionID) { return }
             guard let sessionID else { throw ZeusPatch.failure("No project conversation.") }
             let proposal = try ZeusProjectContract.decoded(args)
             let current = ZeusAgentHarness.shared.state(sessionID).project

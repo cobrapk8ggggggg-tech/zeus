@@ -12,9 +12,9 @@ enum ZeusAgentSchemas {
         case "project_environment": break
         case "propose_project_plan":
             let text: [String: Any] = ["type": "string", "minLength": 1, "maxLength": 240]
-            let identifier: [String: Any] = ["type": "string", "pattern": "^[a-z][a-z0-9_-]{0,39}$"]
+            let identifier: [String: Any] = ["type": "string", "minLength": 1, "maxLength": 80, "description": "A unique stable identifier. Reuse a feature id exactly in checks.covers; these IDs are bookkeeping, not filenames."]
             let feature: [String: Any] = ["type": "object", "properties": ["id": identifier, "title": text], "required": ["id", "title"], "additionalProperties": false]
-            let criterion: [String: Any] = ["type": "object", "properties": ["id": identifier, "title": text, "kind": ["type": "string", "enum": ["build", "functional", "ui", "quality"]], "covers": ["type": "array", "maxItems": 20, "items": identifier], "command": ["type": "string", "maxLength": 2000], "github_job": text, "github_step": text, "artifact": text, "screenshot_path": ["type": "string", "maxLength": 500]], "required": ["id", "title", "kind", "covers"], "additionalProperties": false]
+            let criterion: [String: Any] = ["type": "object", "properties": ["id": identifier, "title": text, "kind": ["type": "string", "enum": ["build", "functional", "ui", "quality"]], "covers": ["type": "array", "maxItems": 20, "items": identifier, "description": "Exact proposal.features[].id values tested by this functional/UI check. Example: features=[{id:offline,title:Offline playback}], covers=[offline]. Do not put check IDs, filenames or command names here. Use [*] explicitly to cover all features."], "command": ["type": "string", "maxLength": 2000], "github_job": ["type": "string", "description": "Planned GitHub Actions job display name, matching jobs.<key>.name (or key when no name). Not a numeric job ID."], "github_step": ["type": "string", "description": "Planned exact step name in that workflow. Create the workflow with this explicit name and actual build/test command."], "artifact": ["type": "string", "description": "Planned uploaded artifact name for app build/UI screenshots; create a real upload-artifact step with this name."], "screenshot_path": ["type": "string", "maxLength": 500, "description": "Local path to the actual app screenshot after artifact download/extraction, for read_image review."]], "required": ["id", "title", "kind", "covers"], "additionalProperties": false]
             let list: [String: Any] = ["type": "array", "minItems": 1, "maxItems": 20, "items": text]
             let proposal: [String: Any] = ["type": "object", "properties": ["title": text, "objective": ["type": "string", "minLength": 1, "maxLength": 2000], "platform": ["type": "string", "enum": ["ios", "android", "web", "backend", "other"]], "features": ["type": "array", "minItems": 1, "maxItems": 20, "items": feature], "architecture": list, "steps": list, "checks": ["type": "array", "minItems": 2, "maxItems": 20, "items": criterion], "deliverables": list, "assumptions": ["type": "array", "maxItems": 15, "items": text], "design_reference_notes": ["type": "array", "maxItems": 20, "items": text], "build_route": ["type": "string", "enum": ["local", "github_actions"]], "github_account_id": ["type": "string"], "repository": ["type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"], "branch": text, "workflow": ["type": "string", "pattern": "^\\.github/workflows/[A-Za-z0-9_.-]+\\.ya?ml$"]], "required": ["title", "objective", "platform", "features", "architecture", "steps", "checks", "deliverables", "assumptions", "build_route"], "additionalProperties": false]
             fields["proposal"] = proposal; requiredFields = ["proposal"]
@@ -179,6 +179,13 @@ enum ZeusToolRecovery {
               let match = expression.firstMatch(in: input, range: NSRange(input.startIndex..., in: input)),
               let range = Range(match.range(at: 1), in: input) else { return nil }
         let name = String(input[range]); return tools.contains(name) ? name : nil
+    }
+    static func forcedGeminiTool(_ contents: [[String: Any]], tools: [[String: Any]]) -> String? {
+        guard let last = contents.last, last["role"] as? String == "user",
+              let parts = last["parts"] as? [[String: Any]], let text = parts.first?["text"] as? String,
+              text.hasPrefix(marker) else { return nil }
+        let name = String(text.dropFirst(marker.count).prefix(while: { $0 != "\n" }))
+        return tools.contains(where: { $0["name"] as? String == name }) ? name : nil
     }
     static func forcedTool(_ messages: [AgentMessage], available: Set<String>) -> String? {
         guard let last = messages.last, last.role == .user,

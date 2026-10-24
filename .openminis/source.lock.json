@@ -1,6 +1,6 @@
 {
-  "repository": "https://github.com/naruto00o9n-max/OpenMinis.git",
-  "commit": "6339bfcb25190ebf80fd03086c4ead81cf9428ba",
+  "repository": "https://github.com/OpenMinis/OpenMinis.git",
+  "commit": "b4c0661d5631ebab4d1a2e6f3fd4c805d4030a6c",
   "integration": "native-source",
   "referenceBundleIdentifier": "com.openminis.app"
 }

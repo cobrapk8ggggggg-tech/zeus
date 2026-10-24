@@ -21,8 +21,8 @@ jobs:
         git -C browser rev-parse HEAD > results/browser-commit.txt
     - uses: actions/checkout@v4
       with:
-        repository: naruto00o9n-max/OpenMinis
-        ref: 6339bfcb25190ebf80fd03086c4ead81cf9428ba
+        repository: OpenMinis/OpenMinis
+        ref: b4c0661d5631ebab4d1a2e6f3fd4c805d4030a6c
         path: upstream
         submodules: recursive
         persist-credentials: false

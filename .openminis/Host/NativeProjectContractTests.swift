@@ -33,6 +33,73 @@ import UIKit
         }
         XCTFail("Inline plan approval did not appear")
     }
+    func testOfficialGeminiTransportCarriesNestedSchemasVisionAndNativeToolRepair() async throws {
+        let provider = GeminiAgentProvider(provider: GeminiProvider(apiKey: "local-fixture-only", customBasePath: "http://127.0.0.1:8765/gemini-fixture"))
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 16, height: 16)).image { ctx in
+            UIColor.blue.setFill(); ctx.fill(CGRect(x: 0, y: 0, width: 16, height: 16))
+        }.pngData()!
+        let messages = [
+            AgentMessage(role: .user, parts: [.text("Inspect the actual attached design"), .imageData(data: image, mimeType: "image/png")]),
+            AgentMessage(role: .assistant, parts: [.toolUse(id: "image-read", name: "read_image", input: ["path": "/var/minis/workspace/design.png"])]),
+            AgentMessage(role: .user, parts: [.toolResult(id: "image-read", name: "read_image", content: "Image loaded", isError: false, imageData: image, imageMimeType: "image/png")]),
+            AgentMessage(role: .user, parts: [.text(ZeusToolRecovery.marker + "propose_project_plan\nUse a real native function call.")])
+        ]
+        let tools = ZeusAgentHarness.definitions
+        let stream = try await provider.streamAgentMessage(messages: messages, systemPrompt: "You are the embedded ZEUS agent.", tools: tools, maxTokens: 4000, thinkingLevel: .off)
+        var complete = false
+        for try await event in stream {
+            if case .toolCallComplete(_, let name, let raw, _) = event {
+                XCTAssertEqual(name, "propose_project_plan")
+                let args = ZeusProjectContract.normalizedArguments(raw)
+                try ZeusAgentSchemas.validate(args, schema: ZeusAgentSchemas.schema(name)!)
+                try ZeusProjectContract.validate(ZeusProjectContract.decoded(args))
+                complete = true
+            }
+        }
+        XCTAssertTrue(complete, "Official Gemini must produce a parsed native call, not visible JSON")
+    }
+    func testSmallUtilityScriptsNeverBecomeMandatoryProjects() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let runtime = ZeusAgentHarness(root: root), vm = AIChatViewModel()
+        vm.sessionId = UUID().uuidString
+        let session = try XCTUnwrap(vm.sessionId)
+        runtime.registerUserRequest("اكتب سكربت بايثون لقراءة ملف JSON، بدون اقتراح ابدأ تنفيذ", session: session)
+        XCTAssertNil(runtime.state(session).project)
+        _ = try await runtime.projectEnvironment(vm: vm)
+        XCTAssertNil(runtime.state(session).project, "Read-only environment discovery must not create a project")
+        XCTAssertNoThrow(try runtime.projectGate(tool: "file_write", args: ["path": "inspect.py", "content": "print('ok')"], session: session))
+        let result = try await runtime.execute("propose_project_plan", args: [:], callID: "utility-plan", vm: vm)
+        XCTAssertTrue(result.contains("project_plan_required"))
+        XCTAssertNil(runtime.state(session).project)
+    }
+    func testPlanBookkeepingRepairsEquivalentProviderShapesWithoutInventingChecks() throws {
+        var raw = try proposal()
+        raw["features"] = ["Stores the correct value"]
+        raw["steps"] = [["step": "Implement project"], ["step": "Build and verify"]]
+        raw.removeValue(forKey: "assumptions")
+        raw["checks"] = [
+            ["title": "Build", "type": "compile", "command": "test -s value.txt"],
+            ["title": "Value", "type": "test", "feature_ids": ["Stores the correct value"], "command": "test value = value"]
+        ]
+        let args = ZeusProjectContract.normalizedArguments(raw)
+        try ZeusAgentSchemas.validate(args, schema: ZeusAgentSchemas.schema("propose_project_plan")!)
+        let decoded = try ZeusProjectContract.decoded(args)
+        try ZeusProjectContract.validate(decoded)
+        XCTAssertEqual(decoded.features.first?.id, "f1")
+        XCTAssertEqual(decoded.checks.last?.covers, ["f1"])
+        XCTAssertEqual(decoded.checks.count, 2)
+        var invalid = try proposal()
+        invalid["checks"] = [
+            ["id": "build", "title": "Build", "kind": "build", "covers": [String](), "command": "test -s value.txt"],
+            ["id": "test", "title": "Value", "kind": "functional", "covers": ["wrong-id"], "command": "test value = value"]
+        ]
+        XCTAssertThrowsError(try ZeusProjectContract.validate(ZeusProjectContract.decoded(["proposal": invalid]))) { error in
+            XCTAssertTrue(error.localizedDescription.contains("wrong-id"))
+            XCTAssertTrue(error.localizedDescription.contains("value"))
+            XCTAssertTrue(error.localizedDescription.contains("covers"))
+        }
+    }
     func testProseToolJSONIsNeverExecutedAndRecoveryIsBoundedAndSelectsOnlyAnAdvertisedTool() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -242,7 +309,7 @@ import UIKit
         vm.messages = [ChatMessage(role: .assistant, content: "", blocks: [block])]
         let call = AIChatViewModel.StreamResult.ToolEntry(id: "review-ui", name: "read_image", args: ["path": imagePath], blockIdx: 0, metadata: nil, inputChunkRing: [])
         let outcome = await vm.executeSingleToolUse(tu: call, msgIdx: 0, tools: vm.makeAgentTools(), batchBudget: AIChatViewModel.BatchImageBudget(initial: 1))
-        if case .toolResult(_, _, let content, let isError, let image, _, _, _) = outcome.resultPart {
+        if case .toolResult(_, _, let content, let isError, let image, _, _, _, _) = outcome.resultPart {
             XCTAssertFalse(isError, content); XCTAssertNotNil(image)
         } else { XCTFail("Actual read_image must deliver pixels") }
         XCTAssertEqual(runtime.state(sid).project?.reviewedImageCommits?[imagePath], sha)

@@ -83,8 +83,10 @@ def embed(native, browser, report):
             parameters["approval_reason"] = AgentToolParam(type: .string, description: "For consequential actions, explain what you intend to change and why in the user language. The app displays this on an inline approval card.")
             return AgentToolDefinition(name: tool.name, description: tool.description, parameters: parameters, required: tool.required, propertyOrdering: tool.propertyOrdering)
         }""")
-    replace(definitions, 'description: "Control a web browser with up to 3 tabs.',
-            'description: "This is the standalone Zeus automation browser, separate from the user\'s ZEUS tabs and browser profile. For the user\'s current page use zeus_browser_read; for existing tabs use zeus_browser_tabs; for user-browser navigation use zeus_browser_open. Other zeus_browser_* tools inspect its settings, cookies and storage. Control a web browser with up to 3 tabs.')
+    replace(definitions, "        if nativeVision || visionGroupConfigured {", "        if true { // read_image stays discoverable even before vision configuration.")
+    replace(definitions, "description: readImageDescription,", 'description: ((!nativeVision && !visionGroupConfigured) ? "Read a photo/screenshot with the native image pipeline. This selected model has no image input and no vision group is configured; the tool will report that exact configuration requirement. Select an image-capable model or configure the vision group before visual analysis." : readImageDescription) + " Photos never use FFmpeg or Python image packages in ZEUS. Video/audio processing is intentionally unavailable in this text edition.",')
+    replace(definitions, 'description: "Control a web browser with a few tabs (list_tabs shows the ones you may use).',
+            'description: "This is the standalone Zeus automation browser, separate from the user\'s ZEUS tabs and browser profile. For the user\'s current page use zeus_browser_read; for existing tabs use zeus_browser_tabs; for user-browser navigation use zeus_browser_open. Other zeus_browser_* tools inspect its settings, cookies and storage. Control a web browser with a few tabs (list_tabs shows the ones you may use).')
     execution = source / "Agent/Chat/AIChatViewModel+ConcurrentTools.swift"
     replace(execution, "        batchBudget: BatchImageBudget\n", "        batchBudget: BatchImageBudget,\n        zeusSourceMessageID: String? = nil\n")
     replace(source / "Agent/Chat/AIChatViewModel.swift",
@@ -125,7 +127,7 @@ def embed(native, browser, report):
     execution.write_text(parts[0] + adapter + anchor + parts[1] + ''.join('        case let name where name == "browser_use" || name == "zeus_browser" || zeusBrowserOperation(name) != nil:' + p for p in parts[2:]))
 
     replace(execution, "        do {\n        switch tu.name {", """        do {
-        let toolArgs = try ZeusToolInput.normalize(name: tu.name, args: toolArgs, tools: tools)
+        let toolArgs = try ZeusToolInput.normalize(name: tu.name, args: toolArgs, tools: tools, utility: ZeusAgentHarness.shared.isUtilityTask(session: sessionId))
         let argsJson = String(decoding: try JSONSerialization.data(withJSONObject: toolArgs), as: UTF8.self)
         if tu.name == "zeus_browser" || zeusBrowserOperation(tu.name) != nil { _ = try ZEUSNativeAgentBridge.normalizedInput(toolArgs, toolName: tu.name) }
         try ZeusAgentHarness.shared.projectGate(tool: tu.name, args: toolArgs, session: sessionId)
@@ -146,10 +148,10 @@ def embed(native, browser, report):
         '                if !(raw is String) && !(raw is NSNumber) && !(raw is [Any]) && !(raw is [String: Any]) { return true }')
     replace(source / "Agent/Chat/AIChatViewModel+ToolPreflight.swift", '        "file_edit": ["new_string"],',
         '        "file_edit": ["new_string"],\n        "zeus_browser_type": ["text"],')
-    replace(execution, 'tu.name == "file_write" || tu.name == "file_edit" {',
-        'tu.name == "file_write" || tu.name == "file_edit" || tu.name == "zeus_browser" || zeusBrowserOperation(tu.name) != nil || ZeusAgentSchemas.names.contains(tu.name) {')
-    replace(execution, '            let modelMessage = """\n            Error: This call was NOT executed.',
-        '            let modelMessage = (tu.name == "zeus_browser" || zeusBrowserOperation(tu.name) != nil) ? "Error: Browser call NOT executed: the provider truncated its arguments. Send a complete smaller call. Inspect the current page/state before retrying any mutation." : """\n            Error: This call was NOT executed.')
+    replace(execution, '        if let tag = truncationRepairTag,\n           tu.name == "file_write" || tu.name == "file_edit" {',
+        '        if let tag = truncationRepairTag,\n           tu.name == "file_write" || tu.name == "file_edit" || tu.name == "zeus_browser" || zeusBrowserOperation(tu.name) != nil || ZeusAgentSchemas.names.contains(tu.name) {')
+    replace(execution, '            let uiMessage = AppLocalized("Blocked: arguments were truncated in transit")\n            let modelMessage = """',
+        '            let uiMessage = AppLocalized("Blocked: arguments were truncated in transit")\n            let modelMessage = (tu.name == "zeus_browser" || zeusBrowserOperation(tu.name) != nil) ? "Error: Browser call NOT executed: the provider truncated its arguments. Send a complete smaller call. Inspect the current page/state before retrying any mutation." : """')
     replace(source / "Agent/Chat/AIChatViewModel.swift", "        var userSystemPrompt = baseSystemPrompt",
         '        var userSystemPrompt = baseSystemPrompt + "\\n\\n" + ZEUSNativeAgentBridge.context + ZeusAgentHarness.shared.context(session: sessionId)')
     replace(execution, "        let resultPart = AgentContentPart.toolResult(", "        ZeusAgentHarness.shared.observe(session: sessionId, tool: tu.name, success: toolSuccess, args: toolArgs, sourceWasTracked: zeusSourceTracked, imageDelivered: tu.name != \"read_image\" || toolImageData != nil || !self.activeModelHasNativeVision)\n        let resultPart = AgentContentPart.toolResult(")
@@ -162,8 +164,9 @@ def embed(native, browser, report):
                 if msgIdx >= 0, msgIdx < messages.count { messages[msgIdx].error = notice }
                 canResume = true; hitTurnLimit = false; break
             }''')
-    replace(source / "Agent/Chat/AIChatViewModel.swift", "            let contextHistory = effectiveAgentHistory()", "            userSystemPrompt = ZeusAgentHarness.shared.refreshContext(userSystemPrompt, session: sessionId)\n            let contextHistory = effectiveAgentHistory()")
-    replace(source / "Agent/Chat/AIChatViewModel.swift", "                userSystemPrompt = baseSystemPrompt", '                userSystemPrompt = baseSystemPrompt + "\\n\\n" + ZEUSNativeAgentBridge.context')
+    replace(source / "Agent/Chat/AIChatViewModel.swift", "            var contextHistory = effectiveAgentHistory()", "            userSystemPrompt = ZeusAgentHarness.shared.refreshContext(userSystemPrompt, session: sessionId)\n            var contextHistory = effectiveAgentHistory()")
+    replace(source / "Agent/Chat/AIChatViewModel.swift", "                userSystemPrompt = baseSystemPrompt\n", '                userSystemPrompt = baseSystemPrompt + "\\n\\n" + ZEUSNativeAgentBridge.context\n')
+    replace(source / "Agent/Chat/AIChatViewModel.swift", "userSystemPrompt = baseSystemPrompt + Self.modelPromptFragments(newEntry.model)", 'userSystemPrompt = baseSystemPrompt + Self.modelPromptFragments(newEntry.model) + "\\n\\n" + ZEUSNativeAgentBridge.context + ZeusAgentHarness.shared.context(session: sessionId)')
     file_tools = source / "Agent/Chat/AIChatViewModel+FileTools.swift"
     replace(file_tools, 'ISHExecutionCoordinator.shared.hostURL(for: linuxPath)', 'ISHExecutionCoordinator.shared.hostURL(for: linuxPath, sessionId: self.sessionId)')
     replace(file_tools, 'ISHExecutionCoordinator.shared.hostURL(for: path)', 'ISHExecutionCoordinator.shared.hostURL(for: path, sessionId: self.sessionId)')
@@ -204,6 +207,13 @@ def embed(native, browser, report):
     for method, responses in [("convertToolsChatCompletions", "false"), ("convertToolsResponsesAPI", "true")]:
         anchor = '    private func ' + method + '(_ tools: [AgentToolDefinition]) -> [[String: Any]] {\n        tools.map { tool in'
         replace(openai, anchor, anchor + '\n            if let native = ZeusAgentSchemas.openAI(tool.name, description: tool.description, responses: ' + responses + ') { return native }')
+    # Gemini's official native protocol uses toolConfig, never OpenAI tool_choice.
+    gemini = source / "Providers/Gemini/GeminiProvider.swift"
+    gemini_code = gemini.read_text()
+    config_anchor = '            body["toolConfig"] = ["functionCallingConfig": ["mode": "AUTO"]]'
+    if gemini_code.count(config_anchor) != 2:
+        raise RuntimeError("Gemini native function config anchor changed")
+    gemini.write_text(gemini_code.replace(config_anchor, config_anchor + '\n            if let name = ZeusToolRecovery.forcedGeminiTool(contents, tools: tools) {\n                body["toolConfig"] = ["functionCallingConfig": ["mode": "ANY", "allowedFunctionNames": [name]]]\n            }'))
     replace(source / "Providers/Gemini/GeminiAgentProvider.swift", '                parameters: params\n', '                parameters: ZeusAgentSchemas.schema(tool.name).map(ZeusAgentSchemas.gemini) ?? params\n')
     replace(source / "Providers/Antigravity/AntigravityAgentProvider.swift", '                parameters: params\n', '                parameters: ZeusAgentSchemas.schema(tool.name).map(ZeusAgentSchemas.gemini) ?? params\n')
     replace(source / "Providers/Gemini/GeminiProvider.swift", '''        [

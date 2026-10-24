@@ -76,16 +76,17 @@ struct ZeusProjectContract: Codable {
     static func isProjectRequest(_ text: String) -> Bool {
         let text = text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "ar"))
             .replacingOccurrences(of: "أ", with: "ا").replacingOccurrences(of: "إ", with: "ا").replacingOccurrences(of: "آ", with: "ا")
-        let actions = ["ابني", "ابن لي", "انشئ", "انشاء", "اصنع", "اعمل لي", "سوي", "برمج", "طور لي", "بناء", "build", "create", "develop", "implement", "refactor"]
+        let actions = ["ابني", "ابن لي", "انشئ", "انشاء", "اصنع", "اعمل لي", "سوي", "برمج", "طور لي", "بناء", "build", "create", "develop", "implement", "refactor", "عدل", "تعديل", "تحسين", "حسن", "اكتب", "صمم", "write", "make", "design"]
         let products = ["تطبيق", "مشروع", "موقع", "لعبه", "لعبة", "برنامج", "app", "apps", "application", "project", "website", "web site", "webapp", "game", "backend"]
         func contains(_ term: String) -> Bool {
             if term.unicodeScalars.allSatisfy({ $0.isASCII }) { return text.range(of: "\\b" + NSRegularExpression.escapedPattern(for: term) + "\\b", options: .regularExpression) != nil }
             return text.contains(term)
         }
-        return actions.contains(where: contains) && products.contains(where: contains)
+        let directProductRequest = ["اريد تطبيق", "اريد موقع", "اريد برنامج", "ابغى تطبيق", "ابغى موقع", "ارغب في تطبيق"].contains(where: text.contains)
+        return directProductRequest || (actions.contains(where: contains) && products.contains(where: contains))
     }
     static func decoded(_ args: [String: Any]) throws -> Proposal {
-        guard let proposal = args["proposal"] else { throw ZeusPatch.failure("A structured proposal is required.") }
+        guard let proposal = normalizedArguments(args)["proposal"] else { throw ZeusPatch.failure("A structured proposal is required.") }
         return try JSONDecoder().decode(Proposal.self, from: JSONSerialization.data(withJSONObject: proposal))
     }
     static func explicitPlatform(_ goal: String) -> String? {
@@ -96,14 +97,20 @@ struct ZeusProjectContract: Codable {
         return nil
     }
     static func validate(_ p: Proposal) throws {
-        guard Set(p.features.map(\.id)).count == p.features.count, Set(p.checks.map(\.id)).count == p.checks.count,
-              Set(p.steps).count == p.steps.count else { throw ZeusPatch.failure("Feature/check IDs and plan steps must be unique.") }
-        let featureIDs = Set(p.features.map(\.id))
-        guard p.checks.allSatisfy({ Set($0.covers).isSubset(of: featureIDs) }),
-              featureIDs.isSubset(of: Set(p.checks.filter { ["functional", "ui"].contains($0.kind) }.flatMap(\.covers))),
-              p.checks.contains(where: { $0.kind == "build" }), p.checks.contains(where: { $0.kind == "functional" }) else {
-            throw ZeusPatch.failure("The plan needs a real build check, functional tests, and acceptance checks covering every requested feature. A build alone is not product completion.")
+        func duplicates(_ values: [String]) -> [String] { Dictionary(grouping: values, by: { $0 }).filter { $0.value.count > 1 }.keys.sorted() }
+        let duplicateFeatures = duplicates(p.features.map(\.id)), duplicateChecks = duplicates(p.checks.map(\.id)), duplicateSteps = duplicates(p.steps)
+        guard duplicateFeatures.isEmpty, duplicateChecks.isEmpty, duplicateSteps.isEmpty else {
+            throw ZeusPatch.failure("PROJECT_PLAN_INVALID: duplicate feature IDs=" + duplicateFeatures.joined(separator: ",") + "; duplicate check IDs=" + duplicateChecks.joined(separator: ",") + "; duplicate steps=" + duplicateSteps.joined(separator: ",") + ". Rename only these duplicates and retain the requested features.")
         }
+        let featureIDs = Set(p.features.map(\.id))
+        var issues: [String] = []
+        let unknown = Set(p.checks.flatMap(\.covers)).subtracting(featureIDs).sorted()
+        let missing = featureIDs.subtracting(Set(p.checks.filter { ["functional", "ui"].contains($0.kind) }.flatMap(\.covers))).sorted()
+        if !unknown.isEmpty { issues.append("proposal.checks[].covers references unknown feature IDs: " + unknown.joined(separator: ", ") + ". Valid IDs: " + featureIDs.sorted().joined(separator: ", ")) }
+        if !missing.isEmpty { issues.append("Add these exact IDs to the appropriate functional/UI check's covers array: " + String(decoding: (try? JSONSerialization.data(withJSONObject: missing)) ?? Data(), as: UTF8.self) + ". covers refers to proposal.features[].id, not check IDs or filenames.") }
+        if !p.checks.contains(where: { $0.kind == "build" }) { issues.append("proposal.checks needs one kind=build criterion describing the actual planned build.") }
+        if !p.checks.contains(where: { $0.kind == "functional" }) { issues.append("proposal.checks needs one kind=functional criterion for actual feature tests, with covers containing the tested feature IDs.") }
+        if !issues.isEmpty { throw ZeusPatch.failure("PROJECT_PLAN_INVALID:\n" + issues.joined(separator: "\n") + "\nCorrect those fields in the next proposal; preserve the user's features and do not repeat an unchanged call. Planned checks describe tests you will implement, not proof they already passed.") }
         if ["ios", "android", "web"].contains(p.platform), !p.checks.contains(where: { $0.kind == "ui" }) {
             throw ZeusPatch.failure("User-facing apps need a UI review check and actual screenshots in addition to build and functional tests.")
         }
@@ -271,6 +278,9 @@ struct ZeusProjectProgressCard: View {
     func registerUserRequest(_ text: String, session: String?) {
         guard let session, !text.isEmpty else { return }
         var value = state(session)
+        if let legacy = value.project, legacy.proposal == nil, !ZeusProjectContract.isProjectRequest(legacy.userGoal), !ZeusProjectContract.isProjectRequest(text) {
+            value.project = nil // Remove the previous over-broad source-file gate for utility scripts.
+        }
         if ZeusProjectContract.isProjectRequest(text), value.project == nil || value.status == "completed" || value.project?.decision == "cancelled" {
             value.project = ZeusProjectContract(userGoal: String(text.prefix(12000)))
             value.goal = String(text.prefix(2000)); value.status = "running"; value.started = Date()
@@ -289,18 +299,14 @@ struct ZeusProjectProgressCard: View {
         }
         try? save(session, value)
     }
+    func isUtilityTask(session: String?) -> Bool {
+        guard let session else { return false }
+        let value = state(session)
+        return value.project == nil && !ZeusProjectContract.isProjectRequest(value.goal)
+    }
     func projectGate(tool: String, args: [String: Any], session: String?) throws {
         guard let session else { return }
         var value = state(session)
-        if value.project == nil, ["file_write", "file_edit", "apply_patch"].contains(tool) {
-            var paths = [args["path"] as? String ?? ""]
-            if let patch = args["patch"] as? String { paths += patch.split(separator: "\n").filter { $0.hasPrefix("*** Add File: ") || $0.hasPrefix("*** Update File: ") }.map { String($0.dropFirst($0.hasPrefix("*** Add") ? 14 : 17)) } }
-            let sourceExtensions = ["swift", "tsx", "jsx", "js", "ts", "py", "html", "css", "kt", "dart", "cs", "go", "rs"]
-            if paths.contains(where: { sourceExtensions.contains(URL(fileURLWithPath: $0).pathExtension.lowercased()) }) {
-                value.project = ZeusProjectContract(userGoal: value.goal.isEmpty ? "Implement the user's requested source change" : value.goal)
-                try save(session, value)
-            }
-        }
         guard let project = value.project, project.required else { return }
         if ["project_environment", "propose_project_plan", "integration_accounts", "integration_tools", "task_checkpoint", "update_plan", "task_complete", "file_read", "read_image", "memory_read", "memory_get"].contains(tool) { return }
         if tool == "github_read_file" { return }
@@ -318,8 +324,9 @@ struct ZeusProjectProgressCard: View {
         }
     }
     func prepareProjectProposal(_ args: [String: Any], session: String, blockID: UUID, connections: ZeusConnections = .shared) throws -> ZeusProjectContract.Proposal {
-        try ZeusAgentSchemas.validate(args, schema: ZeusAgentSchemas.schema("propose_project_plan")!)
-        let proposal = try ZeusProjectContract.decoded(args)
+        let normalized = ZeusProjectContract.normalizedArguments(args)
+        try ZeusAgentSchemas.validate(normalized, schema: ZeusAgentSchemas.schema("propose_project_plan")!)
+        let proposal = try ZeusProjectContract.decoded(normalized)
         try ZeusProjectContract.validate(proposal)
         guard try JSONEncoder().encode(proposal).count <= 18000 else { throw ZeusPatch.failure("Keep the reviewable project proposal under 18KB; use concise features, steps and acceptance checks.") }
         var value = state(session), project = state(session).project ?? ZeusProjectContract(userGoal: proposal.objective)
@@ -373,16 +380,21 @@ struct ZeusProjectProgressCard: View {
         let environment = ZeusProjectContract.Environment(localTools: paths, localError: probeError, hasIOSSDK: false, githubAccounts: accounts, checkedAt: Date())
         var value = state(session), project = state(session).project ?? ZeusProjectContract(userGoal: value.goal)
         project.environment = environment
+        let utility = isUtilityTask(session: session)
         await ZeusDefaultSkills.shared.install()
         let platform = ZeusProjectContract.explicitPlatform(project.userGoal) ?? (project.userGoal.range(of: #"\b(swift|swiftui)\b"#, options: [.regularExpression, .caseInsensitive]) != nil ? "ios" : nil)
-        project.loadSkills(platform: platform)
+        if !utility { project.loadSkills(platform: platform) }
         let references = vm.messages.last(where: { $0.role == .user })?.attachments.filter(\.isImage).map(\.path) ?? []
         project.referenceImages = Array(Set((project.referenceImages ?? []) + references)).sorted()
-        value = state(session); value.project = project; try save(session, value)
+        value = state(session); value.lastEnvironment = environment
+        if !utility { value.project = project }
+        try save(session, value)
         var output: [String: Any] = [:]
         output["host"] = "ZEUS Browser on iOS/iPadOS"
         output["local_execution"] = "Linux guest; not macOS"
         output["has_ios_sdk"] = false
+        output["project_plan_required"] = !utility
+        output["image_tool"] = ["name": "read_image", "native_vision": vm.activeModelHasNativeVision, "vision_group_configured": VisionGroupResolver.isConfigured, "uses_ffmpeg": false]
         output["automatically_loaded_skills"] = (project.loadedSkills ?? [:]).keys.sorted()
         output["skill_paths"] = project.skillPaths ?? [:]
         output["reference_images_to_read"] = project.referenceImages ?? []
@@ -390,6 +402,7 @@ struct ZeusProjectProgressCard: View {
         output["probe_error"] = probeError as Any? ?? NSNull()
         output["github_accounts"] = ZeusConnections.shared.accountSummary().filter { $0["provider"] as? String == "github" }
         output["required_route"] = "iOS apps require a linked GitHub account and a macOS/Xcode Actions workflow. Use github_read_file/github_write_files for plain-text source and github_request for repository/branch/Actions APIs. If no account is linked, ask for that precise connection, preserve the brief and resume; do not offer manual building as completed work."
+        if utility { output["required_route"] = "This is a utility/script task, not an application project. No project approval gate was created. Execute the requested real tools directly; do not propose_project_plan. Use update_plan only if a simple checklist is useful. Photos use read_image, never FFmpeg." }
         return try Self.json(output)
     }
     func recordProjectChecks(session: String) throws {
@@ -495,5 +508,60 @@ struct ZeusProjectProgressCard: View {
     static func projectImagePath(_ path: String) -> String {
         let resolved = path.hasPrefix("minis://") ? "/var/minis/" + String(path.dropFirst(8)) : path
         return URL(fileURLWithPath: resolved.hasPrefix("/") ? resolved : "/var/minis/workspace/" + resolved).standardizedFileURL.path
+    }
+}
+
+extension ZeusProjectContract {
+    /// Coerce only unambiguous plan bookkeeping. No commands run, no checks are
+    /// marked passed, and no feature requirement is invented by this repair.
+    static func normalizedArguments(_ input: [String: Any]) -> [String: Any] {
+        var args = input
+        var proposal = args["proposal"] as? [String: Any]
+        if proposal == nil, let encoded = args["proposal"] as? String, let data = encoded.data(using: .utf8) {
+            proposal = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        }
+        if proposal == nil, args["title"] != nil {
+            proposal = args.filter { !["tool_title", "approval_reason"].contains($0.key) }
+            args = args.filter { ["tool_title", "approval_reason"].contains($0.key) }
+        }
+        guard var p = proposal else { return args }
+        if p["objective"] == nil, let goal = p.removeValue(forKey: "goal") { p["objective"] = goal }
+        if p["assumptions"] == nil { p["assumptions"] = [String]() }
+        if p["build_route"] == nil { p["build_route"] = p["platform"] as? String == "ios" ? "github_actions" : "local" }
+        if let raw = p["features"] as? [Any] {
+            p["features"] = raw.enumerated().map { index, value -> Any in
+                if let title = value as? String { return ["id": "f\(index + 1)", "title": title] }
+                if var feature = value as? [String: Any], feature["id"] == nil { feature["id"] = "f\(index + 1)"; return feature }
+                return value
+            }
+        }
+        if let steps = p["steps"] as? [[String: Any]], steps.allSatisfy({ $0["step"] is String }) { p["steps"] = steps.compactMap { $0["step"] as? String } }
+        let features = p["features"] as? [[String: Any]] ?? []
+        let ids = features.compactMap { $0["id"] as? String }
+        func comparable(_ text: String) -> String { text.trimmingCharacters(in: .whitespacesAndNewlines).folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "ar")) }
+        func canonical(_ text: String) -> String {
+            let matches = features.filter { comparable($0["id"] as? String ?? "") == comparable(text) || comparable($0["title"] as? String ?? "") == comparable(text) }
+            return matches.count == 1 ? matches[0]["id"] as? String ?? text : text
+        }
+        let aliases = ["test": "functional", "tests": "functional", "unit": "functional", "unit_test": "functional", "functional_test": "functional", "functionality": "functional", "اختبار": "functional", "اختبارات": "functional", "compile": "build", "compilation": "build", "بناء": "build", "visual": "ui", "screenshot": "ui", "واجهة": "ui"]
+        if let checks = p["checks"] as? [[String: Any]] {
+            p["checks"] = checks.enumerated().map { index, raw -> [String: Any] in
+                var check = raw
+                if check["id"] == nil { check["id"] = "c\(index + 1)" }
+                if check["kind"] == nil, let kind = check.removeValue(forKey: "type") { check["kind"] = kind }
+                if check["covers"] == nil, let ids = check.removeValue(forKey: "feature_ids") { check["covers"] = ids }
+                if let kind = check["kind"] as? String { check["kind"] = aliases[comparable(kind)] ?? comparable(kind) }
+                var covers = check["covers"] as? [String]
+                if let text = check["covers"] as? String {
+                    covers = text.data(using: .utf8).flatMap { (try? JSONSerialization.jsonObject(with: $0)) as? [String] } ?? [text]
+                }
+                if covers?.contains(where: { ["*", "all", "all_features", "الكل"].contains(comparable($0)) }) == true { covers = ids }
+                if covers == nil, ids.count == 1, check["kind"] as? String == "functional" { covers = ids }
+                check["covers"] = (covers ?? []).map(canonical)
+                return check
+            }
+        }
+        args["proposal"] = p
+        return args
     }
 }

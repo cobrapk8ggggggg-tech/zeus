@@ -34,7 +34,7 @@ class OriginalReferenceTests(unittest.TestCase):
 
     def prepare(self, root, sdk):
         def revision(*args, **kwargs):
-            return ("19c690c3b979c3addef38318231b93a2dcdbe990" if str(kwargs.get("cwd", "")).endswith("deps/ish") else "6339bfcb25190ebf80fd03086c4ead81cf9428ba") + "\n"
+            return (MODULE.patch_ish.__globals__["ISH_COMMIT"] if str(kwargs.get("cwd", "")).endswith("deps/ish") else json.loads((HERE / "source.lock.json").read_text())["commit"]) + "\n"
         with patch.object(MODULE.subprocess, "check_output", side_effect=revision):
             return MODULE.prepare(root, sdk)
 

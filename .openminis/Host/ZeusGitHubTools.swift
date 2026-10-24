@@ -256,15 +256,21 @@ private final class ZeusGitHubNoRedirect: NSObject, URLSessionTaskDelegate {
         defer { try? FileManager.default.removeItem(at: downloaded) }
         try Task.checkCancellation()
         let linux = "/var/minis/workspace/" + relative
-        let parent = (linux as NSString).deletingLastPathComponent
-        let result = try await vm.executeCommand("mkdir -p " + Self.quote(parent) + " && (set -C; : > " + Self.quote(linux) + ")", timeout: 30) { _ in }
-        guard result.exitCode == 0 else { throw ZeusPatch.failure(result.output) }
-        // Creating the guest placeholder registers its fakefs metadata; replace
-        // only this newly-created download, never an unrelated source file.
+        // The original file writer primes the correct session mount and
+        // registers a regular file in fakefs. A shell placeholder could be
+        // pre-created as a directory by mount/path preparation on iPhone.
+        guard !FileManager.default.fileExists(atPath: destination.path) else { throw ZeusPatch.failure("The download destination appeared during retrieval; its contents were preserved.") }
+        let placeholder = try await vm.executeFileWrite(from: Self.json(["path": linux, "content": "", "create_dirs": true, "append": true]))
+        guard placeholder.success else { throw ZeusPatch.failure(placeholder.output) }
+        guard let resolved = await vm.resolvePathForDirectRead(linux) else { throw ZeusPatch.failure("The downloaded artifact path cannot be resolved for this conversation.") }
         let checked = try ZeusPatch.safeURL(relative, root: root)
-        guard try checked.resourceValues(forKeys: [.fileSizeKey]).fileSize == 0 else { throw ZeusPatch.failure("The artifact destination changed during download; its contents were preserved.") }
-        try FileManager.default.removeItem(at: checked)
-        try FileManager.default.copyItem(at: downloaded, to: checked)
+        guard resolved.standardizedFileURL == checked.standardizedFileURL else { throw ZeusPatch.failure("The conversation mount changed during retrieval. Inspect its files before retrying.") }
+        let values = try checked.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+        guard values.isRegularFile == true, values.fileSize == 0 else { throw ZeusPatch.failure("The artifact destination changed or is not a regular empty file; its contents were preserved.") }
+        // Preserve the guest file's inode and metadata instead of unlinking it.
+        let input = try FileHandle(forReadingFrom: downloaded), output = try FileHandle(forWritingTo: checked)
+        defer { try? input.close(); try? output.close() }
+        while let bytes = try input.read(upToCount: 1024 * 1024), !bytes.isEmpty { try Task.checkCancellation(); try output.write(contentsOf: bytes) }
         let extract = Self.projectImagePath((relative as NSString).deletingPathExtension)
         var value = state(session)
         if value.project?.artifactRoots == nil { value.project?.artifactRoots = [:] }
@@ -346,8 +352,9 @@ private final class ZeusGitHubNoRedirect: NSObject, URLSessionTaskDelegate {
     func githubWriteFiles(_ args: [String: Any], session: String, client: ZeusGitHubTools = .shared) async throws -> String {
         let id = args["account_id"] as! String, repository = args["repository"] as! String, branch = args["branch"] as! String
         let before = state(session)
-        guard let project = before.project, project.decision == "approved", let proposal = project.proposal,
-              proposal.github_account_id == id, proposal.repository?.lowercased() == repository.lowercased(), proposal.branch == branch else { throw ZeusPatch.failure("Direct source commits require the exact user-approved GitHub project account, repository and branch.") }
+        if let project = before.project {
+            guard project.decision == "approved", let proposal = project.proposal, proposal.github_account_id == id, proposal.repository?.lowercased() == repository.lowercased(), proposal.branch == branch else { throw ZeusPatch.failure("Direct source commits require the exact user-approved GitHub project account, repository and branch.") }
+        }
         let key = "git-write:" + repository.lowercased() + ":" + branch
         guard artifactDownloads.insert(key).inserted else { throw ZeusPatch.failure("Another direct commit to this branch is in flight. Inspect its result before writing again.") }
         defer { artifactDownloads.remove(key) }
