@@ -307,6 +307,9 @@ import UIKit
         var nextInspection = inspectionArgs; nextInspection["offset"] = 1; nextInspection["expected_head_sha"] = inspected["head_sha"]
         let next = try await client.inspectProject(nextInspection)
         XCTAssertEqual((next["entries"] as? [[String: Any]])?.first?["build_or_test_entry"] as? Bool, true)
+        var subtree = inspectionArgs; subtree["tree_sha"] = String(repeating: "d", count: 40); subtree["path_prefix"] = "Sources"
+        let folder = try await client.inspectProject(subtree)
+        XCTAssertEqual((folder["entries"] as? [[String: Any]])?.first?["path"] as? String, "Sources/AGENTS.md")
         var difference = inspectionArgs; difference["action"] = "diff"; difference["base"] = "main"
         let changes = try await client.inspectProject(difference)
         XCTAssertEqual((changes["entries"] as? [[String: Any]])?.first?["patch_truncated"] as? Bool, true)

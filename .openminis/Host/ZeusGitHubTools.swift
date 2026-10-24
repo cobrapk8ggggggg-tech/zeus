@@ -388,6 +388,9 @@ private final class ZeusGitHubNoRedirect: NSObject, URLSessionTaskDelegate {
         var payload: [String: Any] = ["repository": repo, "branch": branch, "head_sha": head, "read_only": true]
         let entries: [[String: Any]]
         if action == "tree" {
+            let prefix = args["path_prefix"] as? String ?? ""
+            if !prefix.isEmpty { try Self.sourcePath(prefix) }
+            guard args["tree_sha"] == nil || args["path_prefix"] != nil else { throw ZeusPatch.failure("Subtree inspection requires path_prefix from the parent directory entry so file paths remain repository-relative.") }
             let tree: String
             if let subtree = args["tree_sha"] as? String { tree = subtree }
             else {
@@ -399,7 +402,12 @@ private final class ZeusGitHubNoRedirect: NSObject, URLSessionTaskDelegate {
             guard let items = object["tree"] as? [[String: Any]] else { throw ZeusPatch.failure("GitHub did not return a file tree.") }
             entries = items.map { item in
                 var row = item.filter { ["path", "type", "sha", "size"].contains($0.key) }
-                let path = item["path"] as? String ?? ""
+                let relative = item["path"] as? String ?? ""
+                let path = prefix.isEmpty ? relative : prefix + "/" + relative
+                row["path"] = path
+                if item["type"] as? String == "tree", let sha = item["sha"] as? String {
+                    row["directory_inspection"] = ["tree_sha": sha, "path_prefix": path, "expected_head_sha": head]
+                }
                 row["project_instruction"] = path.hasSuffix("AGENTS.md")
                 row["build_or_test_entry"] = ["Package.swift", "package.json", "pyproject.toml", "Cargo.toml", "Makefile", "Gemfile", "project.pbxproj"].contains(URL(fileURLWithPath: path).lastPathComponent) || path.contains(".github/workflows/")
                 return row
