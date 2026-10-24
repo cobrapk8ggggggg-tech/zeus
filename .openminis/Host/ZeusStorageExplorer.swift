@@ -13,20 +13,29 @@ enum ZeusStorageFiles {
         var id: String { url.path }
     }
     static let keys: Set<URLResourceKey> = [.isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey, .totalFileAllocatedSizeKey, .contentModificationDateKey]
-    static func size(_ url: URL) throws -> Int64 {
+    static func canonicalPath(_ url: URL) -> String {
+        url.deletingLastPathComponent().resolvingSymlinksInPath().appendingPathComponent(url.lastPathComponent).standardizedFileURL.path
+    }
+    static func excluded(_ url: URL, roots: [URL]) -> Bool {
+        guard !roots.isEmpty else { return false }
+        let path = canonicalPath(url)
+        return roots.contains { let root = canonicalPath($0); return path == root || path.hasPrefix(root + "/") }
+    }
+    static func size(_ url: URL, excluding: [URL] = []) throws -> Int64 {
+        if excluded(url, roots: excluding) { return 0 }
         let value = try url.resourceValues(forKeys: keys)
         if value.isSymbolicLink == true || value.isDirectory != true {
             return Int64(value.totalFileAllocatedSize ?? value.fileSize ?? 0)
         }
-        return try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: Array(keys)).reduce(0) { try $0 + size($1) }
+        return try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: Array(keys)).reduce(0) { try $0 + size($1, excluding: excluding) }
     }
-    static func children(_ root: URL, container: URL) throws -> [Entry] {
+    static func children(_ root: URL, container: URL, excluding: [URL] = []) throws -> [Entry] {
         try validate(root, container: container)
         guard try root.resourceValues(forKeys: keys).isSymbolicLink != true else { throw failure("لا يمكن الدخول إلى رابط رمزي.") }
-        return try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: Array(keys)).map { url in
+        return try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: Array(keys)).filter { !excluded($0, roots: excluding) }.map { url in
             let v = try url.resourceValues(forKeys: keys)
             return Entry(url: url, directory: v.isDirectory == true && v.isSymbolicLink != true,
-                         link: v.isSymbolicLink == true, bytes: try size(url), modified: v.contentModificationDate ?? .distantPast)
+                         link: v.isSymbolicLink == true, bytes: try size(url, excluding: excluding), modified: v.contentModificationDate ?? .distantPast)
         }
     }
     static func validate(_ url: URL, container: URL) throws {
@@ -85,8 +94,15 @@ enum ZeusStorageFiles {
         case "Logs & Caches": return [library.appendingPathComponent("Logs"), library.appendingPathComponent("Caches")]
         case "Temporary Files": return [FileManager.default.temporaryDirectory]
         case "Stale Shell Leftovers": return ((try? FileManager.default.contentsOfDirectory(at: documents, includingPropertiesForKeys: nil)) ?? []).filter { $0.lastPathComponent.hasPrefix(".alpine-rootfs-broken-") }
-        default: return [documents, library, FileManager.default.temporaryDirectory]
+        default: return [documents, library]
         }
+    }
+    static var otherExclusions: [URL] {
+        var roots = [documents.appendingPathComponent("alpine-rootfs"), library.appendingPathComponent("Logs"), library.appendingPathComponent("Caches"), library.appendingPathComponent("MinisChat/minis")]
+        roots += ((try? FileManager.default.contentsOfDirectory(at: documents, includingPropertiesForKeys: nil)) ?? []).filter { $0.lastPathComponent.hasPrefix(".alpine-rootfs-broken-") }
+        let chat = library.appendingPathComponent("MinisChat")
+        roots += ((try? FileManager.default.contentsOfDirectory(at: chat, includingPropertiesForKeys: nil)) ?? []).filter { $0.lastPathComponent.hasPrefix("minis.db") }
+        return roots
     }
     static func title(_ category: String) -> String {
         switch category {
@@ -108,11 +124,11 @@ struct ZeusStorageCategoryView: View {
         Group {
             if category == "Chat Database" { ZeusStorageConversationsView() }
             else if ZeusStorageScope.roots(category).count == 1, let root = ZeusStorageScope.roots(category).first {
-                ZeusStorageDirectoryView(root: root)
+                directory(root)
             } else {
                 List {
                     ForEach(ZeusStorageScope.roots(category), id: \.path) { root in
-                        NavigationLink { ZeusStorageDirectoryView(root: root) } label: {
+                        NavigationLink { directory(root) } label: {
                             Label(root.lastPathComponent, systemImage: "folder")
                         }
                     }
@@ -120,10 +136,18 @@ struct ZeusStorageCategoryView: View {
             }
         }.navigationTitle(ZeusStorageScope.title(category)).navigationBarTitleDisplayMode(.inline)
     }
+    private func directory(_ root: URL) -> ZeusStorageDirectoryView {
+        ZeusStorageDirectoryView(root: root, excluding: category == "Other" ? ZeusStorageScope.otherExclusions : [], orphanedOnly: category == "Orphaned Session Files")
+    }
 }
 
 struct ZeusStorageDirectoryView: View {
     let root: URL
+    let excluding: [URL]
+    let orphanedOnly: Bool
+    init(root: URL, excluding: [URL] = [], orphanedOnly: Bool = false) {
+        self.root = root; self.excluding = excluding; self.orphanedOnly = orphanedOnly
+    }
     @State private var entries: [ZeusStorageFiles.Entry] = []
     @State private var selection = Set<String>()
     @State private var query = ""
@@ -162,7 +186,7 @@ struct ZeusStorageDirectoryView: View {
                             }.buttonStyle(.borderless)
                         }
                         if entry.directory {
-                            NavigationLink { ZeusStorageDirectoryView(root: entry.url) } label: { row(entry) }
+                            NavigationLink { ZeusStorageDirectoryView(root: entry.url, excluding: excluding) } label: { row(entry) }
                         } else {
                             Button { if !entry.link { preview = entry.url } } label: { row(entry) }.foregroundStyle(.primary)
                         }
@@ -202,7 +226,13 @@ struct ZeusStorageDirectoryView: View {
     @MainActor private func reload() async {
         busy = true
         let directory = root, container = ZeusStorageScope.container
-        let result = await Task.detached(priority: .utility) { Result { try ZeusStorageFiles.children(directory, container: container) } }.value
+        var exclusions = excluding
+        if orphanedOnly {
+            let known = await ChatStore.shared.listSessions()
+            exclusions += known.map { directory.appendingPathComponent($0.id) }
+        }
+        let finalExclusions = exclusions
+        let result = await Task.detached(priority: .utility) { Result { try ZeusStorageFiles.children(directory, container: container, excluding: finalExclusions) } }.value
         switch result { case .success(let value): entries = value; selection.formIntersection(Set(value.map(\.id)))
         case .failure(let failure): error = failure.localizedDescription }
         busy = false
@@ -211,10 +241,18 @@ struct ZeusStorageDirectoryView: View {
         busy = true
         let targets = entries.filter { selection.contains($0.id) }.map(\.url)
         // Obtain active-session protections immediately before deletion.
-        let protected = ZeusStorageScope.protected, container = ZeusStorageScope.container
+        var protected = ZeusStorageScope.protected
+        let container = ZeusStorageScope.container
+        if orphanedOnly {
+            // Recheck classification at delete time, including sessions restored
+            // by sync since the initial scan. Known conversations are not orphans.
+            let known = await ChatStore.shared.listSessions()
+            protected += known.map { root.appendingPathComponent($0.id) }
+        }
+        let finalProtected = protected
         let failures = await Task.detached(priority: .utility) {
             targets.compactMap { url -> String? in
-                do { try ZeusStorageFiles.delete(url, container: container, protected: protected); return nil }
+                do { try ZeusStorageFiles.delete(url, container: container, protected: finalProtected); return nil }
                 catch { return url.lastPathComponent + ": " + error.localizedDescription }
             }
         }.value
