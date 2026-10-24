@@ -304,7 +304,7 @@ import UIKit
         XCTAssertEqual(inspected["has_more"] as? Bool, true)
         XCTAssertEqual(inspected["next_offset"] as? Int, 1)
         XCTAssertEqual((inspected["entries"] as? [[String: Any]])?.first?["project_instruction"] as? Bool, true)
-        var nextInspection = inspectionArgs; nextInspection["offset"] = 1
+        var nextInspection = inspectionArgs; nextInspection["offset"] = 1; nextInspection["expected_head_sha"] = inspected["head_sha"]
         let next = try await client.inspectProject(nextInspection)
         XCTAssertEqual((next["entries"] as? [[String: Any]])?.first?["build_or_test_entry"] as? Bool, true)
         var difference = inspectionArgs; difference["action"] = "diff"; difference["base"] = "main"

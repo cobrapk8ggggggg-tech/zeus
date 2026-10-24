@@ -39,6 +39,7 @@ enum ZeusAgentSchemas {
             fields["action"] = ["type": "string", "enum": ["tree", "diff"]]
             fields["base"] = ["type": "string", "minLength": 1, "maxLength": 240]
             fields["tree_sha"] = ["type": "string", "pattern": "^[0-9a-fA-F]{40}$"]
+            fields["expected_head_sha"] = ["type": "string", "pattern": "^[0-9a-fA-F]{40}$"]
             fields["recursive"] = ["type": "boolean"]
             fields["offset"] = ["type": "integer", "minimum": 0]
             fields["limit"] = ["type": "integer", "minimum": 1, "maximum": 20]

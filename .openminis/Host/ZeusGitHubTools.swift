@@ -383,6 +383,8 @@ private final class ZeusGitHubNoRedirect: NSObject, URLSessionTaskDelegate {
         try Self.relativePath("/repos/" + repo + "/git/ref/heads/" + branch)
         let ref = try await object(accountID: account, path: "/repos/" + repo + "/git/ref/heads/" + branch)
         guard let head = (ref["object"] as? [String: Any])?["sha"] as? String, head.range(of: "^[0-9a-fA-F]{40}$", options: .regularExpression) != nil else { throw ZeusPatch.failure("GitHub did not return an actual branch commit SHA.") }
+        if let expected = args["expected_head_sha"] as? String, expected.lowercased() != head.lowercased() { throw ZeusPatch.failure("HEAD_CHANGED: Restart inspection at offset zero; the branch changed since the previous page.") }
+        guard offset == 0 || args["expected_head_sha"] != nil else { throw ZeusPatch.failure("Continuation pages require expected_head_sha from the previous result to prevent mixing different revisions.") }
         var payload: [String: Any] = ["repository": repo, "branch": branch, "head_sha": head, "read_only": true]
         let entries: [[String: Any]]
         if action == "tree" {
@@ -402,6 +404,7 @@ private final class ZeusGitHubNoRedirect: NSObject, URLSessionTaskDelegate {
                 row["build_or_test_entry"] = ["Package.swift", "package.json", "pyproject.toml", "Cargo.toml", "Makefile", "Gemfile", "project.pbxproj"].contains(URL(fileURLWithPath: path).lastPathComponent) || path.contains(".github/workflows/")
                 return row
             }
+            payload["tree_selection"] = args["tree_sha"] == nil ? "Current HEAD tree" : "Caller-selected tree object; may be historical. Verify its relationship to HEAD before relying on it."
             payload["tree_sha"] = tree; payload["server_truncated"] = object["truncated"] as? Bool ?? false
         } else {
             guard let base = args["base"] as? String, !base.contains(".."), !base.contains("?"), !base.contains("#") else { throw ZeusPatch.failure("Diff inspection requires a valid base branch or commit SHA.") }
@@ -413,7 +416,8 @@ private final class ZeusGitHubNoRedirect: NSObject, URLSessionTaskDelegate {
                 else { row["patch_unavailable"] = true }
                 return row
             }
-            payload["base"] = base; payload["comparison_status"] = diff["status"]
+            payload["base"] = base; payload["base_sha"] = (diff["base_commit"] as? [String: Any])?["sha"] ?? NSNull()
+            payload["comparison_status"] = diff["status"]
             payload["files_coverage"] = "GitHub Compare exposes at most 300 files. Patches are previews and can be absent for binary/large changes. Use source reads for complete inspection."
             payload["server_truncated"] = items.count >= 300
         }
@@ -421,6 +425,7 @@ private final class ZeusGitHubNoRedirect: NSObject, URLSessionTaskDelegate {
         var page = Array(entries.dropFirst(offset).prefix(limit))
         while page.count > 1, (try JSONSerialization.data(withJSONObject: page)).count > 10000 { page.removeLast() }
         payload["entries"] = page; payload["available_entries"] = entries.count
+        payload["continuation_expected_head_sha"] = head
         payload["next_offset"] = offset + page.count; payload["has_more"] = offset + page.count < entries.count
         return payload
     }
