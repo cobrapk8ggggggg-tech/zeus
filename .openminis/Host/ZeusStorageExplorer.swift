@@ -41,7 +41,7 @@ enum ZeusStorageFiles {
         for item in protected {
             let p = item.resolvingSymlinksInPath().standardizedFileURL.path
             if path == p || path.hasPrefix(p + "/") || p.hasPrefix(path + "/") {
-                throw failure("هذا العنصر قيد الاستخدام أو تديره قاعدة البيانات. أوقف المهمة، أو استخدم إدارة المحادثات لحذفه.")
+                throw failure("هذا العنصر قيد الاستخدام أو تديره قاعدة بيانات. أوقف المهمة، أو استخدم إدارة المحادثات أو بيانات المواقع لحذفه.")
             }
         }
         try FileManager.default.removeItem(at: url)
@@ -57,6 +57,9 @@ enum ZeusStorageFiles {
     static var protected: [URL] {
         var paths = ["minis.db", "minis.db-wal", "minis.db-shm"].map { library.appendingPathComponent("MinisChat/" + $0) }
         paths.append(library.appendingPathComponent("Preferences"))
+        // WebKit databases are live; use the browser's per-site data manager.
+        paths.append(library.appendingPathComponent("WebKit"))
+        paths.append(library.appendingPathComponent("HTTPStorages"))
         let active = SessionActivityTracker.shared.activeSessions
         if !active.isEmpty { paths.append(documents.appendingPathComponent("alpine-rootfs")) }
         paths += active.map { library.appendingPathComponent("MinisChat/minis/" + $0) }

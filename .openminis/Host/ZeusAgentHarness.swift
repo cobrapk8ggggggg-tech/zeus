@@ -40,6 +40,7 @@ import CryptoKit
     var artifactDownloads: Set<String> = []
     private var sourceChanges: [String: Set<UUID>] = [:]
     private let root: URL
+    var taskStorageDirectory: URL { root }
     init(root: URL? = nil) {
         self.root = root ?? FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0].appendingPathComponent("ZeusAgentTasks", isDirectory: true)
         try? FileManager.default.createDirectory(at: self.root, withIntermediateDirectories: true)
@@ -541,6 +542,7 @@ struct ZeusAgentRuntimeSettings: View {
                 NavigationLink("إدارة المزوّدين") { ProviderInstancesView() }
                 NavigationLink("مجموعات النماذج") { ModelGroupsView() }
             }
+            NavigationLink("متابعة المشاريع والمهام") { ZeusTaskDashboard() }
             Section("قدرات الوكيل") {
                 ForEach(["خطة محفوظة لكل محادثة", "رقع متعددة الملفات مع تحقق السياق", "جلسات أوامر ومتابعة المخرجات", "اختبارات فعلية قبل إعلان الإكمال", "نقاط استئناف بعد الانقطاع"], id: \.self) { Text($0) }
             }
