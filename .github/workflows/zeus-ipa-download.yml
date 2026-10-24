@@ -61,7 +61,7 @@ jobs:
             upstream/deps/resources
             upstream/deps/frameworks
             upstream/deps/lame-build
-          key: openminis-b4c0661-iphoneos-arm64-xcode263-v1-114
+          key: openminis-b4c0661-iphoneos-arm64-xcode263-v2-114-hook-inode
       - name: Build real device dependencies and Linux rootfs
         if: steps.native.outputs.cache-hit != 'true'
         working-directory: upstream
@@ -81,7 +81,7 @@ jobs:
             upstream/deps/resources
             upstream/deps/frameworks
             upstream/deps/lame-build
-          key: openminis-b4c0661-iphoneos-arm64-xcode263-v1-114
+          key: openminis-b4c0661-iphoneos-arm64-xcode263-v2-114-hook-inode
       - name: Require full native device dependencies
         run: |
           set -euo pipefail

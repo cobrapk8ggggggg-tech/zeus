@@ -77,7 +77,7 @@ jobs:
           upstream/deps/resources
           upstream/deps/frameworks
           upstream/deps/lame-build
-        key: openminis-b4c0661-simulator-arm64-xcode263-v1-114
+        key: openminis-b4c0661-simulator-arm64-xcode263-v2-114-hook-inode
     - name: Build the actual native dependencies and Linux rootfs
       if: steps.native.outputs.cache-hit != 'true'
       working-directory: upstream
@@ -97,7 +97,7 @@ jobs:
           upstream/deps/resources
           upstream/deps/frameworks
           upstream/deps/lame-build
-        key: openminis-b4c0661-simulator-arm64-xcode263-v1-114
+        key: openminis-b4c0661-simulator-arm64-xcode263-v2-114-hook-inode
     - name: Verify unchanged original application source
       run: python3 browser/.openminis/verify_source.py upstream results/original-source.json
     - name: Embed the original native application in the browser

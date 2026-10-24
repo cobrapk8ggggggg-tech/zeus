@@ -182,3 +182,10 @@ entries from the previously embedded fork with its source revision, while review
 `arabic-overrides.json` corrects earlier translations and covers every added 1.14
 catalog key. Official 1.14 itself has no Arabic catalog. Embedding tests require
 Arabic coverage for every resulting localization key and matching format tokens.
+
+The pinned iSH adapter now marks hook-routed file descriptors explicitly. Their
+host inode numbers must not be interpreted as unrelated guest database inodes in
+fstat/fchmod, otherwise a regular artifact or extracted image can appear to be a
+directory. A C regression executes the actual patched functions with a deliberate
+inode collision; the original functions fail the same case. Dependency hashes
+are recorded and both SDK caches are revised after this ABI change.

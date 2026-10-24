@@ -95,6 +95,8 @@ private enum OpenMinisReferenceFixtureBootstrap {
     adapters = {str(file.relative_to(root)): hashlib.sha256(file.read_bytes()).hexdigest() for file in [app] + fixtures}
     return {"repository": expected["repository"], "commit": actual, "sdk": sdk,
             "applicationFilesSHA256": manifest,
+            "dependencyAdaptersSHA256": {str(file.relative_to(root)): hashlib.sha256(file.read_bytes()).hexdigest()
+                for file in [root / "deps/ish/kernel/uname.c", root / "deps/ish/fs/fd.h", root / "deps/ish/fs/fake.c"]},
             "testEntryAdapters": adapters}
 
 
