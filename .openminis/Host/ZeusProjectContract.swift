@@ -85,9 +85,13 @@ struct ZeusProjectContract: Codable {
         let directProductRequest = ["اريد تطبيق", "اريد موقع", "اريد برنامج", "ابغى تطبيق", "ابغى موقع", "ارغب في تطبيق"].contains(where: text.contains)
         // Mentioning an application's name while requesting a script/token
         // inspection is not a request to build that application.
-        let utility = ["سكربت", "سكريبت", "script", "snippet", "bookmarklet", "indexeddb", "indexdb"].contains(where: contains)
-        let explicitBuild = text.range(of: #"(?:ابني|ابن لي|انشئ|اصنع|بناء|build|create|develop|implement)\s+(?:(?:لي|an?|the|new)\s+){0,3}(?:تطبيق|مشروع|موقع|لعبه|لعبة|برنامج|app\b|application\b|project\b|website\b|game\b)"#, options: .regularExpression) != nil
-        if utility && !directProductRequest && !explicitBuild { return false }
+        let utilityTerms = ["سكربت", "سكريبت", "script", "snippet", "bookmarklet", "indexeddb", "indexdb"]
+        let firstUtility = utilityTerms.compactMap { text.range(of: $0)?.lowerBound }.min()
+        let productAction = text.range(of: #"(?:ابني|ابن|انشئ|اصنع|بناء|طور|عدل|تعديل|تحسين|حسن|صمم|اكتب|سوي|اعمل|برمج|build|create|develop|implement|refactor|write|make|design)\s+(?:(?:لي|هذا|an?|the|new|existing)\s+){0,3}(?:(?:ال)?(?:تطبيق|مشروع|موقع|لعبه|لعبة|برنامج)|app\b|application\b|project\b|website\b|game\b)"#, options: .regularExpression)
+        // The requested object comes first: a script ABOUT an app is a utility;
+        // an app USING IndexedDB or scripts is still a real product project.
+        if let firstUtility, !directProductRequest,
+           productAction == nil || productAction!.lowerBound > firstUtility { return false }
         return directProductRequest || (actions.contains(where: contains) && products.contains(where: contains))
     }
     static func decoded(_ args: [String: Any]) throws -> Proposal {

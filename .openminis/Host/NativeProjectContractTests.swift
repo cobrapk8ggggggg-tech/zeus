@@ -218,6 +218,10 @@ import UIKit
         XCTAssertFalse(ZeusProjectContract.isProjectRequest("اكتب سكربت استخراج توكن تطبيق من IndexedDB"))
         XCTAssertFalse(ZeusProjectContract.isProjectRequest("Write a script to inspect this app's IndexedDB"))
         XCTAssertTrue(ZeusProjectContract.isProjectRequest("Build an app with a script editor"))
+        XCTAssertTrue(ZeusProjectContract.isProjectRequest("صمم تطبيق يستخدم IndexedDB"))
+        XCTAssertTrue(ZeusProjectContract.isProjectRequest("طور لي البرنامج ليستخدم IndexedDB"))
+        XCTAssertTrue(ZeusProjectContract.isProjectRequest("Write an application using IndexedDB"))
+        XCTAssertFalse(ZeusProjectContract.isProjectRequest("اكتب سكربت لتحسين تطبيق موجود"))
         XCTAssertFalse(ZeusProjectContract.isProjectRequest("اشرح إعدادات المتصفح"))
         let fallback = ZeusAgentHarness(root: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)), fallbackSession = UUID().uuidString
         fallback.registerUserRequest("أريد تطبيق Swift صوتي بواجهات الصور", session: fallbackSession)
