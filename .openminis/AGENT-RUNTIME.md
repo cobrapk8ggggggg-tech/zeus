@@ -176,3 +176,9 @@ environment discovery does not create a mandatory project; an unwanted plan call
 for a utility is a harmless no-op. Model-facing prompts no longer tell text-only
 models to use removed FFmpeg/Pillow for image understanding; use the original
 native `read_image` pipeline or configure a real vision model/group.
+
+Arabic carry-forward is explicit: `arabic-base.json` retains the 1,767 Arabic
+entries from the previously embedded fork with its source revision, while reviewed
+`arabic-overrides.json` corrects earlier translations and covers every added 1.14
+catalog key. Official 1.14 itself has no Arabic catalog. Embedding tests require
+Arabic coverage for every resulting localization key and matching format tokens.

@@ -404,6 +404,12 @@ def embed(native, browser, report):
         'case "name":  if !value.isEmpty { meta.name = value.lowercased() == "minis" ? "Zeus" : value }')
     strings_file = source / "Localizable.xcstrings"
     strings = json.loads(strings_file.read_text())
+    # Official 1.14 does not contain the Arabic catalog from our previous fork.
+    # Carry translations by stable source key before applying reviewed fixes.
+    arabic_base = json.loads((browser / ".openminis/arabic-base.json").read_text())["localizations"]
+    for key, translation in arabic_base.items():
+        if key in strings["strings"]:
+            strings["strings"][key].setdefault("localizations", {})["ar"] = translation
     overrides = json.loads((browser / ".openminis/arabic-overrides.json").read_text())
     for key in overrides:
         strings["strings"].setdefault(key, {"localizations": {}})
