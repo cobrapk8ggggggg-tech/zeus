@@ -51,7 +51,7 @@ def embed(native, browser, report):
     # The application remains OpenMinis' original @main/AppDelegate/root setup;
     # its root content now embeds the browser with the original AI UI alongside.
     replace(source / "MinisApp.swift", "                ContentView()", "                ZEUSBrowserRootEntry()")
-    for name in ("ZEUSNativeIntegration.swift", "ZeusToolPermissions.swift", "ZeusDefaultSkills.swift", "ZeusAgentSchemas.swift", "ZeusPatch.swift", "ZeusAgentHarness.swift", "ZeusConnections.swift", "ZeusGitHubAuthorization.swift"):
+    for name in ("ZEUSNativeIntegration.swift", "ZeusToolPermissions.swift", "ZeusDefaultSkills.swift", "ZeusAgentSchemas.swift", "ZeusPatch.swift", "ZeusAgentHarness.swift", "ZeusConnections.swift", "ZeusGitHubAuthorization.swift", "ZeusProjectContract.swift", "ZeusGitHubTools.swift"):
         shutil.copyfile(browser / ".openminis/Host" / name, source / name)
     # Reuse the exact native settings sheet from the browser's AI settings row.
     # Only its file-private visibility changes; its body is untouched.
@@ -86,6 +86,11 @@ def embed(native, browser, report):
     replace(definitions, 'description: "Control a web browser with up to 3 tabs.',
             'description: "This is the standalone Zeus automation browser, separate from the user\'s ZEUS tabs and browser profile. For the user\'s current page use zeus_browser_read; for existing tabs use zeus_browser_tabs; for user-browser navigation use zeus_browser_open. Other zeus_browser_* tools inspect its settings, cookies and storage. Control a web browser with up to 3 tabs.')
     execution = source / "Agent/Chat/AIChatViewModel+ConcurrentTools.swift"
+    replace(execution, "        batchBudget: BatchImageBudget\n", "        batchBudget: BatchImageBudget,\n        zeusSourceMessageID: String? = nil\n")
+    replace(source / "Agent/Chat/AIChatViewModel.swift",
+            "tu: tu, msgIdx: msgIdx, tools: toolsSnapshot, batchBudget: imageBudgetActor",
+            "tu: tu, msgIdx: msgIdx, tools: toolsSnapshot, batchBudget: imageBudgetActor, zeusSourceMessageID: deferredAssistantRaw?.id")
+    replace(execution, '        var toolSuccess: Bool = false', '        var toolSuccess: Bool = false\n        var zeusSourceTracked = false\n        let zeusSourceTicket = UUID()')
     text = execution.read_text()
     anchor = '        case "browser_use":'
     parts = text.split(anchor)
@@ -109,10 +114,11 @@ def embed(native, browser, report):
 
 '''
     adapter += '''        case let name where ZeusAgentSchemas.names.contains(name):
-            toolOutput = try await ZeusAgentHarness.shared.execute(name, args: toolArgs, callID: tu.id, vm: self)
+            toolOutput = try await ZeusAgentHarness.shared.execute(name, args: toolArgs,
+                callID: ZeusAgentHarness.scopedCallID(providerID: tu.id, sourceMessageID: zeusSourceMessageID), vm: self)
             if let object = try? JSONSerialization.jsonObject(with: Data(toolOutput.utf8)) as? [String: Any], object["isError"] as? Bool == true { toolSuccess = false }
             else if let object = try? JSONSerialization.jsonObject(with: Data(toolOutput.utf8)) as? [String: Any], let code = object["exit_code"] as? Int { toolSuccess = code == 0 }
-            else if ["task_verify", "task_verify_mcp"].contains(name), let checks = try? JSONSerialization.jsonObject(with: Data(toolOutput.utf8)) as? [[String: Any]] { toolSuccess = checks.allSatisfy { $0["exitCode"] as? Int == 0 } }
+            else if ["task_verify", "task_verify_mcp", "task_verify_github"].contains(name), let checks = try? JSONSerialization.jsonObject(with: Data(toolOutput.utf8)) as? [[String: Any]] { toolSuccess = checks.allSatisfy { $0["exitCode"] as? Int == 0 } }
             else { toolSuccess = true }
 
 '''
@@ -122,8 +128,11 @@ def embed(native, browser, report):
         let toolArgs = try ZeusToolInput.normalize(name: tu.name, args: toolArgs, tools: tools)
         let argsJson = String(decoding: try JSONSerialization.data(withJSONObject: toolArgs), as: UTF8.self)
         if tu.name == "zeus_browser" || zeusBrowserOperation(tu.name) != nil { _ = try ZEUSNativeAgentBridge.normalizedInput(toolArgs, toolName: tu.name) }
+        try ZeusAgentHarness.shared.projectGate(tool: tu.name, args: toolArgs, session: sessionId)
         try await ZeusToolPermissions.shared.authorize(tool: tu.name, args: toolArgs, sessionID: sessionId,
             blockID: messages[msgIdx].blocks[blockIdx].id)
+        zeusSourceTracked = try ZeusAgentHarness.shared.beginSourceChange(session: sessionId, tool: tu.name, args: toolArgs, ticket: zeusSourceTicket)
+        defer { if zeusSourceTracked { ZeusAgentHarness.shared.finishSourceChange(session: sessionId, ticket: zeusSourceTicket) } }
         switch tu.name {""")
     # Avoid a second, old modal after the common gate already authorized shell.
     text = execution.read_text()
@@ -143,7 +152,9 @@ def embed(native, browser, report):
         '            let modelMessage = (tu.name == "zeus_browser" || zeusBrowserOperation(tu.name) != nil) ? "Error: Browser call NOT executed: the provider truncated its arguments. Send a complete smaller call. Inspect the current page/state before retrying any mutation." : """\n            Error: This call was NOT executed.')
     replace(source / "Agent/Chat/AIChatViewModel.swift", "        var userSystemPrompt = baseSystemPrompt",
         '        var userSystemPrompt = baseSystemPrompt + "\\n\\n" + ZEUSNativeAgentBridge.context + ZeusAgentHarness.shared.context(session: sessionId)')
-    replace(execution, "        let snapshotItem = ToolSnapshotItem(", "        ZeusAgentHarness.shared.observe(session: sessionId, tool: tu.name, success: toolSuccess)\n        let snapshotItem = ToolSnapshotItem(")
+    replace(execution, "        let resultPart = AgentContentPart.toolResult(", "        ZeusAgentHarness.shared.observe(session: sessionId, tool: tu.name, success: toolSuccess, args: toolArgs, sourceWasTracked: zeusSourceTracked, imageDelivered: tu.name != \"read_image\" || toolImageData != nil || !self.activeModelHasNativeVision)\n        let resultPart = AgentContentPart.toolResult(")
+    replace(source / "Agent/Chat/AIChatViewModel.swift", "            await self.ensureSession()", "            await self.ensureSession()\n            ZeusAgentHarness.shared.registerUserRequest(text, session: self.sessionId)")
+    replace(source / "Agent/Chat/AIChatViewModel+Persistence.swift", "    func loadSession() async {\n        guard let sessionId else { return }", "    func loadSession() async {\n        guard let sessionId else { return }\n        _ = ZeusAgentHarness.shared.state(sessionId)\n        defer { ZeusAgentHarness.shared.rebindProjectCard(session: sessionId, messages: self.messages) }")
     replace(source / "Agent/Chat/AIChatViewModel.swift", "    func cancel() {", "    func cancel() {\n        ZeusAgentHarness.shared.cancel(session: sessionId)")
     replace(source / "Agent/Chat/AIChatViewModel.swift", "    static let maxAgentTurns = 200", "    static var maxAgentTurns: Int { ZeusAgentHarness.maxTurns }")
     replace(source / "Agent/Chat/AIChatViewModel.swift", "            defer { turnCount += 1 }", '''            defer { turnCount += 1 }
@@ -309,7 +320,7 @@ def embed(native, browser, report):
             guard CommandLine.arguments.contains("--zeus-native-fixture") else { throw RPCError(code: -32601, message: "Fixture launch required") }
             return await MainActor.run {
                 ["requests": ZeusToolPermissions.shared.requests.values.map {
-                    ["id": $0.id.uuidString, "tool": $0.tool, "title": $0.title, "explanation": $0.explanation]
+                    ["id": $0.id.uuidString, "tool": $0.tool, "title": $0.title, "explanation": $0.explanation, "sessionId": $0.sessionID ?? ""]
                 }]
             }
         case "zeus.fixture.approval.respond":

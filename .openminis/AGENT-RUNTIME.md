@@ -6,6 +6,8 @@ Codex CLI delegation in the app's registered tools or settings. The old Python
 Codex service remains historical source in `Runtime/agent_service`; it is not a
 dependency of this native runtime and must not be deployed as its replacement.
 
+The next project-contract layer is documented in [PROJECT-CONTRACT.md](PROJECT-CONTRACT.md): mandatory inline plan approval, native GitHub REST/Actions and evidence for every approved feature, including actual UI image review.
+
 ## Implementation and acceptance stages
 
 1. **Native tools and provider contracts**: nested JSON schemas on OpenAI Chat

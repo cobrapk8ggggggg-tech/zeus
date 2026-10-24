@@ -4,11 +4,37 @@ import CoreFoundation
 /// Provider-independent JSON schemas for the native execution runtime.
 /// These are real nested schemas, not JSON encoded inside string parameters.
 enum ZeusAgentSchemas {
-    static let names: Set<String> = ["update_plan", "apply_patch", "exec_command", "write_stdin", "task_checkpoint", "task_verify", "task_verify_mcp", "task_complete", "integration_accounts", "integration_tools", "integration_call"]
+    static let names: Set<String> = ["update_plan", "apply_patch", "exec_command", "write_stdin", "task_checkpoint", "task_verify", "task_verify_mcp", "task_complete", "integration_accounts", "integration_tools", "integration_call", "project_environment", "propose_project_plan", "github_request", "task_verify_github", "github_download_artifact"]
     static func schema(_ name: String) -> [String: Any]? {
         var fields: [String: Any] = ["tool_title": ["type": "string"], "approval_reason": ["type": "string"]]
         var requiredFields: [String] = []
         switch name {
+        case "project_environment": break
+        case "propose_project_plan":
+            let text: [String: Any] = ["type": "string", "minLength": 1, "maxLength": 240]
+            let identifier: [String: Any] = ["type": "string", "pattern": "^[a-z][a-z0-9_-]{0,39}$"]
+            let feature: [String: Any] = ["type": "object", "properties": ["id": identifier, "title": text], "required": ["id", "title"], "additionalProperties": false]
+            let criterion: [String: Any] = ["type": "object", "properties": ["id": identifier, "title": text, "kind": ["type": "string", "enum": ["build", "functional", "ui", "quality"]], "covers": ["type": "array", "maxItems": 20, "items": identifier], "command": ["type": "string", "maxLength": 2000], "github_job": text, "github_step": text, "artifact": text, "screenshot_path": ["type": "string", "maxLength": 500]], "required": ["id", "title", "kind", "covers"], "additionalProperties": false]
+            let list: [String: Any] = ["type": "array", "minItems": 1, "maxItems": 20, "items": text]
+            let proposal: [String: Any] = ["type": "object", "properties": ["title": text, "objective": ["type": "string", "minLength": 1, "maxLength": 2000], "platform": ["type": "string", "enum": ["ios", "android", "web", "backend", "other"]], "features": ["type": "array", "minItems": 1, "maxItems": 20, "items": feature], "architecture": list, "steps": list, "checks": ["type": "array", "minItems": 2, "maxItems": 20, "items": criterion], "deliverables": list, "assumptions": ["type": "array", "maxItems": 15, "items": text], "build_route": ["type": "string", "enum": ["local", "github_actions"]], "github_account_id": ["type": "string"], "repository": ["type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"], "branch": text, "workflow": ["type": "string", "pattern": "^\\.github/workflows/[A-Za-z0-9_.-]+\\.ya?ml$"]], "required": ["title", "objective", "platform", "features", "architecture", "steps", "checks", "deliverables", "assumptions", "build_route"], "additionalProperties": false]
+            fields["proposal"] = proposal; requiredFields = ["proposal"]
+        case "github_request":
+            fields["account_id"] = ["type": "string"]
+            fields["method"] = ["type": "string", "enum": ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"]]
+            fields["path"] = ["type": "string", "minLength": 1, "maxLength": 1500]
+            fields["query"] = ["type": "object", "additionalProperties": ["type": "string"]]
+            fields["body"] = ["type": "object", "additionalProperties": true]
+            requiredFields = ["account_id", "path"]
+        case "task_verify_github", "github_download_artifact":
+            fields["account_id"] = ["type": "string"]; fields["repository"] = ["type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"]
+            fields["run_id"] = ["type": "integer", "minimum": 1]
+            fields["expected_sha"] = ["type": "string", "pattern": "^[0-9a-fA-F]{40}$"]
+            requiredFields = ["account_id", "repository", "run_id", "expected_sha"]
+            if name == "github_download_artifact" {
+                fields["artifact_id"] = ["type": "integer", "minimum": 1]
+                fields["destination"] = ["type": "string", "minLength": 1, "maxLength": 500]
+                requiredFields += ["artifact_id", "destination"]
+            }
         case "integration_accounts": break
         case "integration_tools":
             fields["account_id"] = ["type": "string"]; fields["provider"] = ["type": "string", "enum": ["github", "railway", "vercel"]]

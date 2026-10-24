@@ -7,10 +7,11 @@ name: ZEUS native browser integration tests
     - feature/zeus-project-agent-20261023
     - feature/zeus-direct-integrations-20261023
     - feature/zeus-native-agent-harness-20261023
+    - feature/zeus-project-contract-20261024
     paths:
     - ZEUSNext/**
     - .openminis/**
-    - .zeus-ci/fixture_server.py
+    - .zeus-ci/**
     - .github/workflows/zeus-native-integration.yml
   workflow_dispatch:
     inputs:

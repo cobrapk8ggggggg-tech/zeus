@@ -12,6 +12,7 @@ import subprocess
 import time
 import urllib.request
 import uuid
+from native_screenshot import capture as screenshot
 
 
 def run(*arguments, check=True):
@@ -71,14 +72,33 @@ def capture(device, bundle, output):
         (output / "conversation-result.json").write_text(json.dumps(answer, ensure_ascii=False, indent=2))
         rpc("debug.fixture.route", {"url": "minis://sessions/" + session})
         time.sleep(2)
-        run("xcrun", "simctl", "io", device, "screenshot", str(output / "chat.png"))
+        screenshot(rpc, output / "chat.png")
         (output / "blocks-diff.json").write_text(json.dumps(rpc("chat.session.blocksDiff", {"sessionId": session}), ensure_ascii=False, indent=2))
         (output / "view-tree.json").write_text(json.dumps(rpc("debug.viewTree", {"maxDepth": 20}), ensure_ascii=False, indent=2))
         if bundle != "com.openminis.app":
             harness = rpc("provider.models.add", {"instanceId": instance["id"], "modelId": "fixture-native-harness-" + uuid.uuid4().hex, "displayName": "Project execution fixture", "contextWindow": 128000, "maxOutputTokens": 4000})
             rpc("zeus.fixture.permission", {"mode": "unrestricted"})
             try:
-                project = rpc("chat.prompt", {"prompt": "أنشئ مشروع اختبار فعلياً، شغّل الفحص، أصلح الخطأ ثم تحقق منه قبل الإكمال.", "modelEntryId": harness["id"], "thinkingLevel": "off", "wait": True, "waitTimeout": 180}, timeout=200)
+                project = rpc("chat.prompt", {"prompt": "أنشئ مشروع اختبار فعلياً، اعرض الخطة للموافقة ثم شغّل الفحص وأصلح الخطأ وتحقق منه قبل الإكمال.", "modelEntryId": harness["id"], "thinkingLevel": "off", "wait": False})
+                rpc("debug.fixture.route", {"url": "minis://sessions/" + project["sessionId"]})
+                deadline = time.monotonic() + 180
+                approved_plan = False
+                while True:
+                    requests = rpc("zeus.fixture.approvals")["requests"]
+                    for request in requests:
+                        if request["tool"] == "propose_project_plan" and request["sessionId"] == project["sessionId"]:
+                            if approved_plan: raise RuntimeError("The same approved project unexpectedly requested a second plan")
+                            time.sleep(1)
+                            screenshot(rpc, output / "project-plan-approval.png")
+                            (output / "project-plan-tree.json").write_text(json.dumps(rpc("debug.viewTree", {"maxDepth": 25}), ensure_ascii=False, indent=2))
+                            rpc("zeus.fixture.approval.respond", {"id": request["id"], "allowed": True})
+                            approved_plan = True
+                    if not rpc("chat.session.status", {"sessionId": project["sessionId"]}).get("isRunning", False): break
+                    if time.monotonic() > deadline: raise RuntimeError("Approved native project did not complete within its test deadline")
+                    time.sleep(0.25)
+                if not approved_plan: raise RuntimeError("Project bypassed explicit user plan approval in unrestricted tool mode")
+                messages = rpc("chat.messages.list", {"sessionId": project["sessionId"], "roles": ["assistant"], "includeTools": False})["messages"]
+                project["responseText"] = "\n".join(m.get("content", "") for m in messages)
                 if "NATIVE_HARNESS_VERIFIED" not in project.get("responseText", ""):
                     raise RuntimeError("The original model/tool loop did not finish the real project fixture")
                 state = rpc("zeus.fixture.task", {"sessionId": project["sessionId"]})
@@ -103,7 +123,7 @@ def capture(device, bundle, output):
             if request["tool"] != "zeus_browser_settings" or "سأغيّر" not in request["explanation"]:
                 raise RuntimeError("The original agent lost the tool schema/approval explanation")
             time.sleep(1)
-            run("xcrun", "simctl", "io", device, "screenshot", str(output / "inline-approval.png"))
+            screenshot(rpc, output / "inline-approval.png")
             (output / "inline-approval-tree.json").write_text(json.dumps(rpc("debug.viewTree", {"maxDepth": 25}), ensure_ascii=False, indent=2))
             rpc("zeus.fixture.approval.respond", {"id": request["id"], "allowed": True})
             deadline = time.monotonic() + 30
@@ -115,11 +135,11 @@ def capture(device, bundle, output):
             if actual["settings"]["advanced"]["forceDarkWebPages"] is not True:
                 raise RuntimeError("The approved agent tool did not change the real browser setting")
             (output / "approved-browser-state.json").write_text(json.dumps(actual, ensure_ascii=False, indent=2))
-            run("xcrun", "simctl", "io", device, "screenshot", str(output / "inline-approved-result.png"))
+            screenshot(rpc, output / "inline-approved-result.png")
         for route in ["settings", "settings/providers", "settings/model-groups"]:
             rpc("debug.fixture.route", {"url": "minis://" + route})
             time.sleep(1.5)
-            run("xcrun", "simctl", "io", device, "screenshot", str(output / (route.replace("/", "-") + ".png")))
+            screenshot(rpc, output / (route.replace("/", "-") + ".png"))
     finally:
         console.flush()
         logs = container / "Library/Logs"
