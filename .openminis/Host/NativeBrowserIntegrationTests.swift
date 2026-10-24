@@ -199,6 +199,14 @@ final class NativeBrowserIntegrationTests: XCTestCase {
             let skill = try XCTUnwrap(SkillStore.shared.skills.first { $0.name == entry.installedName })
             XCTAssertTrue(FileManager.default.fileExists(atPath: SkillStore.shared.skillDirectoryURL(for: skill.id).appendingPathComponent("SKILL.md").path))
         }
+        // Regression: >20 bundled skills previously made recent.prefix(-N)
+        // trap before the original agent sent its first provider request.
+        let fragment = try XCTUnwrap(SkillStore.shared.skillPromptFragment(for: UUID().uuidString))
+        XCTAssertEqual(fragment.components(separatedBy: "  <skill>\n").count - 1, 20)
+        XCTAssertTrue(fragment.contains("more skills not shown above"))
+        for entry in ZeusDefaultSkills.shared.entries {
+            XCTAssertTrue(fragment.contains(entry.installedName), entry.installedName)
+        }
     }
     func testDirectIntegrationCatalogDoesNotRequireAProjectServer() throws {
         XCTAssertEqual(Set(ZeusService.catalog.map(\.id)), ["github", "railway", "vercel"])

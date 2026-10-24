@@ -118,3 +118,11 @@ Use the exact commit recorded by each workflow, not merely the branch name.
 packages an unsigned device IPA separately. Successful packaging is not a
 substitute for successful integration tests. Do not distribute an IPA as a
 verified release while those checks are failing or incomplete.
+
+The full original model loop then exposed an upstream skill-disclosure trap:
+more than 20 bundled skills made `recent.prefix(recentLimit)` receive a negative
+length. The adapter now caps bundled metadata at the existing 20-entry budget
+and bounds remaining counts; all other installed skill names remain discoverable.
+The native regression calls the actual selector with the 59-skill catalog and
+checks both the metadata budget and discoverability before exercising the full
+streaming/model/tool loop. Device version is 2.9.0 (14).

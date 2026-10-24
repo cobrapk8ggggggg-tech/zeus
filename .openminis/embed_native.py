@@ -33,6 +33,18 @@ def embed(native, browser, report):
     before = {str(f.relative_to(source)): hashlib.sha256(f.read_bytes()).hexdigest()
               for f in source.rglob("*.swift")}
     prepare_fixture(native)
+    # The upstream selector assumed bundled skills could never exceed its
+    # metadata budget. Official bundles exceed 20: keep the budget bounded and
+    # leave the complete catalog discoverable through the existing names list.
+    skill_store = source / "Agent/Session/SkillStore.swift"
+    replace(skill_store,
+            "            for s in enabled where s.importSource == .bundled {",
+            "            for s in enabled.filter({ $0.importSource == .bundled }).prefix(Self.maxSkillMetadataCount) {")
+    replace(skill_store,
+            "let recentLimit = min(10, Self.maxSkillMetadataCount - picked.count)",
+            "let recentLimit = min(10, max(0, Self.maxSkillMetadataCount - picked.count))")
+    replace(skill_store, "let maxUndisclosed = 100 - selected.count",
+            "let maxUndisclosed = max(0, 100 - selected.count)")
     generated = browser / ".openminis/build"
     generated.mkdir(parents=True, exist_ok=True)
 

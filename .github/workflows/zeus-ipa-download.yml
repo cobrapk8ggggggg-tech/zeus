@@ -9,7 +9,7 @@ on:
       source_ref:
         description: Browser source branch, tag or commit to package
         required: false
-        default: feature/zeus-project-agent-20261023
+        default: feature/zeus-native-agent-harness-20261023
         type: string
 permissions:
   contents: read
