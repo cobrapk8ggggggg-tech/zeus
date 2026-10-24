@@ -13,6 +13,18 @@ def exact(path, old, new):
 
 
 def apply(source: Path, browser: Path):
+    exact(source / "Providers/LLMTypes.swift",
+          'parts.append("To handle unsupported media, use shell_execute to run ffmpeg or other CLI tools.")',
+          'parts.append("In this ZEUS text edition, photos/screenshots use read_image with native image input or a configured Vision Group. If neither is available, ask to select a vision-capable model or configure a Vision Group. Never use FFmpeg or Python image libraries to view photos. Audio/video tools are not bundled.")')
+    vision = source / "Providers/VisionGroupResolver.swift"
+    code = vision.read_text()
+    start = code.index('            // Deliberately does NOT mention read_image:')
+    end = code.index('\n        }\n        guard let path else {', start)
+    code = code[:start] + r'''            return "[Image attached at \(path). This model cannot view images and no Vision Group is configured. "
+                + "The read_image tool reports this configuration requirement; select an image-capable model "
+                + "or configure a Vision Group before visual analysis. Do not substitute FFmpeg, Pillow, "
+                + "or invented shell/image tools for actual image understanding.]"''' + code[end:]
+    vision.write_text(code)
     original = source / "Providers/Voice/VoiceActivityDetector.swift"
     code = original.read_text()
     protocols = code[code.index("enum SegmentEndReason"):code.index("// MARK: - VoiceActivityDetector")]

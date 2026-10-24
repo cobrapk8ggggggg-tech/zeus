@@ -152,8 +152,12 @@ def embed(native, browser, report):
         '        if let tag = truncationRepairTag,\n           tu.name == "file_write" || tu.name == "file_edit" || tu.name == "zeus_browser" || zeusBrowserOperation(tu.name) != nil || ZeusAgentSchemas.names.contains(tu.name) {')
     replace(execution, '            let uiMessage = AppLocalized("Blocked: arguments were truncated in transit")\n            let modelMessage = """',
         '            let uiMessage = AppLocalized("Blocked: arguments were truncated in transit")\n            let modelMessage = (tu.name == "zeus_browser" || zeusBrowserOperation(tu.name) != nil) ? "Error: Browser call NOT executed: the provider truncated its arguments. Send a complete smaller call. Inspect the current page/state before retrying any mutation." : """')
-    replace(source / "Agent/Chat/AIChatViewModel.swift", "        var userSystemPrompt = baseSystemPrompt",
-        '        var userSystemPrompt = baseSystemPrompt + "\\n\\n" + ZEUSNativeAgentBridge.context + ZeusAgentHarness.shared.context(session: sessionId)')
+    # Keep the original base+model prefix intact so live model switches update
+    # modality/behavior fragments rather than retaining the previous model.
+    for indent, model in [("        ", "activeModel"), ("                ", "newEntry.model")]:
+        anchor = indent + "if let behaviorFragment = " + model + ".agentBehaviorPromptFragment {\n" + indent + '    userSystemPrompt += "\\n\\n" + behaviorFragment\n' + indent + "}"
+        replace(source / "Agent/Chat/AIChatViewModel.swift", anchor,
+                anchor + "\n" + indent + 'userSystemPrompt += "\\n\\n" + ZEUSNativeAgentBridge.context + ZeusAgentHarness.shared.context(session: sessionId)')
     replace(execution, "        let resultPart = AgentContentPart.toolResult(", "        ZeusAgentHarness.shared.observe(session: sessionId, tool: tu.name, success: toolSuccess, args: toolArgs, sourceWasTracked: zeusSourceTracked, imageDelivered: tu.name != \"read_image\" || toolImageData != nil || !self.activeModelHasNativeVision)\n        let resultPart = AgentContentPart.toolResult(")
     replace(source / "Agent/Chat/AIChatViewModel.swift", "            await self.ensureSession()", "            await self.ensureSession()\n            ZeusAgentHarness.shared.registerUserRequest(text, session: self.sessionId)")
     replace(source / "Agent/Chat/AIChatViewModel+Persistence.swift", "    func loadSession() async {\n        guard let sessionId else { return }", "    func loadSession() async {\n        guard let sessionId else { return }\n        _ = ZeusAgentHarness.shared.state(sessionId)\n        defer { ZeusAgentHarness.shared.rebindProjectCard(session: sessionId, messages: self.messages) }")
@@ -165,8 +169,6 @@ def embed(native, browser, report):
                 canResume = true; hitTurnLimit = false; break
             }''')
     replace(source / "Agent/Chat/AIChatViewModel.swift", "            var contextHistory = effectiveAgentHistory()", "            userSystemPrompt = ZeusAgentHarness.shared.refreshContext(userSystemPrompt, session: sessionId)\n            var contextHistory = effectiveAgentHistory()")
-    replace(source / "Agent/Chat/AIChatViewModel.swift", "                userSystemPrompt = baseSystemPrompt\n", '                userSystemPrompt = baseSystemPrompt + "\\n\\n" + ZEUSNativeAgentBridge.context\n')
-    replace(source / "Agent/Chat/AIChatViewModel.swift", "userSystemPrompt = baseSystemPrompt + Self.modelPromptFragments(newEntry.model)", 'userSystemPrompt = baseSystemPrompt + Self.modelPromptFragments(newEntry.model) + "\\n\\n" + ZEUSNativeAgentBridge.context + ZeusAgentHarness.shared.context(session: sessionId)')
     file_tools = source / "Agent/Chat/AIChatViewModel+FileTools.swift"
     replace(file_tools, 'ISHExecutionCoordinator.shared.hostURL(for: linuxPath)', 'ISHExecutionCoordinator.shared.hostURL(for: linuxPath, sessionId: self.sessionId)')
     replace(file_tools, 'ISHExecutionCoordinator.shared.hostURL(for: path)', 'ISHExecutionCoordinator.shared.hostURL(for: path, sessionId: self.sessionId)')

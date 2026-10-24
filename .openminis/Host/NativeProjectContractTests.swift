@@ -58,6 +58,17 @@ import UIKit
         }
         XCTAssertTrue(complete, "Official Gemini must produce a parsed native call, not visible JSON")
     }
+    func testNonVisionPromptsRequestRealVisionConfigurationInsteadOfRemovedMediaTools() throws {
+        let model = LLMModel(id: "fixture-text-only", displayName: "Text only", provider: "openai")
+        if let fragment = model.capabilityPromptFragment {
+            XCTAssertFalse(fragment.contains("run ffmpeg"))
+            XCTAssertTrue(fragment.contains("read_image"))
+        }
+        let placeholder = VisionGroupResolver.attachmentPlaceholder(linuxPath: "/var/minis/workspace/design.png")
+        XCTAssertTrue(placeholder.contains("read_image"))
+        XCTAssertFalse(placeholder.contains("shell_execute"))
+        XCTAssertTrue(placeholder.contains("/var/minis/workspace/design.png"))
+    }
     func testProviderTransportRepairsDoNotWeakenToolValidation() throws {
         let args = try ZeusToolInput.normalize(name: "exec_command", args: ["cmd": "printf ok", "yield_time_ms": "1000", "workdir": NSNull()], tools: [])
         XCTAssertEqual(args["yield_time_ms"] as? Int, 1000)
@@ -76,6 +87,8 @@ import UIKit
         let session = try XCTUnwrap(vm.sessionId)
         runtime.registerUserRequest("اكتب سكربت بايثون لقراءة ملف JSON، بدون اقتراح ابدأ تنفيذ", session: session)
         XCTAssertNil(runtime.state(session).project)
+        let repair = runtime.recoverToolText(#"{"tool_calls":[{"name":"file_read","arguments":{"path":"inspect.py"}}]}"#, tools: ["file_read"], session: session)
+        XCTAssertTrue(repair?.instruction?.hasPrefix(ZeusToolRecovery.marker + "file_read") == true)
         _ = try await runtime.projectEnvironment(vm: vm)
         XCTAssertNil(runtime.state(session).project, "Read-only environment discovery must not create a project")
         XCTAssertNoThrow(try runtime.projectGate(tool: "file_write", args: ["path": "inspect.py", "content": "print('ok')"], session: session))

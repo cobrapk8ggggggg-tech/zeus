@@ -151,7 +151,7 @@ import CryptoKit
     func recoverToolText(_ text: String, tools: Set<String>, session: String?) -> (notice: String, instruction: String?)? {
         guard let session else { return nil }
         var value = state(session)
-        guard value.status == "running", value.project != nil || !value.plan.isEmpty,
+        guard value.status == "running",
               let candidate = ZeusToolRecovery.candidate(text, tools: tools) else { return nil }
         let attempt = (value.toolTextRepairs ?? 0) + 1; value.toolTextRepairs = attempt
         let notice = "أرسل المزوّد طلب أداة كنص؛ لم يُنفَّذ. " + (attempt <= 2 ? "أعيد طلبه الآن بصيغة أداة صحيحة." : "تعذّر تصحيح بروتوكول الأدوات لهذا المزوّد. التقدم محفوظ؛ غيّر النموذج أو إعدادات مزوّد الأدوات ثم استأنف.")
@@ -184,6 +184,7 @@ import CryptoKit
     func hasSourceChanges(_ session: String) -> Bool { !(sourceChanges[session] ?? []).isEmpty }
     func observe(session: String?, tool: String, success: Bool, args: [String: Any] = [:], sourceWasTracked: Bool? = nil, imageDelivered: Bool = true) {
         guard let session, !ZeusAgentSchemas.names.contains(tool), !tool.hasPrefix("zeus_browser_") else { return }
+        if success { var value = state(session); value.toolTextRepairs = 0; value.noToolContinuations = 0; try? save(session, value) }
         if ["file_write", "file_edit", "shell_execute"].contains(tool), sourceWasTracked == nil {
             var value = state(session); value.generation += 1; value.noToolContinuations = 0
             if value.status == "completed" { value.status = "running" }

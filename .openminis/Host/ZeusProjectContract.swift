@@ -278,6 +278,7 @@ struct ZeusProjectProgressCard: View {
     func registerUserRequest(_ text: String, session: String?) {
         guard let session, !text.isEmpty else { return }
         var value = state(session)
+        value.toolTextRepairs = 0
         if let legacy = value.project, legacy.proposal == nil, !ZeusProjectContract.isProjectRequest(legacy.userGoal), !ZeusProjectContract.isProjectRequest(text) {
             value.project = nil // Remove the previous over-broad source-file gate for utility scripts.
         }
@@ -295,7 +296,7 @@ struct ZeusProjectProgressCard: View {
         } else {
             // Keep the actual request for the source-write fallback even when
             // a colloquial "I want an app" did not match intent keywords.
-            value.goal = String(text.prefix(4000))
+            value.goal = String(text.prefix(4000)); value.status = "running"
         }
         try? save(session, value)
     }
