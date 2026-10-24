@@ -4,8 +4,14 @@ import CoreFoundation
 /// The original tool model advertises primitive types. Enforce those types for
 /// every registered tool, not only WebKit operations, before it gets permission.
 enum ZeusToolInput {
-    static func normalize(name: String, args: [String: Any], tools: [AgentToolDefinition]) throws -> [String: Any] {
-        if let schema = ZeusAgentSchemas.schema(name) { try ZeusAgentSchemas.validate(args, schema: schema); return args }
+    static func normalize(name: String, args: [String: Any], tools: [AgentToolDefinition], utility: Bool = false) throws -> [String: Any] {
+        if name == "propose_project_plan", utility { return args } // Harmless no-op; the runtime explains that scripts need no project card.
+        let args = name == "propose_project_plan" ? ZeusProjectContract.normalizedArguments(args) : args
+        if let schema = ZeusAgentSchemas.schema(name) {
+            let normalized = ZeusAgentSchemas.normalized(args, schema: schema) as? [String: Any] ?? args
+            try ZeusAgentSchemas.validate(normalized, schema: schema)
+            return normalized
+        }
         guard let definition = tools.first(where: { $0.name == name }) else { return args }
         var result = args
         for (key, parameter) in definition.parameters {
@@ -59,6 +65,7 @@ enum ZeusPermissionMode: String, CaseIterable {
         let explanation: String
         let destination: String
         let sessionID: String?
+        var plan: ZeusProjectContract.Proposal? = nil
     }
     @Published private(set) var requests: [UUID: Request] = [:]
     private var continuations: [UUID: CheckedContinuation<Bool, Never>] = [:]
@@ -67,13 +74,14 @@ enum ZeusPermissionMode: String, CaseIterable {
         set {
             UserDefaults.standard.set(newValue.rawValue, forKey: Self.modeKey)
             objectWillChange.send()
-            if newValue == .unrestricted { for id in Array(requests.keys) { respond(id, allowed: true) } }
+            if newValue == .unrestricted { for request in Array(requests.values) where request.plan == nil { respond(request.id, allowed: true) } }
         }
     }
 
     static func isConsequential(tool: String, args: [String: Any]) -> Bool {
         switch tool {
-        case "update_plan", "task_checkpoint", "task_complete", "task_verify_mcp", "integration_accounts", "integration_tools": return false
+        case "update_plan", "task_checkpoint", "task_complete", "task_verify_mcp", "task_verify_github", "integration_accounts", "integration_tools", "project_environment", "propose_project_plan", "github_read_file": return false
+        case "github_request": return !["GET", "HEAD"].contains(args["method"] as? String ?? "GET")
         case "integration_call": return !ZeusConnections.shared.isReadOnly(args["account_id"] as? String ?? "", tool: args["tool_name"] as? String ?? "")
         case "write_stdin": return args["terminate"] as? Bool == true || !(args["chars"] as? String ?? "").isEmpty
         case "zeus_project_list", "zeus_project_status", "zeus_project_events", "zeus_project_diff", "zeus_project_files": return false
@@ -97,11 +105,22 @@ enum ZeusPermissionMode: String, CaseIterable {
 
     func authorize(tool: String, args: [String: Any], sessionID: String?, blockID: UUID) async throws {
         try Task.checkCancellation()
-        guard mode == .askAll || (mode == .consequential && Self.isConsequential(tool: tool, args: args)) else { return }
+        var plan: ZeusProjectContract.Proposal?
+        if tool == "propose_project_plan" {
+            if ZeusAgentHarness.shared.isUtilityTask(session: sessionID) { return }
+            guard let sessionID else { throw ZeusPatch.failure("No project conversation.") }
+            let proposal = try ZeusProjectContract.decoded(args)
+            let current = ZeusAgentHarness.shared.state(sessionID).project
+            if current?.decision == "approved", current?.approvedHash == proposal.hash { return }
+            guard !requests.values.contains(where: { $0.sessionID == sessionID && $0.plan != nil }) else { throw ZeusPatch.failure("A project plan is already awaiting user review. Do not create parallel approval cards.") }
+            plan = try ZeusAgentHarness.shared.prepareProjectProposal(args, session: sessionID, blockID: blockID)
+        }
+        let routine = mode == .consequential && ZeusAgentHarness.shared.isRoutineProjectAction(tool: tool, args: args, session: sessionID)
+        guard plan != nil || mode == .askAll || (mode == .consequential && Self.isConsequential(tool: tool, args: args) && !routine) else { return }
         let request = Request(id: blockID, tool: tool,
-            title: String((args["tool_title"] as? String ?? tool).prefix(180)),
-            explanation: String((args["approval_reason"] as? String ?? "سيستخدم Zeus هذه الأداة لتنفيذ طلبك. راجع الإجراء والوجهة قبل المتابعة.").prefix(800)),
-            destination: Self.destination(tool: tool, args: args), sessionID: sessionID)
+            title: plan?.title ?? String((args["tool_title"] as? String ?? tool).prefix(180)),
+            explanation: plan?.objective ?? String((args["approval_reason"] as? String ?? "سيستخدم Zeus هذه الأداة لتنفيذ طلبك. راجع الإجراء والوجهة قبل المتابعة.").prefix(800)),
+            destination: Self.destination(tool: tool, args: args), sessionID: sessionID, plan: plan)
         let allowed = await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
                 guard !Task.isCancelled else { continuation.resume(returning: false); return }
@@ -109,17 +128,35 @@ enum ZeusPermissionMode: String, CaseIterable {
                 requests[request.id] = request
                 changed(request.id)
                 Task { @MainActor in
-                    try? await Task.sleep(for: .seconds(300))
-                    self.respond(request.id, allowed: false)
+                    try? await Task.sleep(for: .seconds(request.plan == nil ? 300 : 1800))
+                    if request.plan != nil { self.respondPlan(request.id, decision: "expired") }
+                    else { self.respond(request.id, allowed: false) }
                 }
             }
         } onCancel: {
             Task { @MainActor in self.respond(request.id, allowed: false) }
         }
         try Task.checkCancellation()
+        if !allowed, plan != nil {
+            let revision = sessionID.flatMap { ZeusAgentHarness.shared.state($0).project?.revision } ?? ""
+            throw ZeusPatch.failure("The project plan was not approved. No project mutation was authorized." + (revision.isEmpty ? " Respect cancellation; wait for a new user request." : " User requested these revisions: " + revision + ". Revise the proposal and ask again; do not begin implementation."))
+        }
         guard allowed else { throw NSError(domain: "ZeusApproval", code: 1, userInfo: [NSLocalizedDescriptionKey: "لم تُمنح الموافقة؛ لم تُنفذ الأداة. لا تكرر طلب الإذن لنفس الإجراء دون طلب جديد من المستخدم."]) }
     }
     func respond(_ id: UUID, allowed: Bool) {
+        if requests[id]?.plan != nil { respondPlan(id, decision: allowed ? "approved" : "cancelled"); return }
+        if let request = requests[id] { ZeusAgentHarness.shared.recordProjectPermission(session: request.sessionID, tool: request.tool, allowed: allowed) }
+        finish(id, allowed: allowed)
+    }
+    func respondPlan(_ id: UUID, decision: String, note: String = "") {
+        guard ["approved", "changes_requested", "cancelled", "expired"].contains(decision), let request = requests[id],
+              let proposal = request.plan, let session = request.sessionID else { return }
+        do {
+            try ZeusAgentHarness.shared.decideProject(session: session, hash: proposal.hash, decision: decision, note: note)
+            finish(id, allowed: decision == "approved")
+        } catch { finish(id, allowed: false) }
+    }
+    private func finish(_ id: UUID, allowed: Bool) {
         guard let continuation = continuations.removeValue(forKey: id) else { return }
         requests.removeValue(forKey: id)
         changed(id)
@@ -134,6 +171,11 @@ enum ZeusPermissionMode: String, CaseIterable {
     private static func destination(tool: String, args: [String: Any]) -> String {
         if tool == "zeus_browser" || zeusBrowserOperation(tool) != nil { return "متصفحك ZEUS · " + (zeusBrowserOperation(tool) ?? args["operation"] as? String ?? "") + "\n" + (args["url"] as? String ?? args["tab_id"] as? String ?? "البروفايل النشط") }
         if tool == "browser_use" { return "متصفح الأتمتة المستقل · " + (args["action"] as? String ?? "") + "\n" + (args["url"] as? String ?? "") }
+        if ["github_write_files", "github_read_file"].contains(tool) {
+            let account = ZeusConnections.shared.accounts.first { $0.id == args["account_id"] as? String }?.label ?? (args["account_id"] as? String ?? "")
+            let files = (args["files"] as? [[String: Any]] ?? []).compactMap { $0["path"] as? String }.prefix(5).joined(separator: "، ")
+            return "GitHub · " + account + "\n" + (args["repository"] as? String ?? "") + " · " + (args["branch"] as? String ?? "") + "\n" + (files.isEmpty ? (args["path"] as? String ?? "") : files)
+        }
         if let path = args["path"] as? String { return String(path.prefix(500)) }
         if let command = args["command"] as? String { return String(command.prefix(600)) }
         return tool
@@ -149,6 +191,8 @@ struct ZeusInlineApprovalCard: View {
     @State private var choice: Bool? = nil
     var body: some View {
         if let request = permissions.requests[blockID] {
+            if request.plan != nil { ZeusProjectApprovalCard(request: request) }
+            else {
             VStack(alignment: .leading, spacing: 12) {
                 Label("موافقة على إجراء", systemImage: "hand.raised.fill").font(.headline)
                 Text(request.title).font(.subheadline.bold()).fixedSize(horizontal: false, vertical: true)
@@ -168,6 +212,9 @@ struct ZeusInlineApprovalCard: View {
             .foregroundStyle(.primary).tint(.blue)
             .environment(\.layoutDirection, .rightToLeft)
             .accessibilityIdentifier("zeusInlineToolApproval")
+            }
+        } else if ZeusAgentHarness.shared.projectForBlock(blockID) != nil {
+            ZeusProjectProgressCard(blockID: blockID)
         }
     }
     private func option(_ title: String, value: Bool) -> some View {

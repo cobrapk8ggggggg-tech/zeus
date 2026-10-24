@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 import time
 import urllib.request
+from native_screenshot import capture as screenshot
 
 
 def run(*arguments):
@@ -49,7 +50,7 @@ def capture(device, app, output, bundle="com.openminis.app"):
             # Allow the original navigation animation and its SQLite reads.
             time.sleep(1.5)
         filename = page.replace("/", "-") + ".png"
-        run("xcrun", "simctl", "io", device, "screenshot", str(output / filename))
+        screenshot(rpc, output / filename)
         captured.append({"route": page, "file": filename})
     (output / "screens.json").write_text(json.dumps(captured, ensure_ascii=False, indent=2))
 

@@ -6,6 +6,8 @@ Codex CLI delegation in the app's registered tools or settings. The old Python
 Codex service remains historical source in `Runtime/agent_service`; it is not a
 dependency of this native runtime and must not be deployed as its replacement.
 
+The next project-contract layer is documented in [PROJECT-CONTRACT.md](PROJECT-CONTRACT.md): inline plan approval for substantial projects (small scripts and inspection tasks execute directly), native GitHub REST/Actions and evidence for every approved feature, including actual UI image review.
+
 ## Implementation and acceptance stages
 
 1. **Native tools and provider contracts**: nested JSON schemas on OpenAI Chat
@@ -145,3 +147,38 @@ honors authorization_pending, slow_down, expiry, denial and cancellation;
 tokens must round-trip through original Keychain storage before account creation.
 Native HTTP tests exercise those responses and reject untrusted verification URLs.
 Version 2.9.1 (15) includes this fix; actual user approval remains interactive.
+
+
+## OpenMinis 1.14 and provider regression fixes
+
+The source lock now points to official `OpenMinis/OpenMinis` tag 1.14,
+`b4c0661d5631ebab4d1a2e6f3fd4c805d4030a6c`. The original provider screens,
+GitHub Copilot device authorization, usage/quota views, request settings,
+Gemini thinking-signature history, image wire-format fixes and agent updates
+come from that source. Provider support and quota availability still depend on
+the account and endpoint. Browser adapters and original view comparisons remain
+explicit, while audio/video/VAD resources stay excluded from the text edition.
+Rclone is built as a real SDK-correct XCFramework for the new backup feature.
+
+Native Gemini tests exercise its actual `streamGenerateContent` request,
+`parametersJsonSchema`, image bytes, functionResponse and forced native repair
+configuration. Custom OpenAI-compatible tests exercise streamed calls and repair
+through the original OpenAI transport. These controlled local HTTP fixtures do
+not claim that a live Gemini/DeepSeek account has been tested or that all models
+produce equally good code.
+
+Plan normalization accepts unambiguous equivalent IDs/titles, explicit all-feature
+coverage and common check-kind aliases, but never fabricates tests or successful
+results. Validation reports the exact unknown/missing IDs. Native argument
+normalization repairs stringified JSON/booleans/integers and optional nulls without
+accepting unknown fields, missing required fields or fractional integers. Utility
+environment discovery does not create a mandatory project; an unwanted plan call
+for a utility is a harmless no-op. Model-facing prompts no longer tell text-only
+models to use removed FFmpeg/Pillow for image understanding; use the original
+native `read_image` pipeline or configure a real vision model/group.
+
+Arabic carry-forward is explicit: `arabic-base.json` retains the 1,767 Arabic
+entries from the previously embedded fork with its source revision, while reviewed
+`arabic-overrides.json` corrects earlier translations and covers every added 1.14
+catalog key. Official 1.14 itself has no Arabic catalog. Embedding tests require
+Arabic coverage for every resulting localization key and matching format tokens.

@@ -30,7 +30,7 @@ final class NativeBrowserIntegrationTests: XCTestCase {
         XCTAssertTrue(store.zeusFixtureLoadFinished)
         let created = try DebugRPCProvider.instancesCreate(params: ["providerType": "openAI", "label": "Native loop fixture " + UUID().uuidString, "apiKey": "local-fixture-only", "customBaseURL": "http://127.0.0.1:8765/v1", "appendV1Suffix": false, "seedBuiltInModels": false])
         let instance = try XCTUnwrap(created["instance"] as? [String: Any]), id = try XCTUnwrap(instance["id"] as? String)
-        defer { _ = try? DebugRPCProvider.instancesDelete(params: ["instanceId": id]) }
+        defer { _ = try? DebugRPCProvider.instancesDelete(params: ["instanceId": id, "confirm": true]) }
         XCTAssertEqual(ProviderKeychainHelper.loadAPIKey(instanceId: id), "local-fixture-only", "The simulator must preserve real Keychain credentials")
         let stream = try DebugRPCProvider.modelsAdd(params: ["instanceId": id, "modelId": "fixture-native-stream", "displayName": "Native full loop", "contextWindow": 128000, "maxOutputTokens": 16000])
         let response = try await DebugRPCChat.prompt(params: ["prompt": "اعرض النص كاملًا كما يرسله مزود الاختبار.", "modelEntryId": stream["id"]!, "thinkingLevel": "off", "wait": true, "waitTimeout": 60])
@@ -38,10 +38,25 @@ final class NativeBrowserIntegrationTests: XCTestCase {
         let project = try DebugRPCProvider.modelsAdd(params: ["instanceId": id, "modelId": "fixture-native-harness-" + UUID().uuidString, "displayName": "Native project loop", "contextWindow": 128000, "maxOutputTokens": 4000])
         let prior = ZeusToolPermissions.shared.mode; ZeusToolPermissions.shared.mode = .unrestricted
         defer { ZeusToolPermissions.shared.mode = prior }
+        let approvePlan = Task { @MainActor in
+            for _ in 0..<1200 {
+                try Task.checkCancellation()
+                if let request = ZeusToolPermissions.shared.requests.values.first(where: { $0.plan?.title.hasPrefix("Native project fixture ") == true }) {
+                    XCTAssertEqual(request.plan?.build_route, "local")
+                    XCTAssertEqual(request.plan?.checks.count, 2)
+                    ZeusToolPermissions.shared.respondPlan(request.id, decision: "approved")
+                    return
+                }
+                try await Task.sleep(for: .milliseconds(50))
+            }
+        }
+        defer { approvePlan.cancel() }
         let completed = try await DebugRPCChat.prompt(params: ["prompt": "أنشئ المشروع، شغّل الفحص وأصلح الخطأ وتحقق منه فعلياً.", "modelEntryId": project["id"]!, "thinkingLevel": "off", "wait": true, "waitTimeout": 60])
         XCTAssertTrue((completed["responseText"] as? String ?? "").contains("NATIVE_HARNESS_VERIFIED"))
         let session = try XCTUnwrap(completed["sessionId"] as? String)
         XCTAssertEqual(ZeusAgentHarness.shared.state(session).status, "completed")
+        XCTAssertEqual(ZeusAgentHarness.shared.state(session).project?.decision, "approved")
+        XCTAssertEqual(ZeusAgentHarness.shared.state(session).project?.evidence.values.filter(\.passed).count, 2)
         await ChatStore.shared.deleteSession(session)
         if let session = response["sessionId"] as? String { await ChatStore.shared.deleteSession(session) }
     }

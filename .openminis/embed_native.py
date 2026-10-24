@@ -48,10 +48,31 @@ def embed(native, browser, report):
     generated = browser / ".openminis/build"
     generated.mkdir(parents=True, exist_ok=True)
 
+    # Carry the previous fork's sideload-compatible storage paths. Official
+    # 1.14 force-unwraps an App Group unavailable to generic IPA signatures.
+    shared_store = source / "Shared/SharedContainerStore.swift"
+    replace(shared_store, '    private static let pendingShareKey', '    /// App Group container when the installed signature includes the App Group\n    /// entitlement. Sideloaded builds signed with a generic certificate often do\n    /// not have that entitlement; in that case iOS returns nil and callers must\n    /// not force-unwrap it during launch.\n    static var appGroupContainerURL: URL? {\n        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID)\n    }\n\n    /// Private in-app fallback used when App Groups are unavailable. This keeps\n    /// the main app launchable after sideload signing, while features that truly\n    /// require app/extension sharing simply degrade instead of crashing.\n    static var fallbackContainerURL: URL {\n        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]\n        let url = support.appendingPathComponent("MinisSharedContainer", isDirectory: true)\n        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)\n        return url\n    }\n\n    static var containerURLForMainAppStorage: URL {\n        appGroupContainerURL ?? fallbackContainerURL\n    }\n\n    static var hasAppGroupAccess: Bool {\n        appGroupContainerURL != nil\n    }\n\n' + '    private static let pendingShareKey')
+    budget = source / "Agent/Chat/AIChatViewModel+RequestBudget.swift"
+    replace(budget, '        FileManager.default.containerURL(\n            forSecurityApplicationGroupIdentifier: SharedContainerStore.appGroupID\n        )!.appendingPathComponent("MinisFileProvider", isDirectory: true)',
+            '        SharedContainerStore.containerURLForMainAppStorage.appendingPathComponent("MinisFileProvider", isDirectory: true)')
+    replace(budget, '        let url = FileManager.default.containerURL(\n            forSecurityApplicationGroupIdentifier: SharedContainerStore.appGroupID\n        )!.appendingPathComponent("MinisConfig", isDirectory: true)',
+            '        let url = SharedContainerStore.containerURLForMainAppStorage.appendingPathComponent("MinisConfig", isDirectory: true)')
+    replace(app, '    private static func registerFileProviderDomain() {', '''    private static func registerFileProviderDomain() {
+        guard SharedContainerStore.hasAppGroupAccess else {
+            lifecycleLog.warning("[FileProvider] App Group unavailable; retaining private sideload storage")
+            SoulStore.ensureExists()
+            SoulStore.refreshCache()
+            return
+        }''')
+    app_code = app.read_text()
+    migration_start = app_code.index('    private static func migrateSharedDirToAppGroup() {')
+    migration_end = app_code.index('    /// Print the canonical AppGroup paths', migration_start)
+    replace(app, app_code[migration_start:migration_end], '    private static func migrateSharedDirToAppGroup() {\n        let fm = FileManager.default\n        let library = fm.urls(for: .libraryDirectory, in: .userDomainMask).first!\n        let appGroupContainer = SharedContainerStore.appGroupContainerURL\n\n        var migrations: [(source: URL, dest: URL, label: String)] = [\n            // Legacy Library/MinisChat/shared → new shared\n            (library.appendingPathComponent("MinisChat/shared", isDirectory: true),\n             AIChatViewModel.minisSharedPersistentDir, "shared"),\n            // Legacy Library/MinisChat/memory → new memory\n            (library.appendingPathComponent("MinisChat/memory", isDirectory: true),\n             AIChatViewModel.minisMemoryPersistentDir, "memory"),\n            // Legacy Library/MinisChat/skills → new skills\n            (library.appendingPathComponent("MinisChat/skills", isDirectory: true),\n             AIChatViewModel.minisSkillsPersistentDir, "skills"),\n        ]\n\n        // Old App Group MinisShared → new shared. Only available when the\n        // installed signature carries the application-groups entitlement.\n        if let appGroupContainer {\n            migrations.append((\n                appGroupContainer.appendingPathComponent("MinisShared", isDirectory: true),\n                AIChatViewModel.minisSharedPersistentDir,\n                "MinisShared→shared"\n            ))\n        }\n\n        for migration in migrations {\n            guard fm.fileExists(atPath: migration.source.path) else { continue }\n            try? fm.createDirectory(at: migration.dest, withIntermediateDirectories: true)\n            guard let contents = try? fm.contentsOfDirectory(at: migration.source, includingPropertiesForKeys: nil) else { continue }\n            for item in contents {\n                let dest = migration.dest.appendingPathComponent(item.lastPathComponent)\n                if !fm.fileExists(atPath: dest.path) {\n                    try? fm.moveItem(at: item, to: dest)\n                }\n            }\n            // Remove old directory if empty\n            if (try? fm.contentsOfDirectory(at: migration.source, includingPropertiesForKeys: nil))?.isEmpty ?? true {\n                try? fm.removeItem(at: migration.source)\n            }\n            lifecycleLog.info("[FileProvider] migrated \\(migration.label) to App Group")\n        }\n    }\n\n')
+
     # The application remains OpenMinis' original @main/AppDelegate/root setup;
     # its root content now embeds the browser with the original AI UI alongside.
     replace(source / "MinisApp.swift", "                ContentView()", "                ZEUSBrowserRootEntry()")
-    for name in ("ZEUSNativeIntegration.swift", "ZeusToolPermissions.swift", "ZeusDefaultSkills.swift", "ZeusAgentSchemas.swift", "ZeusPatch.swift", "ZeusAgentHarness.swift", "ZeusConnections.swift", "ZeusGitHubAuthorization.swift"):
+    for name in ("ZEUSNativeIntegration.swift", "ZeusToolPermissions.swift", "ZeusDefaultSkills.swift", "ZeusAgentSchemas.swift", "ZeusPatch.swift", "ZeusAgentHarness.swift", "ZeusConnections.swift", "ZeusGitHubAuthorization.swift", "ZeusProjectContract.swift", "ZeusGitHubTools.swift"):
         shutil.copyfile(browser / ".openminis/Host" / name, source / name)
     # Reuse the exact native settings sheet from the browser's AI settings row.
     # Only its file-private visibility changes; its body is untouched.
@@ -83,9 +104,16 @@ def embed(native, browser, report):
             parameters["approval_reason"] = AgentToolParam(type: .string, description: "For consequential actions, explain what you intend to change and why in the user language. The app displays this on an inline approval card.")
             return AgentToolDefinition(name: tool.name, description: tool.description, parameters: parameters, required: tool.required, propertyOrdering: tool.propertyOrdering)
         }""")
-    replace(definitions, 'description: "Control a web browser with up to 3 tabs.',
-            'description: "This is the standalone Zeus automation browser, separate from the user\'s ZEUS tabs and browser profile. For the user\'s current page use zeus_browser_read; for existing tabs use zeus_browser_tabs; for user-browser navigation use zeus_browser_open. Other zeus_browser_* tools inspect its settings, cookies and storage. Control a web browser with up to 3 tabs.')
+    replace(definitions, "        if nativeVision || visionGroupConfigured {", "        if true { // read_image stays discoverable even before vision configuration.")
+    replace(definitions, "description: readImageDescription,", 'description: ((!nativeVision && !visionGroupConfigured) ? "Read a photo/screenshot with the native image pipeline. This selected model has no image input and no vision group is configured; the tool will report that exact configuration requirement. Select an image-capable model or configure the vision group before visual analysis." : readImageDescription) + " Photos never use FFmpeg or Python image packages in ZEUS. Video/audio processing is intentionally unavailable in this text edition.",')
+    replace(definitions, 'description: "Control a web browser with a few tabs (list_tabs shows the ones you may use).',
+            'description: "This is the standalone Zeus automation browser, separate from the user\'s ZEUS tabs and browser profile. For the user\'s current page use zeus_browser_read; for existing tabs use zeus_browser_tabs; for user-browser navigation use zeus_browser_open. Other zeus_browser_* tools inspect its settings, cookies and storage. Control a web browser with a few tabs (list_tabs shows the ones you may use).')
     execution = source / "Agent/Chat/AIChatViewModel+ConcurrentTools.swift"
+    replace(execution, "        batchBudget: BatchImageBudget\n", "        batchBudget: BatchImageBudget,\n        zeusSourceMessageID: String? = nil\n")
+    replace(source / "Agent/Chat/AIChatViewModel.swift",
+            "tu: tu, msgIdx: msgIdx, tools: toolsSnapshot, batchBudget: imageBudgetActor",
+            "tu: tu, msgIdx: msgIdx, tools: toolsSnapshot, batchBudget: imageBudgetActor, zeusSourceMessageID: deferredAssistantRaw?.id")
+    replace(execution, '        var toolSuccess: Bool = false', '        var toolSuccess: Bool = false\n        var zeusSourceTracked = false\n        let zeusSourceTicket = UUID()')
     text = execution.read_text()
     anchor = '        case "browser_use":'
     parts = text.split(anchor)
@@ -109,21 +137,25 @@ def embed(native, browser, report):
 
 '''
     adapter += '''        case let name where ZeusAgentSchemas.names.contains(name):
-            toolOutput = try await ZeusAgentHarness.shared.execute(name, args: toolArgs, callID: tu.id, vm: self)
+            toolOutput = try await ZeusAgentHarness.shared.execute(name, args: toolArgs,
+                callID: ZeusAgentHarness.scopedCallID(providerID: tu.id, sourceMessageID: zeusSourceMessageID), vm: self)
             if let object = try? JSONSerialization.jsonObject(with: Data(toolOutput.utf8)) as? [String: Any], object["isError"] as? Bool == true { toolSuccess = false }
             else if let object = try? JSONSerialization.jsonObject(with: Data(toolOutput.utf8)) as? [String: Any], let code = object["exit_code"] as? Int { toolSuccess = code == 0 }
-            else if ["task_verify", "task_verify_mcp"].contains(name), let checks = try? JSONSerialization.jsonObject(with: Data(toolOutput.utf8)) as? [[String: Any]] { toolSuccess = checks.allSatisfy { $0["exitCode"] as? Int == 0 } }
+            else if ["task_verify", "task_verify_mcp", "task_verify_github"].contains(name), let checks = try? JSONSerialization.jsonObject(with: Data(toolOutput.utf8)) as? [[String: Any]] { toolSuccess = checks.allSatisfy { $0["exitCode"] as? Int == 0 } }
             else { toolSuccess = true }
 
 '''
     execution.write_text(parts[0] + adapter + anchor + parts[1] + ''.join('        case let name where name == "browser_use" || name == "zeus_browser" || zeusBrowserOperation(name) != nil:' + p for p in parts[2:]))
 
     replace(execution, "        do {\n        switch tu.name {", """        do {
-        let toolArgs = try ZeusToolInput.normalize(name: tu.name, args: toolArgs, tools: tools)
+        let toolArgs = try ZeusToolInput.normalize(name: tu.name, args: toolArgs, tools: tools, utility: ZeusAgentHarness.shared.isUtilityTask(session: sessionId))
         let argsJson = String(decoding: try JSONSerialization.data(withJSONObject: toolArgs), as: UTF8.self)
         if tu.name == "zeus_browser" || zeusBrowserOperation(tu.name) != nil { _ = try ZEUSNativeAgentBridge.normalizedInput(toolArgs, toolName: tu.name) }
+        try ZeusAgentHarness.shared.projectGate(tool: tu.name, args: toolArgs, session: sessionId)
         try await ZeusToolPermissions.shared.authorize(tool: tu.name, args: toolArgs, sessionID: sessionId,
             blockID: messages[msgIdx].blocks[blockIdx].id)
+        zeusSourceTracked = try ZeusAgentHarness.shared.beginSourceChange(session: sessionId, tool: tu.name, args: toolArgs, ticket: zeusSourceTicket)
+        defer { if zeusSourceTracked { ZeusAgentHarness.shared.finishSourceChange(session: sessionId, ticket: zeusSourceTicket) } }
         switch tu.name {""")
     # Avoid a second, old modal after the common gate already authorized shell.
     text = execution.read_text()
@@ -137,13 +169,19 @@ def embed(native, browser, report):
         '                if !(raw is String) && !(raw is NSNumber) && !(raw is [Any]) && !(raw is [String: Any]) { return true }')
     replace(source / "Agent/Chat/AIChatViewModel+ToolPreflight.swift", '        "file_edit": ["new_string"],',
         '        "file_edit": ["new_string"],\n        "zeus_browser_type": ["text"],')
-    replace(execution, 'tu.name == "file_write" || tu.name == "file_edit" {',
-        'tu.name == "file_write" || tu.name == "file_edit" || tu.name == "zeus_browser" || zeusBrowserOperation(tu.name) != nil || ZeusAgentSchemas.names.contains(tu.name) {')
-    replace(execution, '            let modelMessage = """\n            Error: This call was NOT executed.',
-        '            let modelMessage = (tu.name == "zeus_browser" || zeusBrowserOperation(tu.name) != nil) ? "Error: Browser call NOT executed: the provider truncated its arguments. Send a complete smaller call. Inspect the current page/state before retrying any mutation." : """\n            Error: This call was NOT executed.')
-    replace(source / "Agent/Chat/AIChatViewModel.swift", "        var userSystemPrompt = baseSystemPrompt",
-        '        var userSystemPrompt = baseSystemPrompt + "\\n\\n" + ZEUSNativeAgentBridge.context + ZeusAgentHarness.shared.context(session: sessionId)')
-    replace(execution, "        let snapshotItem = ToolSnapshotItem(", "        ZeusAgentHarness.shared.observe(session: sessionId, tool: tu.name, success: toolSuccess)\n        let snapshotItem = ToolSnapshotItem(")
+    replace(execution, '        if let tag = truncationRepairTag,\n           tu.name == "file_write" || tu.name == "file_edit" {',
+        '        if let tag = truncationRepairTag,\n           tu.name == "file_write" || tu.name == "file_edit" || tu.name == "zeus_browser" || zeusBrowserOperation(tu.name) != nil || ZeusAgentSchemas.names.contains(tu.name) {')
+    replace(execution, '            let uiMessage = AppLocalized("Blocked: arguments were truncated in transit")\n            let modelMessage = """',
+        '            let uiMessage = AppLocalized("Blocked: arguments were truncated in transit")\n            let modelMessage = (tu.name == "zeus_browser" || zeusBrowserOperation(tu.name) != nil) ? "Error: Browser call NOT executed: the provider truncated its arguments. Send a complete smaller call. Inspect the current page/state before retrying any mutation." : """')
+    # Keep the original base+model prefix intact so live model switches update
+    # modality/behavior fragments rather than retaining the previous model.
+    for indent, model in [("        ", "activeModel"), ("                ", "newEntry.model")]:
+        anchor = indent + "if let behaviorFragment = " + model + ".agentBehaviorPromptFragment {\n" + indent + '    userSystemPrompt += "\\n\\n" + behaviorFragment\n' + indent + "}"
+        replace(source / "Agent/Chat/AIChatViewModel.swift", anchor,
+                anchor + "\n" + indent + 'userSystemPrompt += "\\n\\n" + ZEUSNativeAgentBridge.context + ZeusAgentHarness.shared.context(session: sessionId)')
+    replace(execution, "        let resultPart = AgentContentPart.toolResult(", "        ZeusAgentHarness.shared.observe(session: sessionId, tool: tu.name, success: toolSuccess, args: toolArgs, sourceWasTracked: zeusSourceTracked, imageDelivered: tu.name != \"read_image\" || toolImageData != nil || !self.activeModelHasNativeVision)\n        let resultPart = AgentContentPart.toolResult(")
+    replace(source / "Agent/Chat/AIChatViewModel.swift", "            await self.ensureSession()", "            await self.ensureSession()\n            ZeusAgentHarness.shared.registerUserRequest(text, session: self.sessionId)")
+    replace(source / "Agent/Chat/AIChatViewModel+Persistence.swift", "    func loadSession() async {\n        guard let sessionId else { return }", "    func loadSession() async {\n        guard let sessionId else { return }\n        _ = ZeusAgentHarness.shared.state(sessionId)\n        defer { ZeusAgentHarness.shared.rebindProjectCard(session: sessionId, messages: self.messages) }")
     replace(source / "Agent/Chat/AIChatViewModel.swift", "    func cancel() {", "    func cancel() {\n        ZeusAgentHarness.shared.cancel(session: sessionId)")
     replace(source / "Agent/Chat/AIChatViewModel.swift", "    static let maxAgentTurns = 200", "    static var maxAgentTurns: Int { ZeusAgentHarness.maxTurns }")
     replace(source / "Agent/Chat/AIChatViewModel.swift", "            defer { turnCount += 1 }", '''            defer { turnCount += 1 }
@@ -151,8 +189,7 @@ def embed(native, browser, report):
                 if msgIdx >= 0, msgIdx < messages.count { messages[msgIdx].error = notice }
                 canResume = true; hitTurnLimit = false; break
             }''')
-    replace(source / "Agent/Chat/AIChatViewModel.swift", "            let contextHistory = effectiveAgentHistory()", "            userSystemPrompt = ZeusAgentHarness.shared.refreshContext(userSystemPrompt, session: sessionId)\n            let contextHistory = effectiveAgentHistory()")
-    replace(source / "Agent/Chat/AIChatViewModel.swift", "                userSystemPrompt = baseSystemPrompt", '                userSystemPrompt = baseSystemPrompt + "\\n\\n" + ZEUSNativeAgentBridge.context')
+    replace(source / "Agent/Chat/AIChatViewModel.swift", "            var contextHistory = effectiveAgentHistory()", "            userSystemPrompt = ZeusAgentHarness.shared.refreshContext(userSystemPrompt, session: sessionId)\n            var contextHistory = effectiveAgentHistory()")
     file_tools = source / "Agent/Chat/AIChatViewModel+FileTools.swift"
     replace(file_tools, 'ISHExecutionCoordinator.shared.hostURL(for: linuxPath)', 'ISHExecutionCoordinator.shared.hostURL(for: linuxPath, sessionId: self.sessionId)')
     replace(file_tools, 'ISHExecutionCoordinator.shared.hostURL(for: path)', 'ISHExecutionCoordinator.shared.hostURL(for: path, sessionId: self.sessionId)')
@@ -160,7 +197,22 @@ def embed(native, browser, report):
     replace(source / "iSH/ISHShellExecutor.m", '    int exitCode = [notification.userInfo[@"code"] intValue];', '''    // The iSH exit hook reports Linux wait(2) status, not a shell exit code.
     int waitStatus = [notification.userInfo[@"code"] intValue];
     int exitCode = waitStatus < 0 ? waitStatus : ((waitStatus & 0x7f) == 0 ? ((waitStatus >> 8) & 0xff) : 128 + (waitStatus & 0x7f));''')
-    replace(source / "Agent/Chat/AIChatViewModel.swift", "                break\n            }\n\n            // Build assistant RawMessage now but defer DB write", '''                if !canResume, !Task.isCancelled, let reminder = ZeusAgentHarness.shared.continuation(session: sessionId) {
+    replace(source / "Agent/Chat/AIChatViewModel.swift", "                let interruptCount = await MainActor.run { messages[msgIdx].streamInterruptCount }", '''                let zeusRecovery = !Task.isCancelled ? ZeusAgentHarness.shared.recoverToolText(assistantText, tools: Set(tools.map(\\.name)), session: sessionId) : nil
+                if let recovery = zeusRecovery {
+                    if recovery.instruction != nil { canResume = false; messages[msgIdx].error = nil }
+                    assistantMessage.parts = [.text(recovery.notice)]
+                    agentHistory[assistantAgentIdx] = assistantMessage
+                    var first = true
+                    for block in messages[msgIdx].blocks.dropFirst(min(prevCommittedBlockCount, messages[msgIdx].blocks.count)) where block.kind == .text {
+                        block.content = first ? recovery.notice : ""; block.cachedMarkdown = nil; block.cachedAttributedString = nil; first = false
+                    }
+                }
+                let interruptCount = await MainActor.run { messages[msgIdx].streamInterruptCount }''')
+    replace(source / "Agent/Chat/AIChatViewModel.swift", "                break\n            }\n\n            // Build assistant RawMessage now but defer DB write", '''                if !canResume, !Task.isCancelled, let instruction = zeusRecovery?.instruction {
+                    agentHistory.append(AgentMessage(role: .user, parts: [.text(instruction)]))
+                    continue
+                }
+                if !canResume, !Task.isCancelled, zeusRecovery == nil, let reminder = ZeusAgentHarness.shared.continuation(session: sessionId) {
                     agentHistory.append(AgentMessage(role: .user, parts: [.text("<zeus_runtime_instruction source='application'>" + reminder + "</zeus_runtime_instruction>")]))
                     continue
                 }
@@ -170,9 +222,21 @@ def embed(native, browser, report):
 
             // Build assistant RawMessage now but defer DB write''')
     openai = source / "Providers/OpenAI/OpenAIAgentProvider.swift"
+    replace(openai, '        let (lineStream, _) = try await provider.streamRaw(body: body, isResponsesAPI: false)', '''        if let name = ZeusToolRecovery.forcedTool(messages, available: Set(tools.map(\\.name))) {
+            body["tool_choice"] = ["type": "function", "function": ["name": name]]
+        }
+        let (lineStream, _) = try await provider.streamRaw(body: body, isResponsesAPI: false)''')
+
     for method, responses in [("convertToolsChatCompletions", "false"), ("convertToolsResponsesAPI", "true")]:
         anchor = '    private func ' + method + '(_ tools: [AgentToolDefinition]) -> [[String: Any]] {\n        tools.map { tool in'
         replace(openai, anchor, anchor + '\n            if let native = ZeusAgentSchemas.openAI(tool.name, description: tool.description, responses: ' + responses + ') { return native }')
+    # Gemini's official native protocol uses toolConfig, never OpenAI tool_choice.
+    gemini = source / "Providers/Gemini/GeminiProvider.swift"
+    gemini_code = gemini.read_text()
+    config_anchor = '            body["toolConfig"] = ["functionCallingConfig": ["mode": "AUTO"]]'
+    if gemini_code.count(config_anchor) != 2:
+        raise RuntimeError("Gemini native function config anchor changed")
+    gemini.write_text(gemini_code.replace(config_anchor, config_anchor + '\n            if let name = ZeusToolRecovery.forcedGeminiTool(contents, tools: tools) {\n                body["toolConfig"] = ["functionCallingConfig": ["mode": "ANY", "allowedFunctionNames": [name]]]\n            }'))
     replace(source / "Providers/Gemini/GeminiAgentProvider.swift", '                parameters: params\n', '                parameters: ZeusAgentSchemas.schema(tool.name).map(ZeusAgentSchemas.gemini) ?? params\n')
     replace(source / "Providers/Antigravity/AntigravityAgentProvider.swift", '                parameters: params\n', '                parameters: ZeusAgentSchemas.schema(tool.name).map(ZeusAgentSchemas.gemini) ?? params\n')
     replace(source / "Providers/Gemini/GeminiProvider.swift", '''        [
@@ -196,7 +260,7 @@ def embed(native, browser, report):
     static func storeTokensForZeus(_ stored: StoredTokens, server: String, oauth: MCPOAuthConfig) throws {
         keychainSet(try JSONEncoder().encode(stored), account: "\\(server)#tokens")
         guard tokens(server: server)?.accessToken == stored.accessToken else { throw OAuthError.exchangeFailed("تعذر حفظ تفويض الحساب في Keychain؛ لم يكتمل الربط.") }
-        materializeBridge(server: server, oauth: oauth, tokens: stored)
+        try materializeBridge(server: server, oauth: oauth, tokens: stored)
     }
 
     static func refreshAccessTokenForZeus(server: String, oauth: MCPOAuthConfig) async throws -> String {
@@ -217,7 +281,7 @@ def embed(native, browser, report):
         stored.refreshToken = object["refresh_token"] as? String ?? stored.refreshToken
         stored.expiresAt = Date().timeIntervalSince1970 + ((object["expires_in"] as? NSNumber)?.doubleValue ?? 3600)
         keychainSet(try JSONEncoder().encode(stored), account: "\\(server)#tokens")
-        materializeBridge(server: server, oauth: oauth, tokens: stored)
+        try materializeBridge(server: server, oauth: oauth, tokens: stored)
         return access
     }
 
@@ -297,6 +361,19 @@ def embed(native, browser, report):
     replace(source / "Views/Chat/AssistantBlockView.swift", 'case .browserTool:   toolName = "browser_use"',
         'case .browserTool:   toolName = block.zeusIsUserBrowser ? "zeus_browser" : "browser_use"')
 
+    # Original 1.14 Debug statistics mix UInt64/Double ternaries in one large
+    # dictionary. Assign explicitly typed fields to bound Swift's solver work.
+    debug_rpc = source / "Debug/DebugJSONRPC.swift"
+    code = debug_rpc.read_text()
+    start = code.index('        return [\n            "clusterCalls": calls,')
+    end = code.index('\n        ]', start) + len('\n        ]')
+    original_stats = code[start:end]
+    assignments = []
+    for line in original_stats.splitlines()[1:-1]:
+        key, value = line.strip().rstrip(',').split(': ', 1)
+        assignments.append('        stats[' + key + '] = ' + value)
+    replace(debug_rpc, original_stats, '        var stats: [String: Any] = [:]\n' + '\n'.join(assignments) + '\n        return stats')
+
     # Existing DEBUG RPC only, restricted to explicit isolated fixture launches.
     # These cases are compiled out of Release together with the upstream server.
     replace(source / "Debug/DebugJSONRPC.swift", '        case "rpc.discover":', '''        case "zeus.fixture.permission":
@@ -309,7 +386,7 @@ def embed(native, browser, report):
             guard CommandLine.arguments.contains("--zeus-native-fixture") else { throw RPCError(code: -32601, message: "Fixture launch required") }
             return await MainActor.run {
                 ["requests": ZeusToolPermissions.shared.requests.values.map {
-                    ["id": $0.id.uuidString, "tool": $0.tool, "title": $0.title, "explanation": $0.explanation]
+                    ["id": $0.id.uuidString, "tool": $0.tool, "title": $0.title, "explanation": $0.explanation, "sessionId": $0.sessionID ?? ""]
                 }]
             }
         case "zeus.fixture.approval.respond":
@@ -348,6 +425,12 @@ def embed(native, browser, report):
         'case "name":  if !value.isEmpty { meta.name = value.lowercased() == "minis" ? "Zeus" : value }')
     strings_file = source / "Localizable.xcstrings"
     strings = json.loads(strings_file.read_text())
+    # Official 1.14 does not contain the Arabic catalog from our previous fork.
+    # Carry translations by stable source key before applying reviewed fixes.
+    arabic_base = json.loads((browser / ".openminis/arabic-base.json").read_text())["localizations"]
+    for key, translation in arabic_base.items():
+        if key in strings["strings"]:
+            strings["strings"][key].setdefault("localizations", {})["ar"] = translation
     overrides = json.loads((browser / ".openminis/arabic-overrides.json").read_text())
     for key in overrides:
         strings["strings"].setdefault(key, {"localizations": {}})

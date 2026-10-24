@@ -146,6 +146,10 @@ struct ZeusOAuthSetupRequired: Error { let config: MCPOAuthConfig }
         let task = Task { @MainActor in try await MCPOAuthController.refreshAccessTokenForZeus(server: id, oauth: oauth) }
         refreshTasks[id] = task; defer { refreshTasks.removeValue(forKey: id) }; return try await task.value
     }
+    func githubAccessToken(_ id: String) async throws -> String {
+        _ = try account(id, provider: "github")
+        return try await bearer(id)
+    }
     private func rpc(_ id: String, method: String, parameters: [String: Any], initialize: Bool = false) async throws -> [String: Any] {
         let account = try account(id), service = ZeusService.catalog.first(where: { $0.id == account.provider })!
         var request = URLRequest(url: endpoint(account)); request.httpMethod = "POST"; request.timeoutInterval = 120

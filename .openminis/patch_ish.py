@@ -7,7 +7,7 @@ Never disable fortified libc checks: a macOS/iOS hostname can exceed Linux's
 from pathlib import Path
 import subprocess
 
-ISH_COMMIT = "19c690c3b979c3addef38318231b93a2dcdbe990"
+ISH_COMMIT = "e6521d9cfe9cd48f19917fc3b23aea622ba358b4"
 
 
 def patch(root: Path):

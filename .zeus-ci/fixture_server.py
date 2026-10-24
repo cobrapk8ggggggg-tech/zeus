@@ -7,6 +7,7 @@ from threading import Lock
 import struct
 import zlib
 import hashlib
+from project_fixtures import github_response, backend_proposal
 
 TRANSLATION_REQUESTS = {}
 TRANSLATION_LOCK = Lock()
@@ -24,45 +25,69 @@ def harness_events(body):
     results = [m for m in body.get('messages', []) if m.get('role') == 'tool' and m.get('tool_call_id', '').startswith('zeus-harness-')]
     stage = int(results[-1]['tool_call_id'].split('-')[2]) + 1 if results else 0
     cwd = '/var/minis/workspace/e2e-' + hashlib.sha256(body['model'].encode()).hexdigest()[:16]
-    check = 'test "$(cat value.txt)" = correct'
+    check = 'test "$(cat value.txt)" = correct && test ! -e forbidden.txt'
     steps = [
-        ('update_plan', {'goal': 'Create, test, repair and verify a real project', 'plan': [{'step': 'Implement and verify', 'status': 'in_progress'}], 'verification_commands': [check]}),
+        ('project_environment', {}),
+        ('propose_project_plan', {'proposal': backend_proposal(body['model'], check)}),
+        ('update_plan', {'goal': 'Create, test, repair and verify a real project', 'plan': [{'step': 'Implement and verify', 'status': 'in_progress'}], 'verification_commands': ['test -s README.md', check], 'explanation': 'اعتمدت الخطة؛ أنشئ الملفات وأتحقق من سلوكها.'}),
         ('exec_command', {'cmd': 'mkdir -p ' + cwd, 'workdir': '/var/minis/workspace', 'yield_time_ms': 1000}),
         ('write_stdin', {}),
         ('apply_patch', {'workdir': cwd, 'patch': '*** Begin Patch\n*** Add File: value.txt\n+wrong\n*** Add File: README.md\n+Native agent fixture project\n*** End Patch'}),
-        ('task_verify', {'workdir': cwd, 'commands': [check]}),
+        ('task_verify', {'workdir': cwd, 'commands': ['test -s README.md', check]}),
         ('apply_patch', {'workdir': cwd, 'patch': '*** Begin Patch\n*** Update File: value.txt\n@@\n-wrong\n+correct\n*** End Patch'}),
-        ('task_verify', {'workdir': cwd, 'commands': [check]}),
-        ('update_plan', {'plan': [{'step': 'Implement and verify', 'status': 'completed'}]}),
+        ('task_verify', {'workdir': cwd, 'commands': ['test -s README.md', check]}),
+        ('update_plan', {'plan': [{'step': 'Implement and verify', 'status': 'completed'}], 'explanation': 'أصلحت قيمة الملف واجتاز الفحص الفعلي؛ أسجل النتيجة النهائية.'}),
         ('task_complete', {'status': 'completed', 'summary': 'Actual failing check repaired and passing check recorded'})
     ]
     if results:
         previous = results[-1]['content']
         if previous.startswith('Error:'): raise ValueError('Native tool failed: ' + previous)
         previous_stage = int(results[-1]['tool_call_id'].split('-')[2])
-        if previous_stage in (4, 6):
+        if previous_stage in (6, 8):
             checks = json.loads(previous)
-            if not checks or checks[0]['exitCode'] != (1 if previous_stage == 4 else 0): raise ValueError('Native verification did not return the expected actual exit code')
-        if previous_stage == 2 and json.loads(previous)['running']: stage = 2
+            if len(checks) != 2 or checks[0]['exitCode'] != 0 or checks[1]['exitCode'] != (1 if previous_stage == 6 else 0): raise ValueError('Native verification did not return the expected actual exit code')
+        if previous_stage == 4 and json.loads(previous)['running']: stage = 4
     if stage >= len(steps):
         return [{'choices': [{'delta': {'content': 'NATIVE_HARNESS_VERIFIED: تم إنشاء المشروع وإصلاح فحصه الفاشل والتحقق منه فعلياً.'}, 'finish_reason': None}]}, {'choices': [{'delta': {}, 'finish_reason': 'stop'}]}]
-    if stage == 5 and not any(m.get('role') == 'user' and '<zeus_runtime_instruction' in str(m.get('content', '')) for m in body.get('messages', [])):
-        return [{'choices': [{'delta': {'content': 'مستجد: ظهر فشل في الفحص وسأواصل إصلاحه.'}, 'finish_reason': None}]}, {'choices': [{'delta': {}, 'finish_reason': 'stop'}]}]
+    if stage == 7:
+        repair = next((m for m in reversed(body.get('messages', [])) if m.get('role') == 'user'), {})
+        if not str(repair.get('content', '')).startswith('ZEUS_TOOL_REPAIR_REQUIRED:'):
+            # Simulate the user's DeepSeek failure: JSON in visible text must
+            # not become an executable call, and must not terminate the task.
+            malformed = json.dumps({'tool_calls': [{'name': 'apply_patch', 'arguments': {'workdir': cwd, 'patch': '*** Begin Patch\n*** Add File: forbidden.txt\n+MUST NOT EXECUTE\n*** End Patch'}}]})
+            return [{'choices': [{'delta': {'content': malformed}, 'finish_reason': None}]}, {'choices': [{'delta': {}, 'finish_reason': 'stop'}]}]
+        if body.get('tool_choice') != {'type': 'function', 'function': {'name': 'apply_patch'}}: raise ValueError('The actual repair request must select a structured function call')
     name, args = steps[stage]
-    if stage == 2:
-        started = next(m for m in results if m['tool_call_id'].startswith('zeus-harness-1-'))
+    if stage == 4:
+        started = next(m for m in results if m['tool_call_id'].startswith('zeus-harness-3-'))
         args = {'session_id': json.loads(started['content'])['session_id'], 'yield_time_ms': 1000}
     # Confirm nested schemas reached the actual selected provider request.
     definitions = {x['function']['name']: x['function']['parameters'] for x in body.get('tools', []) if x.get('type') == 'function'}
     if definitions.get('update_plan', {}).get('properties', {}).get('plan', {}).get('type') != 'array': raise ValueError('Provider lost the nested plan schema')
+    if definitions.get('propose_project_plan', {}).get('properties', {}).get('proposal', {}).get('type') != 'object': raise ValueError('Provider lost the native project proposal schema')
+    if not any(m.get('role') == 'system' and 'propose_project_plan' in str(m.get('content', '')) for m in body.get('messages', [])): raise ValueError('Native project instructions did not reach the actual model request')
     arguments = json.dumps(args, ensure_ascii=False)
     return [{'choices': [{'delta': {'content': 'مستجد اختبار: أتابع التنفيذ والتحقق.\n', 'tool_calls': [{'index': 0, 'id': 'zeus-harness-' + str(stage) + '-' + str(len(results)), 'type': 'function', 'function': {'name': name, 'arguments': arguments}}]}, 'finish_reason': None}]}, {'choices': [{'delta': {}, 'finish_reason': 'tool_calls'}]}]
 
 
 class Handler(BaseHTTPRequestHandler):
+    def do_PUT(self):
+        raw = self.rfile.read(int(self.headers.get('Content-Length', '0')))
+        if not github_response(self, self.command, json.loads(raw or b'{}')):
+            self.send_response(404); self.end_headers()
+
+    do_PATCH = do_PUT
+    do_DELETE = do_PUT
+
+    def do_HEAD(self):
+        if not github_response(self, 'HEAD'):
+            self.send_response(404); self.end_headers()
+
     def do_POST(self):
         try:
             raw = self.rfile.read(int(self.headers.get('Content-Length', '0')))
+            if self.path.startswith('/github-rest-fixture/'):
+                github_response(self, 'POST', json.loads(raw or b'{}')); return
             if self.path.startswith('/github-device-fixture/'):
                 form = {k: v[0] for k, v in parse_qs(raw.decode()).items()}
                 client = form.get('client_id', '')
@@ -83,6 +108,23 @@ class Handler(BaseHTTPRequestHandler):
                 data = json.dumps(result).encode()
                 self.send_response(200); self.send_header('Content-Type', 'application/json'); self.send_header('Content-Length', str(len(data))); self.end_headers(); self.wfile.write(data); return
             body = json.loads(raw)
+            if self.path.startswith('/gemini-fixture/models/'):
+                if 'streamGenerateContent' not in self.path or 'alt=sse' not in self.path: raise ValueError('Expected the official Gemini streaming endpoint')
+                declarations = body.get('tools', [{}])[0].get('functionDeclarations', [])
+                plan = next(d for d in declarations if d.get('name') == 'propose_project_plan')
+                shape = plan.get('parametersJsonSchema', {}).get('properties', {}).get('proposal', {})
+                if shape.get('type') != 'object' or shape.get('properties', {}).get('checks', {}).get('type') != 'array': raise ValueError('Gemini lost nested JSON schema')
+                contents = body.get('contents', [])
+                parts = [p for c in contents for p in c.get('parts', [])]
+                if not any(p.get('inlineData', {}).get('mimeType') == 'image/png' and p['inlineData'].get('data') for p in parts): raise ValueError('Native vision pixels were not delivered')
+                if not any(p.get('functionResponse', {}).get('name') == 'read_image' for p in parts): raise ValueError('Native tool result was not delivered')
+                expected = {'mode': 'ANY', 'allowedFunctionNames': ['propose_project_plan']}
+                if body.get('toolConfig', {}).get('functionCallingConfig') != expected: raise ValueError('Gemini repair must select only the advertised function')
+                proposal = backend_proposal('gemini-native-wire', 'test value = value')
+                proposal['checks'][-1]['covers'] = ['*']
+                event = {'candidates': [{'content': {'role': 'model', 'parts': [{'functionCall': {'name': 'propose_project_plan', 'args': {'proposal': proposal}}}]}, 'finishReason': 'STOP'}]}
+                encoded = ('data: ' + json.dumps(event) + '\n\n').encode()
+                self.send_response(200); self.send_header('Content-Type', 'text/event-stream'); self.send_header('Content-Length', str(len(encoded))); self.end_headers(); self.wfile.write(encoded); return
             if self.path.startswith('/mcp-fixture/'):
                 account = self.path.rsplit('/', 1)[-1]
                 if self.headers.get('Authorization') != 'Bearer fixture-' + account:
@@ -176,6 +218,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(400); self.end_headers()
 
     def do_GET(self):
+        if github_response(self, 'GET'): return
         if self.path.startswith('/translation-requests'):
             model = parse_qs(urlparse(self.path).query).get('model', [''])[0]
             with TRANSLATION_LOCK: body = json.dumps(TRANSLATION_REQUESTS.get(model, [])).encode()
