@@ -164,6 +164,11 @@ enum ZeusPermissionMode: String, CaseIterable {
     private static func destination(tool: String, args: [String: Any]) -> String {
         if tool == "zeus_browser" || zeusBrowserOperation(tool) != nil { return "متصفحك ZEUS · " + (zeusBrowserOperation(tool) ?? args["operation"] as? String ?? "") + "\n" + (args["url"] as? String ?? args["tab_id"] as? String ?? "البروفايل النشط") }
         if tool == "browser_use" { return "متصفح الأتمتة المستقل · " + (args["action"] as? String ?? "") + "\n" + (args["url"] as? String ?? "") }
+        if ["github_write_files", "github_read_file"].contains(tool) {
+            let account = ZeusConnections.shared.accounts.first { $0.id == args["account_id"] as? String }?.label ?? (args["account_id"] as? String ?? "")
+            let files = (args["files"] as? [[String: Any]] ?? []).compactMap { $0["path"] as? String }.prefix(5).joined(separator: "، ")
+            return "GitHub · " + account + "\n" + (args["repository"] as? String ?? "") + " · " + (args["branch"] as? String ?? "") + "\n" + (files.isEmpty ? (args["path"] as? String ?? "") : files)
+        }
         if let path = args["path"] as? String { return String(path.prefix(500)) }
         if let command = args["command"] as? String { return String(command.prefix(600)) }
         return tool

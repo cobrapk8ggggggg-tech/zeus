@@ -369,9 +369,18 @@ struct ZeusProjectProgressCard: View {
         let references = vm.messages.last(where: { $0.role == .user })?.attachments.filter(\.isImage).map(\.path) ?? []
         project.referenceImages = Array(Set((project.referenceImages ?? []) + references)).sorted()
         value = state(session); value.project = project; try save(session, value)
-        return try Self.json(["host": "ZEUS Browser on iOS/iPadOS", "local_execution": "Linux guest; not macOS", "has_ios_sdk": false,
-            "automatically_loaded_skills": project.loadedSkills ?? [:], "skill_paths": project.skillPaths ?? [:], "reference_images_to_read": project.referenceImages ?? [], "local_tools": paths, "probe_error": probeError as Any? ?? NSNull(), "github_accounts": ZeusConnections.shared.accountSummary().filter { $0["provider"] as? String == "github" },
-            "required_route": "iOS apps require a linked GitHub account and a macOS/Xcode Actions workflow. Use github_request for repositories/files/dispatch/status. If no account is linked, ask the user to link one, preserve the brief and resume; do not offer manual building as completed work."])
+        var output: [String: Any] = [:]
+        output["host"] = "ZEUS Browser on iOS/iPadOS"
+        output["local_execution"] = "Linux guest; not macOS"
+        output["has_ios_sdk"] = false
+        output["automatically_loaded_skills"] = project.loadedSkills ?? [:]
+        output["skill_paths"] = project.skillPaths ?? [:]
+        output["reference_images_to_read"] = project.referenceImages ?? []
+        output["local_tools"] = paths
+        output["probe_error"] = probeError as Any? ?? NSNull()
+        output["github_accounts"] = ZeusConnections.shared.accountSummary().filter { $0["provider"] as? String == "github" }
+        output["required_route"] = "iOS apps require a linked GitHub account and a macOS/Xcode Actions workflow. Use github_read_file/github_write_files for plain-text source and github_request for repository/branch/Actions APIs. If no account is linked, ask for that precise connection, preserve the brief and resume; do not offer manual building as completed work."
+        return try Self.json(output)
     }
     func recordProjectChecks(session: String) throws {
         var value = state(session)
