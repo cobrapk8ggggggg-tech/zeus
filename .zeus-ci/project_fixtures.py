@@ -4,12 +4,16 @@ import io
 import struct
 import zlib
 import zipfile
+import base64
+import hashlib
 from threading import Lock
 from urllib.parse import urlparse, parse_qs
 
 RECORDS = []
 LOCK = Lock()
 SHA = '1' * 40
+BLOBS = {}
+SOURCES = {}
 
 
 def screenshot_zip():
@@ -29,7 +33,7 @@ def github_response(handler, method, body=None):
     path = parsed.path[len('/github-rest-fixture'):]
     token = handler.headers.get('Authorization', '')
     if path.startswith('/download/'):
-        data = screenshot_zip() if not token else b'Credentials must not be forwarded to the artifact download'
+        data = (b'Build failed: App.swift:12: missing symbol\nRepair the source and rerun the workflow.' if path.endswith('.log') else screenshot_zip()) if not token else b'Credentials must not be forwarded to the download'
         handler.send_response(200 if not token else 400)
         handler.send_header('Content-Type', 'application/zip'); handler.send_header('Content-Length', str(len(data))); handler.end_headers()
         handler.wfile.write(data)
@@ -52,12 +56,36 @@ def github_response(handler, method, body=None):
             with LOCK: result = {'requests': list(RECORDS)}
         elif method == 'POST' and path == '/user/repos':
             status, result = 201, {'id': 100, 'full_name': 'fixture-owner/' + body.get('name', '')}
+        elif method == 'GET' and '/contents/' in path:
+            source = SOURCES.get((repo, path.split('/contents/', 1)[1]), '')
+            result = {'type': 'file', 'encoding': 'base64', 'sha': SHA, 'content': base64.b64encode(source.encode()).decode()}
+        elif method == 'POST' and path.endswith('/git/blobs'):
+            if body.get('encoding') != 'utf-8':
+                status, result = 400, {'message': 'Source commits must use native plain UTF-8 text'}
+            else:
+                digest = hashlib.sha1(body['content'].encode()).hexdigest()
+                BLOBS[digest] = body['content']; result = {'sha': digest}
+        elif method == 'POST' and path.endswith('/git/trees'):
+            for item in body['tree']:
+                if item.get('sha') is None: SOURCES.pop((repo, item['path']), None)
+                else: SOURCES[(repo, item['path'])] = BLOBS[item['sha']]
+            result = {'sha': 'fixture-tree'}
+        elif method == 'POST' and path.endswith('/git/commits'):
+            result = {'sha': SHA}
+        elif method == 'GET' and '/git/commits/' in path:
+            result = {'sha': SHA, 'tree': {'sha': 'fixture-base-tree'}}
+        elif method == 'PATCH' and '/git/refs/heads/' in path:
+            if body.get('force') is not False:
+                status, result = 400, {'message': 'Never force the fixture ref'}
+            else: result = {'object': {'sha': SHA}}
         elif method == 'PUT' and '/contents/' in path:
             status, result = 201, {'content': {'path': path.split('/contents/', 1)[1], 'sha': SHA}, 'commit': {'sha': SHA}}
         elif method == 'POST' and path.endswith('/git/refs'):
             status, result = 201, {'ref': body.get('ref'), 'object': {'sha': SHA}}
         elif method == 'POST' and path.endswith('/dispatches'):
             status = 204
+        elif '/actions/jobs/' in path and path.endswith('/logs'):
+            status, headers = 302, {'Location': 'http://' + handler.headers['Host'] + '/github-rest-fixture/download/job.log'}
         elif '/git/ref/heads/' in path:
             result = {'ref': 'refs/heads/feature/project', 'object': {'sha': '2' * 40 if repo.endswith('/stale') else SHA}}
         elif '/actions/artifacts/' in path:

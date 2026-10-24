@@ -60,3 +60,31 @@ that scope explicit. iOS may suspend local execution in the background; this
 change does not install an unlimited cloud runner. Genuine account, network,
 user-denial, storage and configured time-budget blockers preserve progress and
 may require user intervention.
+
+## Provider recovery, direct source editing and visible milestones
+
+Project environments automatically load the full bodies of relevant enabled
+skills: SwiftUI patterns/refactoring/simulator QA for Swift/iOS work, frontend
+building/testing for websites. Disabled skills remain disabled. The native plan
+shows which skills were loaded. Attached reference images must be inspected
+with the original image tool and have design notes before proposing the UI.
+
+`github_read_file` decodes actual repository text natively. `github_write_files`
+accepts normal UTF-8 source for up to 30 files and creates blobs/tree/commit,
+then updates the approved branch without force and checks its HEAD. The model
+does not generate Base64, clone or push locally. Job log redirects are read
+natively with no account token forwarded to the temporary host.
+
+If an active project provider writes `tool_calls` as visible JSON, that text is
+never executed. It is replaced with a clear protocol-error notice and a bounded
+repair request. OpenAI-compatible chat requests select the named advertised
+function on repair. A provider that still cannot produce a structured call
+pauses after two repair attempts with progress preserved. Ordinary text and
+quoted examples outside an active task are unaffected.
+
+The approved plan becomes a checklist with a single active stage. Changes of
+stage require a concrete model-authored explanation and may complete only one
+new stage at a time. Milestones, automatic skill loading and direct source
+receipts appear in a persisted notes/progress card, with a history disclosure.
+The model is also instructed to send concise visible milestone updates while
+continuing its tools; the card does not fabricate reasoning on its behalf.

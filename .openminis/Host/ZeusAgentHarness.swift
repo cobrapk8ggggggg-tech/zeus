@@ -24,6 +24,7 @@ import CryptoKit
         var ledger: [String: String] = [:]
         var commands: [String: String]? = [:]
         var project: ZeusProjectContract?
+        var toolTextRepairs: Int?
     }
     struct Job: Identifiable {
         let id: String; let owner: String; let command: String
@@ -87,7 +88,9 @@ import CryptoKit
         let descriptions = [
             "project_environment": "Inspect this device's ACTUAL local toolchains and linked GitHub accounts before proposing a project. iOS apps require macOS/Xcode on GitHub Actions, not Linux Swift. This fixed read-only probe is allowed before plan approval.",
             "propose_project_plan": "Present the complete project brief as a native INLINE PLAN CARD and WAIT for the user's explicit approve/revise/cancel response. Required before source/build/repository mutations for project tasks. Include features, architecture, ordered steps, deliverables and real acceptance checks covering EVERY feature, plus build, functional and UI review checks. Inspect project_environment first. iOS route must be github_actions with a real linked account/repository/branch/workflow. Local checks identify exact commands (UI also screenshot_path); GitHub checks identify exact job and step names, and app/screenshot artifact names for build/UI. User revisions require a new proposal; prose is not approval.",
-            "github_request": "Execute GitHub REST directly using the specified linked account's private Keychain credential (never returned to the model). path is relative to api.github.com, e.g. /repos/owner/repo/contents/src/App.swift. Supports branches/files/commits/PRs, creating repositories and GitHub Actions dispatch/status/jobs/log redirects/artifacts. method defaults GET, query is a string-valued object, body is a JSON object. PUT contents creates with base64 content and branch; for updates/deletes GET the current file SHA and include it. Use Git blobs/trees/commits for multi-file commits; inspect HEAD before updating its ref, do not force push by default. POST /repos/o/r/actions/workflows/name.yml/dispatches uses body {ref:branch}. Commit all intended source/tests before dispatch; the approved repository/branch is the deliverable source of truth. Respect the selected account and read actual errors; never blindly retry an uncertain mutation.",
+            "github_read_file": "Read a repository UTF-8 source file directly as plain text with its actual SHA. Use the selected account/repository/branch. No local clone, shell, Base64 generation or decoding is needed.",
+            "github_write_files": "Write/create/delete up to 30 text source files DIRECTLY to the approved GitHub repository branch in one real Git commit. files is an array of {path,content} using normal source text, NOT Base64; use {path,delete:true} only for deliberate deletions. The runtime creates Git blobs/tree/commit and updates the ref without force. First inspect existing files with github_read_file. The branch must already exist (initialize a new repo with auto_init:true, then create the approved branch using github_request). No local git push, token handling, shell or manual Base64 is needed. The returned SHA is the source to build on Actions. On an uncertain/conflicting ref update inspect HEAD before a new write; do not blindly repeat.",
+            "github_request": "Execute GitHub REST directly using the specified linked account's private Keychain credential (never returned to the model). path is relative to api.github.com, e.g. /repos/owner/repo/contents/src/App.swift. Supports branches/files/commits/PRs, creating repositories and GitHub Actions dispatch/status/jobs/artifacts. GET /repos/o/r/actions/jobs/JOB_ID/logs returns bounded actual log text natively, without curl. method defaults GET, query is a string-valued object, body is a JSON object. For approved project source use github_read_file/github_write_files with plain text rather than contents PUT or Base64. Use Git blobs/trees/commits only when a specialized operation requires them; inspect HEAD before updating its ref, do not force push by default. POST /repos/o/r/actions/workflows/name.yml/dispatches uses body {ref:branch}. Commit all intended source/tests before dispatch; the approved repository/branch is the deliverable source of truth. Respect the selected account and read actual errors; never blindly retry an uncertain mutation.",
             "task_verify_github": "Verify a REAL GitHub Actions run against exact repository, commit SHA, approved branch/workflow, successful terminal result, each approved job/step and required app/screenshot artifacts. It records current-generation acceptance evidence for the approved project plan. Poll github_request until completed, fix failed builds/tests, then invoke this tool. Missing local Swift/Xcode is a reason to use Actions, not to return an unbuilt project as completed.",
             "github_download_artifact": "Download an approved project's actual GitHub build/screenshot artifact ZIP into this conversation workspace using the native account credential. Provide exact account/repository/run/commit/artifact and a new relative .zip destination. The token/temporary download URL is never returned to the model. Download screenshots, inspect archive paths before extracting into a dedicated artifact directory, read actual screenshots with read_image, then task_verify_github after any local extraction commands and task_complete. No local compiler is needed to retrieve/review a remote build.",
             "integration_accounts": "List the real linked integration accounts, IDs and default selections. Never invent an account or copy credentials into a message.",
@@ -131,6 +134,20 @@ import CryptoKit
         }
         return "Runtime continuation: this task is still active. A progress message is not completion. Inspect task_checkpoint, continue the pending steps using real structured tool calls, run task_verify, then task_complete. If blocked, record the actual blocker with task_complete(status:blocked). Do not repeat an uncertain mutation; inspect its result first."
     }
+    func recoverToolText(_ text: String, tools: Set<String>, session: String?) -> (notice: String, instruction: String?)? {
+        guard let session else { return nil }
+        var value = state(session)
+        guard value.status == "running", value.project != nil || !value.plan.isEmpty,
+              let candidate = ZeusToolRecovery.candidate(text, tools: tools) else { return nil }
+        let attempt = (value.toolTextRepairs ?? 0) + 1; value.toolTextRepairs = attempt
+        let notice = "أرسل المزوّد طلب أداة كنص؛ لم يُنفَّذ. " + (attempt <= 2 ? "أعيد طلبه الآن بصيغة أداة صحيحة." : "تعذّر تصحيح بروتوكول الأدوات لهذا المزوّد. التقدم محفوظ؛ غيّر النموذج أو إعدادات مزوّد الأدوات ثم استأنف.")
+        value.checkpoint = notice; value.project?.appendNote(notice)
+        if attempt > 2 { value.status = "waiting_user" }
+        try? save(session, value)
+        let name = candidate == "github_request" && text.contains("\"content\"") && tools.contains("github_write_files") ? "github_write_files" : candidate
+        let instruction = attempt <= 2 ? ZeusToolRecovery.marker + name + "\nThe previous assistant JSON was visible text and WAS NOT EXECUTED. Send the actual provider function call now, separately from visible prose. Use normal UTF-8 source text with github_write_files; never generate or print Base64. Do not replay any already executed write. Preserve the approved project plan and continue with actual tools. Acknowledge no false success." : nil
+        return (notice, instruction)
+    }
     func pausedNotice(session: String?) -> String? {
         guard let session else { return nil }; let value = state(session)
         return value.status == "waiting_user" && !value.checkpoint.isEmpty ? value.checkpoint : nil
@@ -138,7 +155,7 @@ import CryptoKit
     func beginSourceChange(session: String?, tool: String, args: [String: Any], ticket: UUID, includeNative: Bool = false) throws -> Bool {
         guard let session else { return false }
         let legacy = ["file_write", "file_edit", "shell_execute"].contains(tool)
-        let native = includeNative && (["apply_patch", "exec_command"].contains(tool) || (tool == "github_request" && !["GET", "HEAD"].contains(args["method"] as? String ?? "GET")))
+        let native = includeNative && (["apply_patch", "exec_command", "github_write_files"].contains(tool) || (tool == "github_request" && !["GET", "HEAD"].contains(args["method"] as? String ?? "GET")))
         guard legacy || native else { return false }
         sourceChanges[session, default: []].insert(ticket)
         if legacy || state(session).status == "completed" {
@@ -161,6 +178,10 @@ import CryptoKit
         if tool == "read_image", success, imageDelivered, let path = args["path"] as? String {
             var value = state(session)
             if value.project != nil {
+                if value.project?.referenceImages?.contains(path) == true {
+                    if value.project?.inspectedReferences == nil { value.project?.inspectedReferences = [] }
+                    if value.project?.inspectedReferences?.contains(path) != true { value.project?.inspectedReferences?.append(path) }
+                }
                 let normalized = Self.projectImagePath(path)
                 value.project?.reviewedImages[normalized] = value.generation
                 if let source = value.project?.artifactRoots?.sorted(by: { $0.key.count > $1.key.count }).first(where: { normalized.hasPrefix($0.key + "/") }) {
@@ -193,7 +214,7 @@ import CryptoKit
             if let result = results[session + ":" + callID] { return result }
             throw ZeusPatch.failure("This tool call was already attempted. Read the checkpoint/files/process status before issuing a NEW call; the previous mutation was not replayed.")
         }
-        value.ledger[callID] = signature; value.noToolContinuations = 0
+        value.ledger[callID] = signature; value.noToolContinuations = 0; value.toolTextRepairs = 0
         if value.ledger.count > 2000 { throw ZeusPatch.failure("Task reached its tool-call budget. Save a checkpoint and resume a new task.") }
         try save(session, value)
         if ["apply_patch", "exec_command", "task_verify"].contains(name) { try await prepareEnvironment(vm: vm) }
@@ -228,6 +249,8 @@ import CryptoKit
             let proposal = try ZeusProjectContract.decoded(args)
             guard value.project?.decision == "approved", value.project?.approvedHash == proposal.hash else { throw ZeusPatch.failure("The project plan has not been approved by the user. Do not execute its changes.") }
             return try Self.json(["approved": true, "plan_hash": proposal.hash, "steps": proposal.steps, "next": "Implement the approved product brief, architecture and acceptance checks; follow the selected build route and continue until verified."])
+        case "github_read_file": return try await githubReadFile(args, session: session)
+        case "github_write_files": return try await githubWriteFiles(args, session: session)
         case "github_request": return try await githubProjectRequest(args, session: session)
         case "task_verify_github": return try await verifyGitHubProject(args, session: session)
         case "github_download_artifact": return try await downloadGitHubArtifact(args, session: session, vm: vm)
@@ -257,12 +280,17 @@ import CryptoKit
                 guard value.verificationCommands.isEmpty || Set(value.verificationCommands).isSubset(of: Set(commands)) else { throw ZeusPatch.failure("Verification checks cannot be removed or weakened during an active task.") }
                 value.verificationCommands = commands
             }
+            if value.project?.decision == "approved", plan.map({ $0.status }) != value.plan.map({ $0.status }) {
+                guard let explanation = args["explanation"] as? String, !explanation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw ZeusPatch.failure("A project milestone update needs explanation: briefly tell the user what finished or was discovered and what you will do next. It is shown on the live plan/notes card.") }
+                let newlyCompleted = plan.filter { next in next.status == "completed" && value.plan.first(where: { $0.step == next.step })?.status != "completed" }
+                guard newlyCompleted.count <= 1 else { throw ZeusPatch.failure("Update approved project stages as you finish each one, rather than checking off all stages at once. Record the concrete milestone finding in explanation.") }
+            }
             value.plan = plan; value.goal = args["goal"] as? String ?? value.goal; value.status = "running"
-            if let explanation = args["explanation"] as? String { value.checkpoint = explanation }
+            if let explanation = args["explanation"] as? String { value.checkpoint = explanation; value.project?.appendNote(explanation) }
             try save(session, value)
             return "الخطة محدثة.\n" + plan.map { ($0.status == "completed" ? "✓ " : $0.status == "in_progress" ? "→ " : "○ ") + $0.step }.joined(separator: "\n")
         case "task_checkpoint":
-            if args["action"] as? String == "save" { value.checkpoint = args["note"] as? String ?? value.checkpoint; try save(session, value) }
+            if args["action"] as? String == "save" { value.checkpoint = args["note"] as? String ?? value.checkpoint; value.project?.appendNote(value.checkpoint); try save(session, value) }
             return try snapshot(session)
         case "task_verify_mcp": return try await verifyRemote(args["checks"] as! [[String: Any]], session: session)
         case "apply_patch":

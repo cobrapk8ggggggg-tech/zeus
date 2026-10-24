@@ -171,7 +171,22 @@ def embed(native, browser, report):
     replace(source / "iSH/ISHShellExecutor.m", '    int exitCode = [notification.userInfo[@"code"] intValue];', '''    // The iSH exit hook reports Linux wait(2) status, not a shell exit code.
     int waitStatus = [notification.userInfo[@"code"] intValue];
     int exitCode = waitStatus < 0 ? waitStatus : ((waitStatus & 0x7f) == 0 ? ((waitStatus >> 8) & 0xff) : 128 + (waitStatus & 0x7f));''')
-    replace(source / "Agent/Chat/AIChatViewModel.swift", "                break\n            }\n\n            // Build assistant RawMessage now but defer DB write", '''                if !canResume, !Task.isCancelled, let reminder = ZeusAgentHarness.shared.continuation(session: sessionId) {
+    replace(source / "Agent/Chat/AIChatViewModel.swift", "                let interruptCount = await MainActor.run { messages[msgIdx].streamInterruptCount }", '''                let zeusRecovery = !Task.isCancelled ? ZeusAgentHarness.shared.recoverToolText(assistantText, tools: Set(tools.map(\\.name)), session: sessionId) : nil
+                if let recovery = zeusRecovery {
+                    if recovery.instruction != nil { canResume = false; messages[msgIdx].error = nil }
+                    assistantMessage.parts = [.text(recovery.notice)]
+                    agentHistory[assistantAgentIdx] = assistantMessage
+                    var first = true
+                    for block in messages[msgIdx].blocks.dropFirst(min(prevCommittedBlockCount, messages[msgIdx].blocks.count)) where block.kind == .text {
+                        block.content = first ? recovery.notice : ""; block.cachedMarkdown = nil; block.cachedAttributedString = nil; first = false
+                    }
+                }
+                let interruptCount = await MainActor.run { messages[msgIdx].streamInterruptCount }''')
+    replace(source / "Agent/Chat/AIChatViewModel.swift", "                break\n            }\n\n            // Build assistant RawMessage now but defer DB write", '''                if !canResume, !Task.isCancelled, let instruction = zeusRecovery?.instruction {
+                    agentHistory.append(AgentMessage(role: .user, parts: [.text(instruction)]))
+                    continue
+                }
+                if !canResume, !Task.isCancelled, zeusRecovery == nil, let reminder = ZeusAgentHarness.shared.continuation(session: sessionId) {
                     agentHistory.append(AgentMessage(role: .user, parts: [.text("<zeus_runtime_instruction source='application'>" + reminder + "</zeus_runtime_instruction>")]))
                     continue
                 }
@@ -181,6 +196,11 @@ def embed(native, browser, report):
 
             // Build assistant RawMessage now but defer DB write''')
     openai = source / "Providers/OpenAI/OpenAIAgentProvider.swift"
+    replace(openai, '        let (lineStream, _) = try await provider.streamRaw(body: body, isResponsesAPI: false)', '''        if let name = ZeusToolRecovery.forcedTool(messages, available: Set(tools.map(\\.name))) {
+            body["tool_choice"] = ["type": "function", "function": ["name": name]]
+        }
+        let (lineStream, _) = try await provider.streamRaw(body: body, isResponsesAPI: false)''')
+
     for method, responses in [("convertToolsChatCompletions", "false"), ("convertToolsResponsesAPI", "true")]:
         anchor = '    private func ' + method + '(_ tools: [AgentToolDefinition]) -> [[String: Any]] {\n        tools.map { tool in'
         replace(openai, anchor, anchor + '\n            if let native = ZeusAgentSchemas.openAI(tool.name, description: tool.description, responses: ' + responses + ') { return native }')

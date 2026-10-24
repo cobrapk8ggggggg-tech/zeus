@@ -4,7 +4,7 @@ import CoreFoundation
 /// Provider-independent JSON schemas for the native execution runtime.
 /// These are real nested schemas, not JSON encoded inside string parameters.
 enum ZeusAgentSchemas {
-    static let names: Set<String> = ["update_plan", "apply_patch", "exec_command", "write_stdin", "task_checkpoint", "task_verify", "task_verify_mcp", "task_complete", "integration_accounts", "integration_tools", "integration_call", "project_environment", "propose_project_plan", "github_request", "task_verify_github", "github_download_artifact"]
+    static let names: Set<String> = ["update_plan", "apply_patch", "exec_command", "write_stdin", "task_checkpoint", "task_verify", "task_verify_mcp", "task_complete", "integration_accounts", "integration_tools", "integration_call", "project_environment", "propose_project_plan", "github_request", "task_verify_github", "github_download_artifact", "github_read_file", "github_write_files"]
     static func schema(_ name: String) -> [String: Any]? {
         var fields: [String: Any] = ["tool_title": ["type": "string"], "approval_reason": ["type": "string"]]
         var requiredFields: [String] = []
@@ -16,8 +16,20 @@ enum ZeusAgentSchemas {
             let feature: [String: Any] = ["type": "object", "properties": ["id": identifier, "title": text], "required": ["id", "title"], "additionalProperties": false]
             let criterion: [String: Any] = ["type": "object", "properties": ["id": identifier, "title": text, "kind": ["type": "string", "enum": ["build", "functional", "ui", "quality"]], "covers": ["type": "array", "maxItems": 20, "items": identifier], "command": ["type": "string", "maxLength": 2000], "github_job": text, "github_step": text, "artifact": text, "screenshot_path": ["type": "string", "maxLength": 500]], "required": ["id", "title", "kind", "covers"], "additionalProperties": false]
             let list: [String: Any] = ["type": "array", "minItems": 1, "maxItems": 20, "items": text]
-            let proposal: [String: Any] = ["type": "object", "properties": ["title": text, "objective": ["type": "string", "minLength": 1, "maxLength": 2000], "platform": ["type": "string", "enum": ["ios", "android", "web", "backend", "other"]], "features": ["type": "array", "minItems": 1, "maxItems": 20, "items": feature], "architecture": list, "steps": list, "checks": ["type": "array", "minItems": 2, "maxItems": 20, "items": criterion], "deliverables": list, "assumptions": ["type": "array", "maxItems": 15, "items": text], "build_route": ["type": "string", "enum": ["local", "github_actions"]], "github_account_id": ["type": "string"], "repository": ["type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"], "branch": text, "workflow": ["type": "string", "pattern": "^\\.github/workflows/[A-Za-z0-9_.-]+\\.ya?ml$"]], "required": ["title", "objective", "platform", "features", "architecture", "steps", "checks", "deliverables", "assumptions", "build_route"], "additionalProperties": false]
+            let proposal: [String: Any] = ["type": "object", "properties": ["title": text, "objective": ["type": "string", "minLength": 1, "maxLength": 2000], "platform": ["type": "string", "enum": ["ios", "android", "web", "backend", "other"]], "features": ["type": "array", "minItems": 1, "maxItems": 20, "items": feature], "architecture": list, "steps": list, "checks": ["type": "array", "minItems": 2, "maxItems": 20, "items": criterion], "deliverables": list, "assumptions": ["type": "array", "maxItems": 15, "items": text], "design_reference_notes": ["type": "array", "maxItems": 20, "items": text], "build_route": ["type": "string", "enum": ["local", "github_actions"]], "github_account_id": ["type": "string"], "repository": ["type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"], "branch": text, "workflow": ["type": "string", "pattern": "^\\.github/workflows/[A-Za-z0-9_.-]+\\.ya?ml$"]], "required": ["title", "objective", "platform", "features", "architecture", "steps", "checks", "deliverables", "assumptions", "build_route"], "additionalProperties": false]
             fields["proposal"] = proposal; requiredFields = ["proposal"]
+        case "github_read_file", "github_write_files":
+            fields["account_id"] = ["type": "string"]; fields["repository"] = ["type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"]
+            fields["branch"] = ["type": "string", "minLength": 1, "maxLength": 240]
+            requiredFields = ["account_id", "repository", "branch"]
+            if name == "github_read_file" {
+                fields["path"] = ["type": "string", "minLength": 1, "maxLength": 500]; requiredFields += ["path"]
+            } else {
+                fields["message"] = ["type": "string", "minLength": 1, "maxLength": 500]
+                let file: [String: Any] = ["type": "object", "properties": ["path": ["type": "string", "minLength": 1, "maxLength": 500], "content": ["type": "string", "maxLength": 120000], "delete": ["type": "boolean"]], "required": ["path"], "additionalProperties": false]
+                fields["files"] = ["type": "array", "minItems": 1, "maxItems": 30, "items": file]
+                requiredFields += ["message", "files"]
+            }
         case "github_request":
             fields["account_id"] = ["type": "string"]
             fields["method"] = ["type": "string", "enum": ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"]]
@@ -148,5 +160,26 @@ enum ZeusAgentSchemas {
             if let name = tools[i]["name"] as? String, let schema = schema(name) { tools[i]["input_schema"] = schema; changed = true }
         }
         if changed { root["tools"] = tools; request.httpBody = try? JSONSerialization.data(withJSONObject: root) }
+    }
+}
+
+/// Recover provider protocol errors by asking for a REAL function call. JSON in
+/// visible messages is never turned into an executable tool by the client.
+enum ZeusToolRecovery {
+    static let marker = "ZEUS_TOOL_REPAIR_REQUIRED:"
+    static func candidate(_ text: String, tools: Set<String>) -> String? {
+        let input = String(text.prefix(12000))
+        guard input.contains("\"tool_calls\"") || input.contains("<tool_call>") else { return nil }
+        guard let expression = try? NSRegularExpression(pattern: #""name"\s*:\s*"([a-zA-Z0-9_]+)""#),
+              let match = expression.firstMatch(in: input, range: NSRange(input.startIndex..., in: input)),
+              let range = Range(match.range(at: 1), in: input) else { return nil }
+        let name = String(input[range]); return tools.contains(name) ? name : nil
+    }
+    static func forcedTool(_ messages: [AgentMessage], available: Set<String>) -> String? {
+        guard let last = messages.last, last.role == .user,
+              let text = last.parts.compactMap({ part -> String? in if case .text(let text) = part { return text }; return nil }).first,
+              text.hasPrefix(marker) else { return nil }
+        let name = String(text.dropFirst(marker.count).prefix(while: { $0 != "\n" }))
+        return available.contains(name) ? name : nil
     }
 }

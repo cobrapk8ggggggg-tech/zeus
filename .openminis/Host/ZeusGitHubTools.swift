@@ -74,6 +74,9 @@ private final class ZeusGitHubNoRedirect: NSObject, URLSessionTaskDelegate {
         guard let http = response as? HTTPURLResponse, data.count <= 4_000_000 else { throw ZeusPatch.failure("GitHub response exceeds the 4MB limit; use a smaller page/file request.") }
         let object: Any = data.isEmpty ? NSNull() : (try? JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed)) ?? String(String(decoding: data, as: UTF8.self).prefix(30000)) as Any
         if (300..<400).contains(http.statusCode), let location = http.value(forHTTPHeaderField: "Location"), let url = URL(string: location), permittedDownload(url) {
+            if method == "GET", path.range(of: #"^/repos/[^/]+/[^/]+/actions/jobs/[0-9]+/logs$"#, options: .regularExpression) != nil {
+                return try await jobLog(url)
+            }
             return ["status": http.statusCode, "redirect_url": location, "authorization_forwarded": false]
         }
         guard (200..<300).contains(http.statusCode) else {
@@ -81,6 +84,24 @@ private final class ZeusGitHubNoRedirect: NSObject, URLSessionTaskDelegate {
             throw NSError(domain: "ZeusGitHubHTTP", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: "GitHub HTTP \(http.statusCode): \(String(message.prefix(1000))). Inspect permissions, repository/ref and rate limits; do not blindly retry an uncertain write."])
         }
         return ["status": http.statusCode, "data": object, "rate_limit_remaining": http.value(forHTTPHeaderField: "X-RateLimit-Remaining") as Any? ?? NSNull()]
+    }
+    private func jobLog(_ url: URL) async throws -> [String: Any] {
+        // GitHub job logs redirect to a temporary download host. Fetch them
+        // natively, without forwarding the account token or requiring curl.
+        let transport = URLSession(configuration: .ephemeral)
+        defer { transport.invalidateAndCancel() }
+        let limit = ZeusArtifactLimit(maximum: 16 * 1024 * 1024, allowLoopback: base.host == "127.0.0.1")
+        var request = URLRequest(url: url); request.timeoutInterval = 60
+        let (temporary, response) = try await transport.download(for: request, delegate: limit)
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+              let size = try temporary.resourceValues(forKeys: [.fileSizeKey]).fileSize, size <= 16 * 1024 * 1024 else {
+            throw ZeusPatch.failure("Job log retrieval failed or exceeded 16MB. Inspect the failed job's step annotations and smaller log outputs.")
+        }
+        let log = String(decoding: try Data(contentsOf: temporary), as: UTF8.self)
+        let truncated = log.count > 100000
+        let visible = truncated ? String(log.prefix(40000)) + "\n[Middle of large job log omitted]\n" + String(log.suffix(60000)) : log
+        return ["status": 200, "data": visible, "log_truncated": truncated, "authorization_forwarded": false]
     }
     func object(accountID: String, path: String, query: [String: String] = [:]) async throws -> [String: Any] {
         guard let object = try await request(accountID: accountID, path: path, query: query)["data"] as? [String: Any] else { throw ZeusPatch.failure("GitHub returned no structured JSON object for verification.") }
@@ -171,7 +192,7 @@ private final class ZeusGitHubNoRedirect: NSObject, URLSessionTaskDelegate {
                     let me = try await client.object(accountID: id, path: "/user")
                     guard (me["login"] as? String)?.lowercased() == repo.split(separator: "/").first.map(String.init)?.lowercased() else { throw ZeusPatch.failure("The approved repository owner differs from this GitHub account; use its organization endpoint or revise the plan.") }
                 }
-                if path.contains("/contents/"), ["PUT", "DELETE"].contains(method), body?["branch"] as? String != proposal.branch { throw ZeusPatch.failure("File mutations must specify the approved project branch.") }
+                if path.contains("/contents/"), ["PUT", "DELETE"].contains(method) { throw ZeusPatch.failure("Use github_write_files with plain text source files for approved project edits. It handles GitHub blobs/trees/commits natively; do not generate Base64 or use a local push.") }
                 if path.hasSuffix("/dispatches"), body?["ref"] as? String != proposal.branch { throw ZeusPatch.failure("Dispatch the workflow on the approved branch.") }
                 if method == "POST", path.hasSuffix("/git/refs"), body?["ref"] as? String != "refs/heads/" + (proposal.branch ?? "") { throw ZeusPatch.failure("Create the branch ref specified in the approved plan.") }
                 if path.contains("/git/refs/heads/"), !path.hasSuffix("/git/refs/heads/" + (proposal.branch ?? "")) { throw ZeusPatch.failure("Update only the approved project branch ref.") }
@@ -244,5 +265,85 @@ private final class ZeusGitHubNoRedirect: NSObject, URLSessionTaskDelegate {
         return try Self.json(["path": linux, "extract_into": extract, "artifact_name": metadata.name, "commit": sha,
             "bytes": try checked.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0,
             "next": "Inspect ZIP entry paths, extract into extract_into, then read the approved screenshot_path with read_image. The UI review must use images from this commit."])
+    }
+}
+
+@MainActor extension ZeusGitHubTools {
+    static func sourcePath(_ path: String) throws {
+        guard !path.isEmpty, !path.hasPrefix("/"), !path.contains("\\"), !path.contains("\0"),
+              !path.split(separator: "/", omittingEmptySubsequences: false).contains(where: { $0.isEmpty || $0 == "." || $0 == ".." || $0 == ".git" }) else {
+            throw ZeusPatch.failure("Source paths must be repository-relative regular file paths without traversal or .git metadata.")
+        }
+    }
+    func readSource(accountID: String, repository: String, branch: String, path: String) async throws -> [String: Any] {
+        try Self.sourcePath(path)
+        let result = try await object(accountID: accountID, path: "/repos/" + repository + "/contents/" + path, query: ["ref": branch])
+        guard result["type"] as? String == "file", result["encoding"] as? String == "base64",
+              let encoded = result["content"] as? String, let bytes = Data(base64Encoded: encoded, options: .ignoreUnknownCharacters), bytes.count <= 240000,
+              let text = String(data: bytes, encoding: .utf8) else { throw ZeusPatch.failure("This source is binary, too large or unavailable. Use smaller text files; inspect actual GitHub errors.") }
+        return ["path": path, "branch": branch, "sha": result["sha"] ?? NSNull(), "content": text]
+    }
+    func writeSources(accountID: String, repository: String, branch: String, message: String, files: [[String: Any]]) async throws -> [String: Any] {
+        guard !files.isEmpty, files.count <= 30, Set(files.compactMap { $0["path"] as? String }).count == files.count else { throw ZeusPatch.failure("A commit needs 1–30 unique file paths.") }
+        var total = 0
+        for file in files {
+            guard let path = file["path"] as? String else { throw ZeusPatch.failure("Each file needs a path.") }
+            try Self.sourcePath(path)
+            let deleting = file["delete"] as? Bool == true
+            guard deleting ? file["content"] == nil : file["content"] is String else { throw ZeusPatch.failure("Use {path,content} for normal source text or {path,delete:true} for deletion; do not send Base64.") }
+            total += (file["content"] as? String)?.utf8.count ?? 0
+        }
+        guard total <= 1_000_000 else { throw ZeusPatch.failure("Split the source into commits smaller than 1MB of UTF-8 text.") }
+        let prefix = "/repos/" + repository
+        let ref = try await object(accountID: accountID, path: prefix + "/git/ref/heads/" + branch)
+        guard let parent = (ref["object"] as? [String: Any])?["sha"] as? String else { throw ZeusPatch.failure("The branch has no commit. Initialize a new repository with auto_init:true and create the approved branch before writing files.") }
+        let commit = try await object(accountID: accountID, path: prefix + "/git/commits/" + parent)
+        guard let baseTree = (commit["tree"] as? [String: Any])?["sha"] as? String else { throw ZeusPatch.failure("GitHub returned no base tree.") }
+        var entries: [[String: Any]] = []
+        for file in files {
+            let path = file["path"] as! String
+            if file["delete"] as? Bool == true { entries.append(["path": path, "mode": "100644", "type": "blob", "sha": NSNull()]); continue }
+            let result = try await request(accountID: accountID, method: "POST", path: prefix + "/git/blobs", body: ["content": file["content"] as! String, "encoding": "utf-8"])
+            guard let sha = (result["data"] as? [String: Any])?["sha"] as? String else { throw ZeusPatch.failure("GitHub did not confirm the source blob. Inspect the result before retrying.") }
+            entries.append(["path": path, "mode": "100644", "type": "blob", "sha": sha])
+        }
+        let tree = try await request(accountID: accountID, method: "POST", path: prefix + "/git/trees", body: ["base_tree": baseTree, "tree": entries])
+        guard let treeSHA = (tree["data"] as? [String: Any])?["sha"] as? String else { throw ZeusPatch.failure("GitHub did not confirm the source tree.") }
+        let created = try await request(accountID: accountID, method: "POST", path: prefix + "/git/commits", body: ["message": message, "tree": treeSHA, "parents": [parent]])
+        guard let sha = (created["data"] as? [String: Any])?["sha"] as? String else { throw ZeusPatch.failure("GitHub did not confirm the commit.") }
+        _ = try await request(accountID: accountID, method: "PATCH", path: prefix + "/git/refs/heads/" + branch, body: ["sha": sha, "force": false])
+        let confirmed = try await object(accountID: accountID, path: prefix + "/git/ref/heads/" + branch)
+        guard (confirmed["object"] as? [String: Any])?["sha"] as? String == sha else { throw ZeusPatch.failure("The branch moved during confirmation. Inspect its HEAD; do not blindly repeat this commit.") }
+        return ["repository": repository, "branch": branch, "parent_sha": parent, "commit_sha": sha, "files": files.map { $0["path"] as! String }, "written_directly_to_github": true]
+    }
+}
+
+@MainActor extension ZeusAgentHarness {
+    func githubReadFile(_ args: [String: Any], session: String, client: ZeusGitHubTools = .shared) async throws -> String {
+        if let proposal = state(session).project?.proposal, state(session).project?.decision == "approved" {
+            guard proposal.github_account_id == nil || proposal.github_account_id == args["account_id"] as? String else { throw ZeusPatch.failure("Use the approved GitHub account.") }
+        }
+        return try Self.json(try await client.readSource(accountID: args["account_id"] as! String, repository: args["repository"] as! String, branch: args["branch"] as! String, path: args["path"] as! String))
+    }
+    func githubWriteFiles(_ args: [String: Any], session: String, client: ZeusGitHubTools = .shared) async throws -> String {
+        let id = args["account_id"] as! String, repository = args["repository"] as! String, branch = args["branch"] as! String
+        let before = state(session)
+        guard let project = before.project, project.decision == "approved", let proposal = project.proposal,
+              proposal.github_account_id == id, proposal.repository?.lowercased() == repository.lowercased(), proposal.branch == branch else { throw ZeusPatch.failure("Direct source commits require the exact user-approved GitHub project account, repository and branch.") }
+        let key = "git-write:" + repository.lowercased() + ":" + branch
+        guard artifactDownloads.insert(key).inserted else { throw ZeusPatch.failure("Another direct commit to this branch is in flight. Inspect its result before writing again.") }
+        defer { artifactDownloads.remove(key) }
+        var value = before; value.generation += 1; value.project?.githubAttempts += 1; try save(session, value)
+        do {
+            let receipt = try await client.writeSources(accountID: id, repository: repository, branch: branch, message: args["message"] as! String, files: args["files"] as! [[String: Any]])
+            value = state(session); value.project?.githubLastStatus = 200; value.project?.githubLastError = nil
+            value.project?.appendNote("حُفظت ملفات المصدر مباشرة في GitHub: " + String((args["files"] as! [[String: Any]]).count) + " ملفات · " + branch)
+            try save(session, value); return try Self.json(receipt)
+        } catch {
+            let native = error as NSError; value = state(session)
+            value.project?.githubLastStatus = native.domain == NSURLErrorDomain ? -1 : native.code
+            value.project?.githubLastError = String(error.localizedDescription.prefix(1500)); try? save(session, value)
+            throw error
+        }
     }
 }

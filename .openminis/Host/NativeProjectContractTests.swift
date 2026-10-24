@@ -33,6 +33,25 @@ import UIKit
         }
         XCTFail("Inline plan approval did not appear")
     }
+    func testProseToolJSONIsNeverExecutedAndRecoveryIsBoundedAndSelectsOnlyAnAdvertisedTool() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let runtime = ZeusAgentHarness(root: root), session = UUID().uuidString
+        runtime.registerUserRequest("Build a Swift audio app", session: session)
+        let text = #"{"tool_calls":[{"name":"github_request","arguments":{"body":{"content":"BASE64_TEXT"}}}]}"#
+        let tools: Set<String> = ["github_request", "github_write_files"]
+        let first = try XCTUnwrap(runtime.recoverToolText(text, tools: tools, session: session))
+        XCTAssertTrue(first.instruction?.hasPrefix(ZeusToolRecovery.marker + "github_write_files") == true)
+        XCTAssertFalse(first.notice.contains("BASE64_TEXT"))
+        XCTAssertEqual(runtime.state(session).ledger.count, 0, "Visible text must never execute or enter the execution ledger")
+        let messages = [AgentMessage(role: .user, parts: [.text(first.instruction!)])]
+        XCTAssertEqual(ZeusToolRecovery.forcedTool(messages, available: tools), "github_write_files")
+        XCTAssertNil(ZeusToolRecovery.forcedTool(messages, available: ["file_read"]))
+        XCTAssertNotNil(runtime.recoverToolText(text, tools: tools, session: session)?.instruction)
+        XCTAssertNil(runtime.recoverToolText(text, tools: tools, session: session)?.instruction)
+        XCTAssertEqual(runtime.state(session).status, "waiting_user")
+        XCTAssertNil(ZeusToolRecovery.candidate("A normal progress update", tools: tools))
+    }
     func testRepeatedProviderIDsAreScopedToTheirOriginalToolSlotWithoutReplayingIt() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -128,21 +147,31 @@ import UIKit
         let secondIdentity = try await client.object(accountID: "second", path: "/user")
         XCTAssertEqual(firstIdentity["login"] as? String, "fixture-owner")
         XCTAssertEqual(secondIdentity["login"] as? String, "other-owner")
+        let logs = try await client.request(accountID: "first", path: "/repos/fixture-owner/project/actions/jobs/123/logs")
+        XCTAssertTrue((logs["data"] as? String ?? "").contains("App.swift:12: missing symbol"))
+        XCTAssertEqual(logs["authorization_forwarded"] as? Bool, false)
         let runtime = ZeusAgentHarness.shared, vm = AIChatViewModel()
         let created = try DebugRPCProvider.instancesCreate(params: ["providerType": "openAI", "label": "Contract vision fixture", "apiKey": "local-fixture-only", "customBaseURL": "http://127.0.0.1:8765/v1", "appendV1Suffix": false, "seedBuiltInModels": false])
         let instance = try XCTUnwrap(created["instance"] as? [String: Any]), providerID = try XCTUnwrap(instance["id"] as? String)
-        defer { _ = try? DebugRPCProvider.instancesDelete(params: ["instanceId": providerID]) }
+        defer { _ = try? DebugRPCProvider.instancesDelete(params: ["instanceId": providerID, "confirm": true]) }
         let model = try DebugRPCProvider.modelsAdd(params: ["instanceId": providerID, "modelId": "fixture-contract-vision", "supportsImageInput": true])
         let entryID = try XCTUnwrap(model["id"] as? String)
         let saved = await ChatStore.shared.createSession(modelId: "fixture-contract-vision", title: "Project contract test")
         vm.sessionId = saved.id; let sid = saved.id
         ProviderConfigStore.shared.setBinding(SessionModelBinding(sessionId: sid, primarySource: .directEntry(modelEntryId: entryID)), for: sid)
-        runtime.registerUserRequest("ابني لي تطبيق أصوات مثل سبوتيفاي مع مكتبة دون اتصال", session: sid)
+        runtime.registerUserRequest("ابني لي تطبيق Swift أصوات مثل سبوتيفاي مع مكتبة دون اتصال", session: sid)
         _ = try await runtime.projectEnvironment(vm: vm)
         XCTAssertEqual(runtime.state(sid).project?.environment?.hasIOSSDK, false)
+        XCTAssertNotNil(runtime.state(sid).project?.loadedSkills?["swiftui-ui-patterns"])
+        XCTAssertTrue(runtime.state(sid).project?.notes?.contains(where: { $0.text.contains("مهارات") }) == true)
         let raw = try proposal(remote: true)
         var invalidLocal = raw; invalidLocal["build_route"] = "local"
         XCTAssertThrowsError(try ZeusProjectContract.validate(ZeusProjectContract.decoded(["proposal": invalidLocal])))
+        var withReference = runtime.state(sid)
+        withReference.project?.referenceImages = ["/var/minis/attachments/reference.png"]
+        try runtime.save(sid, withReference)
+        XCTAssertThrowsError(try runtime.prepareProjectProposal(["proposal": raw], session: sid, blockID: UUID(), connections: connections), "A user-supplied UI image must be inspected before planning")
+        withReference.project?.referenceImages = []; try runtime.save(sid, withReference)
         let approved = try runtime.prepareProjectProposal(["proposal": raw], session: sid, blockID: UUID(), connections: connections)
         try runtime.decideProject(session: sid, hash: approved.hash, decision: "approved")
         do { _ = try await runtime.execute("task_complete", args: ["status": "blocked", "summary": "Swift is absent; user should build manually"], callID: "no-remote-attempt", vm: vm); XCTFail("Missing local Swift must not stop an approved remote project") } catch {}
@@ -151,7 +180,12 @@ import UIKit
         for path in ["https://evil.example/", "//evil.example/", "/repos/o/r/../escape", "/repos/o/r/%2e%2e/escape"] { XCTAssertThrowsError(try ZeusGitHubTools.relativePath(path)) }
         do { _ = try await runtime.githubProjectRequest(["account_id": "second", "path": "/user"], session: sid, client: client); XCTFail("Never substitute a different account") } catch {}
         do { _ = try await runtime.githubProjectRequest(["account_id": "first", "method": "PUT", "path": "/repos/fixture-owner/project/contents/App.swift", "body": ["branch": "main", "content": "dGVzdA=="]], session: sid, client: client); XCTFail("Do not write the wrong branch") } catch {}
-        _ = try await runtime.githubProjectRequest(["account_id": "first", "method": "PUT", "path": "/repos/fixture-owner/project/contents/App.swift", "body": ["branch": "feature/project", "content": "dGVzdA=="]], session: sid, client: client)
+        let source = "import SwiftUI\n// مصدر عربي\nstruct AudioApp {}\n"
+        let receipt = try await runtime.githubWriteFiles(["account_id": "first", "repository": "fixture-owner/project", "branch": "feature/project", "message": "Implement real source", "files": [["path": "App.swift", "content": source], ["path": "README.md", "content": "Audio app"]]], session: sid, client: client)
+        XCTAssertTrue(receipt.contains("written_directly_to_github"))
+        let read = try await client.readSource(accountID: "first", repository: "fixture-owner/project", branch: "feature/project", path: "App.swift")
+        XCTAssertEqual(read["content"] as? String, source)
+        XCTAssertThrowsError(try ZeusGitHubTools.sourcePath("../escape.swift"))
         _ = try await runtime.githubProjectRequest(["account_id": "first", "method": "POST", "path": "/repos/fixture-owner/project/actions/workflows/ci.yml/dispatches", "body": ["ref": "feature/project"]], session: sid, client: client)
         let sha = String(repeating: "1", count: 40)
         let base: [String: Any] = ["account_id": "first", "repository": "fixture-owner/project", "run_id": 42, "expected_sha": sha]
@@ -165,7 +199,9 @@ import UIKit
             XCTAssertTrue(checks.contains { !$0.passed })
         }
         _ = try await runtime.verifyGitHubProject(base, session: sid, client: client)
-        _ = try await runtime.execute("update_plan", args: ["plan": approved.steps.map { ["step": $0, "status": "completed"] }], callID: "steps-done", vm: vm)
+        for index in approved.steps.indices {
+            _ = try await runtime.execute("update_plan", args: ["explanation": "انتهت مرحلة التنفيذ والتحقق " + String(index), "plan": approved.steps.enumerated().map { ["step": $0.element, "status": $0.offset <= index ? "completed" : "pending"] }], callID: "steps-done-" + String(index), vm: vm)
+        }
         do { _ = try await runtime.execute("task_complete", args: ["status": "completed", "summary": "CI is green; skip UI inspection"], callID: "unseen-ui", vm: vm); XCTFail("Artifact presence alone is not visual review") } catch {}
         var download = base; download["artifact_id"] = 2; download["destination"] = "artifacts/ui.zip"
         let receipt = try await runtime.downloadGitHubArtifact(download, session: sid, vm: vm, client: client)

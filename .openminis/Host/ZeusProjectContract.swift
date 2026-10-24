@@ -15,6 +15,7 @@ struct ZeusProjectContract: Codable {
         let title: String; let objective: String; let platform: String
         let features: [Feature]; let architecture: [String]; let steps: [String]
         let checks: [Criterion]; let deliverables: [String]; let assumptions: [String]
+        var design_reference_notes: [String]?
         let build_route: String
         let github_account_id: String?; let repository: String?; let branch: String?; let workflow: String?
         var hash: String {
@@ -50,6 +51,18 @@ struct ZeusProjectContract: Codable {
     var artifactRoots: [String: String]?
     var reviewedImageCommits: [String: String]?
     var verifiedGitHubCommit: String?
+    struct Note: Codable { let text: String; let date: Date }
+    var notes: [Note]?
+    var loadedSkills: [String: String]?
+    var skillPaths: [String: String]?
+    var referenceImages: [String]?
+    var inspectedReferences: [String]?
+    mutating func appendNote(_ text: String) {
+        let note = String(text.prefix(1200)); guard !note.isEmpty, notes?.last?.text != note else { return }
+        if notes == nil { notes = [] }
+        notes?.append(Note(text: note, date: Date()))
+        if let count = notes?.count, count > 50 { notes?.removeFirst(count - 50) }
+    }
 
     static func isProjectRequest(_ text: String) -> Bool {
         let text = text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "ar"))
@@ -121,6 +134,10 @@ private struct ZeusProjectPlanDetails: View {
             }
             Text("المميزات المطلوبة").font(.subheadline.bold())
             ForEach(proposal.features, id: \.id) { feature in Label(feature.title, systemImage: "checklist").font(.subheadline) }
+            if let notes = proposal.design_reference_notes, !notes.isEmpty {
+                Text("تفاصيل الصور المرجعية").font(.subheadline.bold())
+                ForEach(Array(notes.enumerated()), id: \.offset) { item in Text("• " + item.element).font(.subheadline) }
+            }
             Text("بنية المشروع").font(.subheadline.bold())
             ForEach(Array(proposal.architecture.enumerated()), id: \.offset) { item in Text("• " + item.element).font(.subheadline) }
             Text("مراحل التنفيذ").font(.subheadline.bold())
@@ -188,13 +205,29 @@ struct ZeusProjectProgressCard: View {
     let blockID: UUID
     @ObservedObject private var runtime = ZeusAgentHarness.shared
     @State private var expanded = false
+    @State private var notesExpanded = false
     var body: some View {
         if let (state, project) = runtime.projectForBlock(blockID), let proposal = project.proposal {
             VStack(alignment: .leading, spacing: 12) {
                 Label(title(state, project), systemImage: state.status == "completed" ? "checkmark.seal.fill" : "list.clipboard").font(.headline)
                 Text(proposal.title).font(.subheadline.bold())
+                if let skills = project.loadedSkills, !skills.isEmpty { Text("مهارات المهمة: " + skills.keys.sorted().joined(separator: "، ")).font(.caption).foregroundStyle(.secondary) }
+
                 ForEach(state.plan, id: \.step) { step in
                     Label(step.step, systemImage: step.status == "completed" ? "checkmark.circle.fill" : step.status == "in_progress" ? "arrow.triangle.2.circlepath" : "circle").font(.subheadline)
+                }
+                if let notes = project.notes, !notes.isEmpty {
+                    Text("ملاحظات وتقدم التنفيذ").font(.subheadline.bold())
+                    ForEach(Array(notes.suffix(4).enumerated()), id: \.offset) { item in
+                        HStack(alignment: .top) { Image(systemName: "note.text"); Text(item.element.text).font(.caption).fixedSize(horizontal: false, vertical: true) }
+                    }
+                    if notes.count > 4 {
+                        DisclosureGroup("سجل الملاحظات (\(notes.count))", isExpanded: $notesExpanded) {
+                            ScrollView { VStack(alignment: .leading, spacing: 10) {
+                                ForEach(Array(notes.enumerated()), id: \.offset) { item in Text(item.element.text).font(.caption).fixedSize(horizontal: false, vertical: true) }
+                            }}.frame(maxHeight: 240)
+                        }.font(.caption)
+                    }
                 }
                 if !project.revision.isEmpty { Text(project.revision).font(.subheadline).foregroundStyle(.secondary) }
                 HStack { Text("شروط القبول المكتملة"); Spacer(); Text("\(passedCount(state, project, proposal)) / \(proposal.checks.count)").monospacedDigit() }.font(.caption)
@@ -204,6 +237,7 @@ struct ZeusProjectProgressCard: View {
                 .foregroundStyle(.primary).tint(.blue).environment(\.layoutDirection, .rightToLeft)
                 .accessibilityIdentifier("zeusProjectProgress")
                 .onChange(of: expanded) { _ in NotificationCenter.default.post(name: .zeusApprovalChanged, object: blockID) }
+                .onChange(of: notesExpanded) { _ in NotificationCenter.default.post(name: .zeusApprovalChanged, object: blockID) }
         }
     }
     private func title(_ state: ZeusAgentHarness.State, _ project: ZeusProjectContract) -> String {
@@ -256,6 +290,7 @@ struct ZeusProjectProgressCard: View {
         }
         guard let project = value.project, project.required else { return }
         if ["project_environment", "propose_project_plan", "integration_accounts", "integration_tools", "task_checkpoint", "update_plan", "task_complete", "file_read", "read_image", "memory_read", "memory_get"].contains(tool) { return }
+        if tool == "github_read_file" { return }
         if tool == "github_request", ["GET", "HEAD"].contains(args["method"] as? String ?? "GET") { return }
         if tool == "integration_call", ZeusConnections.shared.isReadOnly(args["account_id"] as? String ?? "", tool: args["tool_name"] as? String ?? "") { return }
         // Ordinary read-only browser inspection is useful while researching the
@@ -278,12 +313,16 @@ struct ZeusProjectProgressCard: View {
         if let expected = ZeusProjectContract.explicitPlatform(project.userGoal), expected != proposal.platform {
             throw ZeusPatch.failure("The user explicitly requested \(expected). A proposal for \(proposal.platform) cannot silently replace that platform; revise the plan or obtain the user's actual platform change.")
         }
+        if let references = project.referenceImages, !references.isEmpty {
+            guard Set(references).isSubset(of: Set(project.inspectedReferences ?? [])), !(proposal.design_reference_notes ?? []).isEmpty else { throw ZeusPatch.failure("Read every supplied reference image with read_image before proposing the UI. Include design_reference_notes describing its actual layout, spacing, typography, colors and interaction details; generic UI assumptions are insufficient.") }
+        }
         guard project.environment != nil else { throw ZeusPatch.failure("Call project_environment before proposing a project; inspect actual toolchains and linked accounts instead of guessing where it will build.") }
         if proposal.build_route == "local", project.environment?.localTools["sh"] == nil { throw ZeusPatch.failure("The local shell probe did not succeed. Select a working remote route or resolve the reported environment error before proposing local execution.") }
         if proposal.build_route == "github_actions" {
             _ = try connections.account(proposal.github_account_id, provider: "github")
         }
         project.proposal = proposal; project.decision = "awaiting_approval"; project.approvedHash = nil
+        project.appendNote("عُرضت خطة المشروع للمراجعة.")
         project.approvalBlock = blockID.uuidString; project.revision = ""; project.evidence = [:]
         value.project = project; value.status = "running"; try save(session, value)
         return proposal
@@ -293,6 +332,7 @@ struct ZeusProjectProgressCard: View {
         guard var project = value.project, project.proposal?.hash == hash, project.decision == "awaiting_approval" else { throw ZeusPatch.failure("The plan changed or is no longer awaiting approval. No project action was authorized.") }
         project.decision = decision; project.revision = String(note.prefix(4000))
         if decision == "approved", let proposal = project.proposal {
+            project.appendNote("اعتمد المستخدم الخطة؛ يبدأ تنفيذ المراحل ومتابعة نتائجها.")
             project.approvedHash = hash; project.approvedAt = Date(); value.started = Date()
             project.permissionBlocker = nil; project.environmentBlocker = nil
             value.plan = proposal.steps.map { Step(step: $0, status: "pending") }
@@ -318,9 +358,19 @@ struct ZeusProjectProgressCard: View {
         let accounts = ZeusConnections.shared.linked("github").map(\.id)
         let environment = ZeusProjectContract.Environment(localTools: paths, localError: probeError, hasIOSSDK: false, githubAccounts: accounts, checkedAt: Date())
         var value = state(session), project = state(session).project ?? ZeusProjectContract(userGoal: value.goal)
-        project.environment = environment; value.project = project; try save(session, value)
+        project.environment = environment
+        await ZeusDefaultSkills.shared.install()
+        let platform = ZeusProjectContract.explicitPlatform(project.userGoal) ?? (project.userGoal.range(of: #"\b(swift|swiftui)\b"#, options: [.regularExpression, .caseInsensitive]) != nil ? "ios" : nil)
+        let skillNames = platform == "ios" ? ["swiftui-ui-patterns", "swiftui-view-refactor", "ios-simulator-browser"] : platform == "web" ? ["frontend-app-builder", "frontend-testing-debugging"] : ["verification"]
+        let selected = SkillStore.shared.skills.filter { $0.isEnabled && skillNames.contains($0.name) }
+        project.loadedSkills = Dictionary(uniqueKeysWithValues: selected.map { ($0.name, $0.body) })
+        project.skillPaths = Dictionary(uniqueKeysWithValues: selected.map { ($0.name, "/var/minis/skills/" + $0.id + "/SKILL.md") })
+        if !selected.isEmpty { project.appendNote("قُرئت تلقائياً مهارات المهمة: " + selected.map(\.name).sorted().joined(separator: "، ")) }
+        let references = vm.messages.last(where: { $0.role == .user })?.attachments.filter(\.isImage).map(\.path) ?? []
+        project.referenceImages = Array(Set((project.referenceImages ?? []) + references)).sorted()
+        value = state(session); value.project = project; try save(session, value)
         return try Self.json(["host": "ZEUS Browser on iOS/iPadOS", "local_execution": "Linux guest; not macOS", "has_ios_sdk": false,
-            "local_tools": paths, "probe_error": probeError as Any? ?? NSNull(), "github_accounts": ZeusConnections.shared.accountSummary().filter { $0["provider"] as? String == "github" },
+            "automatically_loaded_skills": project.loadedSkills ?? [:], "skill_paths": project.skillPaths ?? [:], "reference_images_to_read": project.referenceImages ?? [], "local_tools": paths, "probe_error": probeError as Any? ?? NSNull(), "github_accounts": ZeusConnections.shared.accountSummary().filter { $0["provider"] as? String == "github" },
             "required_route": "iOS apps require a linked GitHub account and a macOS/Xcode Actions workflow. Use github_request for repositories/files/dispatch/status. If no account is linked, ask the user to link one, preserve the brief and resume; do not offer manual building as completed work."])
     }
     func recordProjectChecks(session: String) throws {
@@ -358,6 +408,7 @@ struct ZeusProjectProgressCard: View {
         guard let project else { return NSNull() }
         var object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(project)) as! [String: Any]
         object["userGoal"] = String(project.userGoal.prefix(4000))
+        object["notes"] = project.notes?.suffix(4).map { $0.text } ?? []
         object["evidence"] = project.evidence.mapValues { ["passed": $0.passed, "generation": $0.generation, "source": $0.source] as [String: Any] }
         object.removeValue(forKey: "reviewedImages")
         object.removeValue(forKey: "reviewedImageCommits")
@@ -403,6 +454,9 @@ struct ZeusProjectProgressCard: View {
         if tool == "apply_patch" { return inWorkspace(args["workdir"] as? String ?? "/var/minis/workspace") }
         if tool == "task_verify", let commands = args["commands"] as? [String] {
             return inWorkspace(args["workdir"] as? String ?? "/var/minis/workspace") && Set(commands).isSubset(of: Set(p.checks.compactMap(\.command)))
+        }
+        if tool == "github_write_files", let branch = p.branch, !["main", "master", "production", "release"].contains(branch.lowercased()) {
+            return args["account_id"] as? String == p.github_account_id && args["repository"] as? String == p.repository && args["branch"] as? String == branch
         }
         if tool == "github_download_artifact" { return args["account_id"] as? String == p.github_account_id && args["repository"] as? String == p.repository }
         if tool == "github_request", args["account_id"] as? String == p.github_account_id, let repo = p.repository,

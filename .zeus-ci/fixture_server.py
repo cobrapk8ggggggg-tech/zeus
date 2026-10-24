@@ -25,18 +25,18 @@ def harness_events(body):
     results = [m for m in body.get('messages', []) if m.get('role') == 'tool' and m.get('tool_call_id', '').startswith('zeus-harness-')]
     stage = int(results[-1]['tool_call_id'].split('-')[2]) + 1 if results else 0
     cwd = '/var/minis/workspace/e2e-' + hashlib.sha256(body['model'].encode()).hexdigest()[:16]
-    check = 'test "$(cat value.txt)" = correct'
+    check = 'test "$(cat value.txt)" = correct && test ! -e forbidden.txt'
     steps = [
         ('project_environment', {}),
         ('propose_project_plan', {'proposal': backend_proposal(body['model'], check)}),
-        ('update_plan', {'goal': 'Create, test, repair and verify a real project', 'plan': [{'step': 'Implement and verify', 'status': 'in_progress'}], 'verification_commands': ['test -s README.md', check]}),
+        ('update_plan', {'goal': 'Create, test, repair and verify a real project', 'plan': [{'step': 'Implement and verify', 'status': 'in_progress'}], 'verification_commands': ['test -s README.md', check], 'explanation': 'اعتمدت الخطة؛ أنشئ الملفات وأتحقق من سلوكها.'}),
         ('exec_command', {'cmd': 'mkdir -p ' + cwd, 'workdir': '/var/minis/workspace', 'yield_time_ms': 1000}),
         ('write_stdin', {}),
         ('apply_patch', {'workdir': cwd, 'patch': '*** Begin Patch\n*** Add File: value.txt\n+wrong\n*** Add File: README.md\n+Native agent fixture project\n*** End Patch'}),
         ('task_verify', {'workdir': cwd, 'commands': ['test -s README.md', check]}),
         ('apply_patch', {'workdir': cwd, 'patch': '*** Begin Patch\n*** Update File: value.txt\n@@\n-wrong\n+correct\n*** End Patch'}),
         ('task_verify', {'workdir': cwd, 'commands': ['test -s README.md', check]}),
-        ('update_plan', {'plan': [{'step': 'Implement and verify', 'status': 'completed'}]}),
+        ('update_plan', {'plan': [{'step': 'Implement and verify', 'status': 'completed'}], 'explanation': 'أصلحت قيمة الملف واجتاز الفحص الفعلي؛ أسجل النتيجة النهائية.'}),
         ('task_complete', {'status': 'completed', 'summary': 'Actual failing check repaired and passing check recorded'})
     ]
     if results:
@@ -49,8 +49,14 @@ def harness_events(body):
         if previous_stage == 4 and json.loads(previous)['running']: stage = 4
     if stage >= len(steps):
         return [{'choices': [{'delta': {'content': 'NATIVE_HARNESS_VERIFIED: تم إنشاء المشروع وإصلاح فحصه الفاشل والتحقق منه فعلياً.'}, 'finish_reason': None}]}, {'choices': [{'delta': {}, 'finish_reason': 'stop'}]}]
-    if stage == 7 and not any(m.get('role') == 'user' and '<zeus_runtime_instruction' in str(m.get('content', '')) for m in body.get('messages', [])):
-        return [{'choices': [{'delta': {'content': 'مستجد: ظهر فشل في الفحص وسأواصل إصلاحه.'}, 'finish_reason': None}]}, {'choices': [{'delta': {}, 'finish_reason': 'stop'}]}]
+    if stage == 7:
+        repair = next((m for m in reversed(body.get('messages', [])) if m.get('role') == 'user'), {})
+        if not str(repair.get('content', '')).startswith('ZEUS_TOOL_REPAIR_REQUIRED:'):
+            # Simulate the user's DeepSeek failure: JSON in visible text must
+            # not become an executable call, and must not terminate the task.
+            malformed = json.dumps({'tool_calls': [{'name': 'apply_patch', 'arguments': {'workdir': cwd, 'patch': '*** Begin Patch\n*** Add File: forbidden.txt\n+MUST NOT EXECUTE\n*** End Patch'}}]})
+            return [{'choices': [{'delta': {'content': malformed}, 'finish_reason': None}]}, {'choices': [{'delta': {}, 'finish_reason': 'stop'}]}]
+        if body.get('tool_choice') != {'type': 'function', 'function': {'name': 'apply_patch'}}: raise ValueError('The actual repair request must select a structured function call')
     name, args = steps[stage]
     if stage == 4:
         started = next(m for m in results if m['tool_call_id'].startswith('zeus-harness-3-'))
