@@ -33,6 +33,16 @@ import UIKit
         }
         XCTFail("Inline plan approval did not appear")
     }
+    func testRecreatingBrowserRootDoesNotResetLanguagePreferences() throws {
+        let defaults = UserDefaults.standard
+        _ = ZEUSBrowserRootEntry()
+        let prior = defaults.string(forKey: "appLanguage")
+        defer { defaults.set(prior, forKey: "appLanguage") }
+        defaults.set("ar-test-sentinel", forKey: "appLanguage")
+        _ = ZEUSBrowserRootEntry()
+        _ = ZEUSBrowserRootEntry()
+        XCTAssertEqual(defaults.string(forKey: "appLanguage"), "ar-test-sentinel", "Root reconstruction must not write AppStorage preferences and create a render loop")
+    }
     func testPersistentPathsRemainAvailableWithoutAnAppGroupEntitlement() throws {
         let container = SharedContainerStore.containerURLForMainAppStorage
         XCTAssertTrue(FileManager.default.fileExists(atPath: container.path))

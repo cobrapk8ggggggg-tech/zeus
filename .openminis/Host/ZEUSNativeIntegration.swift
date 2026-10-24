@@ -13,16 +13,7 @@ nonisolated func zeusBrowserOperation(_ name: String) -> String? {
 
 @MainActor
 struct ZEUSBrowserRootEntry: View {
-    init() {
-        UserDefaults.standard.set("ar", forKey: "appLanguage")
-        UserDefaults.standard.set("text", forKey: "composerInputModePreference")
-        UserDefaults.standard.set(false, forKey: "voice.output.readRepliesAloud")
-        Bundle.setLanguage("ar")
-        Task { await ZeusDefaultSkills.shared.install() }
-        #if DEBUG
-        _ = ZEUSNativeFixtureBootstrap.configured
-        #endif
-    }
+    init() { _ = ZEUSNativeHostBootstrap.configured }
     var body: some View {
         #if DEBUG
         if CommandLine.arguments.contains("--uitest-message-list") {
@@ -38,6 +29,24 @@ struct ZEUSBrowserRootEntry: View {
         }
         #endif
     }
+}
+
+/// SwiftUI can recreate the root many times. Default writes post notifications
+/// even when the value is unchanged, so initialization must not invalidate the
+/// root's own AppStorage bindings on every rendering pass.
+@MainActor
+private enum ZEUSNativeHostBootstrap {
+    static let configured: Void = {
+        let defaults = UserDefaults.standard
+        if defaults.string(forKey: "appLanguage") != "ar" { defaults.set("ar", forKey: "appLanguage") }
+        if defaults.string(forKey: "composerInputModePreference") != "text" { defaults.set("text", forKey: "composerInputModePreference") }
+        if defaults.bool(forKey: "voice.output.readRepliesAloud") { defaults.set(false, forKey: "voice.output.readRepliesAloud") }
+        Bundle.setLanguage("ar")
+        Task { await ZeusDefaultSkills.shared.install() }
+        #if DEBUG
+        _ = ZEUSNativeFixtureBootstrap.configured
+        #endif
+    }()
 }
 
 #if DEBUG
