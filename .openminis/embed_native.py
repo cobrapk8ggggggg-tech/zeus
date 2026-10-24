@@ -51,7 +51,7 @@ def embed(native, browser, report):
     # The application remains OpenMinis' original @main/AppDelegate/root setup;
     # its root content now embeds the browser with the original AI UI alongside.
     replace(source / "MinisApp.swift", "                ContentView()", "                ZEUSBrowserRootEntry()")
-    for name in ("ZEUSNativeIntegration.swift", "ZeusToolPermissions.swift", "ZeusDefaultSkills.swift", "ZeusAgentSchemas.swift", "ZeusPatch.swift", "ZeusAgentHarness.swift", "ZeusConnections.swift"):
+    for name in ("ZEUSNativeIntegration.swift", "ZeusToolPermissions.swift", "ZeusDefaultSkills.swift", "ZeusAgentSchemas.swift", "ZeusPatch.swift", "ZeusAgentHarness.swift", "ZeusConnections.swift", "ZeusGitHubAuthorization.swift"):
         shutil.copyfile(browser / ".openminis/Host" / name, source / name)
     # Reuse the exact native settings sheet from the browser's AI settings row.
     # Only its file-private visibility changes; its body is untouched.
@@ -193,6 +193,12 @@ def embed(native, browser, report):
     replace(oauth, 'URLQueryItem(name: "prompt", value: "consent")', 'URLQueryItem(name: "prompt", value: oauth.prompt ?? "consent")')
     replace(oauth, '        req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")', '        req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")\n        req.setValue("application/json", forHTTPHeaderField: "Accept")')
     replace(oauth, '    // MARK: - Helpers\n', '''    // Native HTTP integrations share the original Keychain and OAuth flow.
+    static func storeTokensForZeus(_ stored: StoredTokens, server: String, oauth: MCPOAuthConfig) throws {
+        keychainSet(try JSONEncoder().encode(stored), account: "\\(server)#tokens")
+        guard tokens(server: server)?.accessToken == stored.accessToken else { throw OAuthError.exchangeFailed("تعذر حفظ تفويض الحساب في Keychain؛ لم يكتمل الربط.") }
+        materializeBridge(server: server, oauth: oauth, tokens: stored)
+    }
+
     static func refreshAccessTokenForZeus(server: String, oauth: MCPOAuthConfig) async throws -> String {
         guard var stored = tokens(server: server) else { throw OAuthError.badConfig("أعد ربط الحساب عبر OAuth.") }
         if stored.expiresAt == 0 || stored.expiresAt > Date().timeIntervalSince1970 + 60 { return stored.accessToken }

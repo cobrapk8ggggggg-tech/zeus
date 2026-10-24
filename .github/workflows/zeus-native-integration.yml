@@ -136,7 +136,7 @@ jobs:
           xcodebuild -project upstream/src/ios/Minis.xcodeproj -scheme Minis \
           -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
           -derivedDataPath "$RUNNER_TEMP/OpenMinisOriginal" \
-          build-for-testing CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ARCHS=arm64
+          build-for-testing CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- ARCHS=arm64
       id: native_build
     - uses: actions/cache/save@v4
       if: always() && steps.native_build.outcome != 'skipped' && steps.swift_cache.outputs.cache-hit
@@ -147,9 +147,6 @@ jobs:
           ${{ runner.temp }}/OpenMinisOriginal/SourcePackages
           ${{ runner.temp }}/OpenMinisOriginal/ModuleCache.noindex
         key: zeus-native-deriveddata-263-v2-${{ github.run_id }}
-    - name: Sign simulator host for real Keychain access
-      if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
-      run: python3 browser/.openminis/sign_simulator.py "$RUNNER_TEMP/OpenMinisOriginal/Build/Products/Debug-iphonesimulator/Minis.app"
     - name: 'IPHONE: Boot'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
       timeout-minutes: 10

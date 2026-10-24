@@ -127,9 +127,21 @@ The native regression calls the actual selector with the 59-skill catalog and
 checks both the metadata budget and discoverability before exercising the full
 streaming/model/tool loop. Device version is 2.9.0 (14).
 
-Simulator validation uses ad-hoc signing with an isolated `ZEUSCITEST` application
-identifier and Keychain access group. Unsigned simulator hosts returned
-`errSecMissingEntitlement` (-34018) from actual Security APIs; credentials are
-not replaced by a mock or in-memory fallback. The full-loop regression explicitly
-reads back its fixture key through the original ProviderKeychainHelper before
-requesting a response. This simulator-only identity does not sign the device IPA.
+Simulator validation uses Xcode's simulator signing and simulated-entitlement
+packaging, with an app-owned Keychain access group. The original unsigned host
+returned errSecMissingEntitlement (-34018); manual post-build device-style
+entitlements were rejected by simulator launch policy, so they were removed.
+There is no credential mock or in-memory fallback. The full-loop regression
+reads back its fixture key using the original ProviderKeychainHelper.
+Device IPAs remain unsigned in the separate packaging workflow.
+
+GitHub authorization now uses its official public-client OAuth device grant:
+https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow
+The user reported Safari HTTPS-only blocking the HTTP loopback after successful
+login. Device Flow avoids the HTTP browser callback entirely; it uses the same
+registered client ID and requires Enable Device Flow (already enabled in the
+user's screenshot). Only GitHub's HTTPS verification page is opened. Polling
+honors authorization_pending, slow_down, expiry, denial and cancellation;
+tokens must round-trip through original Keychain storage before account creation.
+Native HTTP tests exercise those responses and reject untrusted verification URLs.
+Version 2.9.1 (15) includes this fix; actual user approval remains interactive.

@@ -10,6 +10,7 @@ import hashlib
 
 TRANSLATION_REQUESTS = {}
 TRANSLATION_LOCK = Lock()
+DEVICE_POLLS = {}
 
 PAYLOAD = bytes(range(256)) * 4096
 
@@ -61,7 +62,27 @@ def harness_events(body):
 class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
-            body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', '0'))))
+            raw = self.rfile.read(int(self.headers.get('Content-Length', '0')))
+            if self.path.startswith('/github-device-fixture/'):
+                form = {k: v[0] for k, v in parse_qs(raw.decode()).items()}
+                client = form.get('client_id', '')
+                if self.headers.get('Accept') != 'application/json' or 'client_secret' in form: raise ValueError('Device grant must use the public-client JSON flow')
+                if self.path.endswith('/login/device/code'):
+                    result = {'device_code': 'fixture-' + client, 'user_code': 'ZEUS-TEST', 'verification_uri': 'http://untrusted.example/login/device' if client == 'untrusted' else 'https://github.com/login/device', 'expires_in': 900, 'interval': 5}
+                    if client == 'disabled': result = {'error': 'device_flow_disabled'}
+                else:
+                    if form.get('grant_type') != 'urn:ietf:params:oauth:grant-type:device_code' or form.get('device_code') != 'fixture-' + client: raise ValueError('Invalid device grant')
+                    with TRANSLATION_LOCK:
+                        DEVICE_POLLS[client] = DEVICE_POLLS.get(client, 0) + 1
+                        count = DEVICE_POLLS[client]
+                    if client == 'denied': result = {'error': 'access_denied'}
+                    elif client == 'expired': result = {'error': 'expired_token'}
+                    elif count == 1: result = {'error': 'authorization_pending'}
+                    elif count == 2: result = {'error': 'slow_down'}
+                    else: result = {'access_token': 'fixture-device-access', 'token_type': 'bearer', 'scope': 'repo'}
+                data = json.dumps(result).encode()
+                self.send_response(200); self.send_header('Content-Type', 'application/json'); self.send_header('Content-Length', str(len(data))); self.end_headers(); self.wfile.write(data); return
+            body = json.loads(raw)
             if self.path.startswith('/mcp-fixture/'):
                 account = self.path.rsplit('/', 1)[-1]
                 if self.headers.get('Authorization') != 'Bearer fixture-' + account:

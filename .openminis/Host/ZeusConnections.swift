@@ -117,7 +117,12 @@ struct ZeusOAuthSetupRequired: Error { let config: MCPOAuthConfig }
         var server = try JSONDecoder().decode(MCPServerConfig.self, from: JSONSerialization.data(withJSONObject: ["id": id, "note": service.name, "enabled": false, "url": service.endpoint]))
         server.oauth = oauth; MCPStore.shared.add(server)
         if let secret = MCPOAuthController.clientSecret(server: "zeus-client-" + service.id) { MCPOAuthController.setClientSecret(secret, server: id) }
-        do { try await MCPOAuthController.shared.authorize(server: id, oauth: oauth) } catch { MCPStore.shared.delete(id: id); throw error }
+        do {
+            if service.id == "github" {
+                let tokens = try await ZeusGitHubAuthorization.shared.authorize(oauth)
+                try MCPOAuthController.storeTokensForZeus(tokens, server: id, oauth: oauth)
+            } else { try await MCPOAuthController.shared.authorize(server: id, oauth: oauth) }
+        } catch { MCPStore.shared.delete(id: id); throw error }
         accounts.append(ZeusLinkedAccount(id: id, provider: service.id, label: service.name + " " + String(linked(service.id).count + 1), isDefault: linked(service.id).isEmpty, verified: false, toolCount: 0, linkedAt: Date()))
         save(); await identity(id)
         do { _ = try await listTools(id); error = nil } catch { self.error = error.localizedDescription }
@@ -247,6 +252,7 @@ private struct ZeusServiceDetail: View {
     @State private var error: String?
     @State private var setup: MCPOAuthConfig?
     @State private var showSetup = false
+    @ObservedObject private var githubAuthorization = ZeusGitHubAuthorization.shared
     var body: some View {
         List {
             Section { VStack(alignment: .leading, spacing: 14) { Image(systemName: service.symbol).font(.largeTitle).padding(12).background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14)); Text(service.name).font(.largeTitle.bold()); Text(service.summary).foregroundStyle(.secondary) }.padding(.vertical, 12) }
@@ -264,6 +270,7 @@ private struct ZeusServiceDetail: View {
         }.navigationTitle(service.name)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button { setup = connections.client(service.id); showSetup = true } label: { Image(systemName: "gearshape") } } }
             .sheet(isPresented: $showSetup) { ZeusOAuthClientSetup(service: service, initial: setup) }
+            .sheet(item: service.id == "github" ? $githubAuthorization.presentation : .constant(nil), onDismiss: { githubAuthorization.cancel() }) { ZeusGitHubAuthorizationView(authorization: $0) }
     }
     private func connect() async { do { try await connections.connect(service); error = nil } catch let required as ZeusOAuthSetupRequired { setup = required.config; showSetup = true } catch { self.error = error.localizedDescription } }
 }
@@ -303,15 +310,15 @@ private struct ZeusOAuthClientSetup: View {
             Section("تطبيق OAuth الخاص بـZEUS") {
                 if service.id == "github" {
                     Link("تسجيل تطبيق ZEUS لدى GitHub", destination: URL(string: "https://github.com/settings/applications/new?oauth_application%5Bname%5D=ZEUS%20Browser&oauth_application%5Burl%5D=https%3A%2F%2Fgithub.com%2Fcobrapk8ggggggg-tech%2Fzeus&oauth_application%5Bcallback_url%5D=http%3A%2F%2F127.0.0.1%3A18467%2Fcallback")!)
-                    Text("يلزم تسجيل تطبيق ZEUS مرة واحدة لدى GitHub؛ يُستخدم بعدها لربط حساباتك عبر صفحة الموافقة الأصلية.").font(.caption).foregroundStyle(.secondary)
+                    Text("فعّل Enable Device Flow في إعدادات التطبيق لدى GitHub. سيتم الربط برمز تحقق عبر HTTPS، دون عنوان رجوع محلي أو Client Secret.").font(.caption).foregroundStyle(.secondary)
                 }
                 if service.id == "railway" {
                     Link("تسجيل تطبيق ZEUS في Railway", destination: URL(string: "https://railway.com/dashboard")!)
                     Text("إعدادات مساحة العمل ← Developer ← New OAuth App ← Native. عنوان العودة أدناه. التسجيل التلقائي معطّل حالياً لدى Railway.").font(.caption).foregroundStyle(.secondary)
                 }
                 TextField("Client ID", text: $client).textInputAutocapitalization(.never).autocorrectionDisabled()
-                if service.id != "railway" { SecureField("Client Secret عند اشتراطه", text: $secret).textInputAutocapitalization(.never).autocorrectionDisabled() }
-                Text("http://127.0.0.1:18467/callback").font(.caption.monospaced()).textSelection(.enabled).environment(\.layoutDirection, .leftToRight)
+                if service.id != "railway" && service.id != "github" { SecureField("Client Secret عند اشتراطه", text: $secret).textInputAutocapitalization(.never).autocorrectionDisabled() }
+                if service.id != "github" { Text("http://127.0.0.1:18467/callback").font(.caption.monospaced()).textSelection(.enabled).environment(\.layoutDirection, .leftToRight) }
             }
             DisclosureGroup("إعدادات متقدمة") {
                 TextField("Authorization URL", text: $auth).textInputAutocapitalization(.never).autocorrectionDisabled()

@@ -5,6 +5,25 @@ import WebKit
 
 @MainActor
 final class NativeBrowserIntegrationTests: XCTestCase {
+    func testGitHubDeviceGrantUsesHTTPSVerificationAndHonorsPendingSlowdownAndCancellation() async throws {
+        let auth = ZeusGitHubAuthorization(fixture: URL(string: "http://127.0.0.1:8765/github-device-fixture")!)
+        let grant = try await auth.start(clientID: UUID().uuidString, scopes: "repo read:org user:email workflow")
+        XCTAssertEqual(grant.presentation.verificationURL.absoluteString, "https://github.com/login/device")
+        var delays: [Double] = []
+        let tokens = try await auth.poll(grant) { delays.append($0) }
+        XCTAssertEqual(tokens.accessToken, "fixture-device-access")
+        XCTAssertEqual(delays, [5, 5, 10])
+        for client in ["disabled", "untrusted"] {
+            do { _ = try await auth.start(clientID: client, scopes: nil); XCTFail("Invalid or disabled device grants must be rejected") } catch {}
+        }
+        for client in ["denied", "expired"] {
+            let rejected = try await auth.start(clientID: client, scopes: nil)
+            do { _ = try await auth.poll(rejected) { _ in }; XCTFail("Rejected grants must not create accounts") } catch {}
+        }
+        let cancelled = try await auth.start(clientID: "cancelled", scopes: nil)
+        auth.cancel()
+        do { _ = try await auth.poll(cancelled) { _ in XCTFail("Cancellation must stop polling") }; XCTFail("Cancelled grant must fail") } catch is CancellationError {} catch { XCTFail("Unexpected cancellation error") }
+    }
     func testActualNativeModelLoopStreamsAndVerifiesAProject() async throws {
         let store = ProviderConfigStore.shared
         for _ in 0..<200 where !store.zeusFixtureLoadFinished { try await Task.sleep(for: .milliseconds(100)) }
