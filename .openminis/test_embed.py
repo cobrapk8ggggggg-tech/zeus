@@ -45,7 +45,7 @@ class NativeEmbeddingTests(unittest.TestCase):
             # addition to the existing permission card and app-group constants.
             for file in (UPSTREAM / "src/ios/Views").rglob("*.swift"):
                 relative = file.relative_to(UPSTREAM / "src/ios")
-                if str(relative) in {"Views/Chat/OffloadPermissionDialog.swift", "Views/Chat/AIChatView.swift", "Views/Chat/ToolLiveSheet.swift", "Views/Settings/OffloadPermissionSettingsView.swift", "Views/Chat/SelectableMarkdownView.swift"}:
+                if str(relative) in {"Views/Chat/OffloadPermissionDialog.swift", "Views/Chat/AIChatView.swift", "Views/Chat/ToolLiveSheet.swift", "Views/Settings/OffloadPermissionSettingsView.swift", "Views/Chat/SelectableMarkdownView.swift", "Views/Settings/StorageManagementView.swift"}:
                     continue
                 expected = file.read_text().replace("group.com.openminis.app", "group.tools.zeus.openminis").replace("iCloud.com.openminis.app", "iCloud.tools.zeus.openminis")
                 if str(relative) == "Views/ContentView.swift":
@@ -75,6 +75,10 @@ class NativeEmbeddingTests(unittest.TestCase):
                 for tool in ("Shell", "Editor", "Browser", "Memory"):
                     expected = expected.replace('return "Minis is using ' + tool + '"', 'return String(localized: "Minis is using ' + tool + '")')
                 self.assertEqual((native / "src/ios" / relative).read_text(), expected, str(relative))
+            storage = (native / "src/ios/Views/Settings/StorageManagementView.swift").read_text()
+            self.assertIn("ZeusStorageCategoryView(category: label)", storage)
+            self.assertIn("ZeusStorageDirectoryView(root: minisURL)", storage)
+            self.assertTrue((native / "src/ios/ZeusStorageExplorer.swift").exists())
             original_store = (UPSTREAM / "src/ios/Agent/Chat/ChatStore.swift").read_text()
             adapted_store = (native / "src/ios/Agent/Chat/ChatStore.swift").read_text()
             # Storage/protocol/sync methods after UI conversion remain untouched.

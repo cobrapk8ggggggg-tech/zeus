@@ -72,8 +72,15 @@ def embed(native, browser, report):
     # The application remains OpenMinis' original @main/AppDelegate/root setup;
     # its root content now embeds the browser with the original AI UI alongside.
     replace(source / "MinisApp.swift", "                ContentView()", "                ZEUSBrowserRootEntry()")
-    for name in ("ZEUSNativeIntegration.swift", "ZeusToolPermissions.swift", "ZeusDefaultSkills.swift", "ZeusAgentSchemas.swift", "ZeusPatch.swift", "ZeusAgentHarness.swift", "ZeusConnections.swift", "ZeusGitHubAuthorization.swift", "ZeusProjectContract.swift", "ZeusGitHubTools.swift"):
+    for name in ("ZEUSNativeIntegration.swift", "ZeusToolPermissions.swift", "ZeusDefaultSkills.swift", "ZeusAgentSchemas.swift", "ZeusPatch.swift", "ZeusAgentHarness.swift", "ZeusConnections.swift", "ZeusGitHubAuthorization.swift", "ZeusProjectContract.swift", "ZeusGitHubTools.swift", "ZeusStorageExplorer.swift"):
         shutil.copyfile(browser / ".openminis/Host" / name, source / name)
+    # Turn the original informational storage rows into drill-down links.
+    storage = source / "Views/Settings/StorageManagementView.swift"
+    replace(storage, '        HStack {\n            Image(systemName: icon)', '        NavigationLink { ZeusStorageCategoryView(category: label) } label: {\n        HStack {\n            Image(systemName: icon)')
+    replace(storage, '            Text(label)\n', '            Text(ZeusStorageScope.title(label))\n')
+    replace(storage, '                .foregroundStyle(.secondary)\n        }\n    }\n}\n\n// MARK: - Session Storage Detail View', '                .foregroundStyle(.secondary)\n        }\n        }\n    }\n}\n\n// MARK: - Session Storage Detail View')
+    replace(storage, 'FileBrowserView(rootPath: minisURL)', 'ZeusStorageDirectoryView(root: minisURL)')
+
     # Reuse the exact native settings sheet from the browser's AI settings row.
     # Only its file-private visibility changes; its body is untouched.
     replace(source / "Views/ContentView.swift", "private struct SettingsSheet: View", "struct SettingsSheet: View")

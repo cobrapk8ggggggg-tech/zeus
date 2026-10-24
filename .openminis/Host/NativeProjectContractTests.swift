@@ -98,6 +98,39 @@ import UIKit
         XCTAssertThrowsError(try ZeusToolInput.normalize(name: "exec_command", args: ["cmd": NSNull()], tools: []))
         XCTAssertThrowsError(try ZeusToolInput.normalize(name: "exec_command", args: ["cmd": "printf ok", "unknown": true], tools: []))
     }
+    func testBrowserToolsDoNotRequireProjectApprovalButKeepTheirOwnPermissions() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let runtime = ZeusAgentHarness(root: root), session = UUID().uuidString
+        runtime.registerUserRequest("Build an iOS application", session: session)
+        XCTAssertNotNil(runtime.state(session).project)
+        for name in ["zeus_browser", "browser_use"] {
+            XCTAssertNoThrow(try runtime.projectGate(tool: name, args: ["operation": "browser_evaluate", "action": "evaluate"], session: session))
+            XCTAssertTrue(ZeusToolPermissions.isConsequential(tool: name, args: ["operation": "browser_evaluate", "action": "evaluate"]))
+        }
+        XCTAssertThrowsError(try runtime.projectGate(tool: "file_write", args: ["path": "App.swift"], session: session))
+    }
+    func testStorageSelectiveDeletionAndSymlinkBoundaries() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let outside = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root); try? FileManager.default.removeItem(at: outside) }
+        let keep = root.appendingPathComponent("database"), remove = root.appendingPathComponent("cache")
+        try Data("keep".utf8).write(to: keep); try Data("delete".utf8).write(to: remove)
+        XCTAssertThrowsError(try ZeusStorageFiles.delete(keep, container: root, protected: [keep]))
+        try ZeusStorageFiles.delete(remove, container: root, protected: [keep])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: keep.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: remove.path))
+        let secret = outside.appendingPathComponent("keep")
+        try Data("outside".utf8).write(to: secret)
+        let link = root.appendingPathComponent("link")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outside)
+        XCTAssertThrowsError(try ZeusStorageFiles.children(link, container: root))
+        XCTAssertThrowsError(try ZeusStorageFiles.delete(link.appendingPathComponent("keep"), container: root, protected: []))
+        try ZeusStorageFiles.delete(link, container: root, protected: [])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: secret.path))
+    }
     func testSmallUtilityScriptsNeverBecomeMandatoryProjects() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -180,6 +213,9 @@ import UIKit
         XCTAssertTrue(ZeusProjectContract.isProjectRequest("ابني لي تطبيق أصوات"))
         XCTAssertTrue(ZeusProjectContract.isProjectRequest("Build a website with offline support"))
         XCTAssertFalse(ZeusProjectContract.isProjectRequest("Create an apple pie recipe"))
+        XCTAssertFalse(ZeusProjectContract.isProjectRequest("اكتب سكربت استخراج توكن تطبيق من IndexedDB"))
+        XCTAssertFalse(ZeusProjectContract.isProjectRequest("Write a script to inspect this app's IndexedDB"))
+        XCTAssertTrue(ZeusProjectContract.isProjectRequest("Build an app with a script editor"))
         XCTAssertFalse(ZeusProjectContract.isProjectRequest("اشرح إعدادات المتصفح"))
         let fallback = ZeusAgentHarness(root: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)), fallbackSession = UUID().uuidString
         fallback.registerUserRequest("أريد تطبيق Swift صوتي بواجهات الصور", session: fallbackSession)

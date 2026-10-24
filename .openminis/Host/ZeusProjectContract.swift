@@ -83,6 +83,11 @@ struct ZeusProjectContract: Codable {
             return text.contains(term)
         }
         let directProductRequest = ["اريد تطبيق", "اريد موقع", "اريد برنامج", "ابغى تطبيق", "ابغى موقع", "ارغب في تطبيق"].contains(where: text.contains)
+        // Mentioning an application's name while requesting a script/token
+        // inspection is not a request to build that application.
+        let utility = ["سكربت", "سكريبت", "script", "snippet", "bookmarklet", "indexeddb", "indexdb"].contains(where: contains)
+        let explicitBuild = text.range(of: #"(?:ابني|ابن لي|انشئ|اصنع|بناء|build|create|develop|implement)\s+(?:(?:لي|an?|the|new)\s+){0,3}(?:تطبيق|مشروع|موقع|لعبه|لعبة|برنامج|app\b|application\b|project\b|website\b|game\b)"#, options: .regularExpression) != nil
+        if utility && !directProductRequest && !explicitBuild { return false }
         return directProductRequest || (actions.contains(where: contains) && products.contains(where: contains))
     }
     static func decoded(_ args: [String: Any]) throws -> Proposal {
@@ -316,10 +321,10 @@ struct ZeusProjectProgressCard: View {
         if tool == "github_read_file" { return }
         if tool == "github_request", ["GET", "HEAD"].contains(args["method"] as? String ?? "GET") { return }
         if tool == "integration_call", ZeusConnections.shared.isReadOnly(args["account_id"] as? String ?? "", tool: args["tool_name"] as? String ?? "") { return }
-        // Ordinary read-only browser inspection is useful while researching the
-        // brief. Shell/Swift/file mutations cannot bypass project approval.
-        if tool.hasPrefix("zeus_browser"), !ZeusToolPermissions.isConsequential(tool: tool, args: args) { return }
-        if tool == "browser_use", !ZeusToolPermissions.isConsequential(tool: tool, args: args) { return }
+        // Browser actions have their own permission gate. A product-plan gate
+        // governs project mutations, not navigation/JS/IndexedDB inspection.
+        // Sensitive browser operations still require ZeusToolPermissions consent.
+        if tool == "zeus_browser" || zeusBrowserOperation(tool) != nil || tool == "browser_use" { return }
         guard project.decision == "approved", project.approvedHash == project.proposal?.hash else {
             throw ZeusPatch.failure("PROJECT_PLAN_REQUIRED: Inspect project_environment, propose a complete product brief with propose_project_plan, and wait for the user's inline approval before writing source, compiling or changing a repository. Current user goal: " + String(project.userGoal.prefix(1200)) + (project.revision.isEmpty ? "" : "\nRequested revision: " + project.revision))
         }
