@@ -64,6 +64,15 @@ struct ZeusProjectContract: Codable {
         if let count = notes?.count, count > 50 { notes?.removeFirst(count - 50) }
     }
 
+    @MainActor mutating func loadSkills(platform: String?) {
+        let names = platform == "ios" ? ["swiftui-ui-patterns", "swiftui-view-refactor", "ios-simulator-browser"] : platform == "web" ? ["frontend-app-builder", "frontend-testing-debugging"] : ["verification"]
+        let selected = SkillStore.shared.skills.filter { $0.isEnabled && names.contains($0.name) }
+        let previous: Set<String> = Set((loadedSkills ?? [:]).keys)
+        loadedSkills = Dictionary(uniqueKeysWithValues: selected.map { ($0.name, $0.body) })
+        skillPaths = Dictionary(uniqueKeysWithValues: selected.map { ($0.name, "/var/minis/skills/" + $0.id + "/SKILL.md") })
+        if !selected.isEmpty, previous != Set(selected.map(\.name)) { appendNote("قُرئت تلقائياً مهارات المهمة: " + selected.map(\.name).sorted().joined(separator: "، ")) }
+    }
+
     static func isProjectRequest(_ text: String) -> Bool {
         let text = text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "ar"))
             .replacingOccurrences(of: "أ", with: "ا").replacingOccurrences(of: "إ", with: "ا").replacingOccurrences(of: "آ", with: "ا")
@@ -273,7 +282,11 @@ struct ZeusProjectProgressCard: View {
             project.userGoal = String((project.userGoal + "\nUser follow-up: " + text).suffix(16000))
             value.project = project
             if value.status != "completed" { value.status = "running" }
-        } else { return }
+        } else {
+            // Keep the actual request for the source-write fallback even when
+            // a colloquial "I want an app" did not match intent keywords.
+            value.goal = String(text.prefix(4000))
+        }
         try? save(session, value)
     }
     func projectGate(tool: String, args: [String: Any], session: String?) throws {
@@ -321,6 +334,7 @@ struct ZeusProjectProgressCard: View {
         if proposal.build_route == "github_actions" {
             _ = try connections.account(proposal.github_account_id, provider: "github")
         }
+        project.loadSkills(platform: proposal.platform)
         project.proposal = proposal; project.decision = "awaiting_approval"; project.approvedHash = nil
         project.appendNote("عُرضت خطة المشروع للمراجعة.")
         project.approvalBlock = blockID.uuidString; project.revision = ""; project.evidence = [:]
@@ -361,11 +375,7 @@ struct ZeusProjectProgressCard: View {
         project.environment = environment
         await ZeusDefaultSkills.shared.install()
         let platform = ZeusProjectContract.explicitPlatform(project.userGoal) ?? (project.userGoal.range(of: #"\b(swift|swiftui)\b"#, options: [.regularExpression, .caseInsensitive]) != nil ? "ios" : nil)
-        let skillNames = platform == "ios" ? ["swiftui-ui-patterns", "swiftui-view-refactor", "ios-simulator-browser"] : platform == "web" ? ["frontend-app-builder", "frontend-testing-debugging"] : ["verification"]
-        let selected = SkillStore.shared.skills.filter { $0.isEnabled && skillNames.contains($0.name) }
-        project.loadedSkills = Dictionary(uniqueKeysWithValues: selected.map { ($0.name, $0.body) })
-        project.skillPaths = Dictionary(uniqueKeysWithValues: selected.map { ($0.name, "/var/minis/skills/" + $0.id + "/SKILL.md") })
-        if !selected.isEmpty { project.appendNote("قُرئت تلقائياً مهارات المهمة: " + selected.map(\.name).sorted().joined(separator: "، ")) }
+        project.loadSkills(platform: platform)
         let references = vm.messages.last(where: { $0.role == .user })?.attachments.filter(\.isImage).map(\.path) ?? []
         project.referenceImages = Array(Set((project.referenceImages ?? []) + references)).sorted()
         value = state(session); value.project = project; try save(session, value)
@@ -373,7 +383,7 @@ struct ZeusProjectProgressCard: View {
         output["host"] = "ZEUS Browser on iOS/iPadOS"
         output["local_execution"] = "Linux guest; not macOS"
         output["has_ios_sdk"] = false
-        output["automatically_loaded_skills"] = project.loadedSkills ?? [:]
+        output["automatically_loaded_skills"] = (project.loadedSkills ?? [:]).keys.sorted()
         output["skill_paths"] = project.skillPaths ?? [:]
         output["reference_images_to_read"] = project.referenceImages ?? []
         output["local_tools"] = paths
@@ -417,6 +427,8 @@ struct ZeusProjectProgressCard: View {
         guard let project else { return NSNull() }
         var object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(project)) as! [String: Any]
         object["userGoal"] = String(project.userGoal.prefix(4000))
+        object.removeValue(forKey: "loadedSkills")
+        object["loaded_skill_names"] = (project.loadedSkills ?? [:]).keys.sorted()
         object["notes"] = project.notes?.suffix(4).map { $0.text } ?? []
         object["evidence"] = project.evidence.mapValues { ["passed": $0.passed, "generation": $0.generation, "source": $0.source] as [String: Any] }
         object.removeValue(forKey: "reviewedImages")

@@ -70,6 +70,10 @@ import UIKit
         XCTAssertTrue(ZeusProjectContract.isProjectRequest("Build a website with offline support"))
         XCTAssertFalse(ZeusProjectContract.isProjectRequest("Create an apple pie recipe"))
         XCTAssertFalse(ZeusProjectContract.isProjectRequest("اشرح إعدادات المتصفح"))
+        let fallback = ZeusAgentHarness(root: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)), fallbackSession = UUID().uuidString
+        fallback.registerUserRequest("أريد تطبيق Swift صوتي بواجهات الصور", session: fallbackSession)
+        XCTAssertThrowsError(try fallback.projectGate(tool: "file_write", args: ["path": "App.swift"], session: fallbackSession))
+        XCTAssertTrue(fallback.state(fallbackSession).project?.userGoal.contains("Swift") == true)
         let runtime = ZeusAgentHarness.shared, permissions = ZeusToolPermissions.shared
         let prior = permissions.mode; permissions.mode = .unrestricted
         defer { permissions.mode = prior }
@@ -163,6 +167,9 @@ import UIKit
         _ = try await runtime.projectEnvironment(vm: vm)
         XCTAssertEqual(runtime.state(sid).project?.environment?.hasIOSSDK, false)
         XCTAssertNotNil(runtime.state(sid).project?.loadedSkills?["swiftui-ui-patterns"])
+        let once = runtime.refreshContext("Original system", session: sid)
+        XCTAssertEqual(runtime.refreshContext(once, session: sid), once, "Refreshing context must not duplicate skill bodies or grow whitespace")
+        XCTAssertTrue(once.contains("<zeus_project_skills>"))
         XCTAssertTrue(runtime.state(sid).project?.notes?.contains(where: { $0.text.contains("مهارات") }) == true)
         let raw = try proposal(remote: true)
         var invalidLocal = raw; invalidLocal["build_route"] = "local"
@@ -181,8 +188,8 @@ import UIKit
         do { _ = try await runtime.githubProjectRequest(["account_id": "second", "path": "/user"], session: sid, client: client); XCTFail("Never substitute a different account") } catch {}
         do { _ = try await runtime.githubProjectRequest(["account_id": "first", "method": "PUT", "path": "/repos/fixture-owner/project/contents/App.swift", "body": ["branch": "main", "content": "dGVzdA=="]], session: sid, client: client); XCTFail("Do not write the wrong branch") } catch {}
         let source = "import SwiftUI\n// مصدر عربي\nstruct AudioApp {}\n"
-        let receipt = try await runtime.githubWriteFiles(["account_id": "first", "repository": "fixture-owner/project", "branch": "feature/project", "message": "Implement real source", "files": [["path": "App.swift", "content": source], ["path": "README.md", "content": "Audio app"]]], session: sid, client: client)
-        XCTAssertTrue(receipt.contains("written_directly_to_github"))
+        let commitReceipt = try await runtime.githubWriteFiles(["account_id": "first", "repository": "fixture-owner/project", "branch": "feature/project", "message": "Implement real source", "files": [["path": "App.swift", "content": source], ["path": "README.md", "content": "Audio app"]]], session: sid, client: client)
+        XCTAssertTrue(commitReceipt.contains("written_directly_to_github"))
         let read = try await client.readSource(accountID: "first", repository: "fixture-owner/project", branch: "feature/project", path: "App.swift")
         XCTAssertEqual(read["content"] as? String, source)
         XCTAssertThrowsError(try ZeusGitHubTools.sourcePath("../escape.swift"))
