@@ -191,11 +191,11 @@ import CryptoKit
         if tool == "read_image", success, imageDelivered, let path = args["path"] as? String {
             var value = state(session)
             if value.project != nil {
-                if value.project?.referenceImages?.contains(path) == true {
-                    if value.project?.inspectedReferences == nil { value.project?.inspectedReferences = [] }
-                    if value.project?.inspectedReferences?.contains(path) != true { value.project?.inspectedReferences?.append(path) }
-                }
                 let normalized = Self.projectImagePath(path)
+                if value.project?.referenceImages?.contains(normalized) == true {
+                    if value.project?.inspectedReferences == nil { value.project?.inspectedReferences = [] }
+                    if value.project?.inspectedReferences?.contains(normalized) != true { value.project?.inspectedReferences?.append(normalized) }
+                }
                 value.project?.reviewedImages[normalized] = value.generation
                 if let source = value.project?.artifactRoots?.sorted(by: { $0.key.count > $1.key.count }).first(where: { normalized.hasPrefix($0.key + "/") }) {
                     if value.project?.reviewedImageCommits == nil { value.project?.reviewedImageCommits = [:] }

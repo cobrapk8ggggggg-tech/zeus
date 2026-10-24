@@ -178,6 +178,9 @@ import UIKit
         withReference.project?.referenceImages = ["/var/minis/attachments/reference.png"]
         try runtime.save(sid, withReference)
         XCTAssertThrowsError(try runtime.prepareProjectProposal(["proposal": raw], session: sid, blockID: UUID(), connections: connections), "A user-supplied UI image must be inspected before planning")
+        runtime.observe(session: sid, tool: "read_image", success: true, args: ["path": "minis://attachments/reference.png"], imageDelivered: true)
+        XCTAssertEqual(runtime.state(sid).project?.inspectedReferences, ["/var/minis/attachments/reference.png"])
+        XCTAssertThrowsError(try runtime.prepareProjectProposal(["proposal": raw], session: sid, blockID: UUID(), connections: connections), "Inspected references still need concrete design notes")
         withReference.project?.referenceImages = []; try runtime.save(sid, withReference)
         let approved = try runtime.prepareProjectProposal(["proposal": raw], session: sid, blockID: UUID(), connections: connections)
         try runtime.decideProject(session: sid, hash: approved.hash, decision: "approved")

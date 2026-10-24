@@ -493,6 +493,7 @@ struct ZeusProjectProgressCard: View {
         return false
     }
     static func projectImagePath(_ path: String) -> String {
-        URL(fileURLWithPath: path.hasPrefix("/") ? path : "/var/minis/workspace/" + path).standardizedFileURL.path
+        let resolved = path.hasPrefix("minis://") ? "/var/minis/" + String(path.dropFirst(8)) : path
+        return URL(fileURLWithPath: resolved.hasPrefix("/") ? resolved : "/var/minis/workspace/" + resolved).standardizedFileURL.path
     }
 }
