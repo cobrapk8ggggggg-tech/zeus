@@ -2,6 +2,7 @@
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -14,12 +15,13 @@ HERE = Path(__file__).parent
 SPEC = importlib.util.spec_from_file_location("prepare_reference", HERE / "prepare_reference.py")
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
-UPSTREAM = HERE.parent / "Vendor/OpenMinis"
+UPSTREAM = Path(os.environ.get("ZEUS_OPENMINIS_SOURCE", HERE.parent / "Vendor/OpenMinis"))
 
 
 class OriginalReferenceTests(unittest.TestCase):
     def checkout(self, root):
         names = [f"deps/{name}" for name in ("build_lame.sh", "build_ffmpeg.sh", "build_ish.sh")]
+        names += ["deps/ish/kernel/uname.c"]
         names += ["src/ios/Configs/ProviderCustomization.xcconfig.example",
                   "src/ios/Minis.xcodeproj/xcshareddata/xcschemes/Minis.xcscheme",
                   "src/ios/Views/Chat/AIChatView.swift",
@@ -31,7 +33,9 @@ class OriginalReferenceTests(unittest.TestCase):
             shutil.copyfile(UPSTREAM / name, target)
 
     def prepare(self, root, sdk):
-        with patch.object(MODULE.subprocess, "check_output", return_value="6339bfcb25190ebf80fd03086c4ead81cf9428ba\n"):
+        def revision(*args, **kwargs):
+            return ("19c690c3b979c3addef38318231b93a2dcdbe990" if str(kwargs.get("cwd", "")).endswith("deps/ish") else "6339bfcb25190ebf80fd03086c4ead81cf9428ba") + "\n"
+        with patch.object(MODULE.subprocess, "check_output", side_effect=revision):
             return MODULE.prepare(root, sdk)
 
     def test_simulator_has_real_simulator_targets_and_unchanged_ui(self):

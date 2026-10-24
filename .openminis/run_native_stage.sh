@@ -19,7 +19,14 @@ case "$stage" in
   chat|tests)
     python3 browser/.zeus-ci/fixture_server.py > "results/fixture-server-$kind-$stage.log" 2>&1 &
     fixture_pid=$!
-    trap 'kill "$fixture_pid" 2>/dev/null || true' EXIT
+    finish_fixture() {
+      local stage_exit=$?
+      kill "$fixture_pid" 2>/dev/null || true
+      if [ "$stage_exit" -ne 0 ]; then
+        python3 browser/.openminis/collect_simulator_logs.py "$device" "results/embedded-$kind-system.log" || true
+      fi
+    }
+    trap finish_fixture EXIT
     for attempt in {1..30}; do
       if curl --fail --silent http://127.0.0.1:8765/v1/models > /dev/null; then break; fi
       sleep 1
@@ -37,7 +44,7 @@ case "$stage" in
         -only-testing:ZEUSBrowserIntegrationTests \
         -parallel-testing-enabled NO -test-timeouts-enabled YES \
         -default-test-execution-time-allowance 90 -maximum-test-execution-time-allowance 90 \
-        test-without-building CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
+        test-without-building CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=-
     fi
     ;;
   attachments)

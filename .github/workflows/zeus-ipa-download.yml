@@ -2,14 +2,14 @@ name: ZEUS integrated IPA - build and publish (no tests)
 run-name: IPA from ${{ github.ref_name }} (${{ github.sha }})
 on:
   push:
-    branches: [build/zeus-unsigned-ipa-repair-20261023]
+    branches: [build/zeus-unsigned-ipa-repair-20261023, feature/zeus-project-agent-20261023, feature/zeus-direct-integrations-20261023]
     paths: [.github/workflows/zeus-ipa-download.yml, .openminis/**, ZEUSNext/**]
   workflow_dispatch:
     inputs:
       source_ref:
         description: Browser source branch, tag or commit to package
         required: false
-        default: fix/zeus-agent-tools-permissions-20261023
+        default: feature/zeus-native-agent-harness-20261023
         type: string
 permissions:
   contents: read
@@ -57,7 +57,7 @@ jobs:
             upstream/deps/resources
             upstream/deps/frameworks
             upstream/deps/lame-build
-          key: openminis-6339bfcb-iphoneos-arm64-xcode263-v1
+          key: openminis-6339bfcb-iphoneos-arm64-xcode263-v2-uname
       - name: Build real device dependencies and Linux rootfs
         if: steps.native.outputs.cache-hit != 'true'
         working-directory: upstream
@@ -76,7 +76,7 @@ jobs:
             upstream/deps/resources
             upstream/deps/frameworks
             upstream/deps/lame-build
-          key: openminis-6339bfcb-iphoneos-arm64-xcode263-v1
+          key: openminis-6339bfcb-iphoneos-arm64-xcode263-v2-uname
       - name: Require full native device dependencies
         run: |
           set -euo pipefail
@@ -105,9 +105,9 @@ jobs:
           test -f "$app/Info.plist"
           test ! -d "$app/_CodeSignature"
           test -d "$app/PlugIns"
-          test -d "$app/Frameworks"
           test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" = tools.rea.ZEUSBrowserAnalysis
           xcrun lipo "$app/Minis" -verify_arch arm64
+          python3 browser/.openminis/prune_resources.py "$app" > results/text-edition-resources.json
           python3 browser/.openminis/size_audit.py "$app" results/ipa-size-audit.json --strip
           xcrun lipo "$app/Minis" -verify_arch arm64
           mkdir -p results/Payload

@@ -6,9 +6,11 @@ from urllib.parse import urlparse, parse_qs
 from threading import Lock
 import struct
 import zlib
+import hashlib
 
 TRANSLATION_REQUESTS = {}
 TRANSLATION_LOCK = Lock()
+DEVICE_POLLS = {}
 
 PAYLOAD = bytes(range(256)) * 4096
 
@@ -18,12 +20,93 @@ def chunk(kind, value):
 rows = b''.join(b'\0' + bytes([255 if (x // 25 + y // 25) % 2 else 0 for x in range(200)]) for y in range(400))
 IMAGE = b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', 200, 400, 8, 0, 0, 0, 0)) + chunk(b'IDAT', zlib.compress(rows)) + chunk(b'IEND', b'')
 
+def harness_events(body):
+    results = [m for m in body.get('messages', []) if m.get('role') == 'tool' and m.get('tool_call_id', '').startswith('zeus-harness-')]
+    stage = int(results[-1]['tool_call_id'].split('-')[2]) + 1 if results else 0
+    cwd = '/var/minis/workspace/e2e-' + hashlib.sha256(body['model'].encode()).hexdigest()[:16]
+    check = 'test "$(cat value.txt)" = correct'
+    steps = [
+        ('update_plan', {'goal': 'Create, test, repair and verify a real project', 'plan': [{'step': 'Implement and verify', 'status': 'in_progress'}], 'verification_commands': [check]}),
+        ('exec_command', {'cmd': 'mkdir -p ' + cwd, 'workdir': '/var/minis/workspace', 'yield_time_ms': 1000}),
+        ('write_stdin', {}),
+        ('apply_patch', {'workdir': cwd, 'patch': '*** Begin Patch\n*** Add File: value.txt\n+wrong\n*** Add File: README.md\n+Native agent fixture project\n*** End Patch'}),
+        ('task_verify', {'workdir': cwd, 'commands': [check]}),
+        ('apply_patch', {'workdir': cwd, 'patch': '*** Begin Patch\n*** Update File: value.txt\n@@\n-wrong\n+correct\n*** End Patch'}),
+        ('task_verify', {'workdir': cwd, 'commands': [check]}),
+        ('update_plan', {'plan': [{'step': 'Implement and verify', 'status': 'completed'}]}),
+        ('task_complete', {'status': 'completed', 'summary': 'Actual failing check repaired and passing check recorded'})
+    ]
+    if results:
+        previous = results[-1]['content']
+        if previous.startswith('Error:'): raise ValueError('Native tool failed: ' + previous)
+        previous_stage = int(results[-1]['tool_call_id'].split('-')[2])
+        if previous_stage in (4, 6):
+            checks = json.loads(previous)
+            if not checks or checks[0]['exitCode'] != (1 if previous_stage == 4 else 0): raise ValueError('Native verification did not return the expected actual exit code')
+        if previous_stage == 2 and json.loads(previous)['running']: stage = 2
+    if stage >= len(steps):
+        return [{'choices': [{'delta': {'content': 'NATIVE_HARNESS_VERIFIED: تم إنشاء المشروع وإصلاح فحصه الفاشل والتحقق منه فعلياً.'}, 'finish_reason': None}]}, {'choices': [{'delta': {}, 'finish_reason': 'stop'}]}]
+    if stage == 5 and not any(m.get('role') == 'user' and '<zeus_runtime_instruction' in str(m.get('content', '')) for m in body.get('messages', [])):
+        return [{'choices': [{'delta': {'content': 'مستجد: ظهر فشل في الفحص وسأواصل إصلاحه.'}, 'finish_reason': None}]}, {'choices': [{'delta': {}, 'finish_reason': 'stop'}]}]
+    name, args = steps[stage]
+    if stage == 2:
+        started = next(m for m in results if m['tool_call_id'].startswith('zeus-harness-1-'))
+        args = {'session_id': json.loads(started['content'])['session_id'], 'yield_time_ms': 1000}
+    # Confirm nested schemas reached the actual selected provider request.
+    definitions = {x['function']['name']: x['function']['parameters'] for x in body.get('tools', []) if x.get('type') == 'function'}
+    if definitions.get('update_plan', {}).get('properties', {}).get('plan', {}).get('type') != 'array': raise ValueError('Provider lost the nested plan schema')
+    arguments = json.dumps(args, ensure_ascii=False)
+    return [{'choices': [{'delta': {'content': 'مستجد اختبار: أتابع التنفيذ والتحقق.\n', 'tool_calls': [{'index': 0, 'id': 'zeus-harness-' + str(stage) + '-' + str(len(results)), 'type': 'function', 'function': {'name': name, 'arguments': arguments}}]}, 'finish_reason': None}]}, {'choices': [{'delta': {}, 'finish_reason': 'tool_calls'}]}]
+
 
 class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
-            body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', '0'))))
-            if body.get('model') in ('fixture-native-stream', 'fixture-native-tool', 'fixture-native-approval'):
+            raw = self.rfile.read(int(self.headers.get('Content-Length', '0')))
+            if self.path.startswith('/github-device-fixture/'):
+                form = {k: v[0] for k, v in parse_qs(raw.decode()).items()}
+                client = form.get('client_id', '')
+                if self.headers.get('Accept') != 'application/json' or 'client_secret' in form: raise ValueError('Device grant must use the public-client JSON flow')
+                if self.path.endswith('/login/device/code'):
+                    result = {'device_code': 'fixture-' + client, 'user_code': 'ZEUS-TEST', 'verification_uri': 'http://untrusted.example/login/device' if client == 'untrusted' else 'https://github.com/login/device', 'expires_in': 900, 'interval': 5}
+                    if client == 'disabled': result = {'error': 'device_flow_disabled'}
+                else:
+                    if form.get('grant_type') != 'urn:ietf:params:oauth:grant-type:device_code' or form.get('device_code') != 'fixture-' + client: raise ValueError('Invalid device grant')
+                    with TRANSLATION_LOCK:
+                        DEVICE_POLLS[client] = DEVICE_POLLS.get(client, 0) + 1
+                        count = DEVICE_POLLS[client]
+                    if client == 'denied': result = {'error': 'access_denied'}
+                    elif client == 'expired': result = {'error': 'expired_token'}
+                    elif count == 1: result = {'error': 'authorization_pending'}
+                    elif count == 2: result = {'error': 'slow_down'}
+                    else: result = {'access_token': 'fixture-device-access', 'token_type': 'bearer', 'scope': 'repo'}
+                data = json.dumps(result).encode()
+                self.send_response(200); self.send_header('Content-Type', 'application/json'); self.send_header('Content-Length', str(len(data))); self.end_headers(); self.wfile.write(data); return
+            body = json.loads(raw)
+            if self.path.startswith('/mcp-fixture/'):
+                account = self.path.rsplit('/', 1)[-1]
+                if self.headers.get('Authorization') != 'Bearer fixture-' + account:
+                    self.send_response(401); self.end_headers(); return
+                method = body.get('method')
+                if method == 'notifications/initialized':
+                    self.send_response(202); self.send_header('Content-Length', '0'); self.end_headers(); return
+                if method == 'initialize':
+                    result = {'protocolVersion': '2025-03-26', 'capabilities': {'tools': {}}, 'serverInfo': {'name': 'Account-isolation fixture', 'version': '1'}}
+                elif self.headers.get('Mcp-Session-Id') != 'session-' + account:
+                    self.send_response(409); self.end_headers(); return
+                elif method == 'tools/list':
+                    schema = {'type': 'object', 'properties': {'input': {'type': 'object', 'properties': {'values': {'type': 'array', 'minItems': 1, 'items': {'type': 'integer'}}}, 'required': ['values'], 'additionalProperties': False}}, 'required': ['input'], 'additionalProperties': False}
+                    result = {'tools': [{'name': 'fixture_write' if body.get('params', {}).get('cursor') else 'fixture_read', 'description': 'Real HTTP fixture for ' + account, 'inputSchema': schema, 'annotations': {'readOnlyHint': not bool(body.get('params', {}).get('cursor'))}}]}
+                    if not body.get('params', {}).get('cursor'): result['nextCursor'] = 'second'
+                elif method == 'tools/call':
+                    result = {'content': [{'type': 'text', 'text': json.dumps({'account': account, 'arguments': body['params']['arguments']})}], 'isError': False}
+                else:
+                    raise ValueError('Unexpected MCP method')
+                encoded = 'data: ' + json.dumps({'jsonrpc': '2.0', 'method': 'notifications/message', 'params': {'message': 'fixture notification'}}) + '\n\n'
+                encoded += 'data: ' + json.dumps({'jsonrpc': '2.0', 'id': body.get('id'), 'result': result}) + '\n\n'
+                data = encoded.encode()
+                self.send_response(200); self.send_header('Content-Type', 'text/event-stream'); self.send_header('Mcp-Session-Id', 'session-' + account); self.send_header('Content-Length', str(len(data))); self.end_headers(); self.wfile.write(data); return
+            if body.get('model', '').startswith('fixture-native-harness-') or body.get('model') in ('fixture-native-stream', 'fixture-native-tool', 'fixture-native-approval', 'fixture-native-progress-tool'):
                 if body.get('stream') is False:
                     encoded = json.dumps({'choices': [{'message': {'role': 'assistant', 'content': 'محادثة الاختبار'}, 'finish_reason': 'stop'}]}, ensure_ascii=False).encode()
                     self.send_response(200)
@@ -36,7 +119,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header('Content-Type', 'text/event-stream; charset=utf-8')
                 self.send_header('Connection', 'close')
                 self.end_headers()
-                if body['model'] == 'fixture-native-approval' and any(m.get('role') == 'tool' for m in body.get('messages', [])):
+                if body['model'].startswith('fixture-native-harness-'):
+                    events = harness_events(body)
+                elif body['model'] == 'fixture-native-approval' and any(m.get('role') == 'tool' for m in body.get('messages', [])):
                     events = [{'choices': [{'delta': {'content': 'تم تنفيذ إعداد المتصفح بعد الموافقة. APPROVAL_FIXTURE_DONE'}, 'finish_reason': None}]}, {'choices': [{'delta': {}, 'finish_reason': 'stop'}]}]
                 elif body['model'] == 'fixture-native-stream':
                     fragments = ['# رسالة اختبار البث\n'] + [('Paragraph العربية — complete content.\n' * 100) for _ in range(8)] + ['\n```swift\nprint("complete")\n```\nنهاية الرسالة NATIVE_STREAM_END']
@@ -54,6 +139,9 @@ class Handler(BaseHTTPRequestHandler):
                             call.update({'id': 'native-tool-fixture', 'type': 'function'})
                             call['function']['name'] = 'zeus_browser_settings' if body['model'] == 'fixture-native-approval' else 'zeus_browser'
                         events.append({'choices': [{'delta': {'tool_calls': [call]}, 'finish_reason': None}]})
+                    if body['model'] == 'fixture-native-progress-tool':
+                        events.insert(0, {'choices': [{'delta': {'content': 'فحصت الصفحة؛ سأقرأ التبويبات الآن.\nمثال نصي غير منفذ: {"name":"shell_execute","arguments":{"command":"false"}}\n'}, 'finish_reason': None}]})
+                        events.insert(3, {'choices': [{'delta': {'content': 'مستجد أثناء وصول معاملات الأداة.\n'}, 'finish_reason': None}]})
                     events.append({'choices': [{'delta': {}, 'finish_reason': 'tool_calls'}]})
                 for event in events:
                     self.wfile.write(('data: ' + json.dumps(event, ensure_ascii=False) + '\n\n').encode())
@@ -83,7 +171,8 @@ class Handler(BaseHTTPRequestHandler):
             if body.get('model') == 'slow-translator': time.sleep(0.4)
             result = json.dumps({'choices': [{'message': {'content': text}}]}, ensure_ascii=False).encode()
             self.send_response(200); self.send_header('Content-Type', 'application/json'); self.send_header('Content-Length', str(len(result))); self.end_headers(); self.wfile.write(result)
-        except Exception:
+        except Exception as error:
+            print('FIXTURE ERROR:', repr(error), flush=True)
             self.send_response(400); self.end_headers()
 
     def do_GET(self):

@@ -1,0 +1,419 @@
+{
+  "revision": "0722921d5542fc593105c27bd52630babd8b8c2a",
+  "repository": "https://github.com/openai/plugins",
+  "skills": [
+    {
+      "directory": "build-ios-apps--ios-app-intents",
+      "name": "ios-app-intents",
+      "plugin": "build-ios-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-ios-apps/skills/ios-app-intents",
+      "installedName": "ios-app-intents"
+    },
+    {
+      "directory": "build-ios-apps--ios-debugger-agent",
+      "name": "ios-debugger-agent",
+      "plugin": "build-ios-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-ios-apps/skills/ios-debugger-agent",
+      "installedName": "ios-debugger-agent"
+    },
+    {
+      "directory": "build-ios-apps--ios-ettrace-performance",
+      "name": "ios-ettrace-performance",
+      "plugin": "build-ios-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-ios-apps/skills/ios-ettrace-performance",
+      "installedName": "ios-ettrace-performance"
+    },
+    {
+      "directory": "build-ios-apps--ios-memgraph-leaks",
+      "name": "ios-memgraph-leaks",
+      "plugin": "build-ios-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-ios-apps/skills/ios-memgraph-leaks",
+      "installedName": "ios-memgraph-leaks"
+    },
+    {
+      "directory": "build-ios-apps--ios-simulator-browser",
+      "name": "ios-simulator-browser",
+      "plugin": "build-ios-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-ios-apps/skills/ios-simulator-browser",
+      "installedName": "ios-simulator-browser"
+    },
+    {
+      "directory": "build-ios-apps--swiftui-liquid-glass",
+      "name": "swiftui-liquid-glass",
+      "plugin": "build-ios-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-ios-apps/skills/swiftui-liquid-glass",
+      "installedName": "swiftui-liquid-glass"
+    },
+    {
+      "directory": "build-ios-apps--swiftui-performance-audit",
+      "name": "swiftui-performance-audit",
+      "plugin": "build-ios-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-ios-apps/skills/swiftui-performance-audit",
+      "installedName": "swiftui-performance-audit"
+    },
+    {
+      "directory": "build-ios-apps--swiftui-ui-patterns",
+      "name": "swiftui-ui-patterns",
+      "plugin": "build-ios-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-ios-apps/skills/swiftui-ui-patterns",
+      "installedName": "swiftui-ui-patterns"
+    },
+    {
+      "directory": "build-ios-apps--swiftui-view-refactor",
+      "name": "swiftui-view-refactor",
+      "plugin": "build-ios-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-ios-apps/skills/swiftui-view-refactor",
+      "installedName": "swiftui-view-refactor"
+    },
+    {
+      "directory": "build-macos-apps--appkit-interop",
+      "name": "appkit-interop",
+      "plugin": "build-macos-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-macos-apps/skills/appkit-interop",
+      "installedName": "appkit-interop"
+    },
+    {
+      "directory": "build-macos-apps--build-run-debug",
+      "name": "build-run-debug",
+      "plugin": "build-macos-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-macos-apps/skills/build-run-debug",
+      "installedName": "build-run-debug"
+    },
+    {
+      "directory": "build-macos-apps--liquid-glass",
+      "name": "liquid-glass",
+      "plugin": "build-macos-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-macos-apps/skills/liquid-glass",
+      "installedName": "liquid-glass"
+    },
+    {
+      "directory": "build-macos-apps--packaging-notarization",
+      "name": "packaging-notarization",
+      "plugin": "build-macos-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-macos-apps/skills/packaging-notarization",
+      "installedName": "packaging-notarization"
+    },
+    {
+      "directory": "build-macos-apps--signing-entitlements",
+      "name": "signing-entitlements",
+      "plugin": "build-macos-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-macos-apps/skills/signing-entitlements",
+      "installedName": "signing-entitlements"
+    },
+    {
+      "directory": "build-macos-apps--swiftpm-macos",
+      "name": "swiftpm-macos",
+      "plugin": "build-macos-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-macos-apps/skills/swiftpm-macos",
+      "installedName": "swiftpm-macos"
+    },
+    {
+      "directory": "build-macos-apps--swiftui-patterns",
+      "name": "swiftui-patterns",
+      "plugin": "build-macos-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-macos-apps/skills/swiftui-patterns",
+      "installedName": "swiftui-patterns"
+    },
+    {
+      "directory": "build-macos-apps--telemetry",
+      "name": "telemetry",
+      "plugin": "build-macos-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-macos-apps/skills/telemetry",
+      "installedName": "telemetry"
+    },
+    {
+      "directory": "build-macos-apps--test-triage",
+      "name": "test-triage",
+      "plugin": "build-macos-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-macos-apps/skills/test-triage",
+      "installedName": "test-triage"
+    },
+    {
+      "directory": "build-macos-apps--view-refactor",
+      "name": "view-refactor",
+      "plugin": "build-macos-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-macos-apps/skills/view-refactor",
+      "installedName": "view-refactor"
+    },
+    {
+      "directory": "build-macos-apps--window-management",
+      "name": "window-management",
+      "plugin": "build-macos-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-macos-apps/skills/window-management",
+      "installedName": "window-management"
+    },
+    {
+      "directory": "build-web-apps--frontend-app-builder",
+      "name": "frontend-app-builder",
+      "plugin": "build-web-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-web-apps/skills/frontend-app-builder",
+      "installedName": "frontend-app-builder"
+    },
+    {
+      "directory": "build-web-apps--frontend-testing-debugging",
+      "name": "frontend-testing-debugging",
+      "plugin": "build-web-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-web-apps/skills/frontend-testing-debugging",
+      "installedName": "frontend-testing-debugging"
+    },
+    {
+      "directory": "build-web-apps--react-best-practices",
+      "name": "react-best-practices",
+      "plugin": "build-web-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-web-apps/skills/react-best-practices",
+      "installedName": "build-web-apps-react-best-practices"
+    },
+    {
+      "directory": "build-web-apps--shadcn-best-practices",
+      "name": "shadcn-best-practices",
+      "plugin": "build-web-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-web-apps/skills/shadcn-best-practices",
+      "installedName": "shadcn"
+    },
+    {
+      "directory": "build-web-apps--stripe-best-practices",
+      "name": "stripe-best-practices",
+      "plugin": "build-web-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-web-apps/skills/stripe-best-practices",
+      "installedName": "stripe-best-practices"
+    },
+    {
+      "directory": "build-web-apps--supabase-best-practices",
+      "name": "supabase-best-practices",
+      "plugin": "build-web-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-web-apps/skills/supabase-best-practices",
+      "installedName": "supabase-postgres-best-practices"
+    },
+    {
+      "directory": "test-android-apps--android-emulator-qa",
+      "name": "android-emulator-qa",
+      "plugin": "test-android-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/test-android-apps/skills/android-emulator-qa",
+      "installedName": "android-emulator-qa"
+    },
+    {
+      "directory": "test-android-apps--android-performance",
+      "name": "android-performance",
+      "plugin": "test-android-apps",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/test-android-apps/skills/android-performance",
+      "installedName": "android-performance"
+    },
+    {
+      "directory": "openai-developers--agents-sdk",
+      "name": "agents-sdk",
+      "plugin": "openai-developers",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/openai-developers/skills/agents-sdk",
+      "installedName": "openai-developers-agents-sdk"
+    },
+    {
+      "directory": "openai-developers--build-chatgpt-app",
+      "name": "build-chatgpt-app",
+      "plugin": "openai-developers",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/openai-developers/skills/build-chatgpt-app",
+      "installedName": "build-chatgpt-app"
+    },
+    {
+      "directory": "openai-developers--chatgpt-app-submission",
+      "name": "chatgpt-app-submission",
+      "plugin": "openai-developers",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/openai-developers/skills/chatgpt-app-submission",
+      "installedName": "chatgpt-app-submission"
+    },
+    {
+      "directory": "openai-developers--openai-api-troubleshooting",
+      "name": "openai-api-troubleshooting",
+      "plugin": "openai-developers",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/openai-developers/skills/openai-api-troubleshooting",
+      "installedName": "openai-api-troubleshooting"
+    },
+    {
+      "directory": "openai-developers--openai-platform-api-key",
+      "name": "openai-platform-api-key",
+      "plugin": "openai-developers",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/openai-developers/skills/openai-platform-api-key",
+      "installedName": "openai-platform-api-key"
+    },
+    {
+      "directory": "codex-security--assess-patch-risk",
+      "name": "assess-patch-risk",
+      "plugin": "codex-security",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/codex-security/skills/assess-patch-risk",
+      "installedName": "assess-patch-risk"
+    },
+    {
+      "directory": "codex-security--attack-path-analysis",
+      "name": "attack-path-analysis",
+      "plugin": "codex-security",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/codex-security/skills/attack-path-analysis",
+      "installedName": "attack-path-analysis"
+    },
+    {
+      "directory": "codex-security--deep-security-scan",
+      "name": "deep-security-scan",
+      "plugin": "codex-security",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/codex-security/skills/deep-security-scan",
+      "installedName": "deep-security-scan"
+    },
+    {
+      "directory": "codex-security--define-security-policy",
+      "name": "define-security-policy",
+      "plugin": "codex-security",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/codex-security/skills/define-security-policy",
+      "installedName": "define-security-policy"
+    },
+    {
+      "directory": "codex-security--finding-discovery",
+      "name": "finding-discovery",
+      "plugin": "codex-security",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/codex-security/skills/finding-discovery",
+      "installedName": "finding-discovery"
+    },
+    {
+      "directory": "codex-security--fix-finding",
+      "name": "fix-finding",
+      "plugin": "codex-security",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/codex-security/skills/fix-finding",
+      "installedName": "fix-finding"
+    },
+    {
+      "directory": "codex-security--propose-security-hardening",
+      "name": "propose-security-hardening",
+      "plugin": "codex-security",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/codex-security/skills/propose-security-hardening",
+      "installedName": "propose-security-hardening"
+    },
+    {
+      "directory": "codex-security--security-diff-scan",
+      "name": "security-diff-scan",
+      "plugin": "codex-security",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/codex-security/skills/security-diff-scan",
+      "installedName": "security-diff-scan"
+    },
+    {
+      "directory": "codex-security--security-scan",
+      "name": "security-scan",
+      "plugin": "codex-security",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/codex-security/skills/security-scan",
+      "installedName": "security-scan"
+    },
+    {
+      "directory": "codex-security--threat-model",
+      "name": "threat-model",
+      "plugin": "codex-security",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/codex-security/skills/threat-model",
+      "installedName": "threat-model"
+    },
+    {
+      "directory": "codex-security--track-findings",
+      "name": "track-findings",
+      "plugin": "codex-security",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/codex-security/skills/track-findings",
+      "installedName": "track-findings"
+    },
+    {
+      "directory": "codex-security--triage-finding",
+      "name": "triage-finding",
+      "plugin": "codex-security",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/codex-security/skills/triage-finding",
+      "installedName": "triage-finding"
+    },
+    {
+      "directory": "codex-security--validation",
+      "name": "validation",
+      "plugin": "codex-security",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/codex-security/skills/validation",
+      "installedName": "validation"
+    },
+    {
+      "directory": "codex-security--verify-fix",
+      "name": "verify-fix",
+      "plugin": "codex-security",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/codex-security/skills/verify-fix",
+      "installedName": "verify-fix"
+    },
+    {
+      "directory": "codex-security--vulnerability-writeup",
+      "name": "vulnerability-writeup",
+      "plugin": "codex-security",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/codex-security/skills/vulnerability-writeup",
+      "installedName": "vulnerability-writeup"
+    },
+    {
+      "directory": "vercel--ai-sdk",
+      "name": "ai-sdk",
+      "plugin": "vercel",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/vercel/skills/ai-sdk",
+      "installedName": "ai-sdk"
+    },
+    {
+      "directory": "vercel--react-best-practices",
+      "name": "react-best-practices",
+      "plugin": "vercel",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/vercel/skills/react-best-practices",
+      "installedName": "vercel-react-best-practices"
+    },
+    {
+      "directory": "vercel--vercel-cli",
+      "name": "vercel-cli",
+      "plugin": "vercel",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/vercel/skills/vercel-cli",
+      "installedName": "vercel-cli"
+    },
+    {
+      "directory": "vercel--vercel-storage",
+      "name": "vercel-storage",
+      "plugin": "vercel",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/vercel/skills/vercel-storage",
+      "installedName": "vercel-storage"
+    },
+    {
+      "directory": "vercel--verification",
+      "name": "verification",
+      "plugin": "vercel",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/vercel/skills/verification",
+      "installedName": "verification"
+    },
+    {
+      "directory": "vercel--workflow",
+      "name": "workflow",
+      "plugin": "vercel",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/vercel/skills/workflow",
+      "installedName": "workflow"
+    },
+    {
+      "directory": "cloudflare--agents-sdk",
+      "name": "agents-sdk",
+      "plugin": "cloudflare",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/cloudflare/skills/agents-sdk",
+      "installedName": "cloudflare-agents-sdk"
+    },
+    {
+      "directory": "cloudflare--cloudflare",
+      "name": "cloudflare",
+      "plugin": "cloudflare",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/cloudflare/skills/cloudflare",
+      "installedName": "cloudflare"
+    },
+    {
+      "directory": "cloudflare--workers-best-practices",
+      "name": "workers-best-practices",
+      "plugin": "cloudflare",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/cloudflare/skills/workers-best-practices",
+      "installedName": "workers-best-practices"
+    },
+    {
+      "directory": "build-web-data-visualization--data-visualization",
+      "name": "data-visualization",
+      "plugin": "build-web-data-visualization",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-web-data-visualization/skills/data-visualization",
+      "installedName": "data-visualization"
+    },
+    {
+      "directory": "build-web-data-visualization--reports-pdfs-and-slide-automation",
+      "name": "reports-pdfs-and-slide-automation",
+      "plugin": "build-web-data-visualization",
+      "url": "https://github.com/openai/plugins/tree/0722921d5542fc593105c27bd52630babd8b8c2a/plugins/build-web-data-visualization/skills/reports-pdfs-and-slide-automation",
+      "installedName": "reports-pdfs-and-slide-automation"
+    }
+  ]
+}

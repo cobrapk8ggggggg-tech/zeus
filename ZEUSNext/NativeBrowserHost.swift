@@ -61,6 +61,10 @@ private final class NativeToolCapture { var imageFilePath: String? }
 /// Provides real browser actions; conversations, models and rendering live in
 /// the original OpenMinis runtime, shared across all browser profiles.
 @MainActor public final class NativeBrowserSession: ObservableObject {
+    // Keep the WKContentWorld identity alive. A name alone is insufficient if
+    // all Swift references disappear between async evaluations; snapshots must
+    // remain in the same isolated JavaScript world for the document lifetime.
+    private static let agentWorld = WKContentWorld.world(name: "ZEUSAgent")
     private weak var browser: BrowserModel?
     private let profileID: UUID
     private var invalidated = false
@@ -190,7 +194,7 @@ private final class NativeToolCapture { var imageFilePath: String? }
     func read(_ tab:BrowserTab,full:Bool) async throws -> String {
         guard preferences.currentPage else{throw AgentFailure.message("قراءة نص الصفحات معطّلة.")}
         let view=try await webView(tab)
-        let result=try await view.callAsyncJavaScript(Self.readScript,arguments:["full":full],in:nil,contentWorld:.world(name:"ZEUSAgent"))
+        let result=try await view.callAsyncJavaScript(Self.readScript,arguments:["full":full],in:nil,contentWorld:Self.agentWorld)
         var context = result as? [String: Any] ?? [:]
         context["tab_id"] = tab.id.uuidString
         context["profile_id"] = profileIdentifier
@@ -253,11 +257,11 @@ private final class NativeToolCapture { var imageFilePath: String? }
         case "browser_click","browser_type":
             let selected=try tab(args),view=try await webView(selected)
             guard let element=args["element_id"] as? String else{throw AgentFailure.message("لم يُحدد عنصر.")}
-            let metadata=try await view.callAsyncJavaScript("const s=window.__zeusAgentSnapshot;const e=s?.elements?.get(id);if(!e||!e.isConnected||s.url!==location.href)throw Error('Stale element. Read page again.');return {tag:e.tagName,type:e.type||'',name:(e.innerText||e.getAttribute('aria-label')||'').slice(0,200),href:e.href||''}",arguments:["id":element],in:nil,contentWorld:.world(name:"ZEUSAgent")) as? [String:Any] ?? [:]
+            let metadata=try await view.callAsyncJavaScript("const s=window.__zeusAgentSnapshot;const e=s?.elements?.get(id);if(!e||!e.isConnected||s.url!==location.href)throw Error('Stale element. Read page again.');return {tag:e.tagName,type:e.type||'',name:(e.innerText||e.getAttribute('aria-label')||'').slice(0,200),href:e.href||''}",arguments:["id":element],in:nil,contentWorld:Self.agentWorld) as? [String:Any] ?? [:]
             let detail="\(selected.title)\n\(metadata["name"] as? String ?? element)"+(call.name=="browser_type" ? "\n"+String((args["text"] as? String ?? "").prefix(1000)):"")
             try await requireApproval(call,host:URL(string:selected.url)?.host ?? "",detail:detail,always:false)
             let action=call.name=="browser_type" ? "type":"click"
-            _=try await view.callAsyncJavaScript(Self.interactScript,arguments:["id":element,"action":action,"text":args["text"] as? String ?? ""],in:nil,contentWorld:.world(name:"ZEUSAgent"))
+            _=try await view.callAsyncJavaScript(Self.interactScript,arguments:["id":element,"action":action,"text":args["text"] as? String ?? ""],in:nil,contentWorld:Self.agentWorld)
             try await Task.sleep(for:.milliseconds(350));return try await read(selected,full:false)
         case "browser_scroll":
             let selected=try tab(args),view=try await webView(selected),pixels=max(-5000,min(5000,args["pixels"] as? Double ?? 700))

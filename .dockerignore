@@ -1,0 +1,12 @@
+**
+!Runtime/
+!Runtime/Dockerfile
+!Runtime/requirements.txt
+!Runtime/entrypoint.sh
+!Runtime/agent_service/
+!Runtime/agent_service/*.py
+!Runtime/skills/
+!Runtime/skills/**
+!.openminis/
+!.openminis/ZEUSDefaultSkills/
+!.openminis/ZEUSDefaultSkills/**

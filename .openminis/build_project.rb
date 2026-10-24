@@ -32,10 +32,35 @@ target.build_configurations.each do |config|
 end
 app.add_dependency(target)
 app.frameworks_build_phase.add_file_reference(target.product_reference)
-%w[ZEUSNativeIntegration.swift ZeusToolPermissions.swift].each do |name|
+# Strip the actual binaries/dependency graph, not just visible media buttons.
+project.targets.each do |item|
+  [item.source_build_phase, item.resources_build_phase, item.frameworks_build_phase, *item.copy_files_build_phases].each do |phase|
+    phase.files.to_a.each do |build_file|
+      path = build_file.file_ref&.path.to_s
+      product = build_file.respond_to?(:product_ref) ? build_file.product_ref&.product_name.to_s : ''
+      if path.match?(/(?:FFmpegOffload\.m|FFmpeg\.framework|libav\w*\.framework|libsw\w*\.framework|jieba\.dict\.utf8|hmm_model\.utf8)$/) || product == 'RealTimeCutVADLibrary'
+        phase.remove_build_file(build_file)
+      end
+    end
+  end
+  item.package_product_dependencies.to_a.each do |dependency|
+    dependency.remove_from_project if dependency.product_name == 'RealTimeCutVADLibrary'
+  end
+  item.build_configurations.each do |config|
+    config.build_settings['SWIFT_EMIT_LOC_STRINGS'] = 'NO'
+    config.build_settings['INFOPLIST_KEY_CFBundleDevelopmentRegion'] = 'ar'
+    config.build_settings['LD_GENERATE_MAP_FILE'] = 'YES'
+    config.build_settings['LD_MAP_FILE_PATH'] = '$(TARGET_TEMP_DIR)/$(PRODUCT_NAME)-LinkMap-$(CURRENT_ARCH).txt'
+  end
+end
+%w[ZEUSNativeIntegration.swift ZeusToolPermissions.swift ZeusDefaultSkills.swift ZeusAgentSchemas.swift ZeusPatch.swift ZeusAgentHarness.swift ZeusConnections.swift ZeusGitHubAuthorization.swift].each do |name|
   bridge = project.main_group.new_file((native + 'src/ios' + name).to_s)
   app.source_build_phase.add_file_reference(bridge)
 end
+
+skills = project.main_group.new_file((browser + '.openminis/ZEUSDefaultSkills').to_s)
+skills.last_known_file_type = 'folder'
+app.resources_build_phase.add_file_reference(skills)
 
 # Browser resources are resolved by Bundle.main from inside the static module.
 Dir.glob((browser + 'ZEUSNext/Resources/*').to_s).each do |path|
@@ -58,11 +83,17 @@ raise 'Original asset catalog missing' unless original_assets
 original_assets.path = icons.to_s
 original_assets.source_tree = '<absolute>'
 
+simulator_entitlements = native + 'src/ios/ZeusSimulator.entitlements'
+Xcodeproj::Plist.write_to_path({
+  'application-identifier' => 'tools.rea.ZEUSBrowserAnalysis',
+  'keychain-access-groups' => ['tools.rea.ZEUSBrowserAnalysis']
+}, simulator_entitlements)
 app.build_configurations.each do |config|
+  config.build_settings['CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]'] = 'ZeusSimulator.entitlements'
   config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'tools.rea.ZEUSBrowserAnalysis'
   config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '18.1'
-  config.build_settings['MARKETING_VERSION'] = '2.7.0'
-  config.build_settings['CURRENT_PROJECT_VERSION'] = '12'
+  config.build_settings['MARKETING_VERSION'] = '2.9.1'
+  config.build_settings['CURRENT_PROJECT_VERSION'] = '15'
   config.build_settings['INFOPLIST_KEY_CFBundleDisplayName'] = 'ZEUS'
 end
 # A device `build` (unlike archive/install) did not strip the original app's
