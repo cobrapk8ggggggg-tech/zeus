@@ -79,6 +79,34 @@ enum ZeusAgentSchemas {
         }
         return ["type": "object", "properties": fields, "required": requiredFields, "additionalProperties": false]
     }
+    /// Lossless transport repairs only. Never manufacture missing arguments,
+    /// change a command, accept fractional integers, or ignore unknown fields.
+    static func normalized(_ value: Any, schema: [String: Any], depth: Int = 0) -> Any {
+        guard depth < 32 else { return value }
+        let type = schema["type"] as? String
+        var value = value
+        if let text = value as? String {
+            if type == "object" || type == "array", let data = text.data(using: .utf8),
+               let parsed = try? JSONSerialization.jsonObject(with: data) { value = parsed }
+            else if type == "boolean", ["true", "false"].contains(text.lowercased()) { value = text.lowercased() == "true" }
+            else if type == "integer", let number = Int(text) { value = number }
+        }
+        if type == "object", var object = value as? [String: Any] {
+            let properties = schema["properties"] as? [String: [String: Any]] ?? [:]
+            let required = Set(schema["required"] as? [String] ?? [])
+            for (key, child) in object {
+                guard let shape = properties[key] else { continue }
+                if child is NSNull, !required.contains(key), shape["type"] as? String != "null" {
+                    object.removeValue(forKey: key)
+                } else { object[key] = normalized(child, schema: shape, depth: depth + 1) }
+            }
+            return object
+        }
+        if type == "array", let array = value as? [Any], let shape = schema["items"] as? [String: Any] {
+            return array.map { normalized($0, schema: shape, depth: depth + 1) }
+        }
+        return value
+    }
     static func validate(_ value: Any, schema: [String: Any], path: String = "arguments", root: [String: Any]? = nil, depth: Int = 0) throws {
         func invalid(_ why: String) -> NSError { NSError(domain: "ZeusSchema", code: 1, userInfo: [NSLocalizedDescriptionKey: "INVALID_ARGUMENTS: \(path): \(why). Nothing was executed; correct the structured call."]) }
         guard depth <= 64 else { throw invalid("schema nesting exceeds the limit") }

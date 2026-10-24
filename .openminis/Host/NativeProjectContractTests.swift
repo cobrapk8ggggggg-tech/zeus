@@ -58,6 +58,16 @@ import UIKit
         }
         XCTAssertTrue(complete, "Official Gemini must produce a parsed native call, not visible JSON")
     }
+    func testProviderTransportRepairsDoNotWeakenToolValidation() throws {
+        let args = try ZeusToolInput.normalize(name: "exec_command", args: ["cmd": "printf ok", "yield_time_ms": "1000", "workdir": NSNull()], tools: [])
+        XCTAssertEqual(args["yield_time_ms"] as? Int, 1000)
+        XCTAssertNil(args["workdir"])
+        let plan = try ZeusToolInput.normalize(name: "update_plan", args: ["plan": "[{\"step\":\"Inspect\",\"status\":\"pending\"}]"], tools: [])
+        XCTAssertEqual((plan["plan"] as? [[String: Any]])?.first?["step"] as? String, "Inspect")
+        XCTAssertThrowsError(try ZeusToolInput.normalize(name: "exec_command", args: ["cmd": "printf ok", "yield_time_ms": "1.5"], tools: []))
+        XCTAssertThrowsError(try ZeusToolInput.normalize(name: "exec_command", args: ["cmd": NSNull()], tools: []))
+        XCTAssertThrowsError(try ZeusToolInput.normalize(name: "exec_command", args: ["cmd": "printf ok", "unknown": true], tools: []))
+    }
     func testSmallUtilityScriptsNeverBecomeMandatoryProjects() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

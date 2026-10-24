@@ -7,7 +7,11 @@ enum ZeusToolInput {
     static func normalize(name: String, args: [String: Any], tools: [AgentToolDefinition], utility: Bool = false) throws -> [String: Any] {
         if name == "propose_project_plan", utility { return args } // Harmless no-op; the runtime explains that scripts need no project card.
         let args = name == "propose_project_plan" ? ZeusProjectContract.normalizedArguments(args) : args
-        if let schema = ZeusAgentSchemas.schema(name) { try ZeusAgentSchemas.validate(args, schema: schema); return args }
+        if let schema = ZeusAgentSchemas.schema(name) {
+            let normalized = ZeusAgentSchemas.normalized(args, schema: schema) as? [String: Any] ?? args
+            try ZeusAgentSchemas.validate(normalized, schema: schema)
+            return normalized
+        }
         guard let definition = tools.first(where: { $0.name == name }) else { return args }
         var result = args
         for (key, parameter) in definition.parameters {
