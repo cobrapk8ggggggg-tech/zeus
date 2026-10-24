@@ -147,6 +147,9 @@ jobs:
           ${{ runner.temp }}/OpenMinisOriginal/SourcePackages
           ${{ runner.temp }}/OpenMinisOriginal/ModuleCache.noindex
         key: zeus-native-deriveddata-263-v2-${{ github.run_id }}
+    - name: Sign simulator host for real Keychain access
+      if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
+      run: python3 browser/.openminis/sign_simulator.py "$RUNNER_TEMP/OpenMinisOriginal/Build/Products/Debug-iphonesimulator/Minis.app"
     - name: 'IPHONE: Boot'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
       timeout-minutes: 10

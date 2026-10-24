@@ -12,6 +12,7 @@ final class NativeBrowserIntegrationTests: XCTestCase {
         let created = try DebugRPCProvider.instancesCreate(params: ["providerType": "openAI", "label": "Native loop fixture " + UUID().uuidString, "apiKey": "local-fixture-only", "customBaseURL": "http://127.0.0.1:8765/v1", "appendV1Suffix": false, "seedBuiltInModels": false])
         let instance = try XCTUnwrap(created["instance"] as? [String: Any]), id = try XCTUnwrap(instance["id"] as? String)
         defer { _ = try? DebugRPCProvider.instancesDelete(params: ["instanceId": id]) }
+        XCTAssertEqual(ProviderKeychainHelper.loadAPIKey(instanceId: id), "local-fixture-only", "The simulator must preserve real Keychain credentials")
         let stream = try DebugRPCProvider.modelsAdd(params: ["instanceId": id, "modelId": "fixture-native-stream", "displayName": "Native full loop", "contextWindow": 128000, "maxOutputTokens": 16000])
         let response = try await DebugRPCChat.prompt(params: ["prompt": "اعرض النص كاملًا كما يرسله مزود الاختبار.", "modelEntryId": stream["id"]!, "thinkingLevel": "off", "wait": true, "waitTimeout": 60])
         XCTAssertTrue((response["responseText"] as? String ?? "").hasSuffix("نهاية الرسالة NATIVE_STREAM_END"))

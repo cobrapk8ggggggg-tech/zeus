@@ -126,3 +126,10 @@ and bounds remaining counts; all other installed skill names remain discoverable
 The native regression calls the actual selector with the 59-skill catalog and
 checks both the metadata budget and discoverability before exercising the full
 streaming/model/tool loop. Device version is 2.9.0 (14).
+
+Simulator validation uses ad-hoc signing with an isolated `ZEUSCITEST` application
+identifier and Keychain access group. Unsigned simulator hosts returned
+`errSecMissingEntitlement` (-34018) from actual Security APIs; credentials are
+not replaced by a mock or in-memory fallback. The full-loop regression explicitly
+reads back its fixture key through the original ProviderKeychainHelper before
+requesting a response. This simulator-only identity does not sign the device IPA.
