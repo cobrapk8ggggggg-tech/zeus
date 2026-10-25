@@ -93,7 +93,7 @@ app.build_configurations.each do |config|
   config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'tools.rea.ZEUSBrowserAnalysis'
   config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '18.1'
   config.build_settings['MARKETING_VERSION'] = '3.2.0'
-  config.build_settings['CURRENT_PROJECT_VERSION'] = '27'
+  config.build_settings['CURRENT_PROJECT_VERSION'] = '28'
   config.build_settings['INFOPLIST_KEY_CFBundleDisplayName'] = 'ZEUS'
 end
 # A device `build` (unlike archive/install) did not strip the original app's
@@ -125,6 +125,7 @@ tests.frameworks_build_phase.add_file_reference(target.product_reference)
 tests.source_build_phase.add_file_reference(group.new_file((browser + '.openminis/Host/NativeBrowserIntegrationTests.swift').to_s))
 tests.source_build_phase.add_file_reference(group.new_file((browser + '.openminis/Host/NativeProjectContractTests.swift').to_s))
 tests.source_build_phase.add_file_reference(group.new_file((browser + '.openminis/Host/NativePersonalizationTests.swift').to_s))
+tests.source_build_phase.add_file_reference(group.new_file((browser + '.openminis/Host/NativeTranslationStreamingTests.swift').to_s))
 tests.build_configurations.each do |config|
   app_config = app.build_configurations.find { |candidate| candidate.name == config.name }
   %w[HEADER_SEARCH_PATHS FRAMEWORK_SEARCH_PATHS LIBRARY_SEARCH_PATHS].each do |key|

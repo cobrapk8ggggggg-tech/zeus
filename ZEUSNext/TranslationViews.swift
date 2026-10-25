@@ -74,7 +74,11 @@ struct TranslationSettingsPage: View {
                         ForEach(context.settings.aiProviders ?? []) { p in Text(p.name).tag(Optional(p.id)) }
                     }
                     NavigationLink { AISettingsPage(context: context) } label: { Label("إدارة مزودي الذكاء الاصطناعي", systemImage: "sparkles") }
+                    if prefs.streamsLargeBatches(provider: context.settings.aiProviders?.first { $0.id == prefs.providerID }) {
+                        Text("تُرسل الصفحة في جزأين، أو ثلاثة للصفحات الطويلة، وتظهر الترجمة تدريجيًا أثناء وصول الرد.").font(.footnote).foregroundStyle(.secondary)
+                    }
                 }
+                if prefs.engine == .microsoftVisco { Text("viscodev.x10.mx • بدون مفتاح API").font(.footnote).foregroundStyle(.secondary) }
                 if let message { Text(message).font(.footnote) }
             }
             if !prefs.excludedHosts.isEmpty {

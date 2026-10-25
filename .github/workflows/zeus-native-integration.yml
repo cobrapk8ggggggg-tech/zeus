@@ -160,7 +160,7 @@ jobs:
       run: bash browser/.openminis/run_native_stage.sh boot IPHONE "${IPHONE_SIMULATOR}"
     - name: 'IPHONE: Run browser and tool integration tests'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
-      timeout-minutes: 8
+      timeout-minutes: 15
       run: bash browser/.openminis/run_native_stage.sh tests IPHONE "${IPHONE_SIMULATOR}"
     - name: 'IPHONE: Save unit diagnostics immediately'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
@@ -198,7 +198,7 @@ jobs:
       run: bash browser/.openminis/run_native_stage.sh boot IPAD "${IPAD_SIMULATOR}"
     - name: 'IPAD: Run browser and tool integration tests'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
-      timeout-minutes: 8
+      timeout-minutes: 15
       run: bash browser/.openminis/run_native_stage.sh tests IPAD "${IPAD_SIMULATOR}"
     - name: 'IPAD: Save unit diagnostics immediately'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}

@@ -37,7 +37,7 @@ struct ZeusAgentControls: View {
             .overlay(Capsule().strokeBorder(.primary.opacity(0.12), lineWidth: 0.5))
             .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
             .position(center)
-            .simultaneousGesture(DragGesture(minimumDistance: 8).updating($translation) { value, state, _ in state = value.translation }.onEnded { value in
+            .highPriorityGesture(DragGesture(minimumDistance: 8).updating($translation) { value, state, _ in state = value.translation }.onEnded { value in
                 guard area.width > 0, area.height > 0 else { return }
                 x = Double(clamp(CGFloat(x) * area.width + value.translation.width, 30, area.width - 30) / area.width)
                 y = Double(clamp(CGFloat(y) * area.height + value.translation.height, height / 2 + 8, area.height - height / 2 - 8) / area.height)

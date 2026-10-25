@@ -162,6 +162,7 @@ import UniformTypeIdentifiers
             let image = UIGraphicsImageRenderer(size: size).image { _ in controller.view.drawHierarchy(in: CGRect(origin: .zero, size: size), afterScreenUpdates: true) }
             let attachment = XCTAttachment(image: image); attachment.name = "ChromeStudio-\(Int(size.width))x\(Int(size.height))"; attachment.lifetime = .keepAlways; add(attachment)
             XCTAssertGreaterThan(try XCTUnwrap(image.pngData()).count, 10_000)
+            assertVisibleScreenshot(image)
             window.isHidden = true; window.rootViewController = nil
         }
     }
@@ -191,7 +192,18 @@ import UniformTypeIdentifiers
         let image = UIGraphicsImageRenderer(size: size).image { _ in host.view.drawHierarchy(in: CGRect(origin: .zero, size: size), afterScreenUpdates: true) }
         let attachment = XCTAttachment(image: image); attachment.name = "ConversationFiles-IPad"; attachment.lifetime = .keepAlways; add(attachment)
         XCTAssertGreaterThan(try XCTUnwrap(image.pngData()).count, 10_000)
+        assertVisibleScreenshot(image)
         window.isHidden = true; window.rootViewController = nil
+    }
+    private func assertVisibleScreenshot(_ image: UIImage, file: StaticString = #filePath, line: UInt = #line) {
+        var pixels = [UInt8](repeating: 0, count: 64 * 64 * 4)
+        let drawn = pixels.withUnsafeMutableBytes { bytes -> Bool in
+            guard let cg = image.cgImage, let context = CGContext(data: bytes.baseAddress, width: 64, height: 64, bitsPerComponent: 8, bytesPerRow: 64 * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            context.draw(cg, in: CGRect(x: 0, y: 0, width: 64, height: 64)); return true
+        }
+        let colors = Set(stride(from: 0, to: pixels.count, by: 4).map { UInt32(pixels[$0]) << 16 | UInt32(pixels[$0 + 1]) << 8 | UInt32(pixels[$0 + 2]) })
+        XCTAssertTrue(drawn, file: file, line: line)
+        XCTAssertGreaterThan(colors.count, 32, "A blank image is not UI verification", file: file, line: line)
     }
 }
 

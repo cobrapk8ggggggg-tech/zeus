@@ -1,8 +1,8 @@
 import Foundation
 import Security
 
-enum TranslationEngine: String, Codable, CaseIterable { case googleWeb, googleCloud, ai, cloudflare
-    var title: String { switch self { case .googleWeb: return "Google Translate — خدمة الويب"; case .googleCloud: return "Google Cloud Translation — رسمي"; case .ai: return "الذكاء الاصطناعي"; case .cloudflare: return "Cloudflare Workers AI" } }
+enum TranslationEngine: String, Codable, CaseIterable { case googleWeb, googleCloud, ai, cloudflare, microsoftVisco
+    var title: String { switch self { case .googleWeb: return "Google Translate — خدمة الويب"; case .googleCloud: return "Google Cloud Translation — رسمي"; case .ai: return "الذكاء الاصطناعي"; case .cloudflare: return "Cloudflare Workers AI"; case .microsoftVisco: return "Microsoft Translator — عبر Visco" } }
 }
 struct TranslationPreferences: Codable, Equatable {
     var engine: TranslationEngine = .googleWeb
@@ -18,8 +18,10 @@ struct TranslationPreferences: Codable, Equatable {
     var suggestionSeconds: Double { min(30, max(0, suggestionDuration ?? 1.5)) }
     var keepsTranslations: Bool { retainTranslations ?? true }
     var usesAIBatches: Bool { engine == .ai || engine == .cloudflare }
+    func streamsLargeBatches(provider: AIProviderConfiguration?) -> Bool { engine == .ai && provider?.kind == .openAICompatible }
     func secretKey(provider: AIProviderConfiguration?) -> String {
         switch engine {
+        case .microsoftVisco: return ""
         case .googleCloud: return "google-cloud"
         case .cloudflare: return "cloudflare-workers-ai"
         default: return provider?.id.uuidString ?? ""
@@ -51,7 +53,7 @@ struct AIProviderConfiguration: Codable, Identifiable, Equatable {
     var lastChecked: Date?
     var discoveryNotice: String?
 }
-struct TranslationSegment: Codable, Equatable { var id: String; var text: String }
+struct TranslationSegment: Codable, Equatable, Sendable { var id: String; var text: String }
 enum TranslationFailure: LocalizedError {
     case message(String)
     var errorDescription: String? { switch self { case .message(let value): return value } }

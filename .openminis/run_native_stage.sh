@@ -23,10 +23,13 @@ case "$stage" in
       local stage_exit=$?
       kill "$fixture_pid" 2>/dev/null || true
       if [ "$stage_exit" -ne 0 ]; then
+        xcrun simctl terminate "$device" tools.rea.ZEUSBrowserAnalysis || true
         python3 browser/.openminis/collect_simulator_logs.py "$device" "results/embedded-$kind-system.log" || true
       fi
     }
     trap finish_fixture EXIT
+    trap 'exit 143' TERM
+    trap 'exit 130' INT
     for attempt in {1..30}; do
       if curl --fail --silent http://127.0.0.1:8765/v1/models > /dev/null; then break; fi
       sleep 1
