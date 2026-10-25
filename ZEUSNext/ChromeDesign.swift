@@ -115,6 +115,7 @@ struct ChromeDesign: Codable, Identifiable, Equatable {
 /// and anchor controls to their nearest edge or the centre of the canvas.
 struct ChromeCanvasGeometry {
     let size: CGSize
+    var blocks: [ChromeBlock] = []
     var reference: CGSize { ChromeDesign.usesWideCanvas(size) ? CGSize(width: 1024, height: 768) : CGSize(width: 430, height: 932) }
     func rect(_ block: ChromeBlock) -> CGRect {
         let original = block.rect(in: reference)
@@ -122,12 +123,27 @@ struct ChromeCanvasGeometry {
         let flexibleHeight = block.kind == .panel && block.height >= 0.4
         let width = min(size.width, max(block.kind == .panel ? 8 : 44, original.width + (flexibleWidth ? size.width - reference.width : 0)))
         let height = min(size.height, max(block.kind == .panel ? 8 : 44, original.height + (flexibleHeight ? size.height - reference.height : 0)))
-        func origin(_ value: CGFloat, extent: CGFloat, reference: CGFloat, available: CGFloat, result: CGFloat, flexible: Bool) -> CGFloat {
+        var horizontalAnchor: CGFloat?
+        if block.kind == .action {
+            let bars = blocks.filter { [ChromeBlockKind.address, .tabs, .bookmarks].contains($0.kind) && $0.width >= 0.25 }.map { $0.rect(in: reference) }
+            if let bar = bars.first(where: { abs($0.midY - original.midY) < 20 }) {
+                if original.minX >= bar.maxX { horizontalAnchor = 1 }
+                else if original.maxX <= bar.minX { horizontalAnchor = 0 }
+            }
+            if horizontalAnchor == nil {
+                let row = blocks.filter { $0.kind == .action && abs($0.rect(in: reference).midY - original.midY) < 2 }.map { $0.rect(in: reference).minX }.sorted()
+                let gaps = zip(row, row.dropFirst()).map { pair in pair.1 - pair.0 }
+                if row.count >= 3, let first = gaps.first, gaps.allSatisfy({ abs($0 - first) < 2 }) {
+                    horizontalAnchor = original.minX / max(1, reference.width - original.width)
+                }
+            }
+        }
+        func origin(_ value: CGFloat, extent: CGFloat, reference: CGFloat, available: CGFloat, result: CGFloat, flexible: Bool, anchorOverride: CGFloat? = nil) -> CGFloat {
             let centre = (value + extent / 2) / reference
-            let anchor: CGFloat = flexible || centre < 0.25 ? 0 : (centre > 0.75 ? 1 : 0.5)
+            let anchor: CGFloat = anchorOverride ?? (flexible || centre < 0.25 ? 0 : (centre > 0.75 ? 1 : 0.5))
             return min(max(0, value + (available - reference) * anchor), max(0, available - result))
         }
-        return CGRect(x: origin(original.minX, extent: original.width, reference: reference.width, available: size.width, result: width, flexible: flexibleWidth),
+        return CGRect(x: origin(original.minX, extent: original.width, reference: reference.width, available: size.width, result: width, flexible: flexibleWidth, anchorOverride: horizontalAnchor),
                       y: origin(original.minY, extent: original.height, reference: reference.height, available: size.height, result: height, flexible: flexibleHeight), width: width, height: height)
     }
     func inset(_ fraction: Double) -> CGFloat { min(size.height * 0.4, fraction * reference.height) }

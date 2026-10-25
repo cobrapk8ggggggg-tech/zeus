@@ -22,6 +22,13 @@ import UniformTypeIdentifiers
                 XCTAssertGreaterThanOrEqual(rect.minY, 0); XCTAssertLessThanOrEqual(rect.maxY, size.height)
             }
             XCTAssertEqual(ChromeCanvasGeometry(size: size).inset(composition.topInset), 152, accuracy: 0.01)
+            let geometry = ChromeCanvasGeometry(size: size, blocks: composition.blocks)
+            let controls = composition.blocks.filter { $0.kind == .action }
+            for (index, first) in controls.enumerated() {
+                for second in controls.dropFirst(index + 1) {
+                    XCTAssertFalse(geometry.rect(first).intersects(geometry.rect(second)), "Tablet preset controls must not overlap after rotation or split resizing")
+                }
+            }
         }
         XCTAssertFalse(ChromeDesign.usesWideCanvas(CGSize(width: 500, height: 1000)))
     }
