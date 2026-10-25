@@ -60,3 +60,40 @@ public extension View {
         }
     }
 }
+
+#if DEBUG
+/// Exercises the shipping importer through the system Files UI, without
+/// injecting delegate selections. Available only to the UI test launch route.
+public struct ZEUSFileImportDiagnostics: View {
+    @State private var presented = false
+    @State private var mode = 0
+    @State private var result = ""
+    public init() { }
+    public var body: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                Button("Single file") { mode = 0; presented = true }.accessibilityIdentifier("importSingle")
+                Button("Multiple files") { mode = 1; presented = true }.accessibilityIdentifier("importMultiple")
+                Button("Folder") { mode = 2; presented = true }.accessibilityIdentifier("importFolder")
+                Text(result).accessibilityIdentifier("importResult")
+            }.navigationTitle("Files import verification")
+                .zeusFileImporter(isPresented: $presented, allowedContentTypes: mode == 2 ? [.folder] : [.item], allowsMultipleSelection: mode == 1) { value in
+                    switch value {
+                    case .success(let urls):
+                        let readable = urls.allSatisfy { url in
+                            let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }
+                            return FileManager.default.isReadableFile(atPath: url.path)
+                        }
+                        result = "\(urls.count):\(readable ? "readable" : "unreadable"):" + urls.map(\.lastPathComponent).sorted().joined(separator: ",")
+                    case .failure(let error): result = "error:" + error.localizedDescription
+                    }
+                }
+        }.task {
+            let root = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("ZEUS-Import-Test")
+            try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            try? Data("first".utf8).write(to: root.appendingPathComponent("ZEUS-Picker-A.txt"))
+            try? Data("second".utf8).write(to: root.appendingPathComponent("ZEUS-Picker-B.txt"))
+        }
+    }
+}
+#endif

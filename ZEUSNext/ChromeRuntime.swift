@@ -38,7 +38,7 @@ struct ChromeRuntimeLayer: View {
     var body: some View {
         GeometryReader { geometry in
             ForEach(composition.blocks.filter { !$0.hidden }) { block in
-                let rect = block.rect(in: geometry.size)
+                let rect = ChromeCanvasGeometry(size: geometry.size).rect(block)
                 blockContent(block)
                     .buttonStyle(.plain).frame(width: rect.width, height: rect.height)
                     .modifier(ChromeBlockDecoration(block: block))

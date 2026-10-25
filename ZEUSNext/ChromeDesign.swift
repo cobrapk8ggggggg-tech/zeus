@@ -58,6 +58,7 @@ struct ChromeComposition: Codable, Equatable {
     }
 }
 struct ChromeDesign: Codable, Identifiable, Equatable {
+    static func usesWideCanvas(_ size: CGSize) -> Bool { size.width >= 700 }
     var id = UUID()
     var name: String
     var base: ChromeLayout?
@@ -108,6 +109,28 @@ struct ChromeDesign: Codable, Identifiable, Equatable {
         }
         return ChromeDesign(name: layout.title, base: layout, portrait: make(wide: false), landscape: make(wide: true))
     }
+}
+
+/// Keep control sizes in points when the window rotates. Stretch long bars,
+/// and anchor controls to their nearest edge or the centre of the canvas.
+struct ChromeCanvasGeometry {
+    let size: CGSize
+    var reference: CGSize { ChromeDesign.usesWideCanvas(size) ? CGSize(width: 1024, height: 768) : CGSize(width: 430, height: 932) }
+    func rect(_ block: ChromeBlock) -> CGRect {
+        let original = block.rect(in: reference)
+        let flexibleWidth = block.kind != .action && block.width >= 0.25
+        let flexibleHeight = block.kind == .panel && block.height >= 0.4
+        let width = min(size.width, max(block.kind == .panel ? 8 : 44, original.width + (flexibleWidth ? size.width - reference.width : 0)))
+        let height = min(size.height, max(block.kind == .panel ? 8 : 44, original.height + (flexibleHeight ? size.height - reference.height : 0)))
+        func origin(_ value: CGFloat, extent: CGFloat, reference: CGFloat, available: CGFloat, result: CGFloat, flexible: Bool) -> CGFloat {
+            let centre = (value + extent / 2) / reference
+            let anchor: CGFloat = flexible || centre < 0.25 ? 0 : (centre > 0.75 ? 1 : 0.5)
+            return min(max(0, value + (available - reference) * anchor), max(0, available - result))
+        }
+        return CGRect(x: origin(original.minX, extent: original.width, reference: reference.width, available: size.width, result: width, flexible: flexibleWidth),
+                      y: origin(original.minY, extent: original.height, reference: reference.height, available: size.height, result: height, flexible: flexibleHeight), width: width, height: height)
+    }
+    func inset(_ fraction: Double) -> CGFloat { min(size.height * 0.4, fraction * reference.height) }
 }
 struct ChromeWorkspace: Codable, Equatable {
     var designs: [ChromeDesign] = []

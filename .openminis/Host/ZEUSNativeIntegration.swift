@@ -16,7 +16,9 @@ struct ZEUSBrowserRootEntry: View {
     init() { _ = ZEUSNativeHostBootstrap.configured }
     var body: some View {
         #if DEBUG
-        if CommandLine.arguments.contains("--uitest-message-list") {
+        if CommandLine.arguments.contains("--zeus-file-picker") {
+            ZEUSFileImportDiagnostics()
+        } else if CommandLine.arguments.contains("--uitest-message-list") {
             MessageListTestView()
         } else {
             NativeBrowserHostView(preferences: { AnyView(OriginalPreferencesRoot()) }) { session, presentation in

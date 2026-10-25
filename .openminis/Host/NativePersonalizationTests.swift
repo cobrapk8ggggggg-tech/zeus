@@ -5,6 +5,36 @@ import UniformTypeIdentifiers
 @testable import Minis
 
 @MainActor final class NativePersonalizationTests: XCTestCase {
+    func testTabletCanvasMatchesEditorInBothOrientationsAndKeepsControlsInPoints() throws {
+        var design = ChromeDesign.preset(.icab)
+        let share = try XCTUnwrap(design.landscape.blocks.firstIndex { $0.kind == .action && $0.action == BrowserAction.share.rawValue })
+        design.landscape.blocks[share].corner = 7
+        let restored = try JSONDecoder().decode(ChromeDesign.self, from: JSONEncoder().encode(design))
+        for size in [CGSize(width: 834, height: 1194), CGSize(width: 1194, height: 834), CGSize(width: 1032, height: 1376), CGSize(width: 700, height: 1000)] {
+            XCTAssertTrue(ChromeDesign.usesWideCanvas(size))
+            let composition = restored.composition(wide: ChromeDesign.usesWideCanvas(size))
+            XCTAssertTrue(composition.blocks.contains { $0.action == BrowserAction.share.rawValue && $0.corner == 7 })
+            XCTAssertTrue(composition.blocks.contains { $0.kind == .action && $0.action == BrowserAction.library.rawValue })
+            for block in composition.blocks where block.kind == .action {
+                let rect = ChromeCanvasGeometry(size: size).rect(block)
+                XCTAssertEqual(rect.width, 44, accuracy: 0.01); XCTAssertEqual(rect.height, 44, accuracy: 0.01)
+                XCTAssertGreaterThanOrEqual(rect.minX, 0); XCTAssertLessThanOrEqual(rect.maxX, size.width)
+                XCTAssertGreaterThanOrEqual(rect.minY, 0); XCTAssertLessThanOrEqual(rect.maxY, size.height)
+            }
+            XCTAssertEqual(ChromeCanvasGeometry(size: size).inset(composition.topInset), 152, accuracy: 0.01)
+        }
+        XCTAssertFalse(ChromeDesign.usesWideCanvas(CGSize(width: 500, height: 1000)))
+    }
+    func testCustomButtonResizingAndBottomAnchorsSurviveRotation() {
+        var block = ChromeBlock(kind: .action); block.width = 88.0 / 1024; block.height = 60.0 / 768
+        block.x = 900.0 / 1024; block.y = 700.0 / 768
+        let portrait = ChromeCanvasGeometry(size: CGSize(width: 834, height: 1194)).rect(block)
+        let landscape = ChromeCanvasGeometry(size: CGSize(width: 1194, height: 834)).rect(block)
+        XCTAssertEqual(portrait.width, 88, accuracy: 0.01); XCTAssertEqual(landscape.width, 88, accuracy: 0.01)
+        XCTAssertEqual(portrait.height, 60, accuracy: 0.01); XCTAssertEqual(landscape.height, 60, accuracy: 0.01)
+        XCTAssertEqual(834 - portrait.maxX, 1194 - landscape.maxX, accuracy: 0.01)
+        XCTAssertEqual(1194 - portrait.maxY, 834 - landscape.maxY, accuracy: 0.01)
+    }
     func testLayoutsSurviveProfileRoundTripAndKeepOriginalDefaults() throws {
         let legacy = try JSONDecoder().decode(BrowserSettings.self, from: JSONEncoder().encode(BrowserSettings()))
         XCTAssertNil(legacy.chromeWorkspace)

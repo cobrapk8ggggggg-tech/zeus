@@ -123,11 +123,11 @@ struct BrowserRoot: View {
     @ViewBuilder private var browsingSurface: some View {
         if let customDesign, model.profile.role != .kiosk {
             GeometryReader { geometry in
-                let composition = customDesign.composition(wide: geometry.size.width > geometry.size.height)
+                let composition = customDesign.composition(wide: ChromeDesign.usesWideCanvas(geometry.size))
                 ZStack {
                     browserContent
-                        .padding(.top, barsVisible ? geometry.size.height * composition.topInset : 0)
-                        .padding(.bottom, barsVisible ? geometry.size.height * composition.bottomInset : 0)
+                        .padding(.top, barsVisible ? ChromeCanvasGeometry(size: geometry.size).inset(composition.topInset) : 0)
+                        .padding(.bottom, barsVisible ? ChromeCanvasGeometry(size: geometry.size).inset(composition.bottomInset) : 0)
                     if barsVisible { ChromeRuntimeLayer(model: model, composition: composition, perform: perform, addressFocusChanged: { customAddressFocused = $0 }) }
                     if !barsVisible { edgeReveal }
                     VStack { Spacer(); HStack { Spacer();

@@ -145,13 +145,16 @@ struct ChromeStudioEditor: View {
             .confirmationDialog("تجاهل التغييرات؟", isPresented: $cancelling, titleVisibility: .visible) { Button("تجاهل", role: .destructive) { dismiss() } }
             .alert("تعذّر الحفظ", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("حسنًا") { error = nil } } message: { Text(error ?? "") }
             .interactiveDismissDisabled(design != initial)
-            .onAppear { if !initialized { wide = sizeClass == .regular; initialized = true } }
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
+                guard !initialized, size.width > 0 else { return }
+                wide = ChromeDesign.usesWideCanvas(size); initialized = true
+            }
         }.environment(\.layoutDirection, .rightToLeft)
     }
     private var options: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 16) {
-                Picker("الاتجاه", selection: $wide) { Label("أفقي", systemImage: "ipad.landscape").tag(true); Label("عمودي", systemImage: "ipad").tag(false) }.pickerStyle(.segmented).frame(width: 190)
+                Picker("حجم النافذة", selection: $wide) { Label("واسع / iPad", systemImage: "ipad.landscape").tag(true); Label("ضيق / هاتف", systemImage: "iphone").tag(false) }.pickerStyle(.segmented).frame(width: 220)
                     .onChange(of: wide) { _, _ in selected = nil; moveOrigin = nil }
                 Button { withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { preview.toggle() } } label: { Label(preview ? "تحرير" : "معاينة", systemImage: preview ? "pencil.tip.crop.circle" : "eye") }
                 Button { layers = true } label: { Label("الطبقات", systemImage: "square.3.layers.3d") }

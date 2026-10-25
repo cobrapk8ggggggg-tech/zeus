@@ -1,6 +1,97 @@
 import XCTest
 
 final class NativePersonalizationUITests: XCTestCase {
+    override func tearDownWithError() throws {
+        if let testRun, testRun.failureCount > 0 {
+            let app = XCUIApplication()
+            let screen = XCTAttachment(screenshot: app.screenshot()); screen.name = "Failure-System-UI"; screen.lifetime = .keepAlways; add(screen)
+            let tree = XCTAttachment(string: app.debugDescription); tree.name = "Failure-Accessibility"; tree.lifetime = .keepAlways; add(tree)
+        }
+        try super.tearDownWithError()
+    }
+    @MainActor func testFilesSingleSelectionAndCancellationThroughSystemUI() throws {
+        let app = launchFiles()
+        app.buttons["importSingle"].tap()
+        try browseLocalFixture(app)
+        file("ZEUS-Picker-A", app).tap()
+        confirmOpen(app)
+        expectation(for: NSPredicate(format: "label == %@", "1:readable:ZEUS-Picker-A.txt"), evaluatedWith: app.staticTexts["importResult"])
+        waitForExpectations(timeout: 15)
+        app.buttons["importSingle"].tap()
+        let cancel = app.buttons.matching(NSPredicate(format: "label IN %@", ["Cancel", "إلغاء"])).firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 10)); cancel.tap()
+        expectation(for: NSPredicate(format: "hittable == true"), evaluatedWith: app.buttons["importSingle"])
+        waitForExpectations(timeout: 10)
+    }
+    @MainActor func testFilesMultipleSelectionThroughSystemOpenButton() throws {
+        let app = launchFiles()
+        app.buttons["importMultiple"].tap()
+        try browseLocalFixture(app)
+        file("ZEUS-Picker-A", app).tap(); file("ZEUS-Picker-B", app).tap()
+        let screen = XCTAttachment(screenshot: app.screenshot()); screen.name = "Files-Multiple-Before-Open"; screen.lifetime = .keepAlways; add(screen)
+        confirmOpen(app)
+        let result = app.staticTexts["importResult"]
+        let completed = NSPredicate(format: "label == %@", "2:readable:ZEUS-Picker-A.txt,ZEUS-Picker-B.txt")
+        expectation(for: completed, evaluatedWith: result); waitForExpectations(timeout: 15)
+    }
+    @MainActor func testFolderSelectionThroughSystemOpenButton() throws {
+        let app = launchFiles()
+        app.buttons["importFolder"].tap()
+        try browseLocalFixture(app)
+        confirmOpen(app)
+        let result = app.staticTexts["importResult"]
+        expectation(for: NSPredicate(format: "label == %@", "1:readable:ZEUS-Import-Test"), evaluatedWith: result)
+        waitForExpectations(timeout: 15)
+    }
+    @MainActor private func launchFiles() -> XCUIApplication {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--zeus-file-picker", "--zeus-native-fixture", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch(); XCTAssertTrue(app.buttons["importSingle"].waitForExistence(timeout: 30)); return app
+    }
+    @MainActor private func file(_ name: String, _ app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", name)).firstMatch
+    }
+    @MainActor private func browseLocalFixture(_ app: XCUIApplication) throws {
+        let local = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS[c] %@ OR label CONTAINS %@", "On My iPad", "على الـ iPad")).firstMatch
+        for _ in 0..<3 where !local.exists || !local.isHittable {
+            let browse = app.buttons.matching(NSPredicate(format: "label IN %@", ["Browse", "Show Sidebar", "Sidebar", "استعراض", "إظهار الشريط الجانبي"])).firstMatch
+            if browse.waitForExistence(timeout: 5) { browse.tap() }
+        }
+        XCTAssertTrue(local.waitForExistence(timeout: 10)); local.tap()
+        let zeus = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "ZEUS")).firstMatch
+        XCTAssertTrue(zeus.waitForExistence(timeout: 10)); zeus.tap()
+        let fixture = file("ZEUS-Import-Test", app)
+        XCTAssertTrue(fixture.waitForExistence(timeout: 10)); fixture.tap()
+    }
+    @MainActor private func confirmOpen(_ app: XCUIApplication) {
+        let open = app.buttons.matching(NSPredicate(format: "label IN %@ OR label BEGINSWITH %@", ["Open", "Choose", "فتح", "اختيار"], "Open (")).firstMatch
+        if open.waitForExistence(timeout: 3), open.isEnabled { open.tap() }
+    }
+    @MainActor func testPortraitIPadEditedPresetKeepsTabletButtonsAndSizesAfterRotation() throws {
+        continueAfterFailure = false
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        app.launchArguments = ["--uitesting", "--layout=icab", "--zeus-layout-editor", "--zeus-native-fixture", "-AppleLanguages", "(ar)", "-AppleLocale", "ar_SA"]
+        app.launch()
+        let save = app.buttons["saveChromeDesign"]; XCTAssertTrue(save.waitForExistence(timeout: 45))
+        let share = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label == %@", "chromeStudioBlock-", "مشاركة")).firstMatch
+        XCTAssertTrue(share.waitForExistence(timeout: 10))
+        let start = share.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        start.press(forDuration: 0.08, thenDragTo: start.withOffset(CGVector(dx: 4, dy: 5)))
+        save.tap()
+        let assistant = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label == %@", "custom-", "وكيل ZEUS")).firstMatch
+        XCTAssertTrue(assistant.waitForExistence(timeout: 15))
+        XCTAssertEqual(assistant.frame.width, 44, accuracy: 1); XCTAssertEqual(assistant.frame.height, 44, accuracy: 1)
+        let library = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label == %@", "custom-", "المواقع")).firstMatch
+        XCTAssertTrue(library.exists, "Editing the iPad preset must retain its tablet-only actions")
+        let portrait = XCTAttachment(screenshot: app.screenshot()); portrait.name = "Edited-iPad-Portrait"; portrait.lifetime = .keepAlways; add(portrait)
+        XCUIDevice.shared.orientation = .landscapeLeft
+        XCTAssertEqual(assistant.frame.width, 44, accuracy: 1); XCTAssertEqual(assistant.frame.height, 44, accuracy: 1)
+        XCTAssertTrue(library.exists)
+        let landscape = XCTAttachment(screenshot: app.screenshot()); landscape.name = "Edited-iPad-Landscape"; landscape.lifetime = .keepAlways; add(landscape)
+        XCUIDevice.shared.orientation = .portrait
+    }
     @MainActor func testIPadLayoutDragResizeAndSave() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
