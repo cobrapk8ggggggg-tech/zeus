@@ -86,11 +86,14 @@ struct AITranslationJSONStream {
                     depth += 1
                     if depth == 1 { currentID = ""; currentText = nil; key = ""; expectsKey = true }
                 case 125:
-                    if depth == 1, expected.contains(currentID), let currentText {
-                        guard completed.insert(currentID).inserted else { throw TranslationFailure.message("أعاد النموذج معرّف ترجمة مكررًا.") }
-                        pending[currentID] = AITranslationToken(id: currentID, text: currentText, finished: true)
+                    if depth == 1 {
+                        if expected.contains(currentID), let currentText {
+                            guard completed.insert(currentID).inserted else { throw TranslationFailure.message("أعاد النموذج معرّف ترجمة مكررًا.") }
+                            pending[currentID] = AITranslationToken(id: currentID, text: currentText, finished: true)
+                        }
+                        currentID = ""; currentText = nil; key = ""
                     }
-                    depth = max(0, depth - 1); currentID = ""; currentText = nil; key = ""
+                    depth = max(0, depth - 1)
                 case 44: if depth == 1 { expectsKey = true; key = "" }
                 case 34: inString = true; escaped = false; tokenStart = cursor; isKey = expectsKey
                 default: break
@@ -177,7 +180,9 @@ enum OpenAIPageTranslation {
                         if !rows.isEmpty, let onPartial { try await onPartial(rows) }
                     }
                     let maximum = max(30_000, batch.reduce(0) { $0 + $1.text.count } * 8 + 2048)
-                    let checked = try TextTranslationService.validateAIResponse(response, originals: batch, maximumTextCharacters: maximum)
+                    let checked: [TranslationSegment]
+                    do { checked = try TextTranslationService.validateAIResponse(response, originals: batch, maximumTextCharacters: maximum) }
+                    catch { throw TranslationFailure.message("استجابة البث غير مكتملة أو لم تطابق معرّفات النصوص. لم تُحفظ الترجمة الناقصة؛ يمكنك عرض الأصل أو إعادة المحاولة.") }
                     let rows = await assembly.apply(checked.map { AITranslationToken(id: $0.id, text: $0.text, finished: true) })
                     if !rows.isEmpty, let onPartial { try await onPartial(rows) }
                 }

@@ -32,6 +32,9 @@ import WebKit
         var unknown = AITranslationJSONStream(expected: ["known"])
         try unknown.append("[{\"id\":\"unknown\",\"text\":\"never apply\"}]")
         XCTAssertTrue(unknown.updates().isEmpty)
+        var nested = AITranslationJSONStream(expected: ["known"])
+        try nested.append("[{\"id\":\"known\",\"metadata\":{\"text\":\"ignore\"},\"text\":\"actual\"}]")
+        XCTAssertEqual(nested.updates().first?.text, "actual")
         var duplicate = AITranslationJSONStream(expected: ["known"])
         XCTAssertThrowsError(try duplicate.append("[{\"id\":\"known\",\"text\":\"first\"},{\"id\":\"known\",\"text\":\"second\"}]"))
     }

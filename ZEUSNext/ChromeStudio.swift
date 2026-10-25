@@ -187,6 +187,7 @@ struct ChromeStudioEditor: View {
             }
         }
         .coordinateSpace(name: "ChromeStage").environment(\.layoutDirection, .leftToRight)
+        .accessibilityElement(children: .contain).accessibilityIdentifier("chromeStudioCanvas")
         .animation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.85), value: composition.blocks.map(\.id))
         .dropDestination(for: String.self) { values, point in
             guard let value = values.first, value.hasPrefix("zeus.chrome."), !preview else { return false }
@@ -218,7 +219,10 @@ struct ChromeStudioEditor: View {
                 Button(block.locked ? "إلغاء القفل" : "قفل", systemImage: "lock") { update(block.id) { $0.locked.toggle() } }
                 Button("حذف", systemImage: "trash", role: .destructive) { remove(block.id) }
             }
+            .accessibilityElement(children: .ignore)
             .accessibilityLabel(block.displayTitle).accessibilityHint("اسحب للنقل؛ مقبض الزاوية لتغيير الحجم")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityIdentifier("chromeStudioBlock-" + block.id.uuidString)
     }
     private func drag(_ block: ChromeBlock, size: CGSize, resize: Bool) -> some Gesture {
         DragGesture(minimumDistance: 2, coordinateSpace: .named("ChromeStage"))
@@ -251,7 +255,7 @@ struct ChromeStudioEditor: View {
     }
     private func paletteItem(_ title: String, symbol: String, token: String) -> some View {
         Button { add(token) } label: { VStack(spacing: 7) { Image(systemName: symbol).font(.system(size: 20)); Text(title).font(.system(size: 10)).lineLimit(1) }.frame(width: 82, height: 64).background(.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 14)) }
-            .buttonStyle(.plain).draggable("zeus.chrome." + token).hoverEffect(.lift).disabled(composition.blocks.count >= 120)
+            .buttonStyle(.plain).draggable("zeus.chrome." + token).hoverEffect(.lift).disabled(composition.blocks.count >= 120).accessibilityIdentifier("chromePalette-" + token)
     }
     private var inspectorContent: some View {
         Form {

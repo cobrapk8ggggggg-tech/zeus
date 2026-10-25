@@ -143,6 +143,19 @@ end
 scheme_path = native + 'src/ios/Minis.xcodeproj/xcshareddata/xcschemes/Minis.xcscheme'
 scheme = Xcodeproj::XCScheme.new(scheme_path)
 scheme.add_test_target(tests)
+ui_tests = project.new_target(:ui_test_bundle, 'ZEUSPersonalizationUITests', :ios, '26.2')
+ui_tests.product_name = 'ZEUSPersonalizationUITests'
+ui_tests.add_dependency(app)
+ui_tests.source_build_phase.add_file_reference(group.new_file((browser + '.openminis/UITests/NativePersonalizationUITests.swift').to_s))
+ui_tests.build_configurations.each do |config|
+  config.build_settings.merge!({
+    'SWIFT_VERSION' => '5.0', 'GENERATE_INFOPLIST_FILE' => 'YES',
+    'PRODUCT_BUNDLE_IDENTIFIER' => 'tools.zeus.personalization.uitests',
+    'PRODUCT_NAME' => 'ZEUSPersonalizationUITests', 'CODE_SIGNING_ALLOWED' => 'NO',
+    'TEST_TARGET_NAME' => 'Minis', 'TARGETED_DEVICE_FAMILY' => '1,2'
+  })
+end
+scheme.add_test_target(ui_tests)
 scheme.save_as(native + 'src/ios/Minis.xcodeproj', 'Minis', true)
 project.save
 

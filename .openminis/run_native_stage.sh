@@ -16,7 +16,7 @@ case "$stage" in
       "$RUNNER_TEMP/OpenMinisOriginal/Build/Products/Debug-iphonesimulator/Minis.app" \
       "results/embedded-screens-$kind" --bundle tools.rea.ZEUSBrowserAnalysis
     ;;
-  chat|tests)
+  chat|tests|personalization)
     python3 browser/.zeus-ci/fixture_server.py > "results/fixture-server-$kind-$stage.log" 2>&1 &
     fixture_pid=$!
     finish_fixture() {
@@ -38,6 +38,16 @@ case "$stage" in
     if [ "$stage" = chat ]; then
       python3 -u browser/.openminis/capture_chat.py "$device" tools.rea.ZEUSBrowserAnalysis \
         "results/embedded-conversation-$kind"
+    elif [ "$stage" = personalization ]; then
+      python3 browser/.openminis/run_xcode.py "results/embedded-$kind-ui.log" -- \
+        xcodebuild -project upstream/src/ios/Minis.xcodeproj -scheme Minis \
+        -configuration Debug -destination "platform=iOS Simulator,id=$device" \
+        -derivedDataPath "$RUNNER_TEMP/OpenMinisOriginal" \
+        -resultBundlePath "results/embedded-$kind-ui.xcresult" \
+        -only-testing:ZEUSPersonalizationUITests -parallel-testing-enabled NO \
+        -test-timeouts-enabled YES -default-test-execution-time-allowance 120 \
+        -maximum-test-execution-time-allowance 120 \
+        test-without-building CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=-
     else
       python3 browser/.openminis/run_xcode.py "results/embedded-$kind-tests.log" -- \
         xcodebuild -project upstream/src/ios/Minis.xcodeproj -scheme Minis \
@@ -53,6 +63,10 @@ case "$stage" in
   attachments)
     xcrun xcresulttool export attachments --path "results/embedded-$kind.xcresult" \
       --output-path "results/embedded-attachments-$kind" || true
+    if [ -d "results/embedded-$kind-ui.xcresult" ]; then
+      xcrun xcresulttool export attachments --path "results/embedded-$kind-ui.xcresult" \
+        --output-path "results/embedded-ui-attachments-$kind" || true
+    fi
     xcrun simctl shutdown "$device" || true
     ;;
   *) exit 2 ;;

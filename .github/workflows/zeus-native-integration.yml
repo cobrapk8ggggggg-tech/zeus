@@ -212,6 +212,10 @@ jobs:
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
       timeout-minutes: 5
       run: bash browser/.openminis/run_native_stage.sh screens IPAD "${IPAD_SIMULATOR}"
+    - name: 'IPAD: Drag resize and apply a visual layout'
+      if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
+      timeout-minutes: 8
+      run: bash browser/.openminis/run_native_stage.sh personalization IPAD "${IPAD_SIMULATOR}"
     - name: 'IPAD: Verify native chat and inline approval'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
       timeout-minutes: 6

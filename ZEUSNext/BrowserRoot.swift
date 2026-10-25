@@ -45,6 +45,9 @@ struct BrowserRoot: View {
     @State private var assistantVisible = false
     @State private var assistantExpanded = false
     @State private var customAddressFocused = false
+    #if DEBUG
+    @State private var studioFixture = false
+    #endif
     @FocusState private var addressFocused: Bool
     private var layout: ChromeLayout { model.data.settings.chromeLayout ?? .original }
     private var customDesign: ChromeDesign? { model.data.settings.chromeWorkspace?.active(for: layout) }
@@ -78,6 +81,14 @@ struct BrowserRoot: View {
         .ignoresSafeArea(.container, edges: layout == .original ? .all : [])
         .animation(.spring(response: 0.34, dampingFraction: 0.86), value: model.chromeHidden)
         .fullScreenCover(isPresented: assistantCover) { if let agent = model.agent { assistant(agent, fullScreen: true) } }
+        #if DEBUG
+        .fullScreenCover(isPresented: $studioFixture) {
+            ChromeStudioEditor(design: .preset(.icab), model: model) { design in
+                model.data.settings.chromeWorkspace = ChromeWorkspace(designs: [design])
+                model.data.settings.chromeLayout = .icab; model.persist()
+            }.browserTheme(theme)
+        }
+        #endif
         .fullScreenCover(item: $panel) { item in panelContent(item).browserTheme(theme).environment(\.layoutDirection, .rightToLeft) }
         .overlay { if profilePicker { ProfilePickerPopover(model: model, close: { profilePicker = false }, manage: { profilePicker = false; panel = .profiles }).browserTheme(theme) } }
         .overlay(alignment: .top) { if model.current?.loading == true { ProgressView(value: max(0.05, model.current?.progress ?? 0)).progressViewStyle(.linear).tint(theme.accentColor).frame(height: 2).allowsHitTesting(false) } }
@@ -103,6 +114,9 @@ struct BrowserRoot: View {
             await model.ensureCurrentLoaded()
             #if DEBUG && ZEUS_NATIVE_HOST
             if CommandLine.arguments.contains("--open-native-agent"), !assistantVisible { perform(.assistant) }
+            #endif
+            #if DEBUG
+            if CommandLine.arguments.contains("--zeus-layout-editor") { studioFixture = true }
             #endif
         }
     }
