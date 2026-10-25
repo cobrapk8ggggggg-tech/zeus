@@ -49,6 +49,7 @@ class NativeEmbeddingTests(unittest.TestCase):
                     continue
                 expected = file.read_text().replace("group.com.openminis.app", "group.tools.zeus.openminis").replace("iCloud.com.openminis.app", "iCloud.tools.zeus.openminis")
                 if str(relative) == "Views/ContentView.swift":
+                    expected = expected.replace('BrowserSheetView(pool:', 'ZeusAgentBrowserWindow(pool:')
                     expected = expected.replace('                Section("Agent Runtime") {', '''                Section("وكيل ZEUS") {
                     NavigationLink { ZeusAgentRuntimeSettings() } label: { Label("أدوات الوكيل وتنفيذه", systemImage: "terminal") }
                     NavigationLink { ZeusPluginsSettingsView() } label: { Label("الإضافات", systemImage: "puzzlepiece.extension") }
@@ -110,7 +111,9 @@ class NativeEmbeddingTests(unittest.TestCase):
             self.assertNotIn(".offloadPermissionDialog()", (native / "src/ios/Views/Chat/AIChatView.swift").read_text())
             self.assertIn("@MainActor enum BrowserFixtureFactory", (browser / ".openminis/build/BrowserFixtureFactory.swift").read_text())
             chat = (native / "src/ios/Views/Chat/AIChatView.swift").read_text()
-            self.assertIn('.fullScreenCover(isPresented: $zeusFullBrowser, onDismiss:', chat)
+            self.assertIn('ZeusAgentBrowserWindow(pool: vm.browserTabPool', chat)
+            window = (native / 'src/ios/ZeusAgentBrowserWindow.swift').read_text()
+            self.assertIn('.fullScreenCover(isPresented: $expanded, onDismiss:', window)
             self.assertIn('ZeusConversationFiles(sessionID: vm.sessionId)', chat)
             self.assertIn('vm.zeusAddPickedFiles(urls)', chat)
             self.assertIn('FileBrowserView(rootPath: base', chat)

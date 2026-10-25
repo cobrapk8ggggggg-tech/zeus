@@ -44,11 +44,12 @@ struct BrowserRoot: View {
     @State private var dialogText = ""
     @State private var assistantVisible = false
     @State private var assistantExpanded = false
+    @State private var customAddressFocused = false
     @FocusState private var addressFocused: Bool
     private var layout: ChromeLayout { model.data.settings.chromeLayout ?? .original }
     private var customDesign: ChromeDesign? { model.data.settings.chromeWorkspace?.active(for: layout) }
     private var theme: BrowserTheme { model.data.settings.theme ?? .standard }
-    private var barsVisible: Bool { !(layout == .icab && model.chromeManuallyHidden) && (!model.chromeHidden || addressFocused || model.current?.isHome != false) }
+    private var barsVisible: Bool { !(layout == .icab && model.chromeManuallyHidden) && (!model.chromeHidden || addressFocused || customAddressFocused || model.current?.isHome != false) }
     var body: some View {
         ZStack {
             theme.backgroundColor.ignoresSafeArea()
@@ -113,14 +114,13 @@ struct BrowserRoot: View {
                     browserContent
                         .padding(.top, barsVisible ? geometry.size.height * composition.topInset : 0)
                         .padding(.bottom, barsVisible ? geometry.size.height * composition.bottomInset : 0)
-                    if barsVisible { ChromeRuntimeLayer(model: model, composition: composition, perform: perform) }
+                    if barsVisible { ChromeRuntimeLayer(model: model, composition: composition, perform: perform, addressFocusChanged: { customAddressFocused = $0 }) }
                     if !barsVisible { edgeReveal }
                     VStack { Spacer(); HStack { Spacer();
                         Menu {
                             Button("إعدادات الواجهة", systemImage: "slider.horizontal.3") { panel = .settings }
                             Button("العودة للتوزيع الافتراضي", systemImage: "arrow.uturn.backward") {
-                                model.data.settings.chromeWorkspace?.selected = nil
-                                model.data.settings.chromeWorkspace?.designs.removeAll { $0.base == layout }
+                                model.data.settings.chromeWorkspace?.bypass = true
                                 model.chromeHidden = false; model.chromeManuallyHidden = false; model.persist()
                             }
                         } label: { Image(systemName: "slider.horizontal.3").font(.system(size: 13)).frame(width: 36, height: 36).background(.regularMaterial, in: Circle()) }

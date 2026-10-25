@@ -5,7 +5,7 @@ enum ChromeBlockKind: String, Codable, CaseIterable, Identifiable {
     case action, address, tabs, bookmarks, label, panel
     var id: String { rawValue }
     var title: String { switch self { case .action: return "زر"; case .address: return "شريط العنوان"; case .tabs: return "التبويبات"; case .bookmarks: return "المفضلة"; case .label: return "نص"; case .panel: return "خلفية / شكل" } }
-    var symbol: String { switch self { case .action: return "hand.tap"; case .address: return "magnifyingglass"; case .tabs: return "square.on.square"; case .bookmarks: return "bookmark"; case .label: return "textformat"; case .panel: return "rectangle.roundedtop" } }
+    var symbol: String { switch self { case .action: return "hand.tap"; case .address: return "magnifyingglass"; case .tabs: return "square.on.square"; case .bookmarks: return "bookmark"; case .label: return "textformat"; case .panel: return "rectangle" } }
 }
 struct ChromeBlock: Codable, Identifiable, Equatable {
     var id = UUID()
@@ -112,7 +112,9 @@ struct ChromeDesign: Codable, Identifiable, Equatable {
 struct ChromeWorkspace: Codable, Equatable {
     var designs: [ChromeDesign] = []
     var selected: UUID?
+    var bypass: Bool?
     func active(for base: ChromeLayout) -> ChromeDesign? {
+        guard bypass != true else { return nil }
         if let selected, let custom = designs.first(where: { $0.id == selected }) { return custom }
         return designs.first { $0.base == base }
     }

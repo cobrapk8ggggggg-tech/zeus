@@ -36,13 +36,13 @@ def apply(source, replace):
     skills.write_text('import ZEUSBrowser\n' + skills.read_text())
     replace(skills, '''.sheet(isPresented: $showFilePicker) {
                 SkillFileDocumentPicker { result in
-                    do {''', '''.zeusFileImporter(isPresented: $showFilePicker, allowedContentTypes: [.item]) { pick in
+                    do {''', '''.zeusFileImporter(isPresented: $showFilePicker, allowedContentTypes: [.plainText, .zip, UTType(filenameExtension: "skill", conformingTo: .zip) ?? .zip]) { pick in
                 if case .success(let url) = pick {
                     do {
                         let result = try zeusReadSkillPick(url)''')
     replace(skills, '''.sheet(isPresented: $showFilePicker) {
             SkillFileDocumentPicker { result in
-                do {''', '''.zeusFileImporter(isPresented: $showFilePicker, allowedContentTypes: [.item]) { pick in
+                do {''', '''.zeusFileImporter(isPresented: $showFilePicker, allowedContentTypes: [.plainText, .zip, UTType(filenameExtension: "skill", conformingTo: .zip) ?? .zip]) { pick in
             if case .success(let url) = pick {
                 do {
                     let result = try zeusReadSkillPick(url)''')
@@ -65,30 +65,17 @@ private enum SkillFilePickResult {''')
                     vm.addFileAttachment(from: url)
                 }''', '''                vm.zeusAddPickedFiles(urls)''')
     replace(chat, '    @State private var showFileBrowser = false',
-            '    @State private var showFileBrowser = false\n    @State private var zeusShowArtifacts = false\n    @State private var zeusFullBrowser = false\n    @State private var zeusExpandBrowser = false\n    @State private var zeusRestoreBrowser = false')
-    replace(chat, '''        .sheet(isPresented: $showBrowserSheet) {
-            BrowserSheetView(pool: vm.browserTabPool, isAgentBusy: vm.browserTabPool.isAgentBrowsing, onTakeover: {
-                vm.browserTakeoverActive = true
-            })
-        }''', '''        .sheet(isPresented: $zeusShowArtifacts) {
+            '    @State private var showFileBrowser = false\n    @State private var zeusShowArtifacts = false')
+    replace(chat, '        .sheet(isPresented: $showBrowserSheet) {', '''        .sheet(isPresented: $zeusShowArtifacts) {
             ZeusConversationFiles(sessionID: vm.sessionId)
         }
-        .sheet(isPresented: $showBrowserSheet, onDismiss: {
-            if zeusExpandBrowser { zeusExpandBrowser = false; zeusFullBrowser = true }
-        }) {
-            BrowserSheetView(pool: vm.browserTabPool, isAgentBusy: vm.browserTabPool.isAgentBrowsing,
-                onTakeover: { vm.browserTakeoverActive = true },
-                onWindowResize: { zeusExpandBrowser = true; showBrowserSheet = false })
-        }
-        .fullScreenCover(isPresented: $zeusFullBrowser, onDismiss: {
-            if zeusRestoreBrowser { zeusRestoreBrowser = false; showBrowserSheet = true }
-        }) {
-            BrowserSheetView(pool: vm.browserTabPool, isAgentBusy: vm.browserTabPool.isAgentBrowsing,
-                onTakeover: { vm.browserTakeoverActive = true },
-                onWindowResize: { zeusRestoreBrowser = true; zeusFullBrowser = false }, windowExpanded: true)
-        }''')
+        .sheet(isPresented: $showBrowserSheet) {''')
     replace(chat, 'showFileBrowser || showBrowserSheet || showTerminal || showCamera',
-            'showFileBrowser || showBrowserSheet || zeusFullBrowser || zeusShowArtifacts || showTerminal || showCamera')
+            'showFileBrowser || showBrowserSheet || zeusShowArtifacts || showTerminal || showCamera')
+    replace(chat, '    private func dismissAllOwnedImmersiveCovers() {', '''    private func dismissAllOwnedImmersiveCovers() {
+        if showBrowserSheet { showBrowserSheet = false }''')
+    for file in [chat, source / 'Views/ContentView.swift', source / 'Views/Chat/ToolLiveSheet.swift']:
+        replace(file, 'BrowserSheetView(pool:', 'ZeusAgentBrowserWindow(pool:')
     replace(chat, '            onBrowseFiles: { showFileBrowser = true },',
             '            onBrowseFiles: { showFileBrowser = true },\n            onArtifacts: { zeusShowArtifacts = true },')
     replace(chat, '    let onBrowseFiles: () -> Void', '    let onBrowseFiles: () -> Void\n    let onArtifacts: () -> Void', count=2)
@@ -100,7 +87,7 @@ private enum SkillFilePickResult {''')
     # to a real fullScreenCover, after the prior presentation fully dismisses.
     browser = source / 'Agent/BrowserUse/BrowserSheetView.swift'
     replace(browser, '    var onTakeover: (() -> Void)? = nil',
-            '    var onTakeover: (() -> Void)? = nil\n    var onWindowResize: (() -> Void)? = nil\n    var windowExpanded = false')
+            '    var onTakeover: (() -> Void)? = nil\n    var onWindowResize: (() -> Void)? = nil\n    var windowExpanded = false\n    var onWindowClose: (() -> Void)? = nil')
     replace(browser, '                ToolbarItem(placement: .topBarTrailing) {\n                    Button("Done") { dismiss() }\n                }', '''                ToolbarItem(placement: .topBarTrailing) {
                     HStack {
                         if let onWindowResize {
@@ -109,7 +96,7 @@ private enum SkillFilePickResult {''')
                         }.accessibilityLabel(windowExpanded ? "استعادة نافذة المتصفح" : "ملء الشاشة")
                             .accessibilityIdentifier("agentBrowserWindowResize")
                         }
-                        Button("Done") { dismiss() }
+                        Button("Done") { if let onWindowClose { onWindowClose() } else { dismiss() } }
                     }
                 }''')
 

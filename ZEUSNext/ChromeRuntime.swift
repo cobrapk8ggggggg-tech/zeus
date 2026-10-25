@@ -29,6 +29,7 @@ struct ChromeRuntimeLayer: View {
     @ObservedObject var model: BrowserModel
     let composition: ChromeComposition
     let perform: (BrowserAction) -> Void
+    var addressFocusChanged: (Bool) -> Void = { _ in }
     @State private var address = ""
     @FocusState private var focused: Bool
     var body: some View {
@@ -45,6 +46,8 @@ struct ChromeRuntimeLayer: View {
         }.environment(\.layoutDirection, .leftToRight)
             .onAppear { address = model.address }
             .onChange(of: model.address) { _, newValue in if !focused { address = newValue } }
+            .onChange(of: focused) { _, value in addressFocusChanged(value) }
+            .onDisappear { addressFocusChanged(false) }
     }
     @ViewBuilder private func blockContent(_ block: ChromeBlock) -> some View {
         switch block.kind {

@@ -23,6 +23,8 @@ import UniformTypeIdentifiers
         XCTAssertEqual(decoded.chromeWorkspace?.active(for: .original)?.id, custom.id)
         workspace.selected = nil
         XCTAssertEqual(workspace.active(for: .original)?.base, .original)
+        workspace.bypass = true; XCTAssertNil(workspace.active(for: .original)); XCTAssertEqual(workspace.designs.count, 4)
+        workspace.bypass = false
         var profile = ProfileData(); profile.settings = settings
         let backup = try ProfileBackup(name: "Personalized", data: profile).validated()
         XCTAssertEqual(try backup.merged(into: ProfileData(), importSettings: true, restoreTabs: true).settings.chromeWorkspace, settings.chromeWorkspace)
@@ -42,6 +44,25 @@ import UniformTypeIdentifiers
                 }
             }
         }
+    }
+    func testAgentLayoutChangesPreserveSavedDesignsAndRejectInvalidGeometry() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let browser = BrowserModel(profiles: ProfileStore(root: root, downloadsRoot: root.appendingPathComponent("downloads")), useBackgroundDownloads: false)
+        var design = ChromeDesign.preset(.icab); design.base = nil
+        var workspace = ChromeWorkspace(designs: [design], selected: design.id)
+        browser.data.settings.chromeWorkspace = workspace
+        _ = try await NativeBrowserControl.execute("browser_settings", args: ["action": "set", "key": "chromeLayout", "value": "\"dualBars\""], browser: browser)
+        XCTAssertNil(browser.data.settings.chromeWorkspace?.selected)
+        XCTAssertEqual(browser.data.settings.chromeWorkspace?.designs.first?.id, design.id)
+        XCTAssertEqual(browser.data.settings.chromeLayout, .dualBars)
+        workspace.designs[0].landscape.blocks[0].fontSize = 999
+        let invalid = String(decoding: try JSONEncoder().encode(workspace), as: UTF8.self)
+        do {
+            _ = try await NativeBrowserControl.execute("browser_settings", args: ["action": "set", "key": "chromeWorkspace", "value": invalid], browser: browser)
+            XCTFail("Invalid saved layouts must never reach the live browser")
+        } catch { }
+        XCTAssertEqual(browser.data.settings.chromeWorkspace?.designs[0].landscape.blocks[0].fontSize, design.landscape.blocks[0].fontSize)
     }
     func testOutputGalleryReadsOriginalWorkspaceWithoutFollowingLinks() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -87,20 +108,98 @@ import UniformTypeIdentifiers
         XCTAssertEqual(vm.attachments.first?.loadState, .ready)
         XCTAssertEqual(try Data(contentsOf: XCTUnwrap(vm.attachments.first?.cacheURL)), data)
     }
+    func testFilesPresentationDismissesBeforeImportAndCanBeOpenedAgain() async throws {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let original = scene.windows.first { $0.isKeyWindow }
+        let state = ZeusPickerProbeState(), window = UIWindow(windowScene: scene)
+        let host = UIHostingController(rootView: ZeusPickerProbe(state: state))
+        window.rootViewController = host; window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil; original?.makeKeyAndVisible() }
+        try await Task.sleep(for: .milliseconds(300))
+        state.presented = true
+        var controller: UIDocumentPickerViewController?
+        for _ in 0..<100 {
+            if let found = picker(in: host) { controller = found; break }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        let first = try XCTUnwrap(controller)
+        let selected = [URL(fileURLWithPath: "/tmp/one.txt"), URL(fileURLWithPath: "/tmp/two.txt")]
+        first.delegate?.documentPicker?(first, didPickDocumentsAt: selected)
+        for _ in 0..<100 where state.deliveries.isEmpty { try await Task.sleep(for: .milliseconds(50)) }
+        XCTAssertEqual(state.deliveries, [selected]); XCTAssertFalse(state.presented)
+        XCTAssertNil(host.presentedViewController, "Import work must start only after UIKit dismissal")
+        state.presented = true; controller = nil
+        for _ in 0..<100 {
+            if let found = picker(in: host) { controller = found; break }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        let second = try XCTUnwrap(controller)
+        second.delegate?.documentPickerWasCancelled?(second)
+        for _ in 0..<100 where state.presented || host.presentedViewController != nil { try await Task.sleep(for: .milliseconds(50)) }
+        XCTAssertFalse(state.presented); XCTAssertEqual(state.deliveries.count, 1)
+    }
+    private func picker(in controller: UIViewController) -> UIDocumentPickerViewController? {
+        if let picker = controller as? UIDocumentPickerViewController { return picker }
+        if let presented = controller.presentedViewController, let match = picker(in: presented) { return match }
+        for child in controller.children { if let match = picker(in: child) { return match } }
+        return nil
+    }
     func testPersonalizationScreensAtPhoneAndIPadSizes() async throws {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let originalKey = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows).first { $0.isKeyWindow }
         defer { originalKey?.makeKeyAndVisible() }
         let browser = BrowserModel()
         for size in [CGSize(width: 1024, height: 768), CGSize(width: 390, height: 844)] {
-            let controller = UIHostingController(rootView: ChromeStudioEditor(design: .preset(.icab), model: browser, save: { _ in }).browserTheme(.standard))
+            let controller = UIHostingController(rootView: ChromeStudioEditor(design: .preset(.icab), model: browser, save: { _ in }).browserTheme(.standard).environment(\.horizontalSizeClass, size.width < 600 ? .compact : .regular))
             controller.overrideUserInterfaceStyle = .dark
-            let window = UIWindow(frame: CGRect(origin: .zero, size: size)); window.rootViewController = controller; window.makeKeyAndVisible()
+            let window = UIWindow(windowScene: scene); window.frame = CGRect(origin: .zero, size: size); window.rootViewController = controller; window.makeKeyAndVisible()
             controller.view.frame = window.bounds; controller.view.setNeedsLayout(); controller.view.layoutIfNeeded()
             try await Task.sleep(for: .milliseconds(500))
-            let image = UIGraphicsImageRenderer(size: size).image { _ in window.drawHierarchy(in: window.bounds, afterScreenUpdates: true) }
+            let image = UIGraphicsImageRenderer(size: size).image { _ in controller.view.drawHierarchy(in: CGRect(origin: .zero, size: size), afterScreenUpdates: true) }
             let attachment = XCTAttachment(image: image); attachment.name = "ChromeStudio-\(Int(size.width))x\(Int(size.height))"; attachment.lifetime = .keepAlways; add(attachment)
             XCTAssertGreaterThan(try XCTUnwrap(image.pngData()).count, 10_000)
             window.isHidden = true; window.rootViewController = nil
+        }
+    }
+    func testConversationFilesGalleryScreens() async throws {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let session = UUID().uuidString, root = AIChatViewModel.minisWorkspacePersistentDir(for: session)
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("تقارير"), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
+        try Data("# تقرير المشروع\nتم إنشاء هذا الملف في مساحة المحادثة.".utf8).write(to: root.appendingPathComponent("تقارير/ملخص.md"))
+        try Data("export const ready = true;".utf8).write(to: root.appendingPathComponent("project.js"))
+        for index in 0..<3 {
+            let image = UIGraphicsImageRenderer(size: CGSize(width: 500, height: 320)).image { context in
+                UIColor(hue: CGFloat(index) / 3 + 0.1, saturation: 0.6, brightness: 0.8, alpha: 1).setFill()
+                context.fill(CGRect(x: 0, y: 0, width: 500, height: 320))
+                UIColor.white.withAlphaComponent(0.3).setFill(); context.cgContext.fillEllipse(in: CGRect(x: CGFloat(80 + index * 20), y: 60, width: 210, height: 210))
+            }
+            try XCTUnwrap(image.pngData()).write(to: root.appendingPathComponent("تصميم-\(index + 1).png"))
+        }
+        let original = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows).first { $0.isKeyWindow }
+        defer { original?.makeKeyAndVisible() }
+        let size = CGSize(width: 1024, height: 768)
+        let host = UIHostingController(rootView: ZeusConversationFiles(sessionID: session))
+        host.overrideUserInterfaceStyle = .dark
+        let window = UIWindow(windowScene: scene); window.frame = CGRect(origin: .zero, size: size); window.rootViewController = host; window.makeKeyAndVisible()
+        host.view.frame = window.bounds; host.view.layoutIfNeeded()
+        try await Task.sleep(for: .milliseconds(800))
+        let image = UIGraphicsImageRenderer(size: size).image { _ in host.view.drawHierarchy(in: CGRect(origin: .zero, size: size), afterScreenUpdates: true) }
+        let attachment = XCTAttachment(image: image); attachment.name = "ConversationFiles-IPad"; attachment.lifetime = .keepAlways; add(attachment)
+        XCTAssertGreaterThan(try XCTUnwrap(image.pngData()).count, 10_000)
+        window.isHidden = true; window.rootViewController = nil
+    }
+}
+
+@MainActor private final class ZeusPickerProbeState: ObservableObject {
+    @Published var presented = false
+    var deliveries: [[URL]] = []
+}
+private struct ZeusPickerProbe: View {
+    @ObservedObject var state: ZeusPickerProbeState
+    var body: some View {
+        Color.clear.zeusFileImporter(isPresented: $state.presented, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
+            if case .success(let urls) = result { state.deliveries.append(urls) }
         }
     }
 }

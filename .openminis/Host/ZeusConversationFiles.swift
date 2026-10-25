@@ -108,7 +108,10 @@ struct ZeusConversationFiles: View {
     @State private var reveal: FileItem?
     private var root: URL? {
         guard let sessionID, !sessionID.isEmpty, sessionID != ".", sessionID != "..", !sessionID.contains("/"), !sessionID.contains("\\") else { return nil }
-        return AIChatViewModel.minisWorkspacePersistentDir(for: sessionID)
+        let root = AIChatViewModel.minisWorkspacePersistentDir(for: sessionID)
+        let expectedSession = AIChatViewModel.minisPersistentBase.resolvingSymlinksInPath().appendingPathComponent(sessionID).standardizedFileURL.path
+        guard root.deletingLastPathComponent().resolvingSymlinksInPath().standardizedFileURL.path == expectedSession else { return nil }
+        return root
     }
     private var filtered: [ZeusOutputIndex.Entry] {
         entries.filter { (kind == nil || $0.kind == kind) && (query.isEmpty || $0.relativePath.localizedCaseInsensitiveContains(query)) }
@@ -172,7 +175,7 @@ struct ZeusConversationFiles: View {
         }.buttonStyle(.plain)
     }
     private func outputCard(_ entry: ZeusOutputIndex.Entry) -> some View {
-        Button { preview = FileItem(url: entry.url) } label: {
+        Button { preview = file(entry) } label: {
             VStack(alignment: .leading, spacing: 9) {
                 if grid { ZeusOutputThumbnail(entry: entry).frame(height: 118).frame(maxWidth: .infinity).background(Color.accentColor.opacity(0.06), in: RoundedRectangle(cornerRadius: 12)) }
                 HStack {
@@ -185,10 +188,16 @@ struct ZeusConversationFiles: View {
             }.padding(12).background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
                 .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(.primary.opacity(0.05)))
         }.buttonStyle(.plain).contextMenu {
-            Button("معاينة", systemImage: "eye") { preview = FileItem(url: entry.url) }
-            Button("تصدير إلى الملفات", systemImage: "square.and.arrow.up") { export = FileItem(url: entry.url) }
-            Button("إظهار في الشجرة", systemImage: "folder") { reveal = FileItem(url: entry.url) }
+            Button("معاينة", systemImage: "eye") { preview = file(entry) }
+            Button("تصدير إلى الملفات", systemImage: "square.and.arrow.up") { export = file(entry) }
+            Button("إظهار في الشجرة", systemImage: "folder") { reveal = file(entry) }
         }
+    }
+    private func file(_ entry: ZeusOutputIndex.Entry) -> FileItem? {
+        guard let root, let values = try? entry.url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
+              values.isRegularFile == true, values.isSymbolicLink != true,
+              entry.url.resolvingSymlinksInPath().path.hasPrefix(root.resolvingSymlinksInPath().path + "/") else { return nil }
+        return FileItem(url: entry.url)
     }
     @MainActor private func reload() async {
         guard !loading else { return }; loading = true; defer { loading = false }

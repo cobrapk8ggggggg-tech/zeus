@@ -19,21 +19,21 @@ struct ChromeStudioLibrary: View {
                 ForEach(ChromeLayout.allCases) { base in
                     HStack {
                         Button { activate(base) } label: {
-                            Label(base.title, systemImage: workspace.selected == nil && (context.settings.chromeLayout ?? .original) == base ? "checkmark.circle.fill" : "circle")
+                            Label(base.title, systemImage: (workspace.selected == nil || workspace.bypass == true) && (context.settings.chromeLayout ?? .original) == base ? "checkmark.circle.fill" : "circle")
                         }.buttonStyle(.plain)
                         Spacer()
                         if let saved = workspace.designs.first(where: { $0.base == base }) {
                             Button { editing = saved } label: { Image(systemName: "slider.horizontal.3") }.accessibilityLabel("تعديل " + base.title)
                             Button { deleting = saved } label: { Image(systemName: "arrow.counterclockwise") }.accessibilityLabel("استعادة " + base.title)
-                        } else { Button("تصميم") { editing = .preset(base) }.buttonStyle(.bordered) }
+                        } else { Button("تصميم") { editing = .preset(base) }.buttonStyle(.bordered).disabled(workspace.designs.count >= 24) }
                     }.padding(.vertical, 6)
                 }
             }
             Section("توزيعاتي") {
                 ForEach(workspace.designs.filter { $0.base == nil }) { design in
                     HStack {
-                        Button { var value = workspace; value.selected = design.id; save(value) } label: {
-                            Label(design.name, systemImage: workspace.selected == design.id ? "checkmark.circle.fill" : "rectangle.3.group")
+                        Button { var value = workspace; value.selected = design.id; value.bypass = false; save(value) } label: {
+                            Label(design.name, systemImage: workspace.selected == design.id && workspace.bypass != true ? "checkmark.circle.fill" : "rectangle.3.group")
                         }.buttonStyle(.plain)
                         Spacer()
                         Button { editing = design } label: { Image(systemName: "pencil") }.accessibilityLabel("تحرير " + design.name)
@@ -54,6 +54,7 @@ struct ChromeStudioLibrary: View {
                 var value = workspace
                 if let index = value.designs.firstIndex(where: { $0.id == changed.id }) { value.designs[index] = changed } else { value.designs.append(changed) }
                 if let base = changed.base { context.settings.chromeLayout = base; value.selected = nil } else { value.selected = changed.id }
+                value.bypass = false
                 save(value)
             }.browserTheme(theme)
         }
@@ -64,8 +65,9 @@ struct ChromeStudioLibrary: View {
             }
         }
     }
-    private func activate(_ base: ChromeLayout) { context.settings.chromeLayout = base; var value = workspace; value.selected = nil; save(value) }
+    private func activate(_ base: ChromeLayout) { context.settings.chromeLayout = base; var value = workspace; value.selected = nil; value.bypass = false; save(value) }
     private func duplicate(_ design: ChromeDesign) {
+        guard workspace.designs.count < 24 else { context.model.notify("يمكن حفظ ٢٤ توزيعًا. احذف توزيعًا لإضافة آخر."); return }
         var copy = design; copy.id = UUID(); copy.name += " — نسخة"; copy.base = nil
         for index in copy.portrait.blocks.indices { copy.portrait.blocks[index].id = UUID() }
         for index in copy.landscape.blocks.indices { copy.landscape.blocks[index].id = UUID() }
@@ -95,6 +97,8 @@ struct ChromeStudioEditor: View {
     @State private var redo: [ChromeDesign] = []
     @State private var moveOrigin: ChromeBlock?
     @State private var error: String?
+    @State private var sliderEditing = false
+    @State private var initialized = false
     private let initial: ChromeDesign
     private let screenshot: UIImage?
     private let model: BrowserModel?
@@ -141,6 +145,7 @@ struct ChromeStudioEditor: View {
             .confirmationDialog("تجاهل التغييرات؟", isPresented: $cancelling, titleVisibility: .visible) { Button("تجاهل", role: .destructive) { dismiss() } }
             .alert("تعذّر الحفظ", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("حسنًا") { error = nil } } message: { Text(error ?? "") }
             .interactiveDismissDisabled(design != initial)
+            .onAppear { if !initialized { wide = sizeClass == .regular; initialized = true } }
         }.environment(\.layoutDirection, .rightToLeft)
     }
     private var options: some View {
@@ -156,7 +161,7 @@ struct ChromeStudioEditor: View {
                 Menu {
                     Button("نسخ هذا الاتجاه للاتجاه الآخر") { change { value in let source = value.composition(wide: wide); value.set(source, wide: !wide) } }
                     Button("مسح لوحة هذا الاتجاه", role: .destructive) { change { $0.set(ChromeComposition(), wide: wide) }; selected = nil }
-                    if let base = design.base { Button("استعادة أساس " + base.title) { change { $0 = .preset(base) }; selected = nil } }
+                    if let base = design.base { Button("استعادة أساس " + base.title) { change { value in var restored = ChromeDesign.preset(base); restored.id = value.id; restored.name = value.name; value = restored }; selected = nil } }
                 } label: { Image(systemName: "ellipsis.circle") }.accessibilityLabel("خيارات اللوحة")
             }.font(.subheadline).padding(.horizontal, 16).padding(.vertical, 10)
         }
@@ -182,6 +187,7 @@ struct ChromeStudioEditor: View {
             }
         }
         .coordinateSpace(name: "ChromeStage").environment(\.layoutDirection, .leftToRight)
+        .animation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.85), value: composition.blocks.map(\.id))
         .dropDestination(for: String.self) { values, point in
             guard let value = values.first, value.hasPrefix("zeus.chrome."), !preview else { return false }
             add(String(value.dropFirst("zeus.chrome.".count)), point: point, size: size); return true
@@ -194,6 +200,7 @@ struct ChromeStudioEditor: View {
             .modifier(ChromeBlockDecoration(block: block))
             .opacity(block.hidden ? 0.3 : 1)
             .overlay { if selected == block.id && !preview { RoundedRectangle(cornerRadius: max(4, block.corner)).strokeBorder(.cyan, lineWidth: 2) } }
+            .shadow(color: selected == block.id && !preview ? .cyan.opacity(0.25) : .clear, radius: 10)
             .overlay(alignment: .bottomTrailing) {
                 if selected == block.id && !preview && !block.locked {
                     Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 11, weight: .bold)).foregroundStyle(.black)
@@ -244,7 +251,7 @@ struct ChromeStudioEditor: View {
     }
     private func paletteItem(_ title: String, symbol: String, token: String) -> some View {
         Button { add(token) } label: { VStack(spacing: 7) { Image(systemName: symbol).font(.system(size: 20)); Text(title).font(.system(size: 10)).lineLimit(1) }.frame(width: 82, height: 64).background(.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 14)) }
-            .buttonStyle(.plain).draggable("zeus.chrome." + token).disabled(composition.blocks.count >= 120)
+            .buttonStyle(.plain).draggable("zeus.chrome." + token).hoverEffect(.lift).disabled(composition.blocks.count >= 120)
     }
     private var inspectorContent: some View {
         Form {
@@ -302,21 +309,24 @@ struct ChromeStudioEditor: View {
                         HStack { Image(systemName: block.displaySymbol); Text(block.displayTitle); Spacer(); if block.hidden { Image(systemName: "eye.slash") }; if block.locked { Image(systemName: "lock") }; if selected == block.id { Image(systemName: "checkmark") } }
                     }.contextMenu { Button("إلى الأمام") { reorder(block.id, forward: true) }; Button("إلى الخلف") { reorder(block.id, forward: false) }; Button("حذف", role: .destructive) { remove(block.id) } }
                 }
+                .onMove { source, destination in
+                    change { value in var c = value.composition(wide: wide); var ordered = Array(c.blocks.reversed()); ordered.move(fromOffsets: source, toOffset: destination); c.blocks = Array(ordered.reversed()); value.set(c, wide: wide) }
+                }
             }.navigationTitle("الطبقات — الأعلى في المقدمة").navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("تم") { layers = false } } }
+                .toolbar { ToolbarItem(placement: .topBarLeading) { EditButton() }; ToolbarItem(placement: .topBarTrailing) { Button("تم") { layers = false } } }
         }.presentationDetents([.medium, .large])
     }
     private func insetSlider(_ title: String, top: Bool) -> some View {
         VStack(alignment: .leading) {
             Text(title).font(.caption)
-            Slider(value: Binding(get: { top ? composition.topInset : composition.bottomInset }, set: { value in change { design in var c = design.composition(wide: wide); if top { c.topInset = value } else { c.bottomInset = value }; design.set(c, wide: wide) } }), in: 0...0.4)
+            Slider(value: Binding(get: { top ? composition.topInset : composition.bottomInset }, set: { value in change { design in var c = design.composition(wide: wide); if top { c.topInset = value } else { c.bottomInset = value }; design.set(c, wide: wide) } }), in: 0...0.4, onEditingChanged: sliderChanged)
         }
     }
     private func property<T>(_ path: WritableKeyPath<ChromeBlock, T>, block: ChromeBlock) -> Binding<T> {
         Binding(get: { composition.blocks.first { $0.id == block.id }?[keyPath: path] ?? block[keyPath: path] }, set: { value in update(block.id) { $0[keyPath: path] = value; $0.constrain() } })
     }
     private func number(_ title: String, _ path: WritableKeyPath<ChromeBlock, Double>, _ block: ChromeBlock, _ range: ClosedRange<Double>, percent: Bool = false) -> some View {
-        VStack(alignment: .leading, spacing: 2) { HStack { Text(title); Spacer(); Text("\(Int(block[keyPath: path] * (percent ? 100 : 1)))\(percent ? "٪" : "")").monospacedDigit().foregroundStyle(.secondary) }.font(.caption); Slider(value: property(path, block: block), in: range) }
+        VStack(alignment: .leading, spacing: 2) { HStack { Text(title); Spacer(); Text("\(Int(block[keyPath: path] * (percent ? 100 : 1)))\(percent ? "٪" : "")").monospacedDigit().foregroundStyle(.secondary) }.font(.caption); Slider(value: property(path, block: block), in: range, onEditingChanged: sliderChanged) }
     }
     private func color(_ title: String, _ path: WritableKeyPath<ChromeBlock, String>, _ block: ChromeBlock) -> some View {
         ColorPicker(title, selection: Binding(get: { BrowserTheme.color(block[keyPath: path]) }, set: { color in update(block.id) { $0[keyPath: path] = BrowserTheme.hex(color) } }), supportsOpacity: true)
@@ -346,7 +356,8 @@ struct ChromeStudioEditor: View {
     private func update(_ id: UUID, _ edit: (inout ChromeBlock) -> Void) { change { var c = $0.composition(wide: wide); guard let index = c.blocks.firstIndex(where: { $0.id == id }) else { return }; edit(&c.blocks[index]); $0.set(c, wide: wide) } }
     private func replaceBlock(_ block: ChromeBlock) { var c = composition; guard let index = c.blocks.firstIndex(where: { $0.id == block.id }) else { return }; c.blocks[index] = block; design.set(c, wide: wide) }
     private func checkpoint() { undo.append(design); if undo.count > 80 { undo.removeFirst() }; redo.removeAll() }
-    private func change(_ edit: (inout ChromeDesign) -> Void) { let prior = design; edit(&design); if prior != design { undo.append(prior); if undo.count > 80 { undo.removeFirst() }; redo.removeAll() } }
+    private func sliderChanged(_ editing: Bool) { if editing { checkpoint() }; sliderEditing = editing }
+    private func change(_ edit: (inout ChromeDesign) -> Void) { let prior = design; edit(&design); if prior != design && !sliderEditing { undo.append(prior); if undo.count > 80 { undo.removeFirst() }; redo.removeAll() } }
     private func restoreUndo() { guard let value = undo.popLast() else { return }; redo.append(design); design = value; selected = nil }
     private func restoreRedo() { guard let value = redo.popLast() else { return }; undo.append(design); design = value; selected = nil }
 }
