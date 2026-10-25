@@ -132,9 +132,9 @@ jobs:
                 output.write(kind.upper() + '_SIMULATOR=' + identifier + '\n')
         PY
       timeout-minutes: 4
-    - name: Start simulator boot before Swift compilation
+    - name: Start iPad boot before Swift compilation
       timeout-minutes: 4
-      run: xcrun simctl boot "$IPHONE_SIMULATOR" || true
+      run: xcrun simctl boot "$IPAD_SIMULATOR" || true
       continue-on-error: true
     - name: Build the native browser and integration tests
       run: |
@@ -158,7 +158,6 @@ jobs:
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
       timeout-minutes: 10
       run: |
-        xcrun simctl shutdown "$IPHONE_SIMULATOR" || true
         bash browser/.openminis/run_native_stage.sh boot IPAD "${IPAD_SIMULATOR}"
     - name: 'IPAD: Verify system Files imports and saved layouts'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
@@ -169,6 +168,8 @@ jobs:
       timeout-minutes: 2
       run: |
         xcrun xcresulttool export attachments --path results/embedded-IPAD-ui.xcresult --output-path results/embedded-ui-attachments-IPAD || true
+        xcrun xcresulttool export diagnostics --path results/embedded-IPAD-ui.xcresult --output-path results/embedded-ui-diagnostics-IPAD || true
+        xcrun simctl spawn "$IPAD_SIMULATOR" log show --last 12m --style compact --predicate 'process == "Minis" AND (eventMessage CONTAINS "ZEUS Files" OR eventMessage CONTAINS "bookmark" OR eventMessage CONTAINS "array of items")' > results/embedded-IPAD-file-provider.log || true
         xcrun simctl shutdown "$IPAD_SIMULATOR" || true
     - name: 'IPAD: Upload Files and layout diagnostics immediately'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
@@ -178,6 +179,8 @@ jobs:
         path: |
           results/embedded-IPAD-ui*
           results/embedded-ui-attachments-IPAD
+          results/embedded-ui-diagnostics-IPAD
+          results/embedded-IPAD-file-provider.log
         retention-days: 14
         if-no-files-found: warn
     - name: 'IPHONE: Boot'

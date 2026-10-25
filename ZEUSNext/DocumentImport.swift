@@ -107,7 +107,7 @@ private struct ZEUSSystemFilesPresentation: UIViewControllerRepresentable {
             controller.preferredContentSize = CGSize(width: 900, height: 700)
             picker = controller
             #if DEBUG
-            print("[ZEUS Files] present copy=\(!folders) multiple=\(multiple)")
+            NSLog("[ZEUS Files] present copy=\(!folders) multiple=\(multiple)")
             #endif
             presenter.present(controller, animated: true)
             controller.presentationController?.delegate = self
@@ -115,7 +115,7 @@ private struct ZEUSSystemFilesPresentation: UIViewControllerRepresentable {
         func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
             guard controller === picker else { return }
             #if DEBUG
-            print("[ZEUS Files] selected count=\(urls.count)")
+            NSLog("[ZEUS Files] selected count=\(urls.count)")
             #endif
             finish(urls.isEmpty ? .failure(CocoaError(.fileReadUnknown)) : .success(urls))
         }
@@ -173,8 +173,19 @@ public struct ZEUSFileImportDiagnostics: View {
         }.task {
             let root = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("ZEUS-Import-Test")
             try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-            try? Data("first".utf8).write(to: root.appendingPathComponent("ZEUS-Picker-A.txt"))
-            try? Data("second".utf8).write(to: root.appendingPathComponent("ZEUS-Picker-B.txt"))
+            // Shared Documents are indexed by the system file provider. Create
+            // both fixtures in one coordinated write, without replacing them
+            // on every relaunch while Files still holds their document IDs.
+            var issue: NSError?
+            NSFileCoordinator().coordinate(writingItemAt: root, options: .forMerging, error: &issue) { folder in
+                for (name, text) in [("ZEUS-Picker-A.txt", "first"), ("ZEUS-Picker-B.txt", "second")] {
+                    let url = folder.appendingPathComponent(name)
+                    if !FileManager.default.fileExists(atPath: url.path) { try? Data(text.utf8).write(to: url, options: .atomic) }
+                    let id = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.systemFileNumber]
+                    NSLog("[ZEUS Files] fixture inode=\(String(describing: id)) bytes=\((try? Data(contentsOf: url).count) ?? -1)")
+                }
+            }
+            if let issue { result = "fixture-error:" + issue.localizedDescription }
         }
     }
 }

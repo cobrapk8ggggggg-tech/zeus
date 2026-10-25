@@ -96,6 +96,7 @@ struct ChromeStudioEditor: View {
     @State private var undo: [ChromeDesign] = []
     @State private var redo: [ChromeDesign] = []
     @State private var moveOrigin: ChromeBlock?
+    @State private var moveResizes = false
     @State private var error: String?
     @State private var sliderEditing = false
     @State private var initialized = false
@@ -220,14 +221,15 @@ struct ChromeStudioEditor: View {
                 if selected == block.id && !preview && !block.locked {
                     Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 11, weight: .bold)).foregroundStyle(.black)
                         .frame(width: 28, height: 28).background(.cyan, in: Circle()).contentShape(Circle())
-                        .highPriorityGesture(drag(block, size: size, resize: true))
                         .accessibilityLabel("اسحب لتغيير الحجم")
                         .offset(x: 14, y: 14)
+                        .allowsHitTesting(false)
                 }
             }
-            .rotationEffect(.degrees(block.rotation)).position(x: rect.midX, y: rect.midY)
+            .padding(14)
+            .contentShape(ChromeStudioHitShape(handle: selected == block.id && !preview && !block.locked))
             .onTapGesture { guard !preview else { return }; selected = block.id }
-            .gesture(drag(block, size: size, resize: false), including: preview || block.locked ? .none : .all)
+            .gesture(drag(block, size: size), including: preview || block.locked ? .none : .all)
             .contextMenu {
                 Button("الخصائص", systemImage: "slider.horizontal.3") { selected = block.id; inspector = true }
                 Button("نسخ", systemImage: "plus.square.on.square") { duplicate(block) }
@@ -238,22 +240,36 @@ struct ChromeStudioEditor: View {
             .accessibilityLabel(block.displayTitle).accessibilityHint("اسحب للنقل؛ مقبض الزاوية لتغيير الحجم")
             .accessibilityAddTraits(.isButton)
             .accessibilityIdentifier("chromeStudioBlock-" + block.id.uuidString)
+            .rotationEffect(.degrees(block.rotation)).position(x: rect.midX, y: rect.midY)
     }
-    private func drag(_ block: ChromeBlock, size: CGSize, resize: Bool) -> some Gesture {
+    private func drag(_ block: ChromeBlock, size: CGSize) -> some Gesture {
         DragGesture(minimumDistance: 2, coordinateSpace: .named("ChromeStage"))
             .onChanged { value in
                 guard !block.locked, !preview else { return }
-                if moveOrigin == nil { checkpoint(); moveOrigin = block; selected = block.id }
+                if moveOrigin == nil {
+                    let reference = CGSize(width: wide ? 1024 : 430, height: wide ? 768 : 932)
+                    let scale = size.width / reference.width, logical = block.rect(in: reference)
+                    let rect = CGRect(x: logical.minX * scale, y: logical.minY * scale, width: logical.width * scale, height: logical.height * scale)
+                    let angle = -block.rotation * .pi / 180, cosine = CGFloat(cos(angle)), sine = CGFloat(sin(angle))
+                    let offset = CGPoint(x: value.startLocation.x - rect.midX, y: value.startLocation.y - rect.midY)
+                    let point = CGPoint(x: rect.midX + offset.x * cosine - offset.y * sine, y: rect.midY + offset.x * sine + offset.y * cosine)
+                    moveResizes = selected == block.id && point.x > rect.midX + 2 && point.y > rect.midY + 2
+                        && hypot(point.x - rect.maxX, point.y - rect.maxY) <= 20
+                    checkpoint(); moveOrigin = block; selected = block.id
+                }
                 guard var changed = moveOrigin, changed.id == block.id else { return }
-                let dx = value.translation.width / max(1, size.width), dy = value.translation.height / max(1, size.height)
-                if resize { changed.width += dx; changed.height += dy }
+                let angle = moveResizes ? -block.rotation * .pi / 180 : 0
+                let cosine = CGFloat(cos(angle)), sine = CGFloat(sin(angle))
+                let dx = (value.translation.width * cosine - value.translation.height * sine) / max(1, size.width)
+                let dy = (value.translation.width * sine + value.translation.height * cosine) / max(1, size.height)
+                if moveResizes { changed.width += dx; changed.height += dy }
                 else { changed.x += dx; changed.y += dy }
                 if snap {
-                    if resize { changed.width = snapped(changed.width, pixels: size.width); changed.height = snapped(changed.height, pixels: size.height) }
+                    if moveResizes { changed.width = snapped(changed.width, pixels: size.width); changed.height = snapped(changed.height, pixels: size.height) }
                     else { changed.x = snapped(changed.x, pixels: size.width); changed.y = snapped(changed.y, pixels: size.height) }
                 }
                 changed.constrain(); replaceBlock(changed)
-            }.onEnded { _ in moveOrigin = nil }
+            }.onEnded { _ in moveOrigin = nil; moveResizes = false }
     }
     private func snapped(_ value: Double, pixels: Double) -> Double { (value * pixels / 8).rounded() * 8 / max(1, pixels) }
     private var palette: some View {
@@ -379,4 +395,14 @@ struct ChromeStudioEditor: View {
     private func change(_ edit: (inout ChromeDesign) -> Void) { initialized = true; let prior = design; edit(&design); if prior != design && !sliderEditing { undo.append(prior); if undo.count > 80 { undo.removeFirst() }; redo.removeAll() } }
     private func restoreUndo() { guard let value = undo.popLast() else { return }; redo.append(design); design = value; selected = nil }
     private func restoreRedo() { guard let value = redo.popLast() else { return }; undo.append(design); design = value; selected = nil }
+}
+
+private struct ChromeStudioHitShape: Shape {
+    var handle: Bool
+    func path(in rect: CGRect) -> Path {
+        let body = rect.insetBy(dx: 14, dy: 14)
+        var path = Path(); path.addRect(body)
+        if handle { path.addEllipse(in: CGRect(x: body.maxX - 14, y: body.maxY - 14, width: 28, height: 28)) }
+        return path
+    }
 }

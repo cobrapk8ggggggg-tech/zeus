@@ -115,7 +115,7 @@ final class NativePersonalizationUITests: XCTestCase {
         XCTAssertGreaterThan(abs(moved.midX - before.midX) + abs(moved.midY - before.midY), 35)
         XCTAssertEqual(moved.width, before.width, accuracy: 3, "Dragging the centre must move a button without resizing it")
         XCTAssertEqual(moved.height, before.height, accuracy: 3)
-        let handle = block.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: moved.width, dy: moved.height))
+        let handle = block.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: moved.width - 14, dy: moved.height - 14))
         handle.press(forDuration: 0.08, thenDragTo: handle.withOffset(CGVector(dx: 80, dy: 35)))
         let resized = block.frame
         XCTAssertGreaterThan(resized.width, moved.width + 20)
