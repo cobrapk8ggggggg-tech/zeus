@@ -118,9 +118,7 @@ struct ChromeStudioEditor: View {
                         let available = CGSize(width: max(1, geometry.size.width - 28), height: max(1, geometry.size.height - 28))
                         let ratio: CGFloat = wide ? 4 / 3 : 430 / 932
                         let width = min(available.width, available.height * ratio)
-                        let global = geometry.frame(in: .global)
-                        let origin = CGPoint(x: global.midX - width / 2, y: global.midY - width / ratio / 2)
-                        stage(size: CGSize(width: width, height: width / ratio), globalOrigin: origin)
+                        stage(size: CGSize(width: width, height: width / ratio))
                             .frame(width: width, height: width / ratio)
                             .clipShape(RoundedRectangle(cornerRadius: 22))
                             .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(.white.opacity(0.15), lineWidth: 1))
@@ -172,7 +170,7 @@ struct ChromeStudioEditor: View {
             }.font(.subheadline).padding(.horizontal, 16).padding(.vertical, 10)
         }
     }
-    private func stage(size: CGSize, globalOrigin: CGPoint) -> some View {
+    private func stage(size: CGSize) -> some View {
         ZStack(alignment: .topLeading) {
             LinearGradient(colors: [Color(white: 0.05), Color(white: 0.12)], startPoint: .topLeading, endPoint: .bottomTrailing)
             if let screenshot { Image(uiImage: screenshot).resizable().scaledToFill().frame(width: size.width, height: size.height).clipped().allowsHitTesting(false) }
@@ -195,7 +193,7 @@ struct ChromeStudioEditor: View {
                     .frame(width: size.width, height: size.height, alignment: .topLeading).allowsHitTesting(false)
             }
             ForEach(composition.blocks.filter { (!$0.hidden || !preview) && !(preview && model != nil) }) { block in
-                stageBlock(block, size: size, globalOrigin: globalOrigin)
+                stageBlock(block, size: size)
             }
         }
         .coordinateSpace(name: "ChromeStage").environment(\.layoutDirection, .leftToRight)
@@ -206,23 +204,20 @@ struct ChromeStudioEditor: View {
             add(String(value.dropFirst("zeus.chrome.".count)), point: point, size: size); return true
         }
     }
-    private func stageBlock(_ block: ChromeBlock, size: CGSize, globalOrigin: CGPoint) -> some View {
+    private func stageBlock(_ block: ChromeBlock, size: CGSize) -> some View {
         let reference = CGSize(width: wide ? 1024 : 430, height: wide ? 768 : 932)
         let scale = size.width / reference.width
         let real = block.rect(in: reference)
         let rect = CGRect(x: real.minX * scale, y: real.minY * scale, width: real.width * scale, height: real.height * scale)
-        let touchFrame = CGRect(x: -(rect.width + 28) / 2, y: -(rect.height + 28) / 2, width: rect.width + 28, height: rect.height + 28)
-            .applying(CGAffineTransform(rotationAngle: block.rotation * .pi / 180))
-            .offsetBy(dx: globalOrigin.x + rect.midX, dy: globalOrigin.y + rect.midY)
         var appearance = block
         appearance.corner *= Double(scale); appearance.fontSize *= Double(scale); appearance.borderWidth *= Double(scale)
-        return ChromeBlockGlyph(block: block, scale: scale)
+        let glyph = ChromeBlockGlyph(block: block, scale: scale)
             .frame(width: rect.width, height: rect.height)
             .modifier(ChromeBlockDecoration(block: appearance))
             .opacity(block.hidden ? 0.3 : 1)
             .overlay { if selected == block.id && !preview { RoundedRectangle(cornerRadius: max(4, appearance.corner)).strokeBorder(.cyan, lineWidth: 2) } }
             .shadow(color: selected == block.id && !preview ? .cyan.opacity(0.25) : .clear, radius: 10)
-            .overlay(alignment: .bottomTrailing) {
+        let decorated = glyph.overlay(alignment: .bottomTrailing) {
                 if selected == block.id && !preview && !block.locked {
                     Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 11, weight: .bold)).foregroundStyle(.black)
                         .frame(width: 28, height: 28).background(.cyan, in: Circle()).contentShape(Circle())
@@ -231,7 +226,7 @@ struct ChromeStudioEditor: View {
                         .allowsHitTesting(false)
                 }
             }
-            .padding(14)
+        let interactive = decorated.padding(14)
             .contentShape(ChromeStudioHitShape(handle: selected == block.id && !preview && !block.locked))
             .onTapGesture { guard !preview else { return }; selected = block.id }
             .gesture(drag(block, size: size), including: preview || block.locked ? .none : .all)
@@ -241,12 +236,18 @@ struct ChromeStudioEditor: View {
                 Button(block.locked ? "إلغاء القفل" : "قفل", systemImage: "lock") { update(block.id) { $0.locked.toggle() } }
                 Button("حذف", systemImage: "trash", role: .destructive) { remove(block.id) }
             }
+        return interactive
+            .accessibilityRepresentation { blockAccessibility(block, size: CGSize(width: rect.width + 28, height: rect.height + 28)) }
+            .rotationEffect(.degrees(block.rotation)).position(x: rect.midX, y: rect.midY)
+    }
+    private func blockAccessibility(_ block: ChromeBlock, size: CGSize) -> some View {
+        Rectangle().fill(Color.clear).frame(width: size.width, height: size.height)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(block.displayTitle).accessibilityHint("اسحب للنقل؛ مقبض الزاوية لتغيير الحجم")
             .accessibilityAddTraits(.isButton)
             .accessibilityIdentifier("chromeStudioBlock-" + block.id.uuidString)
-            .rotationEffect(.degrees(block.rotation)).position(x: rect.midX, y: rect.midY)
-            .accessibilityFrame(touchFrame)
+            .accessibilityAction { selected = block.id }
+            .accessibilityAction(named: Text("الخصائص")) { selected = block.id; inspector = true }
     }
     private func drag(_ block: ChromeBlock, size: CGSize) -> some Gesture {
         DragGesture(minimumDistance: 2, coordinateSpace: .named("ChromeStage"))
