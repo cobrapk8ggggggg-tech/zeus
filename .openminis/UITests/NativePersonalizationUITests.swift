@@ -43,6 +43,26 @@ final class NativePersonalizationUITests: XCTestCase {
         expectation(for: NSPredicate(format: "label == %@", "1:readable:ZEUS-Import-Test"), evaluatedWith: result)
         waitForExpectations(timeout: 15)
     }
+    @MainActor func testExternalFolderSettingsOpensConfirmationAndMountsSelectedFolder() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--zeus-mounted-folders", "--zeus-native-fixture", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        let pick = app.buttons["mountExternalFolder"]
+        XCTAssertTrue(pick.waitForExistence(timeout: 30)); pick.tap()
+        try browseLocalFixture(app)
+        confirmOpen(app)
+        let confirm = app.buttons["confirmExternalMount"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 15), "Picking a folder must dismiss Files and open the real mount confirmation")
+        let name = app.textFields["externalMountName"]
+        XCTAssertTrue(name.exists)
+        XCTAssertEqual(name.value as? String, "ZEUS-Import-Test")
+        confirm.tap()
+        XCTAssertTrue(pick.waitForExistence(timeout: 10))
+        let mounted = app.staticTexts["ZEUS-Import-Test"].firstMatch
+        XCTAssertTrue(mounted.waitForExistence(timeout: 15), "The selected folder must be listed after confirming the mount")
+        let screen = XCTAttachment(screenshot: app.screenshot()); screen.name = "External-Folder-Mounted"; screen.lifetime = .keepAlways; add(screen)
+    }
     @MainActor private func launchFiles() -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -87,6 +107,11 @@ final class NativePersonalizationUITests: XCTestCase {
         XCTAssertTrue(library.exists, "Editing the iPad preset must retain its tablet-only actions")
         let portrait = XCTAttachment(screenshot: app.screenshot()); portrait.name = "Edited-iPad-Portrait"; portrait.lifetime = .keepAlways; add(portrait)
         XCUIDevice.shared.orientation = .landscapeLeft
+        expectation(for: NSPredicate { _, _ in
+            let window = app.windows.firstMatch.frame
+            return window.width > window.height && assistant.frame.maxX > window.maxX - 100
+        }, evaluatedWith: assistant)
+        waitForExpectations(timeout: 15)
         XCTAssertEqual(assistant.frame.width, 44, accuracy: 1); XCTAssertEqual(assistant.frame.height, 44, accuracy: 1)
         XCTAssertTrue(library.exists)
         let landscape = XCTAttachment(screenshot: app.screenshot()); landscape.name = "Edited-iPad-Landscape"; landscape.lifetime = .keepAlways; add(landscape)

@@ -16,6 +16,9 @@ def apply(source, replace):
             if case .success(let url) = result {'''
     replace(folders, before, after)
     folders.write_text('import ZEUSBrowser\n' + folders.read_text())
+    replace(folders, '.disabled(model.isAtCapacity)', '.accessibilityIdentifier("mountExternalFolder")\n                .disabled(model.isAtCapacity)')
+    replace(folders, 'Button(AppLocalized("Mount"), action: onConfirm)', 'Button(AppLocalized("Mount"), action: onConfirm)\n                        .accessibilityIdentifier("confirmExternalMount")')
+    replace(folders, 'TextField("name", text: $name)', 'TextField("name", text: $name).accessibilityIdentifier("externalMountName")')
     files = source / 'Views/Rootfs/FileBrowserView.swift'
     replace(files, '''        .sheet(isPresented: $showImportPicker) {
             FileImportPicker { urls in

@@ -18,6 +18,8 @@ struct ZEUSBrowserRootEntry: View {
         #if DEBUG
         if CommandLine.arguments.contains("--zeus-file-picker") {
             ZEUSFileImportDiagnostics()
+        } else if CommandLine.arguments.contains("--zeus-mounted-folders") {
+            ZeusMountedFoldersTestEntry()
         } else if CommandLine.arguments.contains("--uitest-message-list") {
             MessageListTestView()
         } else {
@@ -52,6 +54,19 @@ private enum ZEUSNativeHostBootstrap {
 }
 
 #if DEBUG
+/// Use the real settings view inside a sheet, as in browser preferences.
+private struct ZeusMountedFoldersTestEntry: View {
+    @State private var settings = true
+    var body: some View {
+        Color.clear.sheet(isPresented: $settings) {
+            NavigationStack { MountedFoldersSettingsView() }
+        }.task {
+            let folder = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("ZEUS-Import-Test", isDirectory: true)
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
+    }
+}
 private enum ZEUSNativeFixtureBootstrap {
     static let configured: Void = {
         if CommandLine.arguments.contains("--zeus-native-fixture") {
