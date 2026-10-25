@@ -74,7 +74,11 @@ import UniformTypeIdentifiers
         try Data("private input".utf8).write(to: outside.appendingPathComponent("private.txt"))
         try FileManager.default.createSymbolicLink(at: root.appendingPathComponent("escape"), withDestinationURL: outside)
         let snapshot = try ZeusOutputIndex.scan(root)
-        XCTAssertEqual(snapshot.entries.map(\.relativePath), ["report/result.md"])
+        let resource = try root.appendingPathComponent("report/result.md").resourceValues(forKeys: [.isRegularFileKey, .isDirectoryKey, .isSymbolicLinkKey])
+        let diagnostic = "root=\(ZeusOutputIndex.components(root)) file=\(ZeusOutputIndex.components(root.appendingPathComponent("report/result.md"))) regular=\(String(describing: resource.isRegularFile)) directory=\(String(describing: resource.isDirectory)) link=\(String(describing: resource.isSymbolicLink))"
+        XCTAssertEqual(ZeusOutputIndex.relativePath(root.appendingPathComponent("report/result.md"), under: root), "report/result.md")
+        XCTAssertNil(ZeusOutputIndex.relativePath(outside.appendingPathComponent("private.txt"), under: root))
+        XCTAssertEqual(snapshot.entries.map(\.relativePath), ["report/result.md"], diagnostic)
         XCTAssertEqual(snapshot.entries.first?.kind, .document)
         XCTAssertEqual(snapshot.entries.first?.url, root.appendingPathComponent("report/result.md"))
         try Data("changed in tree".utf8).write(to: root.appendingPathComponent("report/result.md"))

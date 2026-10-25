@@ -62,6 +62,14 @@ enum ZeusOutputIndex {
         var id: String { relativePath }
     }
     struct Snapshot: Sendable { var entries: [Entry]; var truncated: Bool }
+    static func components(_ url: URL) -> [String] {
+        url.resolvingSymlinksInPath().standardizedFileURL.pathComponents.filter { !$0.isEmpty && $0 != "/" }
+    }
+    static func relativePath(_ url: URL, under root: URL) -> String? {
+        let base = components(root), file = components(url)
+        guard file.count > base.count, Array(file.prefix(base.count)) == base else { return nil }
+        return file.dropFirst(base.count).joined(separator: "/")
+    }
     /// This is the existing per-conversation workspace; uploads, browser
     /// snapshots, memory, credentials and other sessions are separate buckets.
     /// Never follow links into those buckets or external mounted directories.
@@ -72,7 +80,6 @@ enum ZeusOutputIndex {
         var error: Error?
         guard let walker = FileManager.default.enumerator(at: root, includingPropertiesForKeys: Array(keys), options: [.skipsPackageDescendants], errorHandler: { _, issue in error = issue; return false }) else { throw CocoaError(.fileReadUnknown) }
         var entries: [Entry] = [], visited = 0, truncated = false
-        let base = root.resolvingSymlinksInPath().standardizedFileURL.path + "/"
         for case let url as URL in walker {
             try Task.checkCancellation()
             visited += 1
@@ -83,8 +90,7 @@ enum ZeusOutputIndex {
                 if [".git", "node_modules", ".venv", "__pycache__", ".build", ".cache"].contains(url.lastPathComponent) { walker.skipDescendants() }
                 continue
             }
-            guard values.isRegularFile == true, url.resolvingSymlinksInPath().standardizedFileURL.path.hasPrefix(base) else { continue }
-            let path = String(url.standardizedFileURL.path.dropFirst(root.standardizedFileURL.path.count + 1))
+            guard values.isRegularFile == true, let path = relativePath(url, under: root) else { continue }
             entries.append(Entry(url: url, relativePath: path, bytes: Int64(values.fileSize ?? 0), date: values.contentModificationDate ?? .distantPast, kind: .classify(url)))
         }
         if let error { throw error }
@@ -109,8 +115,8 @@ struct ZeusConversationFiles: View {
     private var root: URL? {
         guard let sessionID, !sessionID.isEmpty, sessionID != ".", sessionID != "..", !sessionID.contains("/"), !sessionID.contains("\\") else { return nil }
         let root = AIChatViewModel.minisWorkspacePersistentDir(for: sessionID)
-        let expectedSession = AIChatViewModel.minisPersistentBase.resolvingSymlinksInPath().appendingPathComponent(sessionID).standardizedFileURL.path
-        guard root.deletingLastPathComponent().resolvingSymlinksInPath().standardizedFileURL.path == expectedSession else { return nil }
+        let expectedSession = AIChatViewModel.minisPersistentBase.resolvingSymlinksInPath().appendingPathComponent(sessionID)
+        guard ZeusOutputIndex.components(root.deletingLastPathComponent()) == ZeusOutputIndex.components(expectedSession) else { return nil }
         return root
     }
     private var filtered: [ZeusOutputIndex.Entry] {
@@ -196,7 +202,7 @@ struct ZeusConversationFiles: View {
     private func file(_ entry: ZeusOutputIndex.Entry) -> FileItem? {
         guard let root, let values = try? entry.url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
               values.isRegularFile == true, values.isSymbolicLink != true,
-              entry.url.resolvingSymlinksInPath().path.hasPrefix(root.resolvingSymlinksInPath().path + "/") else { return nil }
+              ZeusOutputIndex.relativePath(entry.url, under: root) != nil else { return nil }
         return FileItem(url: entry.url)
     }
     @MainActor private func reload() async {
