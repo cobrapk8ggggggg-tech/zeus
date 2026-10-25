@@ -19,7 +19,7 @@ final class NativePersonalizationUITests: XCTestCase {
         let canvas = app.otherElements["chromeStudioCanvas"]
         XCTAssertTrue(canvas.exists)
         let destination = canvas.coordinate(withNormalizedOffset: CGVector(dx: 0.55, dy: 0.58))
-        block.press(forDuration: 0.08, thenDragTo: destination)
+        block.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.08, thenDragTo: destination)
         let moved = block.frame
         XCTAssertGreaterThan(abs(moved.midX - before.midX) + abs(moved.midY - before.midY), 35)
         let handle = block.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: moved.width - 14, dy: moved.height - 14))
