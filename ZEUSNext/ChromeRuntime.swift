@@ -15,10 +15,13 @@ struct ChromeBlockDecoration: ViewModifier {
 }
 struct ChromeBlockGlyph: View {
     let block: ChromeBlock
+    var scale: CGFloat = 1
     var body: some View {
-        VStack(spacing: 3) {
-            if block.kind == .action || block.kind == .address { Image(systemName: block.displaySymbol) }
-            if block.kind != .action || block.showTitle { Text(block.displayTitle).font(.system(size: min(block.fontSize, 14))).lineLimit(1).minimumScaleFactor(0.6) }
+        VStack(spacing: 3 * scale) {
+            if block.kind == .action || block.kind == .address { Image(systemName: block.displaySymbol).font(.system(size: block.fontSize * Double(scale), weight: .medium)) }
+            if block.kind != .panel && (block.kind != .action || block.showTitle) {
+                Text(block.displayTitle).font(.system(size: (block.kind == .label ? block.fontSize : min(block.fontSize, 14)) * Double(scale))).lineLimit(1).minimumScaleFactor(0.6)
+            }
         }.frame(maxWidth: .infinity, maxHeight: .infinity).contentShape(Rectangle())
     }
 }

@@ -81,7 +81,8 @@ import WebKit
         let result = try await TextTranslationService.translate([original], preferences: prefs, provider: provider, secret: "", context: UUID())
         let sent = try await requests(provider.model)
         XCTAssertEqual(sent.count, 3)
-        XCTAssertEqual(sent.flatMap { $0 }.joined(), original.text)
+        let planned = AITranslationPlan.make([original]).batches.map { $0.map(\.text).joined() }.sorted()
+        XCTAssertTrue(sent.map { $0.joined() }.sorted() == planned, "Every exact part must reach HTTP once; concurrent arrival order is unrestricted")
         XCTAssertEqual(result.map(\.id), ["large"])
         XCTAssertFalse(result[0].text.isEmpty)
     }

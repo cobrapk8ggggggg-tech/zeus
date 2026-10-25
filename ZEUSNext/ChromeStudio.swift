@@ -181,7 +181,13 @@ struct ChromeStudioEditor: View {
                 context.fill(path, with: .color(.white.opacity(0.16)))
             }.allowsHitTesting(false) }
             Color.clear.contentShape(Rectangle()).onTapGesture { selected = nil }
-            if preview, let model { ChromeRuntimeLayer(model: model, composition: composition, perform: { _ in }).allowsHitTesting(false) }
+            if preview, let model {
+                let reference = CGSize(width: wide ? 1024 : 430, height: wide ? 768 : 932)
+                ChromeRuntimeLayer(model: model, composition: composition, perform: { _ in })
+                    .frame(width: reference.width, height: reference.height)
+                    .scaleEffect(size.width / reference.width, anchor: .topLeading)
+                    .frame(width: size.width, height: size.height, alignment: .topLeading).allowsHitTesting(false)
+            }
             ForEach(composition.blocks.filter { (!$0.hidden || !preview) && !(preview && model != nil) }) { block in
                 stageBlock(block, size: size)
             }
@@ -195,12 +201,17 @@ struct ChromeStudioEditor: View {
         }
     }
     private func stageBlock(_ block: ChromeBlock, size: CGSize) -> some View {
-        let rect = block.rect(in: size)
-        return ChromeBlockGlyph(block: block)
+        let reference = CGSize(width: wide ? 1024 : 430, height: wide ? 768 : 932)
+        let scale = size.width / reference.width
+        let real = block.rect(in: reference)
+        let rect = CGRect(x: real.minX * scale, y: real.minY * scale, width: real.width * scale, height: real.height * scale)
+        var appearance = block
+        appearance.corner *= Double(scale); appearance.fontSize *= Double(scale); appearance.borderWidth *= Double(scale)
+        return ChromeBlockGlyph(block: block, scale: scale)
             .frame(width: rect.width, height: rect.height)
-            .modifier(ChromeBlockDecoration(block: block))
+            .modifier(ChromeBlockDecoration(block: appearance))
             .opacity(block.hidden ? 0.3 : 1)
-            .overlay { if selected == block.id && !preview { RoundedRectangle(cornerRadius: max(4, block.corner)).strokeBorder(.cyan, lineWidth: 2) } }
+            .overlay { if selected == block.id && !preview { RoundedRectangle(cornerRadius: max(4, appearance.corner)).strokeBorder(.cyan, lineWidth: 2) } }
             .shadow(color: selected == block.id && !preview ? .cyan.opacity(0.25) : .clear, radius: 10)
             .overlay(alignment: .bottomTrailing) {
                 if selected == block.id && !preview && !block.locked {

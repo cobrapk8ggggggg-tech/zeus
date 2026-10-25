@@ -77,23 +77,35 @@ enum ZeusOutputIndex {
         guard FileManager.default.fileExists(atPath: root.path) else { return Snapshot(entries: [], truncated: false) }
         guard try root.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else { throw CocoaError(.fileReadNoPermission) }
         let keys: Set<URLResourceKey> = [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey]
-        var error: Error?
-        guard let walker = FileManager.default.enumerator(at: root, includingPropertiesForKeys: Array(keys), options: [.skipsPackageDescendants], errorHandler: { _, issue in error = issue; return false }) else { throw CocoaError(.fileReadUnknown) }
         var entries: [Entry] = [], visited = 0, truncated = false
-        for case let url as URL in walker {
+        var folders = [root]
+        scan: while let folder = folders.popLast() {
             try Task.checkCancellation()
-            visited += 1
-            if visited > 40_000 || entries.count >= 10_000 { truncated = true; break }
-            let values = try url.resourceValues(forKeys: keys)
-            if values.isSymbolicLink == true { walker.skipDescendants(); continue }
-            if values.isDirectory == true {
-                if [".git", "node_modules", ".venv", "__pycache__", ".build", ".cache"].contains(url.lastPathComponent) { walker.skipDescendants() }
-                continue
+            if !FileManager.default.fileExists(atPath: folder.path) { continue }
+            guard try folder.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true,
+                  folder == root || relativePath(folder, under: root) != nil else { continue }
+            // Explicit directory listings avoid DirectoryEnumerator's package/
+            // symlink cursor state; skipping one link cannot skip a sibling.
+            let children: [URL]
+            do { children = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: Array(keys)) }
+            catch {
+                let issue = error as NSError
+                if issue.domain == NSCocoaErrorDomain && [NSFileNoSuchFileError, NSFileReadNoSuchFileError].contains(issue.code) { continue }
+                throw error
             }
-            guard values.isRegularFile == true, let path = relativePath(url, under: root) else { continue }
-            entries.append(Entry(url: url, relativePath: path, bytes: Int64(values.fileSize ?? 0), date: values.contentModificationDate ?? .distantPast, kind: .classify(url)))
+            for url in children {
+                try Task.checkCancellation(); visited += 1
+                if visited > 40_000 || entries.count >= 10_000 { truncated = true; break scan }
+                guard let values = try? url.resourceValues(forKeys: keys) else { continue }
+                if values.isSymbolicLink == true { continue }
+                if values.isDirectory == true {
+                    if ![".git", "node_modules", ".venv", "__pycache__", ".build", ".cache"].contains(url.lastPathComponent) { folders.append(url) }
+                    continue
+                }
+                guard values.isRegularFile == true, let path = relativePath(url, under: root) else { continue }
+                entries.append(Entry(url: url, relativePath: path, bytes: Int64(values.fileSize ?? 0), date: values.contentModificationDate ?? .distantPast, kind: .classify(url)))
+            }
         }
-        if let error { throw error }
         return Snapshot(entries: entries, truncated: truncated)
     }
 }
@@ -186,10 +198,10 @@ struct ZeusConversationFiles: View {
                 if grid { ZeusOutputThumbnail(entry: entry).frame(height: 118).frame(maxWidth: .infinity).background(Color.accentColor.opacity(0.06), in: RoundedRectangle(cornerRadius: 12)) }
                 HStack {
                     Image(systemName: entry.kind.symbol).foregroundStyle(Color.accentColor)
-                    Text(entry.url.lastPathComponent).font(.subheadline.weight(.semibold)).lineLimit(1).truncationMode(.middle)
+                    Text("\u{2066}" + entry.url.lastPathComponent + "\u{2069}").font(.subheadline.weight(.semibold)).lineLimit(1).truncationMode(.middle)
                     if !grid { Spacer(); Text(ByteCountFormatter.string(fromByteCount: entry.bytes, countStyle: .file)).font(.caption).foregroundStyle(.secondary) }
                 }
-                Text(entry.relativePath).font(.caption2).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                Text("\u{2066}" + entry.relativePath + "\u{2069}").font(.caption2).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                 if grid { Text(ByteCountFormatter.string(fromByteCount: entry.bytes, countStyle: .file)).font(.caption2).foregroundStyle(.secondary) }
             }.padding(12).background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
                 .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(.primary.opacity(0.05)))
