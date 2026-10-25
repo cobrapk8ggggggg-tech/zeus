@@ -9,6 +9,17 @@ final class NativePersonalizationUITests: XCTestCase {
         }
         try super.tearDownWithError()
     }
+    @MainActor func test00CreateImportFixturesThroughSystemFilesExport() throws {
+        let app = launchFiles()
+        let prepare = app.buttons["prepareFiles"]
+        expectation(for: NSPredicate(format: "enabled == true"), evaluatedWith: prepare)
+        waitForExpectations(timeout: 10); prepare.tap()
+        try browseLocalFixture(app)
+        let save = app.buttons.matching(NSPredicate(format: "label IN %@", ["Export", "Save", "Copy", "Move", "تصدير", "حفظ", "نسخ", "نقل"])).firstMatch
+        XCTAssertTrue(save.waitForExistence(timeout: 10)); XCTAssertTrue(save.isEnabled); save.tap()
+        expectation(for: NSPredicate(format: "label == %@", "fixtures-ready"), evaluatedWith: app.staticTexts["fixtureStatus"])
+        waitForExpectations(timeout: 20)
+    }
     @MainActor func testFilesSingleSelectionAndCancellationThroughSystemUI() throws {
         let app = launchFiles()
         app.buttons["importSingle"].tap()

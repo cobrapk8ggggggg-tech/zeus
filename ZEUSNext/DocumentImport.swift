@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// UIKit picker adapter retained for integrations that manage their own host.
-/// App import routes below use the system SwiftUI presenter.
+/// App import routes below use the shared system modal presenter.
 public struct ZEUSFilePicker: UIViewControllerRepresentable {
     public let types: [UTType]
     public var asCopy: Bool
@@ -64,9 +64,15 @@ private struct ZEUSSystemFilesPresentation: UIViewControllerRepresentable {
     let types: [UTType]
     let multiple: Bool
     let completion: (Result<[URL], Error>) -> Void
+    #if DEBUG
+    var exporting: [URL]? = nil
+    #endif
     func makeUIViewController(context: Context) -> Host { Host() }
     func updateUIViewController(_ host: Host, context: Context) {
         host.binding = $presented; host.types = types; host.multiple = multiple; host.completion = completion
+        #if DEBUG
+        host.exporting = exporting
+        #endif
         host.requested = presented; host.schedule()
     }
     static func dismantleUIViewController(_ host: Host, coordinator: ()) {
@@ -82,6 +88,10 @@ private struct ZEUSSystemFilesPresentation: UIViewControllerRepresentable {
         var picker: UIDocumentPickerViewController?
         private var queued = false
         private var finishing = false
+        private var selectedFolderAccess: ZEUSSystemFolderAccess?
+        #if DEBUG
+        var exporting: [URL]?
+        #endif
         override func loadView() { view = UIView(); view.backgroundColor = .clear; view.isUserInteractionEnabled = false }
         override func viewDidAppear(_ animated: Bool) { super.viewDidAppear(animated); schedule() }
         func schedule() {
@@ -99,8 +109,18 @@ private struct ZEUSSystemFilesPresentation: UIViewControllerRepresentable {
                 return
             }
             let folders = types.contains { $0.conforms(to: .folder) }
-            let controller = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: !folders)
+            let controller: UIDocumentPickerViewController
+            #if DEBUG
+            if let exporting {
+                controller = UIDocumentPickerViewController(forExporting: exporting, asCopy: true)
+            } else {
+                controller = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: !folders)
+                controller.allowsMultipleSelection = multiple
+            }
+            #else
+            controller = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: !folders)
             controller.allowsMultipleSelection = multiple
+            #endif
             controller.shouldShowFileExtensions = true
             controller.delegate = self
             controller.modalPresentationStyle = .formSheet
@@ -117,6 +137,12 @@ private struct ZEUSSystemFilesPresentation: UIViewControllerRepresentable {
             #if DEBUG
             NSLog("[ZEUS Files] selected count=\(urls.count)")
             #endif
+            // Acquire provider access in the delegate callback, before the
+            // system dismisses Files. The folder confirmation takes its own
+            // balanced lease before this temporary handoff lease is released.
+            if types.contains(where: { $0.conforms(to: .folder) }) {
+                selectedFolderAccess = ZEUSSystemFolderAccess(urls)
+            }
             finish(urls.isEmpty ? .failure(CocoaError(.fileReadUnknown)) : .success(urls))
         }
         func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) { if controller === picker { finish(nil) } }
@@ -128,7 +154,9 @@ private struct ZEUSSystemFilesPresentation: UIViewControllerRepresentable {
             let delivered = { [weak self] in
                 guard let self else { return }
                 self.picker = nil; self.binding?.wrappedValue = false; self.finishing = false
-                if let result { callback?(result) }
+                let access = self.selectedFolderAccess
+                self.selectedFolderAccess = nil
+                withExtendedLifetime(access) { if let result { callback?(result) } }
             }
             if controller.presentingViewController == nil { delivered(); return }
             if controller.isBeingDismissed, let transition = controller.transitionCoordinator,
@@ -138,6 +166,13 @@ private struct ZEUSSystemFilesPresentation: UIViewControllerRepresentable {
     }
 }
 
+/// Balanced access retained across UIKit dismissal and callback delivery.
+private final class ZEUSSystemFolderAccess {
+    private let active: [URL]
+    init(_ urls: [URL]) { active = urls.filter { $0.startAccessingSecurityScopedResource() } }
+    deinit { active.forEach { $0.stopAccessingSecurityScopedResource() } }
+}
+
 #if DEBUG
 /// Exercises the shipping importer through the system Files UI, without
 /// injecting delegate selections. Available only to the UI test launch route.
@@ -145,10 +180,16 @@ public struct ZEUSFileImportDiagnostics: View {
     @State private var presented = false
     @State private var mode = 0
     @State private var result = ""
+    @State private var exporting = false
+    @State private var exportFiles: [URL] = []
+    @State private var fixtureStatus = ""
     public init() { }
     public var body: some View {
         NavigationStack {
             VStack(spacing: 24) {
+                Button("Prepare Files fixtures") { exporting = true }.accessibilityIdentifier("prepareFiles")
+                    .disabled(exportFiles.count != 2)
+                Text(fixtureStatus).accessibilityIdentifier("fixtureStatus")
                 Button("Single file") { mode = 0; presented = true }.accessibilityIdentifier("importSingle")
                 Button("Multiple files") { mode = 1; presented = true }.accessibilityIdentifier("importMultiple")
                 Button("Folder") { mode = 2; presented = true }.accessibilityIdentifier("importFolder")
@@ -170,22 +211,30 @@ public struct ZEUSFileImportDiagnostics: View {
                     case .failure(let error): result = "error:" + error.localizedDescription
                     }
                 }
-        }.task {
+        }
+        .background(ZEUSSystemFilesPresentation(presented: $exporting, types: [], multiple: false, completion: { value in
+            if case .success = value {
+                let root = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("ZEUS-Import-Test")
+                let valid = [("ZEUS-Picker-A.txt", "first"), ("ZEUS-Picker-B.txt", "second")].allSatisfy { name, text in
+                    (try? Data(contentsOf: root.appendingPathComponent(name))) == Data(text.utf8)
+                }
+                fixtureStatus = valid ? "fixtures-ready" : "fixture-export-incomplete"
+            }
+        }, exporting: exportFiles).frame(width: 0, height: 0).accessibilityHidden(true))
+        .task {
             let root = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("ZEUS-Import-Test")
             try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-            // Shared Documents are indexed by the system file provider. Create
-            // both fixtures in one coordinated write, without replacing them
-            // on every relaunch while Files still holds their document IDs.
-            var issue: NSError?
-            NSFileCoordinator().coordinate(writingItemAt: root, options: .forMerging, error: &issue) { folder in
-                for (name, text) in [("ZEUS-Picker-A.txt", "first"), ("ZEUS-Picker-B.txt", "second")] {
-                    let url = folder.appendingPathComponent(name)
-                    if !FileManager.default.fileExists(atPath: url.path) { try? Data(text.utf8).write(to: url, options: .atomic) }
-                    let id = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.systemFileNumber]
-                    NSLog("[ZEUS Files] fixture inode=\(String(describing: id)) bytes=\((try? Data(contentsOf: url).count) ?? -1)")
+            // Register import fixtures through the real system export UI, not
+            // raw writes into a directory already indexed by File Provider.
+            let temp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            do {
+                try FileManager.default.createDirectory(at: temp, withIntermediateDirectories: true)
+                exportFiles = try [("ZEUS-Picker-A.txt", "first"), ("ZEUS-Picker-B.txt", "second")].map { name, text in
+                    let url = temp.appendingPathComponent(name)
+                    try Data(text.utf8).write(to: url, options: .atomic)
+                    return url
                 }
-            }
-            if let issue { result = "fixture-error:" + issue.localizedDescription }
+            } catch { fixtureStatus = "fixture-error:" + error.localizedDescription }
         }
     }
 }
