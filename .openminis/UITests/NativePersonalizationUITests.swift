@@ -43,6 +43,23 @@ final class NativePersonalizationUITests: XCTestCase {
         expectation(for: NSPredicate(format: "label == %@", "1:readable:ZEUS-Import-Test"), evaluatedWith: result)
         waitForExpectations(timeout: 15)
     }
+    @MainActor func testExternalFolderSettingsCancellationLeavesSettingsUsable() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--zeus-mounted-folders", "--zeus-native-fixture", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        let pick = app.buttons["mountExternalFolder"]
+        XCTAssertTrue(pick.waitForExistence(timeout: 30)); pick.tap()
+        let cancel = app.buttons.matching(NSPredicate(format: "label IN %@", ["Cancel", "إلغاء"])).firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 15)); cancel.tap()
+        expectation(for: NSPredicate(format: "hittable == true"), evaluatedWith: pick)
+        waitForExpectations(timeout: 15)
+        pick.tap(); try browseLocalFixture(app); confirmOpen(app)
+        XCTAssertTrue(app.buttons["confirmExternalMount"].waitForExistence(timeout: 15))
+        XCTAssertTrue(cancel.waitForExistence(timeout: 10)); cancel.tap()
+        expectation(for: NSPredicate(format: "hittable == true"), evaluatedWith: pick)
+        waitForExpectations(timeout: 15)
+    }
     @MainActor func testExternalFolderSettingsOpensConfirmationAndMountsSelectedFolder() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
