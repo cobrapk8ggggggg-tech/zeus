@@ -82,6 +82,14 @@ class NativeEmbeddingTests(unittest.TestCase):
             self.assertIn("ZeusStorageCategoryView(category: label)", storage)
             self.assertIn("ZeusStorageDirectoryView(root: minisURL)", storage)
             self.assertTrue((native / "src/ios/ZeusStorageExplorer.swift").exists())
+            # Replacing the picker/confirmation must preserve the folder's
+            # detail context and its filesystem browser routing.
+            original_mounts = (UPSTREAM / 'src/ios/Views/Settings/MountedFoldersSettingsView.swift').read_text()
+            adapted_mounts = (native / 'src/ios/Views/Settings/MountedFoldersSettingsView.swift').read_text()
+            def detail_context(text):
+                start = text.index('    private func detailContext(for entry: MountedFolderEntry)')
+                return text[start:text.index('    /// Trivial', start)]
+            self.assertEqual(detail_context(adapted_mounts), detail_context(original_mounts))
             original_store = (UPSTREAM / "src/ios/Agent/Chat/ChatStore.swift").read_text()
             adapted_store = (native / "src/ios/Agent/Chat/ChatStore.swift").read_text()
             # Storage/protocol/sync methods after UI conversion remain untouched.

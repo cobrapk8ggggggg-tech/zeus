@@ -14,7 +14,7 @@ def apply(source, replace):
     # grant alive throughout configuration, and leave chat imports unchanged.
     text = folders.read_text()
     start = text.index('        .sheet(isPresented: $showingPicker) {')
-    end = text.index('\n    }\n\n    /// Trivial', start)
+    end = text.index('\n    }\n', text.index('        .alert(AppLocalized("Error"),', start))
     replace(folders, text[start:end], '''        .sheet(isPresented: $showingPicker) {
             ZeusExternalFolderMountFlow { url, name, allowWrite in
                 _ = try model.add(pickedURL: url, customName: name, userAllowWrite: allowWrite)
