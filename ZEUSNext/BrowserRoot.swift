@@ -35,6 +35,7 @@ struct BrowserRoot: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var sizeClass
     @AppStorage("showCurrentUserAvatar") private var showCurrentUserAvatar = false
+    @AppStorage("zeus.assistant.dockRight") private var assistantOnRight = false
     @State private var panel: BrowserPanel?
     @State private var profilePicker = false
     @State private var toolbarVisible = false
@@ -45,6 +46,7 @@ struct BrowserRoot: View {
     @State private var assistantExpanded = false
     @FocusState private var addressFocused: Bool
     private var layout: ChromeLayout { model.data.settings.chromeLayout ?? .original }
+    private var customDesign: ChromeDesign? { model.data.settings.chromeWorkspace?.active(for: layout) }
     private var theme: BrowserTheme { model.data.settings.theme ?? .standard }
     private var barsVisible: Bool { !(layout == .icab && model.chromeManuallyHidden) && (!model.chromeHidden || addressFocused || model.current?.isHome != false) }
     var body: some View {
@@ -54,12 +56,17 @@ struct BrowserRoot: View {
             else {
                 GeometryReader { geometry in
                     HStack(spacing: 0) {
-                        if assistantVisible, sizeClass == .regular, !assistantExpanded, let agent = model.agent {
+                        if assistantVisible, sizeClass == .regular, !assistantExpanded, !assistantOnRight, let agent = model.agent {
                             assistant(agent, fullScreen: false)
                                 .frame(width: max(300, min(420, geometry.size.width * 0.29)))
                             Divider().overlay(.white.opacity(0.15))
                         }
                         browsingSurface
+                        if assistantVisible, sizeClass == .regular, !assistantExpanded, assistantOnRight, let agent = model.agent {
+                            Divider().overlay(.white.opacity(0.15))
+                            assistant(agent, fullScreen: false)
+                                .frame(width: max(300, min(420, geometry.size.width * 0.29)))
+                        }
                     }.environment(\.layoutDirection, .leftToRight)
                 }
             }
@@ -98,7 +105,32 @@ struct BrowserRoot: View {
             #endif
         }
     }
-    private var browsingSurface: some View {
+    @ViewBuilder private var browsingSurface: some View {
+        if let customDesign, model.profile.role != .kiosk {
+            GeometryReader { geometry in
+                let composition = customDesign.composition(wide: geometry.size.width > geometry.size.height)
+                ZStack {
+                    browserContent
+                        .padding(.top, barsVisible ? geometry.size.height * composition.topInset : 0)
+                        .padding(.bottom, barsVisible ? geometry.size.height * composition.bottomInset : 0)
+                    if barsVisible { ChromeRuntimeLayer(model: model, composition: composition, perform: perform) }
+                    if !barsVisible { edgeReveal }
+                    VStack { Spacer(); HStack { Spacer();
+                        Menu {
+                            Button("إعدادات الواجهة", systemImage: "slider.horizontal.3") { panel = .settings }
+                            Button("العودة للتوزيع الافتراضي", systemImage: "arrow.uturn.backward") {
+                                model.data.settings.chromeWorkspace?.selected = nil
+                                model.data.settings.chromeWorkspace?.designs.removeAll { $0.base == layout }
+                                model.chromeHidden = false; model.chromeManuallyHidden = false; model.persist()
+                            }
+                        } label: { Image(systemName: "slider.horizontal.3").font(.system(size: 13)).frame(width: 36, height: 36).background(.regularMaterial, in: Circle()) }
+                        .accessibilityLabel("إدارة التوزيع واستعادته").padding(8)
+                    } }
+                }
+            }
+        } else { standardBrowsingSurface }
+    }
+    private var standardBrowsingSurface: some View {
         ZStack {
                 VStack(spacing: 0) {
                     if model.profile.role != .kiosk && layout != .original && barsVisible { topBar.transition(.move(edge: .top).combined(with: .opacity)) }
@@ -258,7 +290,7 @@ struct BrowserRoot: View {
             assistantVisible = true
         case .translate: model.current?.translation?.translate()
         case .back: model.webView?.goBack(); case .forward: model.webView?.goForward(); case .reload: model.reload(); case .home: model.home(); case .newTab: _ = model.newTab(); topTray = false
-        case .tabs: if layout == .original { withAnimation { topTray.toggle() } } else { panel = .tabs }
+        case .tabs: if layout == .original && customDesign == nil { withAnimation { topTray.toggle() } } else { panel = .tabs }
         case .library: panel = .library; case .history: panel = .history
         case .reader: model.readerMode(); case .gallery: model.galleryMode()
         case .downloads: panel = .downloads; case .profiles: profilePicker = true; case .scripts: panel = .scripts; case .console: panel = .console

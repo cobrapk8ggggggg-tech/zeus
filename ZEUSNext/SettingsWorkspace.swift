@@ -22,6 +22,7 @@ struct SettingsSheet: View {
     @State private var selection: SettingsCategory? = .account
     @State private var path: [SettingsCategory]
     @State private var search = ""
+    @AppStorage("zeus.assistant.dockRight") private var assistantOnRight = false
     #if ZEUS_NATIVE_HOST
     @Environment(\.nativeAgentPreferences) private var nativePreferences
     @State private var showNativePreferences = false
@@ -96,9 +97,15 @@ struct SettingsSheet: View {
         Form {
             ThemedSection { NavigationLink { ThemeEditor(context: context) } label: { Label("الألوان والمظهر", systemImage: "paintpalette") }.accessibilityIdentifier("themeEditorButton") }
             ThemedSection("توزيع الأشرطة") {
-                ForEach(ChromeLayout.allCases) { layout in Button { context.settings.chromeLayout = layout; context.save(); context.model.chromeManuallyHidden = false; context.model.chromeHidden = false } label: { HStack { Text(layout.title); Spacer(); if (context.settings.chromeLayout ?? .original) == layout { Image(systemName: "checkmark") } } }.accessibilityIdentifier("layout-" + layout.rawValue) }
+                NavigationLink { ChromeStudioLibrary(context: context) } label: { Label("استوديو التوزيعات — تصميم بالسحب", systemImage: "square.3.layers.3d") }.accessibilityIdentifier("chromeStudioButton")
+                ForEach(ChromeLayout.allCases) { layout in Button { context.settings.chromeLayout = layout; context.settings.chromeWorkspace?.selected = nil; context.save(); context.model.chromeManuallyHidden = false; context.model.chromeHidden = false } label: { HStack { Text(layout.title); Spacer(); if (context.settings.chromeLayout ?? .original) == layout && context.settings.chromeWorkspace?.selected == nil { Image(systemName: "checkmark") } } }.accessibilityIdentifier("layout-" + layout.rawValue) }
             }
             ThemedSection("الأشرطة") { Toggle("إخفاء الأشرطة عند التمرير", isOn: context.option(\.hideChromeOnScroll)); Toggle("شريط المفضلة في توزيع iCab", isOn: context.option(\.showBookmarksBar)); Toggle("شريط التبويبات في توزيع iCab", isOn: context.option(\.showTabsBar)); Toggle("السحب للتنقل بين الصفحات", isOn: context.option(\.swipeNavigation, reload: true)) }
+            ThemedSection("لوحة الوكيل على iPad") {
+                Picker("جانب اللوحة", selection: $assistantOnRight) { Text("اليسار").tag(false); Text("اليمين").tag(true) }
+                    .pickerStyle(.segmented).accessibilityIdentifier("assistantDockPicker")
+                Text("يمكن سحب مقبض أزرار الوكيل إلى أي مكان، وطي الأزرار بالضغط عليه.").font(.footnote)
+            }
             ThemedSection { Text("في ZEUS الأصلي: اسحب من اليمين للأدوات، ومن الأعلى للتبويبات. الأوامر نفسها متاحة في التوزيعات الثلاثة. الواجهة سوداء والأيقونات والنصوص بيضاء.").font(.footnote) }
         }.settingsPage("واجهة المستخدم")
     }

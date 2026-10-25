@@ -69,7 +69,7 @@ struct DownloadsSheet: View {
                     Button("إلغاء", role: .cancel) { renaming = nil }
                 }
                 .confirmationDialog("حذف الملف وإيقاف تنزيله؟", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })) { Button("حذف") { if let item = deleting { service.remove(item) }; deleting = nil } }
-                .fileImporter(isPresented: $importing, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
+                .zeusFileImporter(isPresented: $importing, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
                     switch result { case .success(let files): let owner = model.profile; for file in files { Task { await service.importFile(file, profile: owner) } }; case .failure(let error): model.notify(error.localizedDescription) }
                 }
                 .sheet(item: $preview) { FilePreview(url: $0.url).ignoresSafeArea() }

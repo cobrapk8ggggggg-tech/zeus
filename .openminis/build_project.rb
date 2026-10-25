@@ -53,7 +53,7 @@ project.targets.each do |item|
     config.build_settings['LD_MAP_FILE_PATH'] = '$(TARGET_TEMP_DIR)/$(PRODUCT_NAME)-LinkMap-$(CURRENT_ARCH).txt'
   end
 end
-%w[ZEUSNativeIntegration.swift ZeusToolPermissions.swift ZeusDefaultSkills.swift ZeusAgentSchemas.swift ZeusPatch.swift ZeusAgentHarness.swift ZeusConnections.swift ZeusGitHubAuthorization.swift ZeusProjectContract.swift ZeusGitHubTools.swift ZeusStorageExplorer.swift ZeusTaskDashboard.swift].each do |name|
+%w[ZEUSNativeIntegration.swift ZeusToolPermissions.swift ZeusDefaultSkills.swift ZeusAgentSchemas.swift ZeusPatch.swift ZeusAgentHarness.swift ZeusConnections.swift ZeusGitHubAuthorization.swift ZeusProjectContract.swift ZeusGitHubTools.swift ZeusStorageExplorer.swift ZeusTaskDashboard.swift ZeusAgentControls.swift ZeusConversationFiles.swift].each do |name|
   bridge = project.main_group.new_file((native + 'src/ios' + name).to_s)
   app.source_build_phase.add_file_reference(bridge)
 end
@@ -124,6 +124,7 @@ tests.add_dependency(target)
 tests.frameworks_build_phase.add_file_reference(target.product_reference)
 tests.source_build_phase.add_file_reference(group.new_file((browser + '.openminis/Host/NativeBrowserIntegrationTests.swift').to_s))
 tests.source_build_phase.add_file_reference(group.new_file((browser + '.openminis/Host/NativeProjectContractTests.swift').to_s))
+tests.source_build_phase.add_file_reference(group.new_file((browser + '.openminis/Host/NativePersonalizationTests.swift').to_s))
 tests.build_configurations.each do |config|
   app_config = app.build_configurations.find { |candidate| candidate.name == config.name }
   %w[HEADER_SEARCH_PATHS FRAMEWORK_SEARCH_PATHS LIBRARY_SEARCH_PATHS].each do |key|

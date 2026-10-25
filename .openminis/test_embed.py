@@ -45,7 +45,7 @@ class NativeEmbeddingTests(unittest.TestCase):
             # addition to the existing permission card and app-group constants.
             for file in (UPSTREAM / "src/ios/Views").rglob("*.swift"):
                 relative = file.relative_to(UPSTREAM / "src/ios")
-                if str(relative) in {"Views/Chat/OffloadPermissionDialog.swift", "Views/Chat/AIChatView.swift", "Views/Chat/ToolLiveSheet.swift", "Views/Settings/OffloadPermissionSettingsView.swift", "Views/Chat/SelectableMarkdownView.swift", "Views/Settings/StorageManagementView.swift"}:
+                if str(relative) in {"Views/Chat/OffloadPermissionDialog.swift", "Views/Chat/AIChatView.swift", "Views/Chat/ToolLiveSheet.swift", "Views/Settings/OffloadPermissionSettingsView.swift", "Views/Chat/SelectableMarkdownView.swift", "Views/Settings/StorageManagementView.swift", "Views/Rootfs/FileBrowserView.swift", "Views/Settings/MountedFoldersSettingsView.swift", "Views/Settings/BackupDestinationPicker.swift", "Views/Skills/SkillsManagementView.swift"}:
                     continue
                 expected = file.read_text().replace("group.com.openminis.app", "group.tools.zeus.openminis").replace("iCloud.com.openminis.app", "iCloud.tools.zeus.openminis")
                 if str(relative) == "Views/ContentView.swift":
@@ -72,6 +72,8 @@ class NativeEmbeddingTests(unittest.TestCase):
                 if str(relative) == "Views/Providers/ProviderInstancesView.swift":
                     expected = expected.replace('let shadows = store.shadowVoiceProviders()', 'let shadows: [ProviderConfigStore.ShadowVoiceProvider] = []')
                 expected = expected.replace('"Minis"', '"Zeus"')
+                if '.fileImporter(' in expected:
+                    expected = 'import ZEUSBrowser\n' + expected.replace('.fileImporter(', '.zeusFileImporter(')
                 for tool in ("Shell", "Editor", "Browser", "Memory"):
                     expected = expected.replace('return "Minis is using ' + tool + '"', 'return String(localized: "Minis is using ' + tool + '")')
                 self.assertEqual((native / "src/ios" / relative).read_text(), expected, str(relative))
@@ -107,6 +109,18 @@ class NativeEmbeddingTests(unittest.TestCase):
             self.assertIn("ZeusToolPermissions.shared.authorize", execution)
             self.assertNotIn(".offloadPermissionDialog()", (native / "src/ios/Views/Chat/AIChatView.swift").read_text())
             self.assertIn("@MainActor enum BrowserFixtureFactory", (browser / ".openminis/build/BrowserFixtureFactory.swift").read_text())
+            chat = (native / "src/ios/Views/Chat/AIChatView.swift").read_text()
+            self.assertIn('.fullScreenCover(isPresented: $zeusFullBrowser, onDismiss:', chat)
+            self.assertIn('ZeusConversationFiles(sessionID: vm.sessionId)', chat)
+            self.assertIn('vm.zeusAddPickedFiles(urls)', chat)
+            self.assertIn('FileBrowserView(rootPath: base', chat)
+            # All used import routes share the same post-dismiss owner. The old
+            # private picker declarations may remain, but have no call sites.
+            for relative in ['Views/Settings/MountedFoldersSettingsView.swift', 'Views/Settings/BackupDestinationPicker.swift', 'Views/Rootfs/FileBrowserView.swift', 'Views/Skills/SkillsManagementView.swift']:
+                adapted = (native / 'src/ios' / relative).read_text()
+                self.assertIn('.zeusFileImporter(', adapted)
+                for old in ['FolderPicker {', 'BackupFolderPicker {', 'FileImportPicker {', 'SkillFileDocumentPicker {']:
+                    self.assertNotIn(old, adapted)
 
 
 if __name__ == "__main__":

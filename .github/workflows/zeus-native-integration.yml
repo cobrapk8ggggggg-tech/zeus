@@ -8,6 +8,7 @@ name: ZEUS native browser integration tests
     - feature/zeus-direct-integrations-20261023
     - feature/zeus-native-agent-harness-20261023
     - feature/zeus-project-contract-20261024
+    - feature/zeus-ipad-layout-studio-20261025
     paths:
     - ZEUSNext/**
     - .openminis/**

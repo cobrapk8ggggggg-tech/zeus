@@ -268,7 +268,7 @@ struct AIWorkspace: View {
             }
             if !response.isEmpty { ThemedSection("الرد") { Text(response).textSelection(.enabled) } }
         }.settingsPage("مساحة الذكاء الاصطناعي")
-            .fileImporter(isPresented: $selectingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
+            .zeusFileImporter(isPresented: $selectingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
                 do { let urls = try result.get(); let items = try urls.map { try AIAttachment.load($0) }; guard (attachments + items).reduce(0, { $0 + $1.data.count }) <= 20_000_000 else { throw TranslationFailure.message("مجموع المرفقات يتجاوز 20 ميجابايت.") }; attachments += items }
                 catch { response = error.localizedDescription }
             }.onAppear { selected = context.settings.translation?.providerID }

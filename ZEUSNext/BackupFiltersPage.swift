@@ -20,7 +20,7 @@ struct BackupFiltersPage: View {
                 Text("القوائم الكبيرة قد تحتاج وقتًا ومساحة إضافية لتجميعها. يستمر التصفح أثناء التجهيز. لا تُنزّل أو تُفعّل إلا باختيارك، ويمكن حذفها من هنا. يُعاد استخدام التجميع المحفوظ عند عدم تغيّر القواعد.").font(.footnote)
             }
             ThemedSection { Text(shield.status).font(.footnote); if let message { Text(message).font(.footnote) } }
-        }.settingsPage("القواعد الاحتياطية").fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in
+        }.settingsPage("القواعد الاحتياطية").zeusFileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in
             do {
                 let url = try result.get(); guard context.permitted else { return }; busy = true
                 let owner = context.profile

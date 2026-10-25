@@ -7,6 +7,7 @@ struct ProfileBackup: Codable {
     var data: ProfileData
     var avatar: Data?
     func validated() throws -> ProfileBackup {
+        guard data.settings.chromeWorkspace?.validated() != false else { throw URLError(.cannotParseResponse) }
         guard version == 1, data.bookmarks.count <= 5000, data.history.count <= 5000, data.scripts.count <= 100, data.tabs.count <= 30, (avatar?.count ?? 0) < 2_000_000 else { throw URLError(.cannotParseResponse) }
         guard data.bookmarks.allSatisfy({ URL(string: $0.url).map(BrowserURL.isWeb) == true }), data.tabs.allSatisfy({ $0.url == "zeus://home" || URL(string: $0.url).map(BrowserURL.isWeb) == true }), data.scripts.allSatisfy({ $0.code.utf8.count <= 100_000 && ($0.domain == "*" || FilterRules.validDomain($0.domain)) }), (0.5...2).contains(data.settings.textScale) else { throw URLError(.cannotParseResponse) }
         if let o = data.settings.advanced {
@@ -92,8 +93,8 @@ struct ProfileTransferPage: View {
             .onDisappear { lan.stop() }
             .onChange(of: scenePhase) { _, phase in if phase != .active { lan.stop() } }
             .onReceive(lan.$received) { bytes in if let bytes { do { backup = try JSONDecoder().decode(ProfileBackup.self, from: bytes).validated(); message = "استُلمت نسخة عبر الشبكة. راجع محتواها قبل الاستيراد." } catch { message = error.localizedDescription }; lan.received = nil } }
-            .sheet(isPresented: $importing) {
-                BackupDocumentPicker(selected: { url in importing = false; readBackup(url) }, cancelled: { importing = false })
+            .zeusFileImporter(isPresented: $importing, allowedContentTypes: [.item], asCopy: true) { result in
+                switch result { case .success(let url): readBackup(url); case .failure(let error): message = error.localizedDescription }
             }
             .sheet(item: $exported) { item in FileExporter(url: item.url).onDisappear { try? FileManager.default.removeItem(at: item.url) } }
     }

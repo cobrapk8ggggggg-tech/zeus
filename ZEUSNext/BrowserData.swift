@@ -73,6 +73,7 @@ struct BrowserSettings: Codable {
     var theme: BrowserTheme?
     var translation: TranslationPreferences?
     var aiProviders: [AIProviderConfiguration]?
+    var chromeWorkspace: ChromeWorkspace?
 }
 
 struct SavedTab: Codable, Identifiable {
