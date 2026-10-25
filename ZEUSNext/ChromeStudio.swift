@@ -146,15 +146,15 @@ struct ChromeStudioEditor: View {
             .alert("تعذّر الحفظ", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("حسنًا") { error = nil } } message: { Text(error ?? "") }
             .interactiveDismissDisabled(design != initial)
             .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
-                guard !initialized, size.width > 0 else { return }
-                wide = ChromeDesign.usesWideCanvas(size); initialized = true
+                guard !initialized, size.width >= 200, size.height >= 200 else { return }
+                wide = ChromeDesign.usesWideCanvas(size)
             }
         }.environment(\.layoutDirection, .rightToLeft)
     }
     private var options: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 16) {
-                Picker("حجم النافذة", selection: $wide) { Label("واسع / iPad", systemImage: "ipad.landscape").tag(true); Label("ضيق / هاتف", systemImage: "iphone").tag(false) }.pickerStyle(.segmented).frame(width: 220)
+                Picker("حجم النافذة", selection: Binding(get: { wide }, set: { wide = $0; initialized = true })) { Label("واسع / iPad", systemImage: "ipad.landscape").tag(true); Label("ضيق / هاتف", systemImage: "iphone").tag(false) }.pickerStyle(.segmented).frame(width: 220)
                     .onChange(of: wide) { _, _ in selected = nil; moveOrigin = nil }
                 Button { withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { preview.toggle() } } label: { Label(preview ? "تحرير" : "معاينة", systemImage: preview ? "pencil.tip.crop.circle" : "eye") }
                 Button { layers = true } label: { Label("الطبقات", systemImage: "square.3.layers.3d") }
@@ -222,6 +222,7 @@ struct ChromeStudioEditor: View {
                         .frame(width: 28, height: 28).background(.cyan, in: Circle()).contentShape(Circle())
                         .highPriorityGesture(drag(block, size: size, resize: true))
                         .accessibilityLabel("اسحب لتغيير الحجم")
+                        .offset(x: 14, y: 14)
                 }
             }
             .rotationEffect(.degrees(block.rotation)).position(x: rect.midX, y: rect.midY)
@@ -373,9 +374,9 @@ struct ChromeStudioEditor: View {
     }
     private func update(_ id: UUID, _ edit: (inout ChromeBlock) -> Void) { change { var c = $0.composition(wide: wide); guard let index = c.blocks.firstIndex(where: { $0.id == id }) else { return }; edit(&c.blocks[index]); $0.set(c, wide: wide) } }
     private func replaceBlock(_ block: ChromeBlock) { var c = composition; guard let index = c.blocks.firstIndex(where: { $0.id == block.id }) else { return }; c.blocks[index] = block; design.set(c, wide: wide) }
-    private func checkpoint() { undo.append(design); if undo.count > 80 { undo.removeFirst() }; redo.removeAll() }
+    private func checkpoint() { initialized = true; undo.append(design); if undo.count > 80 { undo.removeFirst() }; redo.removeAll() }
     private func sliderChanged(_ editing: Bool) { if editing { checkpoint() }; sliderEditing = editing }
-    private func change(_ edit: (inout ChromeDesign) -> Void) { let prior = design; edit(&design); if prior != design && !sliderEditing { undo.append(prior); if undo.count > 80 { undo.removeFirst() }; redo.removeAll() } }
+    private func change(_ edit: (inout ChromeDesign) -> Void) { initialized = true; let prior = design; edit(&design); if prior != design && !sliderEditing { undo.append(prior); if undo.count > 80 { undo.removeFirst() }; redo.removeAll() } }
     private func restoreUndo() { guard let value = undo.popLast() else { return }; redo.append(design); design = value; selected = nil }
     private func restoreRedo() { guard let value = redo.popLast() else { return }; undo.append(design); design = value; selected = nil }
 }

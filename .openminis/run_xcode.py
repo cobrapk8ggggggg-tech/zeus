@@ -31,6 +31,7 @@ def run(log: Path, command: list[str]) -> int:
         signal.signal(signal.SIGINT, stop)
         for line in process.stdout:
             output.write(line)
+            output.flush()
             if pattern.search(line):
                 print(line, end="", flush=True)
                 last_update = time.monotonic()

@@ -164,6 +164,8 @@ import UniformTypeIdentifiers
             try await Task.sleep(for: .milliseconds(50))
         }
         let first = try XCTUnwrap(controller)
+        XCTAssertTrue(first.allowsMultipleSelection)
+        XCTAssertEqual(first.documentPickerMode, .import, "Attachments must import provider copies instead of unresolved open-in-place bookmarks")
         let selected = [URL(fileURLWithPath: "/tmp/one.txt"), URL(fileURLWithPath: "/tmp/two.txt")]
         first.delegate?.documentPicker?(first, didPickDocumentsAt: selected)
         for _ in 0..<100 where state.deliveries.isEmpty { try await Task.sleep(for: .milliseconds(50)) }

@@ -65,7 +65,7 @@ final class NativePersonalizationUITests: XCTestCase {
         XCTAssertTrue(fixture.waitForExistence(timeout: 10)); fixture.tap()
     }
     @MainActor private func confirmOpen(_ app: XCUIApplication) {
-        let open = app.buttons.matching(NSPredicate(format: "label IN %@ OR label BEGINSWITH %@", ["Open", "Choose", "فتح", "اختيار"], "Open (")).firstMatch
+        let open = app.buttons.matching(NSPredicate(format: "label IN %@ OR label BEGINSWITH %@", ["Open", "Import", "Choose", "فتح", "استيراد", "اختيار"], "Open (")).firstMatch
         if open.waitForExistence(timeout: 3), open.isEnabled { open.tap() }
     }
     @MainActor func testPortraitIPadEditedPresetKeepsTabletButtonsAndSizesAfterRotation() throws {
@@ -113,7 +113,9 @@ final class NativePersonalizationUITests: XCTestCase {
         block.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.08, thenDragTo: destination)
         let moved = block.frame
         XCTAssertGreaterThan(abs(moved.midX - before.midX) + abs(moved.midY - before.midY), 35)
-        let handle = block.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: moved.width - 14, dy: moved.height - 14))
+        XCTAssertEqual(moved.width, before.width, accuracy: 3, "Dragging the centre must move a button without resizing it")
+        XCTAssertEqual(moved.height, before.height, accuracy: 3)
+        let handle = block.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: moved.width, dy: moved.height))
         handle.press(forDuration: 0.08, thenDragTo: handle.withOffset(CGVector(dx: 80, dy: 35)))
         let resized = block.frame
         XCTAssertGreaterThan(resized.width, moved.width + 20)

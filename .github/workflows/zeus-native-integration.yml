@@ -162,7 +162,7 @@ jobs:
         bash browser/.openminis/run_native_stage.sh boot IPAD "${IPAD_SIMULATOR}"
     - name: 'IPAD: Verify system Files imports and saved layouts'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
-      timeout-minutes: 12
+      timeout-minutes: 18
       run: bash browser/.openminis/run_native_stage.sh personalization IPAD "${IPAD_SIMULATOR}"
     - name: 'IPAD: Save UI diagnostics and shut down'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}

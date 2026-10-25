@@ -43,14 +43,9 @@ public extension View {
     func zeusFileImporter(isPresented: Binding<Bool>, allowedContentTypes: [UTType],
                           allowsMultipleSelection: Bool, asCopy: Bool = false,
                           onCompletion: @escaping (Result<[URL], Error>) -> Void) -> some View {
-        // Let SwiftUI present the system document picker, including its Files
-        // sidebar, providers, navigation and Cancel/Open controls. Embedding its
-        // controller as a fullScreenCover root breaks that presentation on iPad.
-        fileImporter(isPresented: isPresented, allowedContentTypes: allowedContentTypes,
-                     allowsMultipleSelection: allowsMultipleSelection) { result in
-            isPresented.wrappedValue = false
-            Task { @MainActor in ZEUSFileImportDelivery.finish(result, completion: onCompletion) }
-        }
+        background(ZEUSSystemFilesPresentation(presented: isPresented, types: allowedContentTypes,
+                                             multiple: allowsMultipleSelection, completion: onCompletion)
+            .frame(width: 0, height: 0).accessibilityHidden(true))
     }
     func zeusFileImporter(isPresented: Binding<Bool>, allowedContentTypes: [UTType], asCopy: Bool = false,
                           onCompletion: @escaping (Result<URL, Error>) -> Void) -> some View {
@@ -60,24 +55,86 @@ public extension View {
     }
 }
 
-@MainActor private enum ZEUSFileImportDelivery {
-    static func finish(_ result: Result<[URL], Error>, completion: @escaping (Result<[URL], Error>) -> Void) {
-        func picker(in controller: UIViewController) -> UIDocumentPickerViewController? {
-            if let value = controller as? UIDocumentPickerViewController { return value }
-            if let presented = controller.presentedViewController, let value = picker(in: presented) { return value }
-            for child in controller.children { if let value = picker(in: child) { return value } }
-            return nil
+/// Present the complete system controller modally, rather than embedding its
+/// view as a SwiftUI cover. Files are imported as temporary copies: unlike
+/// open-in-place bookmarks, this also works when a provider cannot resolve a
+/// document bookmark. Folder selections retain their in-place access.
+private struct ZEUSSystemFilesPresentation: UIViewControllerRepresentable {
+    @Binding var presented: Bool
+    let types: [UTType]
+    let multiple: Bool
+    let completion: (Result<[URL], Error>) -> Void
+    func makeUIViewController(context: Context) -> Host { Host() }
+    func updateUIViewController(_ host: Host, context: Context) {
+        host.binding = $presented; host.types = types; host.multiple = multiple; host.completion = completion
+        host.requested = presented; host.schedule()
+    }
+    static func dismantleUIViewController(_ host: Host, coordinator: ()) {
+        host.requested = false
+        if host.picker != nil { host.finish(nil) }
+    }
+    final class Host: UIViewController, UIDocumentPickerDelegate, UIAdaptivePresentationControllerDelegate {
+        var binding: Binding<Bool>?
+        var types: [UTType] = [.item]
+        var multiple = false
+        var completion: ((Result<[URL], Error>) -> Void)?
+        var requested = false
+        var picker: UIDocumentPickerViewController?
+        private var queued = false
+        private var finishing = false
+        override func loadView() { view = UIView(); view.backgroundColor = .clear; view.isUserInteractionEnabled = false }
+        override func viewDidAppear(_ animated: Bool) { super.viewDidAppear(animated); schedule() }
+        func schedule() {
+            guard !queued else { return }; queued = true
+            DispatchQueue.main.async { [weak self] in self?.queued = false; self?.updatePresentation() }
         }
-        let windows = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows)
-        let roots = (windows.filter(\.isKeyWindow) + windows.filter { !$0.isKeyWindow }).compactMap(\.rootViewController)
-        guard let controller = roots.compactMap({ picker(in: $0) }).first else { completion(result); return }
-        var delivered = false
-        let deliver = { guard !delivered else { return }; delivered = true; completion(result) }
-        if controller.isBeingDismissed, let transition = controller.transitionCoordinator,
-           transition.animate(alongsideTransition: nil, completion: { _ in DispatchQueue.main.async(execute: deliver) }) { return }
-        // SwiftUI can invoke completion before UIKit's dismissal finishes.
-        // Dismiss this exact system picker, then permit callers to present UI.
-        controller.dismiss(animated: true, completion: deliver)
+        private func updatePresentation() {
+            guard !finishing else { return }
+            if !requested { if picker != nil { finish(nil) }; return }
+            guard picker == nil, let window = view.window, var presenter = window.rootViewController else { return }
+            while let next = presenter.presentedViewController { presenter = next }
+            if presenter.isBeingDismissed || presenter.isBeingPresented {
+                if let transition = presenter.transitionCoordinator { transition.animate(alongsideTransition: nil) { [weak self] _ in self?.schedule() } }
+                else { DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in self?.schedule() } }
+                return
+            }
+            let folders = types.contains { $0.conforms(to: .folder) }
+            let controller = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: !folders)
+            controller.allowsMultipleSelection = multiple
+            controller.shouldShowFileExtensions = true
+            controller.delegate = self
+            controller.modalPresentationStyle = .formSheet
+            controller.preferredContentSize = CGSize(width: 900, height: 700)
+            picker = controller
+            #if DEBUG
+            print("[ZEUS Files] present copy=\(!folders) multiple=\(multiple)")
+            #endif
+            presenter.present(controller, animated: true)
+            controller.presentationController?.delegate = self
+        }
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            guard controller === picker else { return }
+            #if DEBUG
+            print("[ZEUS Files] selected count=\(urls.count)")
+            #endif
+            finish(urls.isEmpty ? .failure(CocoaError(.fileReadUnknown)) : .success(urls))
+        }
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) { if controller === picker { finish(nil) } }
+        func presentationControllerDidDismiss(_ presentationController: UIPresentationController) { finish(nil) }
+        func finish(_ result: Result<[URL], Error>?) {
+            guard !finishing, let controller = picker else { return }
+            finishing = true; requested = false
+            let callback = completion
+            let delivered = { [weak self] in
+                guard let self else { return }
+                self.picker = nil; self.binding?.wrappedValue = false; self.finishing = false
+                if let result { callback?(result) }
+            }
+            if controller.presentingViewController == nil { delivered(); return }
+            if controller.isBeingDismissed, let transition = controller.transitionCoordinator,
+               transition.animate(alongsideTransition: nil, completion: { _ in DispatchQueue.main.async(execute: delivered) }) { return }
+            controller.dismiss(animated: true, completion: delivered)
+        }
     }
 }
 
