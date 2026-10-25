@@ -40,34 +40,18 @@ public struct ZEUSFilePicker: UIViewControllerRepresentable {
     }
 }
 
-private struct ZEUSFileImportModifier: ViewModifier {
-    @Binding var presented: Bool
-    let types: [UTType]
-    let copy: Bool
-    let multiple: Bool
-    let completion: (Result<[URL], Error>) -> Void
-    @State private var pending: Result<[URL], Error>?
-    func body(content: Content) -> some View {
-        content.fullScreenCover(isPresented: $presented, onDismiss: {
-            let result = pending; pending = nil
-            if let result, (result.failure as? CocoaError)?.code != .userCancelled { completion(result) }
-        }) {
-            ZEUSFilePicker(types: types, asCopy: copy, multiple: multiple) { result in
-                pending = result
-                presented = false
-            }.ignoresSafeArea().environment(\.layoutDirection, .leftToRight)
-        }
-    }
-}
-private extension Result {
-    var failure: Failure? { if case .failure(let error) = self { return error }; return nil }
-}
 public extension View {
     func zeusFileImporter(isPresented: Binding<Bool>, allowedContentTypes: [UTType],
                           allowsMultipleSelection: Bool, asCopy: Bool = false,
                           onCompletion: @escaping (Result<[URL], Error>) -> Void) -> some View {
-        modifier(ZEUSFileImportModifier(presented: isPresented, types: allowedContentTypes,
-                                       copy: asCopy, multiple: allowsMultipleSelection, completion: onCompletion))
+        // Let SwiftUI present the system document picker, including its Files
+        // sidebar, providers, navigation and Cancel/Open controls. Embedding its
+        // controller as a fullScreenCover root breaks that presentation on iPad.
+        fileImporter(isPresented: isPresented, allowedContentTypes: allowedContentTypes,
+                     allowsMultipleSelection: allowsMultipleSelection) { result in
+            isPresented.wrappedValue = false
+            onCompletion(result)
+        }
     }
     func zeusFileImporter(isPresented: Binding<Bool>, allowedContentTypes: [UTType], asCopy: Bool = false,
                           onCompletion: @escaping (Result<URL, Error>) -> Void) -> some View {
