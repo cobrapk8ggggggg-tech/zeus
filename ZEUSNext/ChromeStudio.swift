@@ -118,7 +118,9 @@ struct ChromeStudioEditor: View {
                         let available = CGSize(width: max(1, geometry.size.width - 28), height: max(1, geometry.size.height - 28))
                         let ratio: CGFloat = wide ? 4 / 3 : 430 / 932
                         let width = min(available.width, available.height * ratio)
-                        stage(size: CGSize(width: width, height: width / ratio))
+                        let global = geometry.frame(in: .global)
+                        let origin = CGPoint(x: global.midX - width / 2, y: global.midY - width / ratio / 2)
+                        stage(size: CGSize(width: width, height: width / ratio), globalOrigin: origin)
                             .frame(width: width, height: width / ratio)
                             .clipShape(RoundedRectangle(cornerRadius: 22))
                             .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(.white.opacity(0.15), lineWidth: 1))
@@ -170,7 +172,7 @@ struct ChromeStudioEditor: View {
             }.font(.subheadline).padding(.horizontal, 16).padding(.vertical, 10)
         }
     }
-    private func stage(size: CGSize) -> some View {
+    private func stage(size: CGSize, globalOrigin: CGPoint) -> some View {
         ZStack(alignment: .topLeading) {
             LinearGradient(colors: [Color(white: 0.05), Color(white: 0.12)], startPoint: .topLeading, endPoint: .bottomTrailing)
             if let screenshot { Image(uiImage: screenshot).resizable().scaledToFill().frame(width: size.width, height: size.height).clipped().allowsHitTesting(false) }
@@ -193,7 +195,7 @@ struct ChromeStudioEditor: View {
                     .frame(width: size.width, height: size.height, alignment: .topLeading).allowsHitTesting(false)
             }
             ForEach(composition.blocks.filter { (!$0.hidden || !preview) && !(preview && model != nil) }) { block in
-                stageBlock(block, size: size)
+                stageBlock(block, size: size, globalOrigin: globalOrigin)
             }
         }
         .coordinateSpace(name: "ChromeStage").environment(\.layoutDirection, .leftToRight)
@@ -204,11 +206,14 @@ struct ChromeStudioEditor: View {
             add(String(value.dropFirst("zeus.chrome.".count)), point: point, size: size); return true
         }
     }
-    private func stageBlock(_ block: ChromeBlock, size: CGSize) -> some View {
+    private func stageBlock(_ block: ChromeBlock, size: CGSize, globalOrigin: CGPoint) -> some View {
         let reference = CGSize(width: wide ? 1024 : 430, height: wide ? 768 : 932)
         let scale = size.width / reference.width
         let real = block.rect(in: reference)
         let rect = CGRect(x: real.minX * scale, y: real.minY * scale, width: real.width * scale, height: real.height * scale)
+        let touchFrame = CGRect(x: -(rect.width + 28) / 2, y: -(rect.height + 28) / 2, width: rect.width + 28, height: rect.height + 28)
+            .applying(CGAffineTransform(rotationAngle: block.rotation * .pi / 180))
+            .offsetBy(dx: globalOrigin.x + rect.midX, dy: globalOrigin.y + rect.midY)
         var appearance = block
         appearance.corner *= Double(scale); appearance.fontSize *= Double(scale); appearance.borderWidth *= Double(scale)
         return ChromeBlockGlyph(block: block, scale: scale)
@@ -241,6 +246,7 @@ struct ChromeStudioEditor: View {
             .accessibilityAddTraits(.isButton)
             .accessibilityIdentifier("chromeStudioBlock-" + block.id.uuidString)
             .rotationEffect(.degrees(block.rotation)).position(x: rect.midX, y: rect.midY)
+            .accessibilityFrame(touchFrame)
     }
     private func drag(_ block: ChromeBlock, size: CGSize) -> some Gesture {
         DragGesture(minimumDistance: 2, coordinateSpace: .named("ChromeStage"))
