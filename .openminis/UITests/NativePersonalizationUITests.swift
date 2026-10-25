@@ -29,8 +29,7 @@ final class NativePersonalizationUITests: XCTestCase {
         expectation(for: NSPredicate(format: "label == %@", "1:readable:ZEUS-Picker-A.txt"), evaluatedWith: app.staticTexts["importResult"])
         waitForExpectations(timeout: 15)
         app.buttons["importSingle"].tap()
-        let cancel = app.buttons.matching(NSPredicate(format: "label IN %@", ["Cancel", "إلغاء"])).firstMatch
-        XCTAssertTrue(cancel.waitForExistence(timeout: 10)); cancel.tap()
+        cancelSystemFiles(app)
         expectation(for: NSPredicate(format: "hittable == true"), evaluatedWith: app.buttons["importSingle"])
         waitForExpectations(timeout: 10)
     }
@@ -61,12 +60,12 @@ final class NativePersonalizationUITests: XCTestCase {
         app.launch()
         let pick = app.buttons["mountExternalFolder"]
         XCTAssertTrue(pick.waitForExistence(timeout: 30)); pick.tap()
-        let cancel = app.buttons.matching(NSPredicate(format: "label IN %@", ["Cancel", "إلغاء"])).firstMatch
-        XCTAssertTrue(cancel.waitForExistence(timeout: 15)); cancel.tap()
+        cancelSystemFiles(app)
         expectation(for: NSPredicate(format: "hittable == true"), evaluatedWith: pick)
         waitForExpectations(timeout: 15)
         pick.tap(); try browseLocalFixture(app); confirmOpen(app)
         XCTAssertTrue(app.buttons["confirmExternalMount"].waitForExistence(timeout: 15))
+        let cancel = app.buttons.matching(NSPredicate(format: "label IN %@", ["Cancel", "إلغاء"])).firstMatch
         XCTAssertTrue(cancel.waitForExistence(timeout: 10)); cancel.tap()
         expectation(for: NSPredicate(format: "hittable == true"), evaluatedWith: pick)
         waitForExpectations(timeout: 15)
@@ -111,6 +110,29 @@ final class NativePersonalizationUITests: XCTestCase {
         XCTAssertTrue(zeus.waitForExistence(timeout: 10)); zeus.tap()
         let fixture = file("ZEUS-Import-Test", app)
         XCTAssertTrue(fixture.waitForExistence(timeout: 10)); fixture.tap()
+    }
+    @MainActor private func cancelSystemFiles(_ app: XCUIApplication) {
+        // The confirmation sheet also has a Cancel button behind Files. Scope
+        // this action to the actual system navigation bar, never that sheet.
+        let labels = NSPredicate(format: "label IN %@", ["Cancel", "Close", "إلغاء", "إغلاق"])
+        let sidebar = app.navigationBars["DOCSidebarView"].buttons.matching(labels).firstMatch
+        let browser = app.navigationBars["FullDocumentManagerViewControllerNavigationBar"].buttons.matching(labels).firstMatch
+        if sidebar.waitForExistence(timeout: 5) { sidebar.tap() }
+        else { XCTAssertTrue(browser.waitForExistence(timeout: 10)); browser.tap() }
+    }
+    @MainActor func testFilesReferenceMultipleUsingOnlyUIKit() throws {
+        let app = launchFiles(); app.buttons["referenceMultiple"].tap()
+        try browseLocalFixture(app)
+        file("ZEUS-Picker-A", app).tap(); file("ZEUS-Picker-B", app).tap()
+        confirmOpen(app)
+        expectation(for: NSPredicate(format: "label == %@", "2:readable:ZEUS-Picker-A.txt,ZEUS-Picker-B.txt"), evaluatedWith: app.staticTexts["importResult"])
+        waitForExpectations(timeout: 15)
+    }
+    @MainActor func testFilesReferenceSingleUsingOnlyUIKit() throws {
+        let app = launchFiles(); app.buttons["referenceSingle"].tap()
+        try browseLocalFixture(app); file("ZEUS-Picker-A", app).tap(); confirmOpen(app)
+        expectation(for: NSPredicate(format: "label == %@", "1:readable:ZEUS-Picker-A.txt"), evaluatedWith: app.staticTexts["importResult"])
+        waitForExpectations(timeout: 15)
     }
     @MainActor private func confirmOpen(_ app: XCUIApplication) {
         let open = app.buttons.matching(NSPredicate(format: "label IN %@ OR label BEGINSWITH %@", ["Open", "Import", "Choose", "فتح", "استيراد", "اختيار"], "Open (")).firstMatch

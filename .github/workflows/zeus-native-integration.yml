@@ -161,7 +161,7 @@ jobs:
         bash browser/.openminis/run_native_stage.sh boot IPAD "${IPAD_SIMULATOR}"
     - name: 'IPAD: Verify system Files imports and saved layouts'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
-      timeout-minutes: 18
+      timeout-minutes: 22
       run: bash browser/.openminis/run_native_stage.sh personalization IPAD "${IPAD_SIMULATOR}"
     - name: 'IPAD: Save UI diagnostics and shut down'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
@@ -170,6 +170,7 @@ jobs:
         xcrun xcresulttool export attachments --path results/embedded-IPAD-ui.xcresult --output-path results/embedded-ui-attachments-IPAD || true
         xcrun xcresulttool export diagnostics --path results/embedded-IPAD-ui.xcresult --output-path results/embedded-ui-diagnostics-IPAD || true
         xcrun simctl spawn "$IPAD_SIMULATOR" log show --last 12m --style compact --predicate 'process == "Minis" AND (eventMessage CONTAINS "ZEUS Files" OR eventMessage CONTAINS "bookmark" OR eventMessage CONTAINS "array of items")' > results/embedded-IPAD-file-provider.log || true
+        xcrun simctl spawn "$IPAD_SIMULATOR" log show --last 22m --style compact --predicate 'eventMessage CONTAINS "ZEUS-Picker" OR eventMessage CONTAINS "Could not resolve bookmark" OR eventMessage CONTAINS "empty array of items" OR eventMessage CONTAINS "NSFileProviderResolverErrorDomain"' > results/embedded-IPAD-system-files.log || true
         xcrun simctl shutdown "$IPAD_SIMULATOR" || true
     - name: 'IPAD: Upload Files and layout diagnostics immediately'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
@@ -181,6 +182,7 @@ jobs:
           results/embedded-ui-attachments-IPAD
           results/embedded-ui-diagnostics-IPAD
           results/embedded-IPAD-file-provider.log
+          results/embedded-IPAD-system-files.log
         retention-days: 14
         if-no-files-found: warn
     - name: 'IPHONE: Boot'
