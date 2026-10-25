@@ -154,6 +154,32 @@ jobs:
           ${{ runner.temp }}/OpenMinisOriginal/SourcePackages
           ${{ runner.temp }}/OpenMinisOriginal/ModuleCache.noindex
         key: zeus-native-deriveddata-263-v2-${{ github.run_id }}
+    - name: 'IPAD: Boot for Files and layout UI tests'
+      if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
+      timeout-minutes: 10
+      run: |
+        xcrun simctl shutdown "$IPHONE_SIMULATOR" || true
+        bash browser/.openminis/run_native_stage.sh boot IPAD "${IPAD_SIMULATOR}"
+    - name: 'IPAD: Verify system Files imports and saved layouts'
+      if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
+      timeout-minutes: 12
+      run: bash browser/.openminis/run_native_stage.sh personalization IPAD "${IPAD_SIMULATOR}"
+    - name: 'IPAD: Save UI diagnostics and shut down'
+      if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
+      timeout-minutes: 2
+      run: |
+        xcrun xcresulttool export attachments --path results/embedded-IPAD-ui.xcresult --output-path results/embedded-ui-attachments-IPAD || true
+        xcrun simctl shutdown "$IPAD_SIMULATOR" || true
+    - name: 'IPAD: Upload Files and layout diagnostics immediately'
+      if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: zeus-ipad-ui-diagnostics
+        path: |
+          results/embedded-IPAD-ui*
+          results/embedded-ui-attachments-IPAD
+        retention-days: 14
+        if-no-files-found: warn
     - name: 'IPHONE: Boot'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
       timeout-minutes: 10
@@ -212,10 +238,6 @@ jobs:
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
       timeout-minutes: 5
       run: bash browser/.openminis/run_native_stage.sh screens IPAD "${IPAD_SIMULATOR}"
-    - name: 'IPAD: Drag resize and apply a visual layout'
-      if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
-      timeout-minutes: 12
-      run: bash browser/.openminis/run_native_stage.sh personalization IPAD "${IPAD_SIMULATOR}"
     - name: 'IPAD: Verify native chat and inline approval'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
       timeout-minutes: 6

@@ -1,9 +1,8 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// One presentation owner for Files on iPad and iPhone. Deliver URLs only after
-/// the system controller has left the hierarchy, before callers open another UI
-/// or start coordinated reads. Folder URLs remain security scoped (no copying).
+/// UIKit picker adapter retained for integrations that manage their own host.
+/// App import routes below use the system SwiftUI presenter.
 public struct ZEUSFilePicker: UIViewControllerRepresentable {
     public let types: [UTType]
     public var asCopy: Bool
@@ -50,7 +49,7 @@ public extension View {
         fileImporter(isPresented: isPresented, allowedContentTypes: allowedContentTypes,
                      allowsMultipleSelection: allowsMultipleSelection) { result in
             isPresented.wrappedValue = false
-            onCompletion(result)
+            Task { @MainActor in ZEUSFileImportDelivery.finish(result, completion: onCompletion) }
         }
     }
     func zeusFileImporter(isPresented: Binding<Bool>, allowedContentTypes: [UTType], asCopy: Bool = false,
@@ -58,6 +57,27 @@ public extension View {
         zeusFileImporter(isPresented: isPresented, allowedContentTypes: allowedContentTypes, allowsMultipleSelection: false, asCopy: asCopy) {
             onCompletion($0.flatMap { urls in urls.first.map(Result.success) ?? .failure(CocoaError(.fileReadUnknown)) })
         }
+    }
+}
+
+@MainActor private enum ZEUSFileImportDelivery {
+    static func finish(_ result: Result<[URL], Error>, completion: @escaping (Result<[URL], Error>) -> Void) {
+        func picker(in controller: UIViewController) -> UIDocumentPickerViewController? {
+            if let value = controller as? UIDocumentPickerViewController { return value }
+            if let presented = controller.presentedViewController, let value = picker(in: presented) { return value }
+            for child in controller.children { if let value = picker(in: child) { return value } }
+            return nil
+        }
+        let windows = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows)
+        let roots = (windows.filter(\.isKeyWindow) + windows.filter { !$0.isKeyWindow }).compactMap(\.rootViewController)
+        guard let controller = roots.compactMap({ picker(in: $0) }).first else { completion(result); return }
+        var delivered = false
+        let deliver = { guard !delivered else { return }; delivered = true; completion(result) }
+        if controller.isBeingDismissed, let transition = controller.transitionCoordinator,
+           transition.animate(alongsideTransition: nil, completion: { _ in DispatchQueue.main.async(execute: deliver) }) { return }
+        // SwiftUI can invoke completion before UIKit's dismissal finishes.
+        // Dismiss this exact system picker, then permit callers to present UI.
+        controller.dismiss(animated: true, completion: deliver)
     }
 }
 
@@ -82,7 +102,12 @@ public struct ZEUSFileImportDiagnostics: View {
                     case .success(let urls):
                         let readable = urls.allSatisfy { url in
                             let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }
-                            return FileManager.default.isReadableFile(atPath: url.path)
+                            do {
+                                if try url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true {
+                                    _ = try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
+                                } else { _ = try Data(contentsOf: url) }
+                                return true
+                            } catch { return false }
                         }
                         result = "\(urls.count):\(readable ? "readable" : "unreadable"):" + urls.map(\.lastPathComponent).sorted().joined(separator: ",")
                     case .failure(let error): result = "error:" + error.localizedDescription

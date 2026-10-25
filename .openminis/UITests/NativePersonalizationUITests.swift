@@ -53,7 +53,7 @@ final class NativePersonalizationUITests: XCTestCase {
         app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", name)).firstMatch
     }
     @MainActor private func browseLocalFixture(_ app: XCUIApplication) throws {
-        let local = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS[c] %@ OR label CONTAINS %@", "On My iPad", "على الـ iPad")).firstMatch
+        let local = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS[c] %@ AND (label CONTAINS[c] %@ OR label CONTAINS %@)", "iPad", "On My", "على")).firstMatch
         for _ in 0..<3 where !local.exists || !local.isHittable {
             let browse = app.buttons.matching(NSPredicate(format: "label IN %@", ["Browse", "Show Sidebar", "Sidebar", "استعراض", "إظهار الشريط الجانبي"])).firstMatch
             if browse.waitForExistence(timeout: 5) { browse.tap() }
