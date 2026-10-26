@@ -9,14 +9,22 @@ public struct NativeCloudBlob: Codable, Sendable {
     public init(sha256: String, bytes: Int) { self.sha256 = sha256; self.bytes = bytes }
 }
 
+public struct NativeCloudHTTPError: LocalizedError {
+    public let statusCode: Int
+    public let message: String
+    public var errorDescription: String? { message }
+}
+
 public struct NativeCloudFile: Codable, Sendable {
     public let scope: String
     public let path: String
     public let bytes: Int64
     public let parts: [NativeCloudBlob]
     public let sha256: String
-    public init(scope: String, path: String, bytes: Int64, parts: [NativeCloudBlob], sha256: String) {
+    public let mode: Int?
+    public init(scope: String, path: String, bytes: Int64, parts: [NativeCloudBlob], sha256: String, mode: Int? = nil) {
         self.scope = scope; self.path = path; self.bytes = bytes; self.parts = parts; self.sha256 = sha256
+        self.mode = mode.map { $0 & 0o777 }
     }
 }
 
@@ -33,6 +41,9 @@ public struct NativeCloudArchive: Codable, Sendable {
     func prepareLocalExecution(progress: @escaping (String) -> Void) async throws
     func restoreAccountIfNeeded(progress: @escaping (String) -> Void) async throws
     func backupAccount(progress: @escaping (String) -> Void) async throws
+    func validateExecutionTransition() async throws
+    func finishExecutionTransition(enabled: Bool?) async throws
+    func restoreUsingCloudExecution(progress: @escaping (String) -> Void) async throws
 }
 
 @MainActor public final class NativeCloudBackupStatus: ObservableObject {
@@ -76,30 +87,37 @@ actor CloudCheckpointGate {
     public static let runtimeURL = URL(string: "https://zeus-cloud-production.up.railway.app")!
     public static weak var dataDelegate: NativeCloudDataDelegate?
     public static var sharedFilesView: (() -> AnyView)?
+    public static var prepareBrowserBackup: (() async throws -> Void)?
     public static var isMigrating = false
     public static var ownerID: String? { CloudAccount.shared.phase == .ready ? CloudAccount.shared.identity?.id.uuidString.lowercased() : nil }
     private static var preferencesURL: URL { BrowserDisk.applicationRoot.appendingPathComponent("cloud-execution.json") }
     private struct Preference: Codable { let owner: UUID; let enabled: Bool }
     public static var usesCloud: Bool {
-        guard let id = CloudAccount.shared.identity?.id, CloudAccount.shared.phase == .ready,
-              let value = BrowserDisk.read(Preference.self, from: preferencesURL), value.owner == id else { return false }
+        guard let id = CloudAccount.shared.identity?.id, CloudAccount.shared.phase == .ready else { return false }
+        let secure = (try? CloudSessionStorage().retrieve(key: "zeus-execution:" + id.uuidString)).flatMap { try? JSONDecoder().decode(Preference.self, from: $0) }
+        guard let value = secure ?? BrowserDisk.read(Preference.self, from: preferencesURL), value.owner == id else { return false }
         return value.enabled
     }
-    static func setEnabled(_ value: Bool) async throws {
+    public static func setEnabled(_ value: Bool) async throws {
         guard let id = CloudAccount.shared.identity?.id, CloudAccount.shared.phase == .ready else { throw CloudAccountError.wrongOwner }
         await CloudCheckpointGate.shared.enter()
         do {
             let api = try transport()
             guard let head = try await api.head() else { throw CloudAccountError.incomplete("لم تكتمل نسخة الحساب بعد.") }
             var manifest = head.manifest; manifest.executionTarget = value ? "cloud" : "local"
+            if value { manifest.coverage = Array(Set(manifest.coverage + ["cloud_runtime"])) }
             _ = try await api.commit(manifest, expected: head.revision, operation: UUID())
             await CloudCheckpointGate.shared.leave()
         } catch { await CloudCheckpointGate.shared.leave(); throw error }
-        try BrowserDisk.write(Preference(owner: id, enabled: value), to: preferencesURL)
+        let preference = Preference(owner: id, enabled: value)
+        try CloudSessionStorage().store(key: "zeus-execution:" + id.uuidString, value: JSONEncoder().encode(preference))
+        try? BrowserDisk.write(preference, to: preferencesURL)
     }
     static func adoptPreference(_ value: String?) throws {
         guard let value, let id = CloudAccount.shared.identity?.id else { return }
-        try BrowserDisk.write(Preference(owner: id, enabled: value == "cloud"), to: preferencesURL)
+        let preference = Preference(owner: id, enabled: value == "cloud")
+        try CloudSessionStorage().store(key: "zeus-execution:" + id.uuidString, value: JSONEncoder().encode(preference))
+        try? BrowserDisk.write(preference, to: preferencesURL)
     }
     public struct FileRoot {
         public let scope: String
@@ -216,7 +234,8 @@ actor CloudCheckpointGate {
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             let detail = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["detail"] as? String
-            throw CloudAccountError.incomplete(detail ?? "تعذر الاتصال بالخادم. تبقى بياناتك المحلية محفوظة؛ أعد المحاولة بعد التحقق من الاتصال.")
+            throw NativeCloudHTTPError(statusCode: (response as? HTTPURLResponse)?.statusCode ?? 0,
+                message: detail ?? "تعذر الاتصال بالخادم. تبقى بياناتك المحلية محفوظة؛ أعد المحاولة بعد التحقق من الاتصال.")
         }
         guard data.count <= 8 * 1024 * 1024, CloudAccount.shared.identity?.id == id, CloudAccount.shared.phase == .ready else { throw CloudAccountError.wrongOwner }
         return data
@@ -240,6 +259,7 @@ actor CloudCheckpointGate {
         guard archive.version == 1 else { throw CloudAccountError.invalidResponse }
         return archive
     }
+    public static func hasCloudHistory() async throws -> Bool { try await transport().head()?.manifest.coverage.contains("cloud_runtime") == true }
 }
 
 public struct NativeCloudExecutionSettings: View {
@@ -287,8 +307,14 @@ public struct NativeCloudExecutionSettings: View {
                 }
                 try await delegate.migrateToCloud { progress = $0 }
             } else { try await delegate.prepareLocalExecution { progress = $0 } }
+            try await delegate.validateExecutionTransition()
             try await NativeCloudAccountAPI.setEnabled(value)
+            try await delegate.finishExecutionTransition(enabled: value)
             progress = value ? "فُعّل التشغيل السحابي بعد التحقق من النقل." : "فُعّل التشغيل المحلي. النسخة السحابية محفوظة."
-        } catch { enabled = previous; issue = error.localizedDescription; progress = "لم يُغيّر مكان التنفيذ." }
+        } catch {
+            try? await NativeCloudAccountAPI.dataDelegate?.finishExecutionTransition(enabled: nil)
+            enabled = NativeCloudAccountAPI.usesCloud; issue = error.localizedDescription
+            progress = enabled == previous ? "لم يُغيّر مكان التنفيذ." : "تغير مكان التنفيذ؛ بقيت بعض النسخ المحلية حتى اكتمال تحرير المساحة."
+        }
     }
 }

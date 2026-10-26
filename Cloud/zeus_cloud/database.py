@@ -11,6 +11,7 @@ class MongoStore:
         self.client = None
         self._mutex, self._users, self._idle = asyncio.Lock(), 0, None
         self._event_locks = {}
+        self._transition_lock = asyncio.Lock()
 
     @asynccontextmanager
     async def active(self):
@@ -104,7 +105,9 @@ class MongoStore:
 
     async def claim(self):
         async with self.active() as db:
-            row = await db.runs.find_one_and_update({"status": "queued"}, {"$set": {"status": "running", "updated": time.time()}},
+            leases = await db.records.find({"kind": "lease", "expires": {"$gt": time.time()}}).to_list()
+            blocked = [row["owner"] for row in leases]
+            row = await db.runs.find_one_and_update({"status": "queued", "owner": {"$nin": blocked}}, {"$set": {"status": "running", "updated": time.time()}},
                 sort=[("created", 1)], return_document=ReturnDocument.AFTER)
         return self.clean(row)
 
@@ -139,3 +142,21 @@ class MongoStore:
         if not record or record["status"] not in {"completed", "failed", "cancelled", "interrupted"} or not record.get("event_archives"):
             raise ValueError("Verified archive required before pruning events")
         async with self.active() as db: await db.events.delete_many({"owner": owner, "run": run, "seq": {"$lte": through}})
+
+    async def account_state(self, owner):
+        lease = await self.get(owner, "lease", "active")
+        async with self.active() as db:
+            active = await db.runs.count_documents({"owner": owner, "status": {"$in": ["queued", "running", "checkpointing", "waiting_user"]}})
+        return {"active_runs": active, "lease": {"id": lease["lease_id"], "expires": lease["expires"]} if lease and lease["expires"] > time.time() else None}
+
+    async def transition(self, owner, identifier, command):
+        async with self._transition_lock:
+            state = await self.account_state(owner); lease = state["lease"]
+            if command == "end":
+                if lease and lease["id"] == identifier:
+                    async with self.active() as db: await db.records.delete_one({"_id": f"{owner}:lease:active", "owner": owner})
+                return True
+            if command == "begin":
+                if state["active_runs"] or lease and lease["id"] != identifier: raise ValueError("Finish cloud work before changing execution mode")
+            elif not lease or lease["id"] != identifier: raise ValueError("Transition lease expired")
+            return await self.put(owner, "lease", "active", {"lease_id": identifier, "expires": time.time() + 300})

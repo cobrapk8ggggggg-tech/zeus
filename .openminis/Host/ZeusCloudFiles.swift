@@ -7,20 +7,33 @@ import ZEUSBrowser
         let path: String
         let bytes: Int64
         let digest: String
+        let origin: String
+        let sourcePath: String
+        let mode: Int
         var id: String { path }
     }
+    struct Snapshot { let files: [Entry]; let hash: String }
     private static func fail() -> NSError { NSError(domain: "ZEUSCloud", code: 3, userInfo: [NSLocalizedDescriptionKey: "ملف سحابي غير صالح أو تغير أثناء التنزيل. أعد المحاولة."]) }
     static func list(session: String) async throws -> [Entry] {
+        try await snapshot(session: session).files
+    }
+    static func snapshot(session: String) async throws -> Snapshot {
         guard UUID(uuidString: session) != nil else { throw fail() }
         let data = try await NativeCloudAccountAPI.runtime("v1/conversations/\(session)/files")
         let value = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        return try (value?["files"] as? [[String: Any]] ?? []).map { file in
+        let files = try (value?["files"] as? [[String: Any]] ?? []).map { file in
             guard let path = file["path"] as? String, let bytes = file["bytes"] as? Int64, let sha = file["sha256"] as? String,
                   bytes >= 0, bytes <= 128 * 1024 * 1024, sha.count == 64 else { throw fail() }
             let parts = path.split(separator: "/", omittingEmptySubsequences: false)
             guard !path.hasPrefix("/"), !parts.isEmpty, parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." && !$0.contains("\0") }) else { throw fail() }
-            return Entry(path: path, bytes: bytes, digest: sha)
+            let origin = file["origin"] as? String ?? "workspace"
+            let source = file["source_path"] as? String ?? path
+            let sourceParts = source.split(separator: "/", omittingEmptySubsequences: false)
+            guard !source.hasPrefix("/"), sourceParts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." && !$0.contains("\0") }) else { throw fail() }
+            return Entry(path: path, bytes: bytes, digest: sha, origin: origin, sourcePath: source, mode: (file["mode"] as? Int ?? 0o600) & 0o777)
         }
+        guard let hash = value?["workspace_hash"] as? String, hash.count == 64 else { throw fail() }
+        return Snapshot(files: files, hash: hash)
     }
     static func download(_ entry: Entry, session: String, to destination: URL? = nil) async throws -> URL {
         let fm = FileManager.default
@@ -53,6 +66,7 @@ import ZEUSBrowser
             try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
             if fm.fileExists(atPath: destination.path) { _ = try fm.replaceItemAt(destination, withItemAt: result) }
             else { try fm.copyItem(at: result, to: destination) }
+            try fm.setAttributes([.posixPermissions: entry.mode], ofItemAtPath: destination.path)
             return destination
         }
         // One byte budget across conversations, with an exception for the
@@ -74,11 +88,13 @@ import ZEUSBrowser
         return result
     }
     static func downloadAll(session: String) async throws {
-        for entry in try await list(session: session) {
-            let special = ["attachments/", "offloads/", "browser/"]
-            let base = special.contains(where: entry.path.hasPrefix) ? AIChatViewModel.minisPersistentBase.appendingPathComponent(session) : AIChatViewModel.minisWorkspacePersistentDir(for: session)
-            _ = try await download(entry, session: session, to: base.appendingPathComponent(entry.path))
+        let manifest = try await snapshot(session: session)
+        for entry in manifest.files {
+            let base = entry.origin == "input" ? AIChatViewModel.minisPersistentBase.appendingPathComponent(session) : AIChatViewModel.minisWorkspacePersistentDir(for: session)
+            _ = try await download(entry, session: session, to: base.appendingPathComponent(entry.sourcePath))
         }
+        guard try await snapshot(session: session).hash == manifest.hash else { throw fail() }
+        try ZeusCloudRuntime.shared.recordBaseHash(session: session, hash: manifest.hash)
     }
 }
 
@@ -90,11 +106,12 @@ struct ZeusCloudFilesView: View {
     @State private var issue: String?
     @State private var busy: String?
     @State private var preview: FileItem?
+    @State private var showInputs = false
     var body: some View {
         NavigationStack {
             List {
                 if let issue { Text(issue).foregroundStyle(.orange) }
-                ForEach(entries.filter { query.isEmpty || $0.path.localizedCaseInsensitiveContains(query) }) { entry in
+                ForEach(entries.filter { (showInputs || $0.origin != "input") && (query.isEmpty || $0.path.localizedCaseInsensitiveContains(query)) }) { entry in
                     Button {
                         Task {
                             guard let session else { return }; busy = entry.id; defer { busy = nil }
@@ -111,7 +128,10 @@ struct ZeusCloudFilesView: View {
                 }
             }.overlay { if entries.isEmpty && issue == nil { ContentUnavailableView("لا توجد ملفات سحابية بعد", systemImage: "icloud") } }
                 .navigationTitle("ملفات المحادثة السحابية").searchable(text: $query)
-                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("تم") { dismiss() } } }
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) { Button("تم") { dismiss() } }
+                    ToolbarItem(placement: .topBarLeading) { Menu { Toggle("إظهار ملفات الإدخال والمرفقات", isOn: $showInputs) } label: { Image(systemName: "line.3.horizontal.decrease") } }
+                }
                 .sheet(item: $preview) { FilePreviewSheet(item: $0) }
                 .task { await refresh() }.refreshable { await refresh() }
         }

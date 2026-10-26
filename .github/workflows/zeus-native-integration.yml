@@ -153,6 +153,7 @@ jobs:
           -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
           -derivedDataPath "$RUNNER_TEMP/OpenMinisOriginal" \
           build-for-testing CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- ARCHS=arm64
+        cp upstream/src/ios/Minis.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved results/Package.resolved
       id: native_build
     - uses: actions/cache/save@v4
       if: always() && steps.native_build.outcome != 'skipped' && steps.swift_cache.outputs.cache-hit

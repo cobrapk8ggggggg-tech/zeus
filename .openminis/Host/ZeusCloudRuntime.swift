@@ -8,6 +8,12 @@ import ZEUSBrowser
 @MainActor final class ZeusCloudRuntime {
     static let shared = ZeusCloudRuntime()
     static let globalWorkspace = "00000000-0000-4000-8000-000000000001"
+    private(set) var transitionID: String?
+    private var transitionOwner: String?
+    private var transitionIssue: String?
+    private var leaseHeartbeat: Task<Void, Never>?
+    private struct Bases: Codable { let owner: String; var hashes: [String: String] }
+    private var basesURL: URL { AIChatViewModel.minisConfigRoot.appendingPathComponent("zeus-local-cloud-bases.json") }
     private var observers: Set<String> = []
     private struct State: Codable {
         let owner: String
@@ -15,6 +21,8 @@ import ZEUSBrowser
         let run: String
         var complete = false
         var assistantID: String? = nil
+        var submission: Data? = nil
+        var userID: String? = nil
     }
     private func stateURL(_ session: String) -> URL { AIChatViewModel.minisConfigRoot.appendingPathComponent("cloud-run-\(session).json") }
     private func failure(_ text: String) -> NSError { NSError(domain: "ZEUSCloud", code: 1, userInfo: [NSLocalizedDescriptionKey: text]) }
@@ -23,6 +31,49 @@ import ZEUSBrowser
     }
     private func request(_ path: String, _ body: [String: Any], method: String = "POST") async throws -> [String: Any] {
         try json(await NativeCloudAccountAPI.runtime(path, method: method, body: JSONSerialization.data(withJSONObject: body)))
+    }
+    func beginTransition() async throws {
+        guard transitionID == nil, let owner = NativeCloudAccountAPI.ownerID else { throw failure("عملية نقل أخرى جارية.") }
+        let id = UUID().uuidString.lowercased()
+        _ = try await request("v1/transitions/\(id)/begin", [:])
+        transitionID = id; transitionOwner = owner; transitionIssue = nil
+        leaseHeartbeat = Task { [weak self] in
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: .seconds(60)); try Task.checkCancellation()
+                    guard let self else { return }; try await self.validateTransition()
+                } catch is CancellationError { return }
+                catch { self?.transitionIssue = error.localizedDescription; return }
+            }
+        }
+    }
+    func validateTransition() async throws {
+        guard let id = transitionID, transitionOwner == NativeCloudAccountAPI.ownerID else { throw failure("تغيرت جلسة نقل الحساب.") }
+        if let transitionIssue { throw failure(transitionIssue) }
+        _ = try await request("v1/transitions/\(id)/renew", [:])
+    }
+    func endTransition() async {
+        leaseHeartbeat?.cancel(); leaseHeartbeat = nil
+        let id = transitionID; transitionID = nil; transitionOwner = nil; transitionIssue = nil
+        if let id { _ = try? await request("v1/transitions/\(id)/end", [:]) }
+    }
+    func baseHash(session: String) -> String? {
+        guard let owner = NativeCloudAccountAPI.ownerID, let data = try? Data(contentsOf: basesURL),
+              let bases = try? JSONDecoder().decode(Bases.self, from: data), bases.owner == owner else { return nil }
+        return bases.hashes[session.lowercased()]
+    }
+    func recordBaseHash(session: String, hash: String) throws {
+        guard let owner = NativeCloudAccountAPI.ownerID else { throw failure("انتهت جلسة الحساب.") }
+        var bases = (try? Data(contentsOf: basesURL)).flatMap { try? JSONDecoder().decode(Bases.self, from: $0) }
+        if bases?.owner != owner { bases = Bases(owner: owner, hashes: [:]) }
+        bases!.hashes[session.lowercased()] = hash
+        try JSONEncoder().encode(bases!).write(to: basesURL, options: .atomic)
+    }
+    private func importRequest(_ session: String, body: [String: Any]) async throws {
+        var input = body
+        if let id = transitionID { input["lease_id"] = id }
+        if let hash = baseHash(session: session) { input["expected_workspace_hash"] = hash; input["replace_existing"] = true }
+        _ = try await request("v1/conversations/\(session)/import", input, method: "PUT")
     }
     static func wire(_ history: [AgentMessage]) -> [[String: Any]] {
         var result: [[String: Any]] = []
@@ -70,22 +121,40 @@ import ZEUSBrowser
         guard !observers.contains(sid) else { return }
         observers.insert(sid); defer { observers.remove(sid) }
         var state = (try? Data(contentsOf: stateURL(sid))).flatMap { try? JSONDecoder().decode(State.self, from: $0) }
-        if state?.owner != owner || state?.complete != false {
+        let currentUserID = vm.agentHistory.last(where: { $0.role == .user })?.dbMessageId
+        let newUserTurn = state?.userID != nil && state?.userID != currentUserID
+        if state?.owner != owner || state?.complete != false || newUserTurn {
             let history = Self.wire(vm.agentHistory)
             guard let last = history.last, last["role"] as? String == "user", let prompt = last["content"] as? String, !prompt.isEmpty else { throw failure("لا توجد رسالة جديدة قابلة للإرسال.") }
             let selectedProvider = try provider(vm)
             let grant = try await NativeCloudAccountAPI.fileGrant(conversation: sid)
             try await uploadAttachments(sid, grant: grant)
-            state = State(owner: owner, conversation: sid, run: UUID().uuidString.lowercased(), assistantID: UUID().uuidString)
-            // Save the idempotency key before the request, including on timeout.
-            try JSONEncoder().encode(state!).write(to: stateURL(sid), options: .atomic)
+            state = State(owner: owner, conversation: sid, run: UUID().uuidString.lowercased(), assistantID: UUID().uuidString, userID: currentUserID)
             var body: [String: Any] = ["id": state!.run, "conversation": sid, "prompt": prompt,
                 "history": Array(history.dropLast().suffix(150)), "provider": selectedProvider,
                 "file_grant": grant, "permission_mode": ZeusToolPermissions.shared.mode == .askAll ? "ask_all" : ZeusToolPermissions.shared.mode.rawValue,
                 "native_assistant_id": state!.assistantID!]
             if let userID = vm.agentHistory.last?.dbMessageId { body["native_user_id"] = userID }
             if let session = await ChatStore.shared.getSession(sid) { body["native_session"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(session)) }
-            _ = try await request("v1/runs", body)
+            // Preserve the exact request, including the selected provider, as
+            // owner-encrypted data. A timeout can then reuse the same UUID.
+            state!.submission = try await NativeCloudAccountAPI.sealSecrets(JSONSerialization.data(withJSONObject: body))
+            try JSONEncoder().encode(state!).write(to: stateURL(sid), options: .atomic)
+            var pending = state!
+            try await submitPending(&pending, refreshGrant: false); state = pending
+        } else {
+            do { _ = try await NativeCloudAccountAPI.runtime("v1/runs/\(state!.run)") }
+            catch let error as NativeCloudHTTPError where error.statusCode == 404 {
+                if state!.submission != nil {
+                    var pending = state!
+                    try await submitPending(&pending, refreshGrant: true); state = pending
+                }
+                else {
+                    state!.complete = true
+                    try JSONEncoder().encode(state!).write(to: stateURL(sid), options: .atomic)
+                    throw failure("لم تصل هذه المهمة إلى الخادم. يمكنك إعادة المحاولة؛ لم تُعد أي أوامر مجهولة النتيجة.")
+                }
+            }
         }
         guard var state else { return }
         // Replay from the server instead of trusting a device cursor that could
@@ -105,7 +174,12 @@ import ZEUSBrowser
                 display.error = "انقطع الاتصال بالمراقبة. المهمة مستقلة على الخادم؛ أعد فتح المحادثة للمتابعة."
                 throw error
             }
-            if state.assistantID == nil { state.assistantID = (page["run"] as? [String: Any])?["native_assistant_id"] as? String }
+            if state.assistantID == nil || state.userID == nil {
+                let metadata = page["run"] as? [String: Any]
+                state.assistantID = state.assistantID ?? metadata?["native_assistant_id"] as? String
+                state.userID = state.userID ?? metadata?["native_user_id"] as? String
+                try JSONEncoder().encode(state).write(to: stateURL(sid), options: .atomic)
+            }
             for event in page["events"] as? [[String: Any]] ?? [] {
                 let data = event["data"] as? [String: Any] ?? [:]
                 switch event["kind"] as? String {
@@ -158,6 +232,27 @@ import ZEUSBrowser
             try await Task.sleep(for: .milliseconds((page["events"] as? [Any])?.isEmpty == false ? 350 : 1000))
         }
     }
+    private func submitPending(_ state: inout State, refreshGrant: Bool) async throws {
+        guard let sealed = state.submission else { throw failure("حزمة الطلب غير متاحة.") }
+        var body = try json(await NativeCloudAccountAPI.unsealSecrets(sealed))
+        guard body["id"] as? String == state.run, (body["conversation"] as? String)?.lowercased() == state.conversation.lowercased() else { throw failure("حزمة الطلب لا تطابق المحادثة.") }
+        if refreshGrant { body["file_grant"] = try await NativeCloudAccountAPI.fileGrant(conversation: state.conversation) }
+        do { _ = try await request("v1/runs", body) }
+        catch {
+            let original = error
+            if let http = error as? NativeCloudHTTPError, (400..<500).contains(http.statusCode), http.statusCode != 408, http.statusCode != 429 {
+                do { _ = try await NativeCloudAccountAPI.runtime("v1/runs/\(state.run)") }
+                catch let missing as NativeCloudHTTPError where missing.statusCode == 404 {
+                    state.complete = true; state.submission = nil
+                    try JSONEncoder().encode(state).write(to: stateURL(state.conversation), options: .atomic)
+                }
+                catch { }
+            }
+            throw original
+        }
+        state.submission = nil
+        try JSONEncoder().encode(state).write(to: stateURL(state.conversation), options: .atomic)
+    }
     func cancel(session: String?) {
         guard NativeCloudAccountAPI.usesCloud, let session,
               let data = try? Data(contentsOf: stateURL(session)), let state = try? JSONDecoder().decode(State.self, from: data), !state.complete else { return }
@@ -189,6 +284,24 @@ import ZEUSBrowser
         }
     }
     private func restoreTranscript(_ vm: AIChatViewModel, session: String) async throws {
+        if try await restoreTranscript(session: session) { await vm.loadSession() }
+    }
+    func restoreAllTranscripts(progress: @escaping (String) -> Void) async throws {
+        try await restoreSessionIndex()
+        for session in await portableSessions() {
+            progress("استعادة سجل المحادثات الأحدث…")
+            _ = try await restoreTranscript(session: session.id)
+        }
+    }
+    private func portableSessions() async -> [ChatSession] {
+        let tombstoned = Set(await ChatStore.shared.tombstonedSessionIds())
+        var sessions: [ChatSession] = []
+        for id in await ChatStore.shared.allSessionIds() where !tombstoned.contains(id) {
+            if let session = await ChatStore.shared.getSession(id) { sessions.append(session) }
+        }
+        return sessions
+    }
+    private func restoreTranscript(session: String) async throws -> Bool {
         let existing = await ChatStore.shared.loadMessages(sessionId: session)
         var known = Set(existing.map(\.id)), runs: [[String: Any]] = [], before = 4102444800.0
         while true {
@@ -224,40 +337,57 @@ import ZEUSBrowser
                 }
             }
             if !text.isEmpty { parts.append(.text(text)) }
-            var message = AgentMessage(role: .assistant, parts: parts); message.dbMessageId = assistantID
-            _ = await vm.persistAgentMessage(message); known.insert(assistantID); changed = true
+            let content: [ContentPart] = parts.compactMap { part in
+                switch part {
+                case .text(let text): return .text(text)
+                case .toolUse(let id, let name, let input, _):
+                    let encoded = (try? JSONSerialization.data(withJSONObject: input)) ?? Data("{}".utf8)
+                    return .toolUse(ToolUse(toolUseId: id, name: name, input: String(decoding: encoded, as: UTF8.self), description: input["tool_title"] as? String, thoughtSignature: nil))
+                case .toolResult(let id, _, let output, let isError, _, _, _, _, _):
+                    return .toolResult(ToolResult(toolUseId: id, output: output, success: !isError, mediaRef: nil, snapshot: nil, pageURL: nil, status: isError ? "failed" : "success"))
+                case .imageData: return nil
+                }
+            }
+            let raw = RawMessage(id: assistantID, sessionId: session, role: .assistant, parts: content,
+                createdAt: Date(timeIntervalSince1970: (run["created"] as? Double ?? 0) + 0.001), errorInfo: run["error"] as? String)
+            await ChatStore.shared.appendMessage(raw); known.insert(assistantID); changed = true
         }
         if let latest = runs.first, let id = latest["id"] as? String, let assistantID = latest["native_assistant_id"] as? String,
            known.contains(assistantID), let owner = NativeCloudAccountAPI.ownerID {
             let state = State(owner: owner, conversation: session, run: id, complete: true, assistantID: assistantID)
             try JSONEncoder().encode(state).write(to: stateURL(session), options: .atomic)
         }
-        if changed { await vm.loadSession() }
+        return changed
     }
-    func importArchive(_ archive: NativeCloudArchive, fileKey: Data, progress: @escaping (String) -> Void) async throws {
-        let sessions = await ChatStore.shared.listSessions()
+    @discardableResult func importArchive(_ archive: NativeCloudArchive, fileKey: Data, progress: @escaping (String) -> Void) async throws -> Set<String> {
+        guard !archive.files.contains(where: { $0.scope == "agent_sessions" && ($0.path.contains("/workspace/__zeus_inputs__/") || $0.path.hasSuffix("/workspace/__zeus_inputs__")) }) else {
+            throw failure("اسم __zeus_inputs__ محجوز لفصل المرفقات عن نواتج المشروع. غيّر اسم هذا المجلد في المشروع قبل النقل؛ بقيت الملفات الأصلية محفوظة.")
+        }
+        let sessions = await portableSessions()
         for (index, session) in sessions.enumerated() {
             progress("ربط المحادثات وملفاتها بالخادم \(index + 1)/\(sessions.count)…")
             let prefix = session.id + "/"
             let files: [[String: Any]] = archive.files.filter { $0.scope == "agent_sessions" && $0.path.hasPrefix(prefix) }.map { entry in
                 let relative = String(entry.path.dropFirst(prefix.count))
-                let path = relative.hasPrefix("workspace/") ? String(relative.dropFirst(10)) : relative
-                return ["path": path, "bytes": entry.bytes, "sha256": entry.sha256, "parts": entry.parts.map { ["sha256": $0.sha256, "bytes": $0.bytes] }]
+                let path = relative.hasPrefix("workspace/") ? String(relative.dropFirst(10)) : "__zeus_inputs__/" + relative
+                return ["path": path, "bytes": entry.bytes, "sha256": entry.sha256, "mode": entry.mode ?? 0o600, "parts": entry.parts.map { ["sha256": $0.sha256, "bytes": $0.bytes] }]
             }
             let raw = await ChatStore.shared.loadMessages(sessionId: session.id)
             let history = Self.wire(raw.map { $0.toAgentMessage(mediaResolver: { _ in URL(fileURLWithPath: "/unavailable-media") }) })
             let grant = try await NativeCloudAccountAPI.fileGrant(conversation: session.id)
-            _ = try await request("v1/conversations/\(session.id)/import", ["title": session.title ?? "", "history": Array(history.suffix(150)), "files": files, "file_key": fileKey.base64EncodedString(), "file_grant": grant], method: "PUT")
+            let metadata = try JSONSerialization.jsonObject(with: JSONEncoder().encode(session))
+            try await importRequest(session.id, body: ["title": session.title ?? "", "native_session": metadata, "history": Array(history.suffix(150)), "files": files, "file_key": fileKey.base64EncodedString(), "file_grant": grant])
         }
         progress("نقل الملفات المشتركة والمهارات والذاكرة إلى الخادم…")
         let scopes = ["agent_shared": "shared", "agent_skills": "skills", "agent_memory": "memory"]
         let globals: [[String: Any]] = archive.files.compactMap { entry in
             guard let scope = scopes[entry.scope] else { return nil }
-            return ["path": scope + "/" + entry.path, "bytes": entry.bytes, "sha256": entry.sha256,
+            return ["path": scope + "/" + entry.path, "bytes": entry.bytes, "sha256": entry.sha256, "mode": entry.mode ?? 0o600,
                     "parts": entry.parts.map { ["sha256": $0.sha256, "bytes": $0.bytes] }]
         }
         let grant = try await NativeCloudAccountAPI.fileGrant(conversation: Self.globalWorkspace)
-        _ = try await request("v1/conversations/\(Self.globalWorkspace)/import", ["title": "ملفات الحساب المشتركة", "files": globals, "file_key": fileKey.base64EncodedString(), "file_grant": grant], method: "PUT")
+        try await importRequest(Self.globalWorkspace, body: ["title": "ملفات الحساب المشتركة", "files": globals, "file_key": fileKey.base64EncodedString(), "file_grant": grant])
+        return Set(sessions.map(\.id))
     }
     private func uploadAttachments(_ sid: String, grant: String) async throws {
         let root = AIChatViewModel.minisAttachmentsPersistentDir(for: sid)
@@ -277,7 +407,7 @@ import ZEUSBrowser
                 guard let sealed = try AES.GCM.seal(data, using: key, authenticating: aad).combined else { throw failure("فشل تشفير المرفق.") }
                 let ref = try await NativeCloudAccountAPI.putObject(sealed); parts.append(["sha256": ref.sha256, "bytes": ref.bytes])
             }
-            files.append(["path": "attachments/" + item.relativePath, "bytes": item.bytes, "sha256": sha, "parts": parts])
+            files.append(["path": "__zeus_inputs__/attachments/" + item.relativePath, "bytes": item.bytes, "sha256": sha, "parts": parts])
         }
         _ = try await request("v1/conversations/\(sid)/import", ["files": files, "file_key": bytes.base64EncodedString(), "file_grant": grant], method: "PUT")
     }
@@ -289,12 +419,15 @@ import ZEUSBrowser
             progress("استعادة الملفات الأحدث للمحادثة…")
             try await ZeusCloudFiles.downloadAll(session: id)
         }
-        for entry in try await ZeusCloudFiles.list(session: Self.globalWorkspace) {
+        let globals = try await ZeusCloudFiles.snapshot(session: Self.globalWorkspace)
+        for entry in globals.files {
             let parts = entry.path.split(separator: "/", maxSplits: 1)
             guard parts.count == 2 else { continue }
             let roots = ["shared": AIChatViewModel.minisSharedPersistentDir, "skills": AIChatViewModel.minisSkillsPersistentDir, "memory": AIChatViewModel.minisMemoryPersistentDir]
             guard let root = roots[String(parts[0])] else { continue }
             _ = try await ZeusCloudFiles.download(entry, session: Self.globalWorkspace, to: root.appendingPathComponent(String(parts[1])))
         }
+        guard try await ZeusCloudFiles.snapshot(session: Self.globalWorkspace).hash == globals.hash else { throw failure("تغيرت الملفات المشتركة أثناء الاستعادة؛ أعد المحاولة.") }
+        try recordBaseHash(session: Self.globalWorkspace, hash: globals.hash)
     }
 }

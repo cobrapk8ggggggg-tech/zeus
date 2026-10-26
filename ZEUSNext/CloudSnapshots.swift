@@ -154,7 +154,9 @@ struct CloudSnapshotHead: Codable {
                     state?.saved = remote.manifest.created; lastSaved = remote.manifest.created
                     try saveState()
                 } else if state?.revision != remote.revision {
-                    throw CloudAccountError.conflict
+                    guard state?.fingerprint == remote.manifest.browser.sha256 else { throw CloudAccountError.conflict }
+                    state?.revision = remote.revision; try saveState()
+                    try NativeCloudAccountAPI.adoptPreference(remote.manifest.executionTarget)
                 }
             }
             try await NativeCloudAccountAPI.dataDelegate?.restoreAccountIfNeeded(progress: { _ in })
@@ -187,7 +189,7 @@ struct CloudSnapshotHead: Codable {
             browser.persist()
             let data = try encodedPayload()
             let digest = CloudSnapshotTransport.fingerprint(data)
-            if digest == state.fingerprint { pending = false; return }
+            if digest == state.fingerprint { self.state = state; try saveState(); pending = false; return }
             let ref = try await transport.put(data)
             var manifest = CloudSnapshotManifest(version: 1, deviceID: state.deviceID, created: Date(), browser: ref,
                                                  coverage: ["browser_profiles", "browser_settings", "browser_records"])

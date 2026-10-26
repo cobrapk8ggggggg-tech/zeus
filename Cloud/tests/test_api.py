@@ -123,14 +123,18 @@ class APITests(unittest.IsolatedAsyncioTestCase):
         key = os.urandom(32); data = b"private value\n"; digest = hashlib.sha256(data).hexdigest(); nonce = os.urandom(12)
         sealed = nonce + AESGCM(key).encrypt(nonce, data, f"{self.owner}|{digest}|0".encode())
         ref = await self.gateway.put("grant", sealed)
-        file = {"path": ".env", "bytes": len(data), "sha256": digest, "parts": [ref]}
-        body = {"files": [file], "file_key": base64.b64encode(key).decode(), "file_grant": "grant", "history": [], "title": "Existing project"}
+        file = {"path": ".env", "bytes": len(data), "sha256": digest, "parts": [ref], "mode": 0o700}
+        native = {"id": self.conversation.upper(), "title": "Hidden child", "parentSessionId": str(uuid.uuid4()).upper()}
+        body = {"files": [file], "file_key": base64.b64encode(key).decode(), "file_grant": "grant", "history": [], "title": "Existing project", "native_session": native}
         path = f"/v1/conversations/{self.conversation}/import"
         response = await self.client.put(path, json=body); self.assertEqual(response.status_code, 200, response.text)
         record = await self.store.get(self.owner, "workspace", self.conversation)
         self.assertNotIn(base64.b64encode(key).decode(), json.dumps(record))
         root = await self.app.state.engine.spaces.restore(self.owner, self.conversation, "grant")
         self.assertEqual((root / ".env").read_bytes(), data)
+        self.assertEqual((root / ".env").stat().st_mode & 0o777, 0o700)
+        index = (await self.client.get("/v1/conversations")).json()["conversations"]
+        self.assertEqual(index[0]["native_session"], native)
         # Same archive is safe to import again; a different owner-bound key is not.
         self.assertEqual((await self.client.put(path, json=body)).status_code, 200)
         body["file_key"] = base64.b64encode(os.urandom(32)).decode()
@@ -215,6 +219,52 @@ class APITests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.app.state.engine.spaces.path(self.owner, GLOBAL_WORKSPACE).exists())
         root = await self.app.state.engine.spaces.restore(self.owner, GLOBAL_WORKSPACE, "grant")
         self.assertEqual((root / "memory/preference.md").read_text(), "persistent account memory")
+
+    async def test_new_queued_submission_remains_latest_while_an_older_run_saves_progress(self):
+        release = asyncio.Event()
+        class SlowModel(ModelFixture):
+            async def stream(self, *args):
+                await release.wait()
+                async for item in super().stream(*args): yield item
+        self.app.state.engine.models = SlowModel()
+        first, _ = await self.submit()
+        await self.wait_state(first, {"running"})
+        second = str(uuid.uuid4())
+        body = {"id": second, "conversation": self.conversation, "prompt": "second queued instruction", "file_grant": "grant", "permission_mode": "unrestricted"}
+        self.assertEqual((await self.client.post("/v1/runs", json=body)).status_code, 200)
+        release.set()
+        await self.wait_state(first, {"completed"})
+        record = (await self.client.get(f"/v1/conversations/{self.conversation}")).json()
+        self.assertEqual(record["latest_run"], second)
+        self.assertEqual((await self.wait_state(second, {"completed", "failed"}))["status"], "completed")
+
+    async def test_local_edit_can_replace_its_verified_base_without_clobbering_an_unseen_cloud_edit(self):
+        key = os.urandom(32)
+        async def file(content):
+            digest = hashlib.sha256(content).hexdigest(); nonce = os.urandom(12)
+            ciphertext = nonce + AESGCM(key).encrypt(nonce, content, f"{self.owner}|{digest}|0".encode())
+            return {"path": "attachments/project.txt", "bytes": len(content), "sha256": digest, "parts": [await self.gateway.put("grant", ciphertext)]}
+        original, changed = await file(b"original project file"), await file(b"edited locally")
+        path = f"/v1/conversations/{self.conversation}/import"
+        body = {"files": [original], "file_key": base64.b64encode(key).decode(), "file_grant": "grant"}
+        self.assertEqual((await self.client.put(path, json=body)).status_code, 200)
+        base = (await self.client.get(f"/v1/conversations/{self.conversation}/files")).json()
+        self.assertEqual(base["files"][0]["origin"], "workspace")
+        lease = str(uuid.uuid4())
+        self.assertEqual((await self.client.post(f"/v1/transitions/{lease}/begin")).status_code, 200)
+        body.update(files=[changed], lease_id=lease, replace_existing=True, expected_workspace_hash=base["workspace_hash"])
+        self.assertEqual((await self.client.put(path, json=body)).status_code, 200)
+        # The same verified transition may be retried after an ambiguous reply.
+        self.assertEqual((await self.client.put(path, json=body)).status_code, 200)
+        current = await self.store.get(self.owner, "workspace", self.conversation)
+        self.assertEqual(current["previous"]["files"][0]["sha256"], original["sha256"])
+        # Simulate an unseen concurrent revision; the old base must stop it.
+        import copy
+        newer = copy.deepcopy(current); newer["files"].append({"path": "new-cloud-file", "bytes": 0, "sha256": hashlib.sha256(b"").hexdigest(), "parts": []})
+        await self.store.put(self.owner, "workspace", self.conversation, newer)
+        self.assertEqual((await self.client.put(path, json=body)).status_code, 409)
+        self.assertEqual(len((await self.store.get(self.owner, "workspace", self.conversation))["files"]), 2)
+        self.assertEqual((await self.client.post(f"/v1/transitions/{lease}/end")).status_code, 200)
 
 
 if __name__ == "__main__": unittest.main()

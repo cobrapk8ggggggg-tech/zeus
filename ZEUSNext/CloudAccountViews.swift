@@ -68,8 +68,8 @@ private struct CloudWelcomeView: View {
         if account.phase == .loading { ProgressView("جارٍ فتح حسابك…") }
         else if account.passwordRecovery {
             Text("كلمة مرور جديدة").font(.headline)
-            SecureField("12 حرفًا على الأقل", text: $password).textContentType(.newPassword)
-            SecureField("تأكيد كلمة المرور", text: $confirmation).textContentType(.newPassword)
+            SecureField("", text: $password, prompt: Text("12 حرفًا على الأقل").foregroundColor(.white.opacity(0.6))).textContentType(.newPassword).modifier(CloudInputSurface()).accessibilityLabel("كلمة المرور الجديدة")
+            SecureField("", text: $confirmation, prompt: Text("تأكيد كلمة المرور").foregroundColor(.white.opacity(0.6))).textContentType(.newPassword).modifier(CloudInputSurface()).accessibilityLabel("تأكيد كلمة المرور")
             action("حفظ كلمة المرور") { await account.updatePassword(password) }.disabled(password != confirmation || password.isEmpty)
         } else if account.phase == .claim {
             Text(account.identity?.email ?? "").textSelection(.enabled)
@@ -84,11 +84,13 @@ private struct CloudWelcomeView: View {
             action("العودة لتسجيل الدخول") { await account.signOut() }
         } else {
             Text(recovering ? "استعادة الحساب" : creating ? "إنشاء حساب" : "تسجيل الدخول").font(.headline)
-            TextField("البريد الإلكتروني", text: $email).textContentType(.emailAddress).keyboardType(.emailAddress)
+            TextField("", text: $email, prompt: Text("البريد الإلكتروني").foregroundColor(.white.opacity(0.6))).textContentType(.emailAddress).keyboardType(.emailAddress)
+                .modifier(CloudInputSurface())
+                .accessibilityLabel("البريد الإلكتروني")
                 .textInputAutocapitalization(.never).autocorrectionDisabled().accessibilityIdentifier("cloudEmail")
             if !recovering {
-                SecureField("كلمة المرور", text: $password).textContentType(creating ? .newPassword : .password).accessibilityIdentifier("cloudPassword")
-                if creating { SecureField("تأكيد كلمة المرور", text: $confirmation).textContentType(.newPassword) }
+                SecureField("", text: $password, prompt: Text("كلمة المرور").foregroundColor(.white.opacity(0.6))).textContentType(creating ? .newPassword : .password).modifier(CloudInputSurface()).accessibilityLabel("كلمة المرور").accessibilityIdentifier("cloudPassword")
+                if creating { SecureField("", text: $confirmation, prompt: Text("تأكيد كلمة المرور").foregroundColor(.white.opacity(0.6))).textContentType(.newPassword).modifier(CloudInputSurface()) }
             }
             action(recovering ? "إرسال رابط الاستعادة" : creating ? "إنشاء الحساب" : "دخول") {
                 if recovering { await account.recover(email: email) }
@@ -100,7 +102,7 @@ private struct CloudWelcomeView: View {
             Button(recovering ? "العودة للدخول" : "نسيت كلمة المرور") { recovering.toggle(); creating = false; password = "" }
             DisclosureGroup("تأكيد البريد أو الاستعادة باستخدام رابط الرسالة") {
                 Text("انسخ رابط التأكيد من رسالة البريد والصقه هنا إذا لم يفتح التطبيق تلقائيًا.").font(.footnote)
-                SecureField("رابط التأكيد من بريدك", text: $emailLink).textInputAutocapitalization(.never).autocorrectionDisabled()
+                SecureField("", text: $emailLink, prompt: Text("رابط التأكيد من بريدك").foregroundColor(.white.opacity(0.6))).modifier(CloudInputSurface()).textInputAutocapitalization(.never).autocorrectionDisabled().accessibilityLabel("رابط تأكيد البريد")
                 action("التحقق من الرابط") { await account.verifyEmailLink(emailLink); emailLink = "" }.disabled(emailLink.isEmpty)
             }.font(.subheadline)
             Text("Google سيضاف لاحقًا. الدخول الحالي بالبريد وكلمة المرور.").font(.footnote).foregroundStyle(.white.opacity(0.65))
@@ -119,17 +121,42 @@ private extension ProcessInfo.ThermalState {
     var isSerious: Bool { self == .serious || self == .critical }
 }
 
+private struct CloudInputSurface: ViewModifier {
+    func body(content: Content) -> some View {
+        content.foregroundColor(.white).padding(.horizontal, 14).padding(.vertical, 12)
+            .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.white.opacity(0.18)))
+    }
+}
+
 struct CloudPreparedBrowser<Content: View>: View {
     @ObservedObject var sync: BrowserCloudSync
+    @State private var switching = false
+    @State private var transitionProgress = ""
+    @State private var transitionIssue: String?
     let content: () -> Content
     var body: some View {
         Group {
             if sync.prepared { content() }
             else {
                 VStack(spacing: 20) {
-                    if let issue = sync.issue {
+                    if switching { ProgressView(transitionProgress) }
+                    else if let issue = sync.issue {
                         Text(issue).multilineTextAlignment(.center)
                         Button("إعادة محاولة الاستعادة") { Task { await sync.prepare() } }.disabled(sync.busy)
+                        Button("الاستعادة بالتشغيل السحابي") {
+                            Task {
+                                switching = true; transitionIssue = nil
+                                defer { switching = false }
+                                do {
+                                    guard let delegate = NativeCloudAccountAPI.dataDelegate else { throw CloudAccountError.invalidResponse }
+                                    try await delegate.restoreUsingCloudExecution { transitionProgress = $0 }
+                                    await sync.prepare()
+                                } catch { transitionIssue = error.localizedDescription }
+                            }
+                        }.disabled(sync.busy)
+                        Text("يستعيد المحادثات والإعدادات ويُبقي ملفات المشاريع على الخادم، لتوفير مساحة الجهاز.").font(.footnote).foregroundStyle(.secondary)
+                        if let transitionIssue { Text(transitionIssue).foregroundStyle(.orange) }
                     } else { ProgressView("جارٍ التحقق من بيانات حسابك…") }
                 }.padding(30).frame(maxWidth: .infinity, maxHeight: .infinity)
             }

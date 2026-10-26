@@ -14,7 +14,7 @@ from zeus_cloud.terminal import Terminals
 
 
 class MemoryStore:
-    def __init__(self): self.rows = {}; self.runs = {}; self.timeline = []
+    def __init__(self): self.rows = {}; self.runs = {}; self.timeline = []; self.leases = {}
     @asynccontextmanager
     async def active(self): yield self
     async def initialize(self): pass
@@ -27,6 +27,7 @@ class MemoryStore:
     async def list(self, owner, kind): return [v for (o, k, _), v in self.rows.items() if o == owner and k == kind]
     async def run(self, owner, identifier): return self.runs.get((owner, identifier))
     async def create_run(self, owner, value):
+        if owner in self.leases: raise ValueError("Account transition is in progress")
         return self.runs.setdefault((owner, value["id"]), {**value, "owner": owner, "seq": 0})
     async def update_run(self, owner, identifier, **changes):
         self.runs[owner, identifier].update(changes); return self.runs[owner, identifier]
@@ -39,6 +40,11 @@ class MemoryStore:
     async def events(self, owner, identifier, after=0): return [v for v in self.timeline if v["owner"] == owner and v["run"] == identifier and v["seq"] > after]
     async def list_runs(self, owner, conversation, before=4102444800): return sorted([r for (o,_),r in self.runs.items() if o == owner and r["conversation"] == conversation and r["created"] < before], key=lambda r:r["created"], reverse=True)[:25]
     async def prune_events(self, owner, run, through): self.timeline[:] = [e for e in self.timeline if not (e["owner"] == owner and e["run"] == run and e["seq"] <= through)]
+    async def account_state(self, owner): return {"lease": self.leases.get(owner), "active_runs": sum(o == owner and r["status"] in {"queued", "running", "waiting_user"} for (o,_),r in self.runs.items())}
+    async def transition(self, owner, identifier, command):
+        if command == "end": self.leases.pop(owner, None); return True
+        if command == "begin" and (await self.account_state(owner))["active_runs"]: raise ValueError("Finish cloud tasks first")
+        self.leases[owner] = {"id": identifier, "expires": 4102444800}; return self.leases[owner]
 
 
 class RuntimeTests(unittest.IsolatedAsyncioTestCase):

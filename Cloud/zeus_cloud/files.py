@@ -1,6 +1,7 @@
 """Bounded, verified workspace checkpoints outside Railway's ephemeral disk."""
 import asyncio
 import hashlib
+import json
 import os
 import shutil
 from pathlib import Path, PurePosixPath
@@ -16,6 +17,9 @@ GLOBAL_WORKSPACE = "00000000-0000-4000-8000-000000000001"
 CHUNK = 8 * 1024 * 1024
 WORKSPACE_LIMIT = 128 * 1024 * 1024
 MAX_FILES = 4096
+
+
+class WorkspaceConflict(ValueError): pass
 
 
 def relative_path(name):
@@ -141,6 +145,11 @@ class Workspaces:
 
     def aad(self, owner, digest, index): return f"{owner}|{digest}|{index}".encode()
 
+    @staticmethod
+    def fingerprint(record):
+        files = sorted((record or {}).get("files", []), key=lambda file: file["path"])
+        return hashlib.sha256(json.dumps(files, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
     async def part(self, owner, file, index, grant, key):
         data = await self.gateway.get(grant, file["parts"][index])
         if file.get("encrypted"):
@@ -149,14 +158,18 @@ class Workspaces:
             except InvalidTag: raise ValueError("Encrypted file integrity check failed") from None
         return data
 
-    async def import_files(self, owner, conversation, files, key_text, grant):
+    async def import_files(self, owner, conversation, files, key_text, grant, expected_hash=None, replace=False):
         if not self.vault: raise ValueError("Encrypted workspace storage is unavailable")
         key = base64.b64decode(key_text, validate=True)
         if len(key) != 32 or len(files) > MAX_FILES or sum(f["bytes"] for f in files) > WORKSPACE_LIMIT:
             raise ValueError("Workspace exceeds its configured limit or has an invalid key")
         previous = await self.store.get(owner, "workspace", conversation) or {}
+        if replace and (not expected_hash or self.fingerprint(previous) != expected_hash):
+            def logical(entries): return sorted((f["path"], f["bytes"], f.get("sha256"), int(f.get("mode", 0o600)) & 0o777) for f in entries)
+            if logical(previous.get("files", [])) == logical(files): return previous
+            raise WorkspaceConflict("تغيرت نسخة المشروع السحابية منذ آخر استعادة محلية. احتُفظ بالنسختين؛ لم تُستبدل الملفات الأحدث.")
         target_key = self.key(owner, previous) or key
-        merged = {f["path"]: f for f in previous.get("files", [])}
+        merged = {} if replace else {f["path"]: f for f in previous.get("files", [])}
         for file in files:
             relative_path(file["path"])
             digest = hashlib.sha256(); size = 0; parts = []
@@ -172,10 +185,17 @@ class Workspaces:
             if size != file["bytes"] or digest.hexdigest() != file["sha256"]: raise ValueError("Imported file integrity check failed")
             existing = merged.get(file["path"])
             if existing and existing.get("sha256") != file["sha256"]: raise ValueError("Cloud file differs from the local import; local originals were retained")
-            merged[file["path"]] = {"path": file["path"], "bytes": size, "sha256": file["sha256"], "parts": parts, "encrypted": True, "mode": 0o600}
+            inputs = file["path"].startswith("__zeus_inputs__/")
+            mode = int(file.get("mode", 0o600)) & 0o777
+            merged[file["path"]] = {"path": file["path"], "bytes": size, "sha256": file["sha256"], "parts": parts, "encrypted": True, "mode": mode,
+                "origin": "input" if inputs else "workspace", "source_path": file["path"][16:] if inputs else file["path"]}
         if len(merged) > MAX_FILES or sum(f["bytes"] for f in merged.values()) > WORKSPACE_LIMIT: raise ValueError("Merged workspace exceeds its configured limit")
-        return await self.store.put(owner, "workspace", conversation, {"files": list(merged.values()), "version": 1,
-            "key": self.vault.seal(owner, base64.b64encode(target_key).decode())})
+        result = {"files": list(merged.values()), "version": previous.get("version", 0) + 1,
+            "key": self.vault.seal(owner, base64.b64encode(target_key).decode())}
+        if replace and previous.get("files"):
+            result["previous"] = {k: v for k, v in previous.items() if k in {"files", "key", "version"}}
+        elif previous.get("previous"): result["previous"] = previous["previous"]
+        return await self.store.put(owner, "workspace", conversation, result)
 
     async def read_cloud_file(self, owner, conversation, name, grant, offset=0):
         relative_path(name)
@@ -244,7 +264,8 @@ class Workspaces:
             file_digest = await asyncio.to_thread(file_hash)
             old = next((f for f in (previous or {}).get("files", []) if f.get("sha256") == file_digest and f["bytes"] == size and bool(f.get("encrypted")) == bool(key)), None)
             if old:
-                files.append({**old, "path": name, "mode": mode}); continue
+                inputs = name.startswith("__zeus_inputs__/")
+                files.append({**old, "path": name, "mode": mode, "origin": "input" if inputs else "workspace", "source_path": name[16:] if inputs else name}); continue
             with open_regular(root, name) as file:
                 while data := await asyncio.to_thread(file.read, CHUNK - (28 if key else 0)):
                     copied_digest.update(data)
@@ -257,8 +278,12 @@ class Workspaces:
                     parts.append(ref)
             if sum(p["bytes"] - (28 if key else 0) for p in parts) != size: raise ValueError("File changed during checkpoint")
             if copied_digest.hexdigest() != file_digest: raise ValueError("File changed while copying its contents")
-            files.append({"path": name, "bytes": size, "mode": mode, "parts": parts, "sha256": file_digest, "encrypted": bool(key)})
+            inputs = name.startswith("__zeus_inputs__/")
+            files.append({"path": name, "bytes": size, "mode": mode, "parts": parts, "sha256": file_digest, "encrypted": bool(key),
+                "origin": "input" if inputs else "workspace", "source_path": name[16:] if inputs else name})
         if before != await asyncio.to_thread(inventory, root): raise ValueError("Workspace changed during checkpoint; no complete checkpoint published")
-        record = {"files": files, "version": 1}
+        if previous and files == previous.get("files"): return previous
+        record = {"files": files, "version": (previous or {}).get("version", 0) + 1}
+        if (previous or {}).get("previous"): record["previous"] = previous["previous"]
         if key: record["key"] = (previous or {}).get("key") or self.vault.seal(owner, base64.b64encode(key).decode())
         return await self.store.put(owner, "workspace", conversation, record)

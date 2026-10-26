@@ -31,6 +31,15 @@ extension EnvironmentValues {
                     .environment(\.nativeAgentPreferences, preferences)
                     .preferredColorScheme(holder.model.data.settings.theme?.light == true ? .light : .dark)
                     .environment(\.layoutDirection, .rightToLeft)
+                    .task {
+                        NativeCloudAccountAPI.prepareBrowserBackup = { [weak model = holder.model] in
+                            guard let model else { throw CloudAccountError.invalidResponse }
+                            model.persist(); await model.cloudSync.saveNow()
+                            guard !model.cloudSync.pending, model.cloudSync.issue == nil else {
+                                throw CloudAccountError.incomplete(model.cloudSync.issue ?? "احفظ تغييرات المتصفح قبل نقل الوكيل.")
+                            }
+                        }
+                    }
             }
         }
     }

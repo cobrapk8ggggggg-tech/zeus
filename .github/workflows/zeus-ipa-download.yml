@@ -102,6 +102,7 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/ZEUSNativeDevice" \
             build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ARCHS=arm64 \
             2>&1 | tee results/device-build.log
+          cp upstream/src/ios/Minis.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved results/Package.resolved
       - name: Package unsigned IPA and verify its contents
         run: |
           set -euo pipefail
@@ -134,6 +135,7 @@ jobs:
             results/native-adapters.json
             results/ipa-zip-check.txt
             results/ipa-size-audit.json
+            results/Package.resolved
           retention-days: 14
           compression-level: 0
           if-no-files-found: error

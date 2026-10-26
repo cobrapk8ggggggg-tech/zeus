@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr
 from .database import MongoStore
 from .postgres import PostgresGatewayStore
 from .engine import Engine, Vault, TERMINAL
-from .files import FilesGateway, Workspaces, WORKSPACE_LIMIT, GLOBAL_WORKSPACE
+from .files import FilesGateway, Workspaces, WORKSPACE_LIMIT, GLOBAL_WORKSPACE, WorkspaceConflict
 from .providers import Models, provider_url, normalize_history
 from .terminal import Terminals
 
@@ -57,10 +57,14 @@ class ApprovalInput(Input):
 
 class ImportInput(Input):
     title: str = Field(default="", max_length=500)
+    native_session: dict | None = None
     history: list[dict] = Field(default_factory=list, max_length=1000)
     files: list[dict] = Field(default_factory=list, max_length=4096)
     file_key: SecretStr
     file_grant: SecretStr
+    lease_id: uuid.UUID | None = None
+    expected_workspace_hash: str | None = Field(default=None, pattern="^[a-f0-9]{64}$")
+    replace_existing: bool = False
 
 
 class TerminalInput(Input):
@@ -174,6 +178,8 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
     async def missing(_, error): return JSONResponse({"detail": "العنصر غير موجود."}, 404)
     @app.exception_handler(ValueError)
     async def invalid(_, error): return JSONResponse({"detail": str(error)[:1000]}, 400)
+    @app.exception_handler(WorkspaceConflict)
+    async def workspace_conflict(_, error): return JSONResponse({"detail": str(error)}, 409)
 
     def ready():
         if not app.state.ready or engine is None: raise HTTPException(503, app.state.problem or "إعداد اتصال الخادم غير مكتمل.")
@@ -186,8 +192,30 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
         return {"ready": app.state.ready, "reason": app.state.problem,
             "cloud_agent": True, "terminal": True, "browser": False, "xcode": False,
             "max_parallel_runs": 1, "workspace_bytes": WORKSPACE_LIMIT,
-            "provider_protocols": ["openai", "anthropic"], "owner_configured": bool(owner),
+            "provider_protocols": ["openai", "anthropic"], "owner_configured": bool(owner or owner_email),
             "browser_notice": "الخادم بلا متصفح. أخبر المستخدم مبكرًا إن احتاجت المهمة تفاعلًا مع صفحة أو جلسة جهازه."}
+
+    @app.get("/v1/account/state")
+    async def account_state(account=Depends(auth)):
+        ready(); value = await store.account_state(account)
+        return {**value, "terminal_active": any(t.owner == account and terminals.active(account, t.id) for t in terminals.sessions.values())}
+
+    @app.post("/v1/transitions/{identifier}/{operation}")
+    async def transition(identifier: uuid.UUID, operation: str, account=Depends(auth)):
+        ready()
+        if operation not in {"begin", "renew", "end"}: raise HTTPException(404, "عملية غير متاحة.")
+        if operation == "renew":
+            try: return await store.transition(account, str(identifier), operation)
+            except httpx.HTTPStatusError as error:
+                if error.response.status_code == 409: raise HTTPException(409, "انتهت مهلة نقل الحساب؛ بقيت الأصول محفوظة. أعد المحاولة.") from None
+                raise
+        async with engine.execution_gate:
+            if operation == "begin" and any(t.owner == account and terminals.active(account, t.id) for t in terminals.sessions.values()):
+                raise HTTPException(409, "أغلق الطرفية السحابية واحفظ ملفاتها قبل تغيير مكان التنفيذ.")
+            try: return await store.transition(account, str(identifier), operation)
+            except httpx.HTTPStatusError as error:
+                if error.response.status_code == 409: raise HTTPException(409, "أكمل المهام السحابية أو أوقفها قبل تغيير مكان التنفيذ، ثم أعد المحاولة.") from None
+                raise
 
     @app.put("/v1/providers/{identifier}")
     async def configure_provider(identifier: str, value: ProviderInput, account=Depends(auth)):
@@ -224,19 +252,22 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
         if checked.get("user_id") != account or checked.get("conversation_id") != conversation: raise HTTPException(403, "تصريح الملفات لا ينتمي لهذه المحادثة والحساب.")
         for message in value.history:
             if message.get("role") not in {"user", "assistant", "tool"}: raise ValueError("سجل محادثة غير صالح.")
-        run = await store.create_run(account, {"id": identifier, "conversation": conversation, "prompt": value.prompt,
-            "history": normalize_history(value.history), "provider": provider["encrypted"], "grant": vault.seal(account, grant),
-            "permission_mode": value.permission_mode, "max_seconds": value.max_seconds,
-            "native_user_id": str(value.native_user_id).upper() if value.native_user_id else None,
-            "native_assistant_id": str(value.native_assistant_id).upper() if value.native_assistant_id else None,
-            "native_session": value.native_session,
-            "fingerprint": fingerprint, "status": "queued", "created": time.time()})
-        if run.get("fingerprint") != fingerprint: raise HTTPException(409, "معرف الطلب مستخدم لمهمة أخرى.")
-        record = await store.get(account, "conversation", conversation) or {"messages": normalize_history(value.history), "title": value.prompt[:120]}
-        if value.native_session:
-            record["native_session"] = value.native_session
-        await store.put(account, "conversation", conversation, {**record, "latest_run": identifier})
-        engine.wakeup.set()
+        async with engine.execution_gate:
+            if (await store.account_state(account)).get("lease"):
+                raise HTTPException(409, "نقل الحساب جارٍ. انتظر اكتماله قبل إرسال مهمة سحابية.")
+            run = await store.create_run(account, {"id": identifier, "conversation": conversation, "prompt": value.prompt,
+                "history": normalize_history(value.history), "provider": provider["encrypted"], "grant": vault.seal(account, grant),
+                "permission_mode": value.permission_mode, "max_seconds": value.max_seconds,
+                "native_user_id": str(value.native_user_id).upper() if value.native_user_id else None,
+                "native_assistant_id": str(value.native_assistant_id).upper() if value.native_assistant_id else None,
+                "native_session": value.native_session,
+                "fingerprint": fingerprint, "status": "queued", "created": time.time()})
+            if run.get("fingerprint") != fingerprint: raise HTTPException(409, "معرف الطلب مستخدم لمهمة أخرى.")
+            record = await store.get(account, "conversation", conversation) or {"messages": normalize_history(value.history), "title": value.prompt[:120]}
+            if value.native_session:
+                record["native_session"] = value.native_session
+            await store.put(account, "conversation", conversation, {**record, "latest_run": identifier, "latest_created": run["created"]})
+            engine.wakeup.set()
         return public_run(run)
 
     @app.get("/v1/runs/{identifier}")
@@ -293,7 +324,7 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
     @app.get("/v1/conversations/{identifier}/files")
     async def files(identifier: uuid.UUID, account=Depends(auth)):
         ready(); record = await store.get(account, "workspace", str(identifier))
-        return {"files": (record or {}).get("files", []), "version": 1}
+        return {"files": (record or {}).get("files", []), "version": (record or {}).get("version", 0), "workspace_hash": spaces.fingerprint(record)}
 
     @app.get("/v1/conversations/{identifier}")
     async def conversation(identifier: uuid.UUID, account=Depends(auth)):
@@ -310,14 +341,22 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
     @app.put("/v1/conversations/{identifier}/import")
     async def import_conversation(identifier: uuid.UUID, value: ImportInput, account=Depends(auth)):
         ready(); key = str(identifier)
-        if engine.running and not engine.running.done(): raise HTTPException(409, "أوقف المهمة قبل نقل ملفات المحادثة.")
         checked = await gateway.check(value.file_grant.get_secret_value())
         if checked.get("user_id") != account or checked.get("conversation_id") != key: raise HTTPException(403, "تصريح الملفات لا يطابق المحادثة.")
-        await spaces.import_files(account, key, value.files, value.file_key.get_secret_value(), value.file_grant.get_secret_value())
-        if await store.get(account, "conversation", key) is None:
+        async with engine.execution_gate:
+            if engine.running and not engine.running.done() or any(terminals.active(account, t.id) for t in terminals.sessions.values() if t.owner == account):
+                raise HTTPException(409, "أوقف المهمة والطرفية قبل نقل ملفات المحادثة.")
+            lease = (await store.account_state(account)).get("lease")
+            if lease and lease["id"] != str(value.lease_id): raise HTTPException(409, "عملية نقل أخرى قيد التنفيذ.")
+            if value.replace_existing and not lease: raise HTTPException(409, "يلزم بدء انتقال موثق قبل استبدال نسخة الملفات.")
+            await spaces.import_files(account, key, value.files, value.file_key.get_secret_value(), value.file_grant.get_secret_value(), value.expected_workspace_hash, value.replace_existing)
+        existing = await store.get(account, "conversation", key)
+        if existing is None:
             for message in value.history:
                 if message.get("role") not in {"user", "assistant", "tool"}: raise ValueError("سجل محادثة غير صالح.")
-            await store.put(account, "conversation", key, {"title": value.title, "messages": normalize_history(value.history)})
+            await store.put(account, "conversation", key, {"title": value.title, "messages": normalize_history(value.history), "native_session": value.native_session})
+        elif value.native_session and not existing.get("native_session"):
+            await store.put(account, "conversation", key, {**existing, "native_session": value.native_session})
         return {"imported": True, "files": len(value.files)}
 
     @app.post("/v1/conversations/{identifier}/file")
@@ -336,11 +375,13 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
         checked = await gateway.check(grant)
         if checked.get("user_id") != account or checked.get("conversation_id") != conversation: raise HTTPException(403, "تصريح الملفات لا يطابق المحادثة.")
         async with engine.execution_gate:
+            if (await store.account_state(account)).get("lease"): raise HTTPException(409, "نقل الحساب جارٍ. انتظر اكتماله قبل فتح الطرفية.")
             if engine.running and not engine.running.done(): raise HTTPException(409, "الوكيل يستخدم خانة التنفيذ. انتظر انتهاء مهمته أو أوقفها.")
             root = await spaces.restore(account, conversation, grant); engine.own(root)
             global_root = await spaces.restore(account, GLOBAL_WORKSPACE, grant)
             for folder in ["shared", "skills", "memory"]: (global_root / folder).mkdir(exist_ok=True)
             engine.own(global_root)
+            engine.aliases(account, root)
             terminal = await terminals.start(account, conversation, root, uid=child_uid, seconds=900, global_root=global_root)
             terminal_grants[terminal.id] = grant
         return terminals.read(account, terminal.id)

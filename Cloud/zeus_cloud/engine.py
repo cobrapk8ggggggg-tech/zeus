@@ -68,6 +68,20 @@ class Engine:
             os.chown(folder, self.child_uid, self.child_uid)
             for name in files + directories: os.chown(Path(folder, name), self.child_uid, self.child_uid, follow_symlinks=False)
 
+    def aliases(self, owner, root):
+        if self.child_uid is None: return
+        base = Path("/var/minis"); base.mkdir(exist_ok=True, mode=0o755)
+        targets = {"workspace": root}
+        for scope in ["attachments", "offloads", "browser"]:
+            target = root / "__zeus_inputs__" / scope; target.mkdir(parents=True, exist_ok=True, mode=0o700)
+            targets[scope] = target
+        for scope in ["shared", "skills", "memory"]: targets[scope] = self.spaces.path(owner, GLOBAL_WORKSPACE) / scope
+        for name, target in targets.items():
+            link = base / name
+            if link.exists() and not link.is_symlink(): raise ValueError("Unexpected runtime mount destination")
+            link.unlink(missing_ok=True); link.symlink_to(target, target_is_directory=True)
+        self.own(root)
+
     async def execute(self, run):
         owner, identifier, conversation = run["owner"], run["id"], run["conversation"]
         grant = self.vault.open(owner, run["grant"])
@@ -78,6 +92,7 @@ class Engine:
                 global_root = await self.spaces.restore(owner, GLOBAL_WORKSPACE, grant)
                 for folder in ["shared", "skills", "memory"]: (global_root / folder).mkdir(exist_ok=True)
                 self.own(global_root)
+                self.aliases(owner, root)
                 provider = self.vault.open(owner, run["provider"])
                 saved = await self.store.get(owner, "conversation", conversation)
                 run["_context_archives"] = (saved or {}).get("archives", [])[:]
@@ -190,7 +205,12 @@ class Engine:
                 checkpoint = (await self.store.run(run["owner"], run["id"])) or {}
                 messages[:cut] = [{"role": "user", "content": "Earlier conversation context was encrypted and archived without deletion. Use history_read to inspect it. Current request: " + run["prompt"][:4000] + "\nProgress checkpoint: " + checkpoint.get("checkpoint", "")}]
                 await self.store.event(run["owner"], run["id"], "context_archived", {"pages": len(run["_context_archives"])})
-        await self.store.put(run["owner"], "conversation", run["conversation"], {"messages": messages, "title": title, "latest_run": run["id"], "archives": run.get("_context_archives", []), "native_session": run.get("_native_session")})
+        latest = await self.store.get(run["owner"], "conversation", run["conversation"]) or {}
+        newer_submission = latest.get("latest_created", 0) > run["created"]
+        await self.store.put(run["owner"], "conversation", run["conversation"], {"messages": messages, "title": title,
+            "latest_run": latest.get("latest_run") if newer_submission else run["id"],
+            "latest_created": max(latest.get("latest_created", 0), run["created"]), "archives": run.get("_context_archives", []),
+            "native_session": latest.get("native_session") if newer_submission else run.get("_native_session")})
 
     async def approve(self, run, call, pending):
         key = str(uuid.uuid4()); owner, identifier = run["owner"], run["id"]
@@ -204,7 +224,11 @@ class Engine:
         owner, conversation = run["owner"], run["conversation"]
         name, args = call["name"], call["arguments"]
         def scoped_path(value):
+            if value.startswith("/var/minis/workspace/"): value = value[len("/var/minis/workspace/"):]
+            for scope in ["attachments", "offloads", "browser"]:
+                if value.startswith("/var/minis/" + scope + "/"): value = "__zeus_inputs__/" + scope + "/" + value[len("/var/minis/" + scope + "/"):]
             for scope in ["shared", "skills", "memory"]:
+                if value.startswith("/var/minis/" + scope + "/"): value = "@" + scope + "/" + value[len("/var/minis/" + scope + "/"):]
                 if value.startswith("@" + scope + "/"):
                     return self.spaces.path(owner, GLOBAL_WORKSPACE) / scope, value[len(scope) + 2:]
             return root, value
