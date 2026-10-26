@@ -43,8 +43,9 @@ project.root_object.package_references << auth_package
   auth_product.package = auth_package
   auth_product.product_name = 'Auth'
   item.package_product_dependencies << auth_product
-  auth_build = item.frameworks_build_phase.new(Xcodeproj::Project::Object::PBXBuildFile)
+  auth_build = project.new(Xcodeproj::Project::Object::PBXBuildFile)
   auth_build.product_ref = auth_product
+  item.frameworks_build_phase.files << auth_build
 end
 # Strip the actual binaries/dependency graph, not just visible media buttons.
 project.targets.each do |item|
