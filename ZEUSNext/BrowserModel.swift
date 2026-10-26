@@ -46,6 +46,7 @@ struct WebDialog: Identifiable {
 
 @MainActor final class BrowserModel: ObservableObject {
     let profiles: ProfileStore
+    lazy var cloudSync = BrowserCloudSync(browser: self)
     let downloads: DownloadService
     let shield: ShieldEngine
     @Published var data: ProfileData
@@ -116,6 +117,14 @@ struct WebDialog: Identifiable {
         data = imported
         if restoreOpenTabs { restoreTabs() }
         applySettings()
+    }
+    func reloadCloudProfiles() throws {
+        guard !switching else { throw AccountError.permission }
+        for tab in tabs { tab.dispose() }
+        agent?.cancel(); agent = nil
+        data = profiles.load(profiles.active)
+        twinTabID = nil; twinFocused = false
+        restoreTabs(); requiresUnlock = profile.locked || profile.requiresPassword
     }
     func changed() { objectWillChange.send() }
     func notify(_ text: String) { notice = BrowserNotice(text: text) }

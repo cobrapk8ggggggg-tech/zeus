@@ -32,6 +32,20 @@ target.build_configurations.each do |config|
 end
 app.add_dependency(target)
 app.frameworks_build_phase.add_file_reference(target.product_reference)
+# Only Auth is linked; files and sync use bounded URLSession transfers. Pin the
+# SDK rather than following an unreviewed branch or a floating major version.
+auth_package = project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
+auth_package.repositoryURL = 'https://github.com/supabase/supabase-swift.git'
+auth_package.requirement = { 'kind' => 'exactVersion', 'version' => '2.55.4' }
+project.root_object.package_references << auth_package
+[target, app].each do |item|
+  auth_product = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
+  auth_product.package = auth_package
+  auth_product.product_name = 'Auth'
+  item.package_product_dependencies << auth_product
+  auth_build = item.frameworks_build_phase.new(Xcodeproj::Project::Object::PBXBuildFile)
+  auth_build.product_ref = auth_product
+end
 # Strip the actual binaries/dependency graph, not just visible media buttons.
 project.targets.each do |item|
   [item.source_build_phase, item.resources_build_phase, item.frameworks_build_phase, *item.copy_files_build_phases].each do |phase|
@@ -92,8 +106,8 @@ app.build_configurations.each do |config|
   config.build_settings['CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]'] = 'ZeusSimulator.entitlements'
   config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'tools.rea.ZEUSBrowserAnalysis'
   config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '18.1'
-  config.build_settings['MARKETING_VERSION'] = '3.2.3'
-  config.build_settings['CURRENT_PROJECT_VERSION'] = '31'
+  config.build_settings['MARKETING_VERSION'] = '4.0.0'
+  config.build_settings['CURRENT_PROJECT_VERSION'] = '32'
   config.build_settings['INFOPLIST_KEY_CFBundleDisplayName'] = 'ZEUS'
 end
 # A device `build` (unlike archive/install) did not strip the original app's
@@ -126,6 +140,7 @@ tests.source_build_phase.add_file_reference(group.new_file((browser + '.openmini
 tests.source_build_phase.add_file_reference(group.new_file((browser + '.openminis/Host/NativeProjectContractTests.swift').to_s))
 tests.source_build_phase.add_file_reference(group.new_file((browser + '.openminis/Host/NativePersonalizationTests.swift').to_s))
 tests.source_build_phase.add_file_reference(group.new_file((browser + '.openminis/Host/NativeTranslationStreamingTests.swift').to_s))
+tests.source_build_phase.add_file_reference(group.new_file((browser + '.openminis/Host/NativeCloudAccountTests.swift').to_s))
 tests.build_configurations.each do |config|
   app_config = app.build_configurations.find { |candidate| candidate.name == config.name }
   %w[HEADER_SEARCH_PATHS FRAMEWORK_SEARCH_PATHS LIBRARY_SEARCH_PATHS].each do |key|
@@ -165,6 +180,8 @@ info = Xcodeproj::Plist.read_from_path(plist)
 info['CFBundleDisplayName'] = 'ZEUS'
 info['UIFileSharingEnabled'] = true
 info['LSSupportsOpeningDocumentsInPlace'] = true
+info['CFBundleURLTypes'] ||= []
+info['CFBundleURLTypes'] << { 'CFBundleURLName' => 'tools.zeus.cloud-account', 'CFBundleURLSchemes' => ['zeus-account'] }
 info['NSAppTransportSecurity'] = {'NSAllowsArbitraryLoads' => true}
 Xcodeproj::Plist.write_to_path(info, plist)
 puts "Original native app retained; browser module contains #{files.length} Swift source files."

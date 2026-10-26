@@ -1,0 +1,167 @@
+import SwiftUI
+
+struct CloudAccountGate<Content: View>: View {
+    @ObservedObject private var account = CloudAccount.shared
+    let content: () -> Content
+    var body: some View {
+        Group {
+            #if DEBUG
+            if CommandLine.arguments.contains("--zeus-native-fixture") || CommandLine.arguments.contains("--zeus-layout-editor") {
+                content()
+            } else { gated }
+            #else
+            gated
+            #endif
+        }
+        .task { account.start() }
+        .onOpenURL { url in Task { await account.handle(url) } }
+    }
+    @ViewBuilder private var gated: some View {
+        if account.phase == .ready && !account.passwordRecovery { content().id(account.identity?.id) }
+        else { CloudWelcomeView(account: account) }
+    }
+}
+
+private struct CloudWelcomeView: View {
+    @ObservedObject var account: CloudAccount
+    @State private var email = ""
+    @State private var password = ""
+    @State private var confirmation = ""
+    @State private var creating = false
+    @State private var recovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var moving = false
+    @State private var lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
+    @State private var thermal = ProcessInfo.processInfo.thermalState
+    private var animate: Bool { !reduceMotion && !lowPower && scenePhase == .active && !thermal.isSerious }
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                Color(red: 0.025, green: 0.035, blue: 0.08).ignoresSafeArea()
+                LinearGradient(colors: [.cyan.opacity(0.2), .indigo.opacity(0.16), .clear],
+                               startPoint: moving ? .topLeading : .bottomLeading,
+                               endPoint: moving ? .bottomTrailing : .topTrailing)
+                    .ignoresSafeArea().accessibilityHidden(true)
+                    .animation(animate ? .easeInOut(duration: 12).repeatForever(autoreverses: true) : nil, value: moving)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 22) {
+                        Image(systemName: "bolt.shield.fill").font(.system(size: 48, weight: .light)).foregroundStyle(.cyan)
+                        Text("ZEUS").font(.system(size: 38, weight: .bold, design: .rounded))
+                        Text("حسابك، وبروفايلاتك، ومساحة عملك").font(.title3)
+                        form
+                    }
+                    .padding(28).frame(maxWidth: 490)
+                    .background(.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 28))
+                    .overlay(RoundedRectangle(cornerRadius: 28).strokeBorder(.white.opacity(0.1)))
+                    .padding(24).frame(maxWidth: .infinity, minHeight: geometry.size.height)
+                }.scrollDismissesKeyboard(.interactively)
+            }.foregroundStyle(.white).tint(.cyan).environment(\.layoutDirection, .rightToLeft).preferredColorScheme(.dark)
+        }
+        .onAppear { moving = animate }
+        .onChange(of: animate) { _, value in moving = value }
+        .onReceive(NotificationCenter.default.publisher(for: .NSProcessInfoPowerStateDidChange)) { _ in lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled }
+        .onReceive(NotificationCenter.default.publisher(for: ProcessInfo.thermalStateDidChangeNotification)) { _ in thermal = ProcessInfo.processInfo.thermalState }
+    }
+    @ViewBuilder private var form: some View {
+        if account.phase == .loading { ProgressView("جارٍ فتح حسابك…") }
+        else if account.passwordRecovery {
+            Text("كلمة مرور جديدة").font(.headline)
+            SecureField("12 حرفًا على الأقل", text: $password).textContentType(.newPassword)
+            SecureField("تأكيد كلمة المرور", text: $confirmation).textContentType(.newPassword)
+            action("حفظ كلمة المرور") { await account.updatePassword(password) }.disabled(password != confirmation || password.isEmpty)
+        } else if account.phase == .claim {
+            Text(account.identity?.email ?? "").textSelection(.enabled)
+            Text("اربط بيانات هذا التثبيت بحسابك. تبقى الملفات المحلية محفوظة؛ لن تُحذف أثناء الربط أو قبل التحقق من نسخة السحابة.")
+            action("ربط بيانات الجهاز بهذا الحساب") {
+                do { try account.claimLocalData() } catch { account.issue = error.localizedDescription }
+            }.accessibilityIdentifier("cloudClaimLocalData")
+            Button("استخدام حساب آخر") { Task { await account.signOut() } }
+        } else if account.phase == .blocked {
+            Text("حماية بيانات الحساب").font(.headline)
+            Text(account.issue ?? "تعذر فتح بيانات هذا الحساب.")
+            action("العودة لتسجيل الدخول") { await account.signOut() }
+        } else {
+            Text(recovering ? "استعادة الحساب" : creating ? "إنشاء حساب" : "تسجيل الدخول").font(.headline)
+            TextField("البريد الإلكتروني", text: $email).textContentType(.emailAddress).keyboardType(.emailAddress)
+                .textInputAutocapitalization(.never).autocorrectionDisabled().accessibilityIdentifier("cloudEmail")
+            if !recovering {
+                SecureField("كلمة المرور", text: $password).textContentType(creating ? .newPassword : .password).accessibilityIdentifier("cloudPassword")
+                if creating { SecureField("تأكيد كلمة المرور", text: $confirmation).textContentType(.newPassword) }
+            }
+            action(recovering ? "إرسال رابط الاستعادة" : creating ? "إنشاء الحساب" : "دخول") {
+                if recovering { await account.recover(email: email) }
+                else if creating { await account.signUp(email: email, password: password) }
+                else { await account.signIn(email: email, password: password) }
+            }.disabled(email.isEmpty || (!recovering && password.isEmpty) || (creating && password != confirmation))
+                .accessibilityIdentifier("cloudSubmit")
+            if !recovering { Button(creating ? "لدي حساب بالفعل" : "إنشاء حساب جديد") { creating.toggle(); password = ""; confirmation = "" } }
+            Button(recovering ? "العودة للدخول" : "نسيت كلمة المرور") { recovering.toggle(); creating = false; password = "" }
+            Text("Google سيضاف لاحقًا. الدخول الحالي بالبريد وكلمة المرور.").font(.footnote).foregroundStyle(.white.opacity(0.65))
+        }
+        if let issue = account.issue, account.phase != .blocked { Text(issue).font(.footnote).foregroundStyle(.orange).textSelection(.enabled) }
+        if let notice = account.notice { Text(notice).font(.footnote).foregroundStyle(.mint).textSelection(.enabled) }
+        if account.busy { ProgressView().frame(maxWidth: .infinity) }
+    }
+    private func action(_ title: String, run: @escaping () async -> Void) -> some View {
+        Button { Task { await run() } } label: { Text(title).fontWeight(.semibold).frame(maxWidth: .infinity).padding(.vertical, 8) }
+            .buttonStyle(.borderedProminent).disabled(account.busy)
+    }
+}
+
+private extension ProcessInfo.ThermalState {
+    var isSerious: Bool { self == .serious || self == .critical }
+}
+
+struct CloudPreparedBrowser<Content: View>: View {
+    @ObservedObject var sync: BrowserCloudSync
+    let content: () -> Content
+    var body: some View {
+        Group {
+            if sync.prepared { content() }
+            else {
+                VStack(spacing: 20) {
+                    if let issue = sync.issue {
+                        Text(issue).multilineTextAlignment(.center)
+                        Button("إعادة محاولة الاستعادة") { Task { await sync.prepare() } }.disabled(sync.busy)
+                    } else { ProgressView("جارٍ التحقق من بيانات حسابك…") }
+                }.padding(30).frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }.task { await sync.prepare() }
+    }
+}
+
+struct CloudAccountSettingsView: View {
+    @ObservedObject var model: BrowserModel
+    @ObservedObject private var account = CloudAccount.shared
+    @ObservedObject private var sync: BrowserCloudSync
+    @State private var signOutPrompt = false
+    init(model: BrowserModel) { self.model = model; self.sync = model.cloudSync }
+    var body: some View {
+        Form {
+            Section("حساب ZEUS") {
+                LabeledContent("البريد", value: account.identity?.email ?? "غير مسجل")
+                Text("الحساب يملك بروفايلاتك الدائمة والوكيل المشترك بينها. كلمة مرور البروفايل المحلية مستقلة عن كلمة مرور حساب ZEUS.").font(.footnote)
+            }
+            Section("مزامنة المتصفح") {
+                if sync.busy { ProgressView("جارٍ الحفظ والتحقق…") }
+                else { Label(sync.pending ? "توجد بيانات تنتظر الحفظ" : sync.lastSaved == nil ? "لم تحفظ نسخة بعد" : "اكتمل آخر حفظ", systemImage: sync.pending ? "icloud.and.arrow.up" : "checkmark.icloud") }
+                if let saved = sync.lastSaved { LabeledContent("آخر نسخة مكتملة") { Text(saved, style: .relative) } }
+                Button("الحفظ والتحقق الآن") { Task { await sync.saveNow() } }.disabled(sync.busy || account.phase != .ready)
+                    .accessibilityIdentifier("cloudSaveNow")
+                if let issue = sync.issue { Text(issue).foregroundStyle(.orange).textSelection(.enabled) }
+                Text("النسخة الحالية تشمل البروفايلات الدائمة وإعدادات المتصفح وسجلاته. حالة ملفات الوكيل والأسرار ستظهر منفصلة؛ لا تعتبر بياناتها محفوظة حتى يكتمل نقلها.").font(.footnote)
+            }
+            Section("الدخول والأمان") {
+                Button("إرسال رابط تغيير كلمة المرور") { Task { await account.recover(email: account.identity?.email ?? "") } }.disabled(account.busy)
+                Button("تسجيل خروج هذا الجهاز", role: .destructive) { signOutPrompt = true }
+                Text("تسجيل الخروج لا يحذف بيانات السحابة. البيانات التي لم يكتمل رفعها لا تستعاد إذا حذفت التطبيق.").font(.footnote)
+                if let issue = account.issue { Text(issue).foregroundStyle(.orange) }
+                if let notice = account.notice { Text(notice).foregroundStyle(.secondary) }
+            }
+        }.navigationTitle("الحساب والمزامنة")
+            .confirmationDialog("تسجيل الخروج؟", isPresented: $signOutPrompt) {
+                Button("تسجيل الخروج", role: .destructive) { Task { await account.signOut() } }
+            } message: { Text(sync.pending ? "توجد تغييرات لم تحفظ سحابيًا بعد. ستبقى محليًا في هذا التثبيت." : "تبقى نسخ الحساب محفوظة في السحابة.") }
+    }
+}

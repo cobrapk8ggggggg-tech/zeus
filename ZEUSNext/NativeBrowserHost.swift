@@ -25,10 +25,14 @@ extension EnvironmentValues {
     private let preferences: NativePreferencesFactory?
     public init(preferences: NativePreferencesFactory? = nil, assistant: @escaping NativeAssistantFactory) { self.assistant = assistant; self.preferences = preferences }
     public var body: some View {
-        BrowserRoot(model: holder.model, nativeAssistant: assistant)
-            .environment(\.nativeAgentPreferences, preferences)
-            .preferredColorScheme(holder.model.data.settings.theme?.light == true ? .light : .dark)
-            .environment(\.layoutDirection, .rightToLeft)
+        CloudAccountGate {
+            CloudPreparedBrowser(sync: holder.model.cloudSync) {
+                BrowserRoot(model: holder.model, nativeAssistant: assistant)
+                    .environment(\.nativeAgentPreferences, preferences)
+                    .preferredColorScheme(holder.model.data.settings.theme?.light == true ? .light : .dark)
+                    .environment(\.layoutDirection, .rightToLeft)
+            }
+        }
     }
 }
 @MainActor private final class NativeBrowserHolder: ObservableObject {
