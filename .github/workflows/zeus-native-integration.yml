@@ -112,11 +112,9 @@ jobs:
       id: swift_cache
       with:
         path: |
-          ${{ runner.temp }}/OpenMinisOriginal/Build
           ${{ runner.temp }}/OpenMinisOriginal/SourcePackages
-          ${{ runner.temp }}/OpenMinisOriginal/ModuleCache.noindex
-        key: zeus-native-deriveddata-263-v2-${{ github.run_id }}
-        restore-keys: zeus-native-deriveddata-263-v2-
+        key: zeus-native-packages-263-v3-${{ github.run_id }}
+        restore-keys: zeus-native-packages-263-v3-
     - name: Discard SDK module caches tied to the previous runner image
       run: |
         python3 - <<'PYCODE'
@@ -152,7 +150,7 @@ jobs:
           xcodebuild -project upstream/src/ios/Minis.xcodeproj -scheme Minis \
           -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
           -derivedDataPath "$RUNNER_TEMP/OpenMinisOriginal" \
-          build-for-testing CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- ARCHS=arm64
+          -onlyUsePackageVersionsFromResolvedFile build-for-testing CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- ARCHS=arm64
         cp upstream/src/ios/Minis.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved results/Package.resolved
       id: native_build
     - uses: actions/cache/save@v4
@@ -160,10 +158,8 @@ jobs:
         != 'true'
       with:
         path: |
-          ${{ runner.temp }}/OpenMinisOriginal/Build
           ${{ runner.temp }}/OpenMinisOriginal/SourcePackages
-          ${{ runner.temp }}/OpenMinisOriginal/ModuleCache.noindex
-        key: zeus-native-deriveddata-263-v2-${{ github.run_id }}
+        key: zeus-native-packages-263-v3-${{ github.run_id }}
     - name: 'IPAD: Boot for Files and layout UI tests'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
       timeout-minutes: 10

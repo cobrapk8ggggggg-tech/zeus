@@ -133,7 +133,7 @@ import ZEUSBrowser
             var body: [String: Any] = ["id": state!.run, "conversation": sid, "prompt": prompt,
                 "history": Array(history.dropLast().suffix(150)), "provider": selectedProvider,
                 "file_grant": grant, "permission_mode": ZeusToolPermissions.shared.mode == .askAll ? "ask_all" : ZeusToolPermissions.shared.mode.rawValue,
-                "native_assistant_id": state!.assistantID!]
+                "native_assistant_id": state!.assistantID!, "tools": ZeusCloudToolBridge.catalog(vm), "instructions": vm.baseSystemPrompt]
             if let userID = vm.agentHistory.last?.dbMessageId { body["native_user_id"] = userID }
             if let session = await ChatStore.shared.getSession(sid) { body["native_session"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(session)) }
             // Preserve the exact request, including the selected provider, as
@@ -180,6 +180,9 @@ import ZEUSBrowser
                 state.userID = state.userID ?? metadata?["native_user_id"] as? String
                 try JSONEncoder().encode(state).write(to: stateURL(sid), options: .atomic)
             }
+            if let metadata = page["run"] as? [String: Any], metadata["status"] as? String == "waiting_user", let device = metadata["pending_device"] as? String {
+                try await ZeusCloudToolBridge.perform(id: device, vm: vm, run: state.run)
+            }
             for event in page["events"] as? [[String: Any]] ?? [] {
                 let data = event["data"] as? [String: Any] ?? [:]
                 switch event["kind"] as? String {
@@ -225,6 +228,7 @@ import ZEUSBrowser
                 var saved = message; saved.dbMessageId = state.assistantID
                 saved.dbMessageId = await vm.persistAgentMessage(saved)
                 vm.agentHistory.append(saved)
+                ZeusCloudArchive.shared.scheduleBackup()
                 state.complete = true; try JSONEncoder().encode(state).write(to: stateURL(sid), options: .atomic)
                 if status != "completed" { display.error = run["error"] as? String ?? "توقفت المهمة: \(status). الملفات المحفوظة متاحة في السحابة." }
                 return
@@ -273,9 +277,18 @@ import ZEUSBrowser
         vm.isProcessing = true; defer { vm.isProcessing = false }
         do { try await self.run(vm) } catch { vm.errorMessage = error.localizedDescription }
     }
+    private func allConversations() async throws -> [[String: Any]] {
+        var result: [[String: Any]] = [], after = ""
+        while true {
+            let page = try json(await NativeCloudAccountAPI.runtime("v1/conversations?after=" + after))
+            result += page["conversations"] as? [[String: Any]] ?? []
+            guard let next = page["next_cursor"] as? String, next > after, UUID(uuidString: next) != nil else { break }
+            after = next
+        }
+        return result
+    }
     func restoreSessionIndex() async throws {
-        let response = try json(await NativeCloudAccountAPI.runtime("v1/conversations"))
-        for record in response["conversations"] as? [[String: Any]] ?? [] {
+        for record in try await allConversations() {
             guard let raw = record["native_session"] as? [String: Any] else { continue }
             let session = try JSONDecoder().decode(ChatSession.self, from: JSONSerialization.data(withJSONObject: raw))
             if await ChatStore.shared.getSession(session.id) == nil {
@@ -412,8 +425,7 @@ import ZEUSBrowser
         _ = try await request("v1/conversations/\(sid)/import", ["files": files, "file_key": bytes.base64EncodedString(), "file_grant": grant], method: "PUT")
     }
     func restoreWorkspaces(progress: @escaping (String) -> Void) async throws {
-        let data = try await NativeCloudAccountAPI.runtime("v1/conversations")
-        for record in try json(data)["conversations"] as? [[String: Any]] ?? [] {
+        for record in try await allConversations() {
             guard let serverID = record["id"] as? String, serverID != Self.globalWorkspace else { continue }
             let id = (record["native_session"] as? [String: Any])?["id"] as? String ?? serverID
             progress("استعادة الملفات الأحدث للمحادثة…")

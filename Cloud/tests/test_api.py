@@ -266,5 +266,54 @@ class APITests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len((await self.store.get(self.owner, "workspace", self.conversation))["files"]), 2)
         self.assertEqual((await self.client.post(f"/v1/transitions/{lease}/end")).status_code, 200)
 
+    async def test_canonical_browser_tool_waits_without_worker_and_resumes_once(self):
+        class DeviceModel:
+            async def stream(self, provider, messages, tools, instructions):
+                names = {t["name"] for t in tools}
+                assert "browser_use" in names and "shell_execute" in names
+                if not any(m.get("role") == "tool" for m in messages):
+                    yield {"kind": "tool", "id": "browser-call", "name": "browser_use", "arguments": {"action": "get_text"}}
+                else: yield {"kind": "text", "text": "Browser returned original page"}
+        self.app.state.engine.models = DeviceModel()
+        body = {"id": str(uuid.uuid4()), "conversation": self.conversation, "prompt": "read current browser page", "provider": self.provider,
+                "tools": [{"name": n, "description": n, "parameters": {"type": "object", "properties": {}}} for n in ["browser_use", "shell_execute"]],
+                "file_grant": "grant", "permission_mode": "unrestricted"}
+        response = await self.client.post("/v1/runs", json=body); self.assertEqual(response.status_code, 200, response.text)
+        run = await self.wait_state(body["id"], {"waiting_user", "failed"})
+        self.assertEqual(run["status"], "waiting_user", run)
+        request = run["pending_device"]; claimant = str(uuid.uuid4())
+        for _ in range(100):
+            if self.app.state.engine.running is None: break
+            await asyncio.sleep(0.01)
+        self.assertIsNone(self.app.state.engine.running)
+        self.assertEqual((await self.client.post(f"/v1/device-tools/{request}/claim", json={"claimant": claimant}, headers={"Authorization": "Bearer fixture-other"})).status_code, 404)
+        self.assertEqual((await self.client.post(f"/v1/device-tools/{request}/claim", json={"claimant": claimant})).status_code, 200)
+        self.assertEqual((await self.client.post(f"/v1/device-tools/{request}/claim", json={"claimant": str(uuid.uuid4())})).status_code, 409)
+        result = {"claimant": claimant, "output": "Actual native browser page", "success": True}
+        self.assertEqual((await self.client.post(f"/v1/device-tools/{request}/result", json=result)).status_code, 200)
+        done = await self.wait_state(body["id"], {"completed", "failed"})
+        self.assertEqual(done["status"], "completed", done)
+        messages = (await self.store.get(self.owner, "conversation", self.conversation))["messages"]
+        self.assertEqual(sum(m.get("tool_call_id") == "browser-call" for m in messages), 1)
+
+    async def test_native_shell_and_file_edit_are_executed_in_cloud_workspace(self):
+        class NativeModel:
+            async def stream(self, provider, messages, tools, instructions):
+                count = sum(m.get("role") == "tool" for m in messages)
+                calls = [
+                    ("shell_execute", {"command": "printf 'old value' > example.txt"}),
+                    ("file_edit", {"path": "/var/minis/workspace/example.txt", "old_string": "old", "new_string": "new"}),
+                    ("file_write", {"path": "example.txt", "content": " appended", "append": True}),
+                ]
+                if count < len(calls):
+                    name, args = calls[count]; yield {"kind": "tool", "id": str(count), "name": name, "arguments": args}
+                else: yield {"kind": "text", "text": "Verified native tools"}
+        self.app.state.engine.models = NativeModel()
+        run, _ = await self.submit()
+        result = await self.wait_state(run, {"completed", "failed"})
+        self.assertEqual(result["status"], "completed", result)
+        content = await self.app.state.engine.spaces.read_cloud_file(self.owner, self.conversation, "example.txt", "grant")
+        self.assertEqual(content, b"new value appended")
+
 
 if __name__ == "__main__": unittest.main()

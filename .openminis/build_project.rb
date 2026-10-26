@@ -108,7 +108,7 @@ app.build_configurations.each do |config|
   config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'tools.rea.ZEUSBrowserAnalysis'
   config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '18.1'
   config.build_settings['MARKETING_VERSION'] = '4.0.0'
-  config.build_settings['CURRENT_PROJECT_VERSION'] = '36'
+  config.build_settings['CURRENT_PROJECT_VERSION'] = '37'
   config.build_settings['INFOPLIST_KEY_CFBundleDisplayName'] = 'ZEUS'
 end
 # A device `build` (unlike archive/install) did not strip the original app's
@@ -186,3 +186,8 @@ info['CFBundleURLTypes'] << { 'CFBundleURLName' => 'tools.zeus.cloud-account', '
 info['NSAppTransportSecurity'] = {'NSAllowsArbitraryLoads' => true}
 Xcodeproj::Plist.write_to_path(info, plist)
 puts "Original native app retained; browser module contains #{files.length} Swift source files."
+
+# Use the reviewed complete dependency resolution in device and simulator builds.
+lock_path = native + 'src/ios/Minis.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved'
+FileUtils.mkdir_p(lock_path.dirname)
+FileUtils.cp(browser + '.openminis/Package.resolved', lock_path)

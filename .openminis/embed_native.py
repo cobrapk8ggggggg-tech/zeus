@@ -73,7 +73,7 @@ def embed(native, browser, report):
     # The application remains OpenMinis' original @main/AppDelegate/root setup;
     # its root content now embeds the browser with the original AI UI alongside.
     replace(source / "MinisApp.swift", "                ContentView()", "                ZEUSBrowserRootEntry()")
-    for name in ("ZEUSNativeIntegration.swift", "ZeusToolPermissions.swift", "ZeusDefaultSkills.swift", "ZeusAgentSchemas.swift", "ZeusPatch.swift", "ZeusAgentHarness.swift", "ZeusConnections.swift", "ZeusGitHubAuthorization.swift", "ZeusProjectContract.swift", "ZeusGitHubTools.swift", "ZeusStorageExplorer.swift", "ZeusTaskDashboard.swift", "ZeusAgentControls.swift", "ZeusConversationFiles.swift", "ZeusAgentBrowserWindow.swift", "ZeusCloudArchive.swift", "ZeusCloudRuntime.swift", "ZeusCloudFiles.swift"):
+    for name in ("ZEUSNativeIntegration.swift", "ZeusToolPermissions.swift", "ZeusDefaultSkills.swift", "ZeusAgentSchemas.swift", "ZeusPatch.swift", "ZeusAgentHarness.swift", "ZeusConnections.swift", "ZeusGitHubAuthorization.swift", "ZeusProjectContract.swift", "ZeusGitHubTools.swift", "ZeusStorageExplorer.swift", "ZeusTaskDashboard.swift", "ZeusAgentControls.swift", "ZeusConversationFiles.swift", "ZeusAgentBrowserWindow.swift", "ZeusCloudArchive.swift", "ZeusCloudRuntime.swift", "ZeusCloudToolBridge.swift", "ZeusCloudFiles.swift"):
         shutil.copyfile(browser / ".openminis/Host" / name, source / name)
     # Turn the original informational storage rows into drill-down links.
     storage = source / "Views/Settings/StorageManagementView.swift"
@@ -93,6 +93,7 @@ def embed(native, browser, report):
     replace(cloud_vm, "    func send(overrideText: String? = nil) {", "    func send(overrideText: String? = nil) {\n        guard !NativeCloudAccountAPI.isMigrating else { errorMessage = \"انتظر اكتمال نقل الحساب.\"; return }")
     replace(cloud_vm, "    private func runAgentLoop(resumingAt existingMsgIdx: Int? = nil, committedBlocks: Int? = nil) async throws {", "    private func runAgentLoop(resumingAt existingMsgIdx: Int? = nil, committedBlocks: Int? = nil) async throws {\n        if NativeCloudAccountAPI.usesCloud { try await ZeusCloudRuntime.shared.run(self); return }")
     cloud_text = cloud_vm.read_text()
+    cloud_text = cloud_text.replace("    private var baseSystemPrompt: String {", "    var baseSystemPrompt: String {")
     cloud_text = cloud_text.replace("        ensureKernelBooted()", "        if !NativeCloudAccountAPI.usesCloud { ensureKernelBooted() }")
     cloud_text = cloud_text.replace("while self.kernelStatus == .booting {", "while !NativeCloudAccountAPI.usesCloud && self.kernelStatus == .booting {")
     cloud_text = cloud_text.replace("if case .failed(let msg) = self.kernelStatus {", "if !NativeCloudAccountAPI.usesCloud, case .failed(let msg) = self.kernelStatus {")

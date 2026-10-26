@@ -33,3 +33,5 @@ class PostgresGatewayStore:
     async def prune_events(self, owner, run, through): return await self.call("prune_events", owner=owner, id=run, through=through)
     async def account_state(self, owner): return await self.call("account_state", owner=owner)
     async def transition(self, owner, identifier, command): return await self.call(command + "_transition", owner=owner, id=identifier)
+
+    async def list_conversations(self, owner, after=""): return await self.call("list_conversations", owner=owner, after=after)

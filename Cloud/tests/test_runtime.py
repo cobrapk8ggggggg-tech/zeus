@@ -24,6 +24,8 @@ class MemoryStore:
     async def put(self, owner, kind, identifier, value):
         row = {**value, "id": identifier, "owner": owner, "updated": 0}
         self.rows[owner, kind, identifier] = row; return row
+    async def list_conversations(self, owner, after=""):
+        return sorted((v for (o,k,i),v in self.rows.items() if o==owner and k=="conversation" and i>after), key=lambda row: row["id"])[:100]
     async def list(self, owner, kind): return [v for (o, k, _), v in self.rows.items() if o == owner and k == kind]
     async def run(self, owner, identifier): return self.runs.get((owner, identifier))
     async def create_run(self, owner, value):

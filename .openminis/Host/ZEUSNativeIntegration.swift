@@ -48,6 +48,7 @@ private enum ZEUSNativeHostBootstrap {
         if defaults.string(forKey: "composerInputModePreference") != "text" { defaults.set("text", forKey: "composerInputModePreference") }
         if defaults.bool(forKey: "voice.output.readRepliesAloud") { defaults.set(false, forKey: "voice.output.readRepliesAloud") }
         Bundle.setLanguage("ar")
+        ZeusCloudArchive.shared.monitorSettings()
         Task { await ZeusDefaultSkills.shared.install() }
         #if DEBUG
         _ = ZEUSNativeFixtureBootstrap.configured

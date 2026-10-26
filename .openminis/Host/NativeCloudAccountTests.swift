@@ -8,6 +8,17 @@ import XCTest
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
         return root
     }
+    func testCloudIsDefaultForFreshAndOldUncommittedPreference() {
+        let owner = UUID()
+        XCTAssertTrue(CloudExecutionPreference.resolved(owner: owner, secure: nil, disk: nil))
+        XCTAssertTrue(CloudExecutionPreference.resolved(owner: owner, secure: .init(owner: owner, enabled: false), disk: nil))
+        XCTAssertTrue(CloudExecutionPreference.resolved(owner: owner, secure: .init(owner: UUID(), enabled: false, choiceVersion: 2), disk: nil))
+    }
+    func testExplicitLocalChoiceSurvivesRestartAndSecurePreferenceWins() {
+        let owner = UUID()
+        XCTAssertFalse(CloudExecutionPreference.resolved(owner: owner, secure: .init(owner: owner, enabled: false, choiceVersion: 2), disk: .init(owner: owner, enabled: true, choiceVersion: 2)))
+    }
+
     func testOwnerClaimIsIdempotentAndRejectsAnotherCloudAccount() throws {
         let root = try temporary(), a = UUID(), b = UUID()
         let owner = CloudLocalOwner(root: root)

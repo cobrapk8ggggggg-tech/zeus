@@ -160,3 +160,8 @@ class MongoStore:
                 if state["active_runs"] or lease and lease["id"] != identifier: raise ValueError("Finish cloud work before changing execution mode")
             elif not lease or lease["id"] != identifier: raise ValueError("Transition lease expired")
             return await self.put(owner, "lease", "active", {"lease_id": identifier, "expires": time.time() + 300})
+
+    async def list_conversations(self, owner, after=""):
+        async with self.active() as db:
+            rows = await db.records.find({"owner": owner, "kind": "conversation", "id": {"$gt": after}}, {"id": 1, "title": 1, "updated": 1, "native_session": 1}).sort("id", 1).limit(100).to_list()
+        return [self.clean(row) for row in rows]

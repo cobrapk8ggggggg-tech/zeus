@@ -36,7 +36,20 @@ public struct NativeCloudArchive: Codable, Sendable {
     public init(files: [NativeCloudFile], secrets: NativeCloudBlob) { version = 1; self.files = files; self.secrets = secrets; created = Date() }
 }
 
+struct CloudExecutionPreference: Codable {
+    let owner: UUID
+    let enabled: Bool
+    var choiceVersion: Int? = nil
+    static func resolved(owner: UUID, secure: Self?, disk: Self?) -> Bool {
+        for candidate in [secure, disk] {
+            if let candidate, candidate.owner == owner, candidate.choiceVersion == 2 { return candidate.enabled }
+        }
+        return true
+    }
+}
+
 @MainActor public protocol NativeCloudDataDelegate: AnyObject {
+    func prepareCloudExecution(progress: @escaping (String) -> Void) async throws
     func migrateToCloud(progress: @escaping (String) -> Void) async throws
     func prepareLocalExecution(progress: @escaping (String) -> Void) async throws
     func restoreAccountIfNeeded(progress: @escaping (String) -> Void) async throws
@@ -91,31 +104,33 @@ actor CloudCheckpointGate {
     public static var isMigrating = false
     public static var ownerID: String? { CloudAccount.shared.phase == .ready ? CloudAccount.shared.identity?.id.uuidString.lowercased() : nil }
     private static var preferencesURL: URL { BrowserDisk.applicationRoot.appendingPathComponent("cloud-execution.json") }
-    private struct Preference: Codable { let owner: UUID; let enabled: Bool }
+    private typealias Preference = CloudExecutionPreference
     public static var usesCloud: Bool {
         guard let id = CloudAccount.shared.identity?.id, CloudAccount.shared.phase == .ready else { return false }
         let secure = (try? CloudSessionStorage().retrieve(key: "zeus-execution:" + id.uuidString)).flatMap { try? JSONDecoder().decode(Preference.self, from: $0) }
-        guard let value = secure ?? BrowserDisk.read(Preference.self, from: preferencesURL), value.owner == id else { return false }
-        return value.enabled
+        return Preference.resolved(owner: id, secure: secure, disk: BrowserDisk.read(Preference.self, from: preferencesURL))
     }
     public static func setEnabled(_ value: Bool) async throws {
         guard let id = CloudAccount.shared.identity?.id, CloudAccount.shared.phase == .ready else { throw CloudAccountError.wrongOwner }
+        // Persist the user's selection before any network request. A suspended
+        // transfer must never turn cloud execution back into local execution.
+        let preference = Preference(owner: id, enabled: value, choiceVersion: 2)
+        try CloudSessionStorage().store(key: "zeus-execution:" + id.uuidString, value: JSONEncoder().encode(preference))
+        try? BrowserDisk.write(preference, to: preferencesURL)
+        try await prepareBrowserBackup?()
         await CloudCheckpointGate.shared.enter()
         do {
             let api = try transport()
             guard let head = try await api.head() else { throw CloudAccountError.incomplete("لم تكتمل نسخة الحساب بعد.") }
-            var manifest = head.manifest; manifest.executionTarget = value ? "cloud" : "local"
+            var manifest = head.manifest; manifest.executionTarget = value ? "cloud" : "local"; manifest.executionChoiceVersion = 2
             if value { manifest.coverage = Array(Set(manifest.coverage + ["cloud_runtime"])) }
             _ = try await api.commit(manifest, expected: head.revision, operation: UUID())
             await CloudCheckpointGate.shared.leave()
         } catch { await CloudCheckpointGate.shared.leave(); throw error }
-        let preference = Preference(owner: id, enabled: value)
-        try CloudSessionStorage().store(key: "zeus-execution:" + id.uuidString, value: JSONEncoder().encode(preference))
-        try? BrowserDisk.write(preference, to: preferencesURL)
     }
-    static func adoptPreference(_ value: String?) throws {
-        guard let value, let id = CloudAccount.shared.identity?.id else { return }
-        let preference = Preference(owner: id, enabled: value == "cloud")
+    static func adoptPreference(_ value: String?, version: Int?) throws {
+        guard version == 2, let value, let id = CloudAccount.shared.identity?.id else { return }
+        let preference = Preference(owner: id, enabled: value == "cloud", choiceVersion: 2)
         try CloudSessionStorage().store(key: "zeus-execution:" + id.uuidString, value: JSONEncoder().encode(preference))
         try? BrowserDisk.write(preference, to: preferencesURL)
     }
@@ -282,12 +297,30 @@ public struct NativeCloudExecutionSettings: View {
                 if busy { ProgressView(progress) }
                 else if !progress.isEmpty { Text(progress) }
                 if let issue { Text(issue).foregroundStyle(.orange).textSelection(.enabled) }
-                Text("يُنقل الناقص ويُتحقق من الملفات قبل تحرير نسخها المحلية. يحتفظ الجهاز بفهرس وذاكرة مؤقتة صغيرة؛ الملفات الكبيرة تُطلب عند الحاجة.").font(.footnote)
+                Text("اختيار السحابي لا ينقل ملفات الجهاز. المحادثات الجديدة تُحفظ في الحساب وتستخدم Linux السحابي مباشرة. نقل المشاريع المحلية إجراء مستقل تختاره أدناه.").font(.footnote)
+            }
+            Section("المشاريع المحلية السابقة") {
+                Text("الملفات المحلية تبقى على جهازك. استخدم النقل فقط إذا أردت متابعة مشروع محلي موجود على الخادم؛ مهارات التطبيق الجاهزة لا تُرفع.").font(.footnote)
+                Button("نقل البيانات المحلية الموجودة إلى الحساب") {
+                    Task {
+                        busy = true; issue = nil
+                        defer { busy = false }
+                        do {
+                            guard let delegate = NativeCloudAccountAPI.dataDelegate else { return }
+                            try await delegate.migrateToCloud { progress = $0 }
+                            try await delegate.finishExecutionTransition(enabled: nil)
+                            progress = "اكتمل النقل والتحقق. الملفات الأصلية محفوظة على الجهاز."
+                        } catch {
+                            try? await NativeCloudAccountAPI.dataDelegate?.finishExecutionTransition(enabled: nil)
+                            issue = error.localizedDescription
+                        }
+                    }
+                }.disabled(busy)
             }
             Section("الخادم") {
                 LabeledContent("التنفيذ المتزامن", value: "مهمة واحدة، والباقي في الطابور")
                 Text("موارد محدودة، دون متصفح سحابي. تُغلق الاتصالات عند الخمول ليتمكن Railway من النوم بعد انتهاء العمل.").font(.footnote)
-                Text("المزودات الحالية: OpenAI المتوافق وAnthropic وGemini بمفتاح API. اشتراكات OAuth وأدوات MCP وأدوات iPad تحتاج الوضع المحلي حاليًا.").font(.footnote).foregroundStyle(.secondary)
+                Text("تستخدم أدوات Linux الخادم، وأدوات المتصفح والجهاز نفس التنفيذ الأصلي عند اتصال جهازك. إن احتاجت المهمة جهازًا غير متصل، تنتظر عودته وتُظهر السبب.").font(.footnote).foregroundStyle(.secondary)
             }
         }.navigationTitle("التشغيل والتخزين")
             .onChange(of: enabled) { previous, requested in
@@ -301,14 +334,15 @@ public struct NativeCloudExecutionSettings: View {
         do {
             guard let delegate = NativeCloudAccountAPI.dataDelegate else { throw CloudAccountError.incomplete("مسار نقل بيانات الوكيل غير متاح حاليًا.") }
             if value {
+                try await NativeCloudAccountAPI.setEnabled(true)
                 let data = try await NativeCloudAccountAPI.runtime("v1/capabilities")
                 guard let capability = try JSONSerialization.jsonObject(with: data) as? [String: Any], capability["ready"] as? Bool == true else {
                     throw CloudAccountError.incomplete("الخادم غير جاهز للتنفيذ بعد؛ بقي الوضع المحلي كما هو.")
                 }
-                try await delegate.migrateToCloud { progress = $0 }
+                try await delegate.prepareCloudExecution { progress = $0 }
             } else { try await delegate.prepareLocalExecution { progress = $0 } }
             try await delegate.validateExecutionTransition()
-            try await NativeCloudAccountAPI.setEnabled(value)
+            if !value { try await NativeCloudAccountAPI.setEnabled(false) }
             try await delegate.finishExecutionTransition(enabled: value)
             progress = value ? "فُعّل التشغيل السحابي بعد التحقق من النقل." : "فُعّل التشغيل المحلي. النسخة السحابية محفوظة."
         } catch {

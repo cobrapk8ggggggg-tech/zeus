@@ -37,6 +37,7 @@ struct CloudSnapshotManifest: Codable {
     var coverage: [String]
     var native: CloudObjectReference? = nil
     var executionTarget: String? = nil
+    var executionChoiceVersion: Int? = nil
 }
 
 struct CloudSnapshotHead: Codable {
@@ -149,14 +150,14 @@ struct CloudSnapshotHead: Codable {
                     let payload = try JSONDecoder().decode(CloudBrowserPayload.self, from: await api.get(remote.manifest.browser)).validated()
                     try browser.profiles.installCloudBrowser(payload)
                     try browser.reloadCloudProfiles()
-                    try NativeCloudAccountAPI.adoptPreference(remote.manifest.executionTarget)
+                    try NativeCloudAccountAPI.adoptPreference(remote.manifest.executionTarget, version: remote.manifest.executionChoiceVersion)
                     state?.revision = remote.revision; state?.fingerprint = try fingerprint()
                     state?.saved = remote.manifest.created; lastSaved = remote.manifest.created
                     try saveState()
                 } else if state?.revision != remote.revision {
                     guard state?.fingerprint == remote.manifest.browser.sha256 else { throw CloudAccountError.conflict }
                     state?.revision = remote.revision; try saveState()
-                    try NativeCloudAccountAPI.adoptPreference(remote.manifest.executionTarget)
+                    try NativeCloudAccountAPI.adoptPreference(remote.manifest.executionTarget, version: remote.manifest.executionChoiceVersion)
                 }
             }
             try await NativeCloudAccountAPI.dataDelegate?.restoreAccountIfNeeded(progress: { _ in })
@@ -194,7 +195,8 @@ struct CloudSnapshotHead: Codable {
             var manifest = CloudSnapshotManifest(version: 1, deviceID: state.deviceID, created: Date(), browser: ref,
                                                  coverage: ["browser_profiles", "browser_settings", "browser_records"])
             manifest.native = remote?.manifest.native
-            manifest.executionTarget = remote?.manifest.executionTarget
+            manifest.executionTarget = NativeCloudAccountAPI.usesCloud ? "cloud" : "local"
+            manifest.executionChoiceVersion = 2
             manifest.coverage = Array(Set(manifest.coverage + (remote?.manifest.coverage.filter { !$0.hasPrefix("browser_") } ?? [])))
             let head = try await transport.commit(manifest, expected: state.revision, operation: UUID())
             state.revision = head.revision; state.fingerprint = digest; state.saved = manifest.created

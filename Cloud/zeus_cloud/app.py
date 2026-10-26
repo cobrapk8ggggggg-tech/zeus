@@ -33,6 +33,7 @@ class ProviderInput(Input):
     base_url: str = Field(max_length=2000)
     model: str = Field(min_length=1, max_length=200)
     api_key: SecretStr
+    image_input: bool = True
     max_tokens: int = Field(default=4096, ge=256, le=8192)
 
 
@@ -49,6 +50,8 @@ class RunInput(Input):
     native_user_id: uuid.UUID | None = None
     native_assistant_id: uuid.UUID | None = None
     native_session: dict | None = None
+    tools: list[dict] = Field(default_factory=list, max_length=256)
+    instructions: str = Field(default="", max_length=120000)
 
 
 class ApprovalInput(Input):
@@ -100,7 +103,7 @@ class Authorizer:
 
 def public_run(run):
     if run is None: raise HTTPException(404, "المهمة غير موجودة.")
-    return {key: run[key] for key in ["id", "conversation", "status", "seq", "created", "updated", "checkpoint", "error", "pending_approval", "native_user_id", "native_assistant_id"] if key in run}
+    return {key: run[key] for key in ["id", "conversation", "status", "seq", "created", "updated", "checkpoint", "error", "pending_approval", "native_user_id", "native_assistant_id", "pending_device"] if key in run}
 
 
 class BodyLimit:
@@ -260,7 +263,7 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
                 "permission_mode": value.permission_mode, "max_seconds": value.max_seconds,
                 "native_user_id": str(value.native_user_id).upper() if value.native_user_id else None,
                 "native_assistant_id": str(value.native_assistant_id).upper() if value.native_assistant_id else None,
-                "native_session": value.native_session,
+                "native_session": value.native_session, "tools": value.tools, "instructions": value.instructions,
                 "fingerprint": fingerprint, "status": "queued", "created": time.time()})
             if run.get("fingerprint") != fingerprint: raise HTTPException(409, "معرف الطلب مستخدم لمهمة أخرى.")
             record = await store.get(account, "conversation", conversation) or {"messages": normalize_history(value.history), "title": value.prompt[:120]}
@@ -316,10 +319,37 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
         await store.update_run(account, run["id"], status="queued", resume_approval=key)
         engine.wakeup.set(); return {"accepted": True}
 
+    @app.post("/v1/device-tools/{identifier}/{operation}")
+    async def device_tool(identifier: uuid.UUID, operation: str, request: Request, account=Depends(auth)):
+        ready(); key = str(identifier); body = await request.json()
+        async with engine.execution_gate:
+            record = await store.get(account, "approval", key)
+            if not record or record.get("type") != "device": raise HTTPException(404, "طلب الأداة غير موجود.")
+            run = await store.run(account, record["run"])
+            if not run or run.get("pending_device") != key: raise HTTPException(409, "طلب الأداة لم يعد نشطًا.")
+            claimant = str(uuid.UUID(body.get("claimant", "")))
+            if operation == "claim":
+                if record["status"] not in {"pending", "claimed"} or record.get("claimant", claimant) != claimant:
+                    raise HTTPException(409, "الأداة محجوزة لجهاز آخر أو نُفذت بالفعل.")
+                await store.put(account, "approval", key, {**record, "status": "claimed", "claimant": claimant})
+                return {"call": record["call"]}
+            if operation != "result": raise HTTPException(404, "عملية غير متاحة.")
+            if record.get("claimant") != claimant: raise HTTPException(409, "الجهاز لا يملك تنفيذ هذا الطلب.")
+            result = {"output": str(body.get("output", ""))[:32000], "success": body.get("success") is True}
+            if record["status"] == "completed":
+                if record.get("result") != result: raise HTTPException(409, "النتيجة محفوظة ولا يمكن استبدالها.")
+                return {"accepted": True}
+            if run["status"] != "waiting_user" or record["status"] != "claimed": raise HTTPException(409, "حالة المهمة تغيرت.")
+            await store.put(account, "approval", key, {**record, "status": "completed", "result": result})
+            await store.update_run(account, run["id"], status="queued", resume_device=key)
+            engine.wakeup.set(); return {"accepted": True}
+
     @app.get("/v1/conversations")
-    async def conversations(account=Depends(auth)):
-        ready(); records = await store.list(account, "conversation")
-        return {"conversations": [{"id": r["id"], "title": r.get("title", ""), "updated": r["updated"], "native_session": r.get("native_session")} for r in records]}
+    async def conversations(after: str = "", account=Depends(auth)):
+        ready()
+        if after: after = str(uuid.UUID(after))
+        records = await store.list_conversations(account, after)
+        return {"conversations": [{"id": r["id"], "title": r.get("title", ""), "updated": r["updated"], "native_session": r.get("native_session")} for r in records], "next_cursor": records[-1]["id"] if len(records) == 100 else None}
 
     @app.get("/v1/conversations/{identifier}/files")
     async def files(identifier: uuid.UUID, account=Depends(auth)):

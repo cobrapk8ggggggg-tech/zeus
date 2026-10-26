@@ -9,7 +9,7 @@ import time
 import uuid
 from cryptography.fernet import Fernet
 from .files import contained, inventory, open_regular, write_regular, GLOBAL_WORKSPACE
-from .tools import TOOLS, INSTRUCTIONS
+from .tools import SERVER_TOOLS, TOOLS, INSTRUCTIONS, builtin_instructions
 from .history import History
 
 TERMINAL = {"completed", "failed", "cancelled", "interrupted"}
@@ -98,10 +98,22 @@ class Engine:
                 run["_context_archives"] = (saved or {}).get("archives", [])[:]
                 run["_native_session"] = run.get("native_session") or (saved or {}).get("native_session")
                 messages = (saved or {}).get("messages", run.get("history", []))[:]
-                if not run.get("resume_approval"): messages.append({"role": "user", "content": run["prompt"]})
+                if not run.get("resume_approval") and not run.get("resume_device"): messages.append({"role": "user", "content": run["prompt"]})
                 await self.save_conversation(run, messages, (saved or {}).get("title", run["prompt"][:120]))
                 await self.store.event(owner, identifier, "state", {"status": "running"})
                 async with asyncio.timeout(run.get("max_seconds", 7200)):
+                    if run.get("resume_device"):
+                        device = await self.store.get(owner, "approval", run["resume_device"])
+                        pending = run.get("pending_calls", [])
+                        if not device or device.get("status") != "completed" or not pending or device["call"] != pending[0]:
+                            raise ValueError("Device tool result does not match the saved operation")
+                        call, result = pending[0], device["result"]
+                        messages.append({"role": "tool", "tool_call_id": call["id"], "content": result["output"]})
+                        await self.store.event(owner, identifier, "tool_result", {"id": call["id"], **result})
+                        await self.save_conversation(run, messages, (saved or {}).get("title", run["prompt"][:120]))
+                        await self.store.update_run(owner, identifier, resume_device=None, pending_device=None, pending_calls=[])
+                        if len(pending) > 1: await self.perform_calls(run, pending[1:], root, grant, command_ids, messages)
+
                     if run.get("resume_approval"):
                         approval = await self.store.get(owner, "approval", run["resume_approval"])
                         pending = run.get("pending_calls", [])
@@ -112,7 +124,7 @@ class Engine:
                     for _ in range(100):
                         text, calls, buffered = "", [], ""
                         last_flush = time.monotonic()
-                        async for event in self.models.stream(provider, messages, TOOLS, INSTRUCTIONS):
+                        async for event in self.models.stream(provider, messages, self.catalog(run), run.get("instructions", "") + "\n" + INSTRUCTIONS + builtin_instructions()):
                             if event["kind"] == "text":
                                 text += event["text"]; buffered += event["text"]
                                 if len(text) > 512_000: raise ValueError("Reply exceeds the configured limit")
@@ -168,11 +180,36 @@ class Engine:
                 try: await self.history.archive_events(owner, identifier)
                 except Exception: pass  # Keep hot rows if archival fails; never discard unverified events.
 
+    @staticmethod
+    def catalog(run):
+        # The app sends its canonical registry, including enabled MCP tools.
+        # Cloud adds only durable-history support; it does not replace that list.
+        entries = run.get("tools") or TOOLS
+        result = {}
+        for entry in entries:
+            name = entry.get("name", "")
+            if not isinstance(name, str) or not name or len(name) > 200 or not isinstance(entry.get("parameters"), dict):
+                raise ValueError("Invalid canonical tool catalog")
+            result[name] = {k: entry[k] for k in ["name", "description", "parameters"]}
+        result.setdefault("history_read", TOOLS[-1])
+        return list(result.values())
+
     async def perform_calls(self, run, calls, root, grant, command_ids, messages, first_approval=None):
         owner, identifier, conversation = run["owner"], run["id"], run["conversation"]
         for index, call in enumerate(calls):
             approved = first_approval if index == 0 else None
-            if approved is None and (run.get("permission_mode") == "ask_all" or call["name"] in {"exec_command", "file_write"} and run.get("permission_mode") != "unrestricted"):
+            if call["name"] not in SERVER_TOOLS:
+                if call["name"] not in {t["name"] for t in self.catalog(run)}: raise ValueError("The model requested an unregistered tool")
+                if any(self.terminals.active(owner, key) for key in command_ids): raise ValueError("Finish the active command before waiting for the device")
+                await self.checkpoint(owner, conversation, grant)
+                key = str(uuid.uuid4())
+                await self.store.put(owner, "approval", key, {"type": "device", "run": identifier, "call": call, "status": "pending"})
+                await self.store.update_run(owner, identifier, status="waiting_user", pending_calls=calls[index:], pending_device=key)
+                await self.store.event(owner, identifier, "tool_start", {"id": call["id"], "name": call["name"], "input": call["arguments"]})
+                await self.store.event(owner, identifier, "device_required", {"id": key, "call": call, "notice": "هذه الأداة تستخدم الجهاز الأصلي. المهمة محفوظة وتنتظر اتصاله؛ لا يعمل متصفح على Railway."})
+                raise WaitingForUser()
+
+            if approved is None and (run.get("permission_mode") == "ask_all" or call["name"] in {"exec_command", "shell_execute", "file_write", "file_edit", "apply_patch", "memory_write"} and run.get("permission_mode") != "unrestricted"):
                 # A live command cannot be suspended into a portable approval.
                 for key in command_ids:
                     if self.terminals.active(owner, key):
@@ -181,7 +218,7 @@ class Engine:
                 await self.approve(run, call, calls[index:])
             await self.store.event(owner, identifier, "tool_start", {"id": call["id"], "name": call["name"], "input": call["arguments"]})
             output = "User declined this action; it was not executed" if approved is False else await self.tool(run, call, root, command_ids)
-            if approved is not False and (call["name"] == "file_write" or call["name"] in {"exec_command", "write_stdin"} and not any(self.terminals.active(owner, key) for key in command_ids)):
+            if approved is not False and (call["name"] in {"file_write", "file_edit", "apply_patch", "memory_write"} or call["name"] in {"exec_command", "shell_execute", "write_stdin"} and not any(self.terminals.active(owner, key) for key in command_ids)):
                 await self.checkpoint(owner, conversation, grant)
             messages.append({"role": "tool", "tool_call_id": call["id"], "content": output[:32_000]})
             await self.store.event(owner, identifier, "tool_result", {"id": call["id"], "output": output[:32_000], "success": approved is not False})
@@ -225,6 +262,9 @@ class Engine:
         name, args = call["name"], call["arguments"]
         def scoped_path(value):
             if value.startswith("/var/minis/workspace/"): value = value[len("/var/minis/workspace/"):]
+            if value.startswith("@builtin-skills/"):
+                if name != "file_read": raise ValueError("Built-in skills are read-only; save custom skills under @skills")
+                return Path("/opt/zeus/builtin-skills"), value[len("@builtin-skills/"):]
             for scope in ["attachments", "offloads", "browser"]:
                 if value.startswith("/var/minis/" + scope + "/"): value = "__zeus_inputs__/" + scope + "/" + value[len("/var/minis/" + scope + "/"):]
             for scope in ["shared", "skills", "memory"]:
@@ -232,12 +272,49 @@ class Engine:
                 if value.startswith("@" + scope + "/"):
                     return self.spaces.path(owner, GLOBAL_WORKSPACE) / scope, value[len(scope) + 2:]
             return root, value
+        if name in {"memory_get", "memory_write"}:
+            import datetime
+            memory = self.spaces.path(owner, GLOBAL_WORKSPACE) / "memory"
+            if name == "memory_get":
+                keyword = str(args.get("keywords", "")).casefold()
+                content = []
+                for path, _, _, _ in await asyncio.to_thread(inventory, memory):
+                    with open_regular(memory, path) as file: text = file.read(32000).decode(errors="replace")
+                    if not keyword or keyword in text.casefold() or keyword in path.casefold(): content.append(path + "\n" + text)
+                    if sum(map(len, content)) > 32000: break
+                return "\n".join(content)[:32000] or "No matching account memory"
+            name = "file_write"
+            args = {"path": "@memory/" + datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d.md"), "content": str(args["content"]) + "\n", "append": True}
+        if name == "file_edit":
+            selected, path = scoped_path(args["path"])
+            with open_regular(selected, path) as file: data = file.read(1024 * 1024 + 1)
+            if len(data) > 1024 * 1024: raise ValueError("Use a script to edit files larger than 1 MiB")
+            text = data.decode(); old = str(args["old_string"])
+            if not old or text.count(old) == 0 or not args.get("replace_all") and text.count(old) != 1:
+                raise ValueError("old_string must match exactly once unless replace_all is enabled; file was not changed")
+            changed = text.replace(old, str(args["new_string"]), -1 if args.get("replace_all") else 1)
+            await asyncio.to_thread(write_regular, selected, path, changed.encode())
+            self.own(selected); return "File edited"
+        if name == "shell_execute":
+            delay = min(max(float(args.get("delay", 0)), 0), 900)
+            if delay: await asyncio.sleep(delay)
+            terminal = await self.terminals.start(owner, conversation, root, str(args["command"]), self.child_uid,
+                min(max(int(args.get("timeout", 900)), 1), 7200), self.spaces.path(owner, GLOBAL_WORKSPACE))
+            command_ids.add(terminal.id)
+            while self.terminals.active(owner, terminal.id): await asyncio.sleep(0.2)
+            return json.dumps(self.terminals.read(owner, terminal.id), ensure_ascii=False)
         if name == "file_read":
             def read():
                 selected, path = scoped_path(args["path"])
                 with open_regular(selected, path) as file: return file.read(32_001)
             data = await asyncio.to_thread(read)
-            return data[:32_000].decode(errors="replace") + ("\n[truncated]" if len(data) > 32_000 else "")
+            text = data.decode(errors="replace"); lines = text.splitlines(keepends=True)
+            count = min(max(int(args.get("lines", len(lines))), 1), 10000)
+            offset = max(int(args.get("offset", 1)) - 1, 0)
+            selected = lines[-count:] if args.get("direction") == "tail" else lines[offset:offset + count]
+            limit = min(max(int(args.get("max_length", 15000)), 1), 32000)
+            text = "".join(selected)
+            return text[:limit] + ("\n[truncated]" if len(text) > limit or len(data) > 32000 else "")
         if name == "history_read":
             record = await self.store.get(owner, "conversation", conversation) or {}
             archives = record.get("archives", [])
@@ -251,6 +328,12 @@ class Engine:
             data = args["content"].encode()
             if len(data) > 256_000: raise ValueError("File tool payload too large")
             selected, path = scoped_path(args["path"])
+            if args.get("append"):
+                try:
+                    with open_regular(selected, path) as current: previous = current.read(128 * 1024 * 1024 + 1)
+                except FileNotFoundError: previous = b""
+                if len(previous) + len(data) > 128 * 1024 * 1024: raise ValueError("Workspace file size limit reached")
+                data = previous + data
             await asyncio.to_thread(write_regular, selected, path, data)
             self.own(root); self.own(self.spaces.path(owner, GLOBAL_WORKSPACE))
             return "File written and checkpoint verified"

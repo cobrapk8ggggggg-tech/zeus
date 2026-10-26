@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import Combine
 import ZEUSBrowser
 
 /// Portable database export from OpenMinis plus an encrypted, streamed overlay
@@ -8,6 +9,7 @@ import ZEUSBrowser
     static let shared = ZeusCloudArchive()
     private let fm = FileManager.default
     private let chunkSize = 8 * 1024 * 1024 - 28
+    private var settingsObserver: AnyCancellable?
     private var scheduled: Task<Void, Never>?
     private var pendingCleanup: NativeCloudArchive?
     private var pendingCleanupSessions: Set<String> = []
@@ -18,7 +20,7 @@ import ZEUSBrowser
         let browser: Data
         let preferences: Data
     }
-    private struct Item {
+    private struct Item: Sendable {
         let scope: String
         let path: String
         let url: URL
@@ -41,13 +43,17 @@ import ZEUSBrowser
     }
     private func keyBytes() -> Data { SymmetricKey(size: .bits256).withUnsafeBytes { Data($0) } }
     private func hash(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
-    private func inspect(_ url: URL) throws -> (Int64, String) {
+    nonisolated private static func inspect(_ url: URL) throws -> (Int64, String) {
         let handle = try FileHandle(forReadingFrom: url); defer { try? handle.close() }
         var digest = SHA256(); var bytes: Int64 = 0
         while let part = try handle.read(upToCount: 1024 * 1024), !part.isEmpty { digest.update(data: part); bytes += Int64(part.count) }
         return (bytes, digest.finalize().map { String(format: "%02x", $0) }.joined())
     }
-    private func inventory() throws -> [Item] {
+    private func inventory() async throws -> [Item] {
+        let roots = self.roots, bundled = try ZeusDefaultSkills.shared.bundledCopies()
+        return try await Task.detached(priority: .utility) {
+        let fm = FileManager.default
+        func error(_ message: String) -> NSError { NSError(domain: "ZEUSCloud", code: 1, userInfo: [NSLocalizedDescriptionKey: message]) }
         var items: [Item] = []
         for root in roots where fm.fileExists(atPath: root.url.path) {
             let rootInfo = try root.url.resourceValues(forKeys: [.isSymbolicLinkKey])
@@ -58,14 +64,16 @@ import ZEUSBrowser
                 let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
                 guard values.isSymbolicLink != true else { throw error("تحتوي الملفات على رابط رمزي يحتاج معالجة مستقلة: \(url.lastPathComponent). تبقى النسخة المحلية محفوظة.") }
                 guard values.isRegularFile == true else { continue }
+                if let original = bundled[url.path], try Data(contentsOf: url, options: .mappedIfSafe) == original { continue }
                 let path = String(url.path.dropFirst(root.url.path.count + 1))
-                let (bytes, digest) = try inspect(url)
+                let (bytes, digest) = try Self.inspect(url)
                 let mode = (try fm.attributesOfItem(atPath: url.path)[.posixPermissions] as? NSNumber)?.intValue ?? 0o600
                 items.append(Item(scope: root.scope, path: path, url: url, bytes: bytes, digest: digest, mode: mode & 0o777))
             }
             if let traversalError { throw traversalError }
         }
         return items.sorted { ($0.scope, $0.path) < ($1.scope, $1.path) }
+        }.value
     }
     private func same(_ lhs: [Item], _ rhs: [Item]) -> Bool {
         lhs.count == rhs.count && zip(lhs, rhs).allSatisfy { a, b in a.scope == b.scope && a.path == b.path && a.bytes == b.bytes && a.digest == b.digest && a.mode == b.mode }
@@ -76,8 +84,8 @@ import ZEUSBrowser
     }
     private func upload(_ item: Item, key: SymmetricKey, previous: [NativeCloudFile]) async throws -> NativeCloudFile {
         if let old = previous.first(where: { $0.sha256 == item.digest && $0.bytes == item.bytes }) {
-            // Verify each referenced ciphertext still exists before reusing it.
-            for ref in old.parts { _ = try await NativeCloudAccountAPI.getObject(ref) }
+            // A published archive already verified these immutable objects.
+            // Reusing the references avoids re-downloading every unchanged file.
             return NativeCloudFile(scope: item.scope, path: item.path, bytes: item.bytes, parts: old.parts, sha256: item.digest, mode: item.mode)
         }
         let handle = try FileHandle(forReadingFrom: item.url); defer { try? handle.close() }
@@ -87,7 +95,7 @@ import ZEUSBrowser
             guard let sealed = box.combined else { throw error("تعذر تشفير الملف.") }
             parts.append(try await NativeCloudAccountAPI.putObject(sealed)); read += Int64(data.count)
         }
-        guard read == item.bytes, try inspect(item.url).1 == item.digest else { throw error("تغير ملف أثناء النسخ؛ لم تُنشر نسخة ناقصة.") }
+        guard read == item.bytes, try Self.inspect(item.url).1 == item.digest else { throw error("تغير ملف أثناء النسخ؛ لم تُنشر نسخة ناقصة.") }
         return NativeCloudFile(scope: item.scope, path: item.path, bytes: item.bytes, parts: parts, sha256: item.digest, mode: item.mode)
     }
     private func secretBundle(_ archive: NativeCloudArchive) async throws -> Secrets {
@@ -103,7 +111,7 @@ import ZEUSBrowser
     }
     /// Also used for automatic account backup in local mode. Cleanup is a
     /// separate step, after the runtime has accepted the migrated workspaces.
-    func backup(progress: @escaping (String) -> Void, duringTransition: Bool = false) async throws -> NativeCloudArchive {
+    func backup(progress: @escaping (String) -> Void, duringTransition: Bool = false, includeLocalFiles: Bool = true) async throws -> NativeCloudArchive {
         try requireIdle()
         guard !NativeCloudAccountAPI.isMigrating || duringTransition else { throw error("عملية نقل أخرى قيد التنفيذ.") }
         if !duringTransition { NativeCloudAccountAPI.isMigrating = true }
@@ -115,16 +123,18 @@ import ZEUSBrowser
         let keyData = oldSecrets?.fileKey ?? keyBytes(), passphrase = keyBytes().base64EncodedString()
         let summary = try await BackupExporter().export(options: .init(maxFileBytes: 0, includeCredentials: true, passphrase: passphrase))
         defer { try? fm.removeItem(at: summary.packageURL) }
-        let before = try inventory()
-        let package = try inspect(summary.packageURL)
+        let before = includeLocalFiles ? try await inventory() : []
+        let package = try Self.inspect(summary.packageURL)
         var files = [try await upload(Item(scope: "native_database", path: "account.minisbak", url: summary.packageURL, bytes: package.0, digest: package.1, mode: 0o600), key: SymmetricKey(data: keyData), previous: [])]
+        if !includeLocalFiles { files += old?.files.filter { $0.scope != "native_database" } ?? [] }
         for (index, item) in before.enumerated() {
             progress("تشفير الملفات والتحقق منها \(index + 1)/\(before.count)…")
             files.append(try await upload(item, key: SymmetricKey(data: keyData), previous: old?.files ?? []))
             await Task.yield()
         }
         try requireIdle()
-        guard same(before, try inventory()) else { throw error("تغيرت الملفات أثناء النقل؛ تبقى النسخة المحلية محفوظة.") }
+        let after = includeLocalFiles ? try await inventory() : []
+        guard same(before, after) else { throw error("تغيرت الملفات أثناء النقل؛ تبقى النسخة المحلية محفوظة.") }
         let secrets = Secrets(version: 1, fileKey: keyData, passphrase: passphrase, browser: try await NativeCloudAccountAPI.browserSecrets(), preferences: try preferences())
         let raw = try JSONEncoder().encode(secrets)
         let sealed = try await NativeCloudAccountAPI.sealSecrets(raw)
@@ -133,6 +143,12 @@ import ZEUSBrowser
         try await NativeCloudAccountAPI.publishArchive(archive)
         try markRestored()
         return archive
+    }
+    func prepareCloudExecution(progress: @escaping (String) -> Void) async throws {
+        try requireIdle()
+        NativeCloudAccountAPI.isMigrating = true
+        try await ZeusCloudRuntime.shared.beginTransition()
+        progress("السحابي جاهز. لم تُنقل ملفات الجهاز.")
     }
     func migrateToCloud(progress: @escaping (String) -> Void) async throws {
         try requireIdle()
@@ -149,29 +165,22 @@ import ZEUSBrowser
     }
     func validateExecutionTransition() async throws { try await ZeusCloudRuntime.shared.validateTransition() }
     func finishExecutionTransition(enabled: Bool?) async throws {
-        do {
-            if enabled == true, let archive = pendingCleanup {
-                try requireIdle()
-                for entry in archive.files where entry.scope == "agent_sessions" && pendingCleanupSessions.contains(String(entry.path.split(separator: "/").first ?? "")) {
-                    let url = try destination(entry)
-                    guard fm.fileExists(atPath: url.path) else { continue }
-                    if try inspect(url).1 == entry.sha256 { try fm.removeItem(at: url) }
-                }
-            }
-        } catch {
-            pendingCleanup = nil; pendingCleanupSessions = []; NativeCloudAccountAPI.isMigrating = false
-            await ZeusCloudRuntime.shared.endTransition(); throw error
-        }
         pendingCleanup = nil; pendingCleanupSessions = []; NativeCloudAccountAPI.isMigrating = false
         await ZeusCloudRuntime.shared.endTransition()
     }
     func backupAccount(progress: @escaping (String) -> Void) async throws {
         // In cloud mode the server owns changing workspaces. An empty device
         // cache must never replace its authoritative workspace manifest.
-        _ = try await backup(progress: progress)
+        _ = try await backup(progress: progress, includeLocalFiles: !NativeCloudAccountAPI.usesCloud)
+    }
+    func monitorSettings() {
+        guard settingsObserver == nil else { return }
+        settingsObserver = ProviderConfigStore.shared.objectWillChange.sink { [weak self] _ in
+            Task { @MainActor in self?.scheduleBackup() }
+        }
     }
     func scheduleBackup() {
-        guard NativeCloudAccountAPI.ownerID != nil, !NativeCloudAccountAPI.usesCloud else { return }
+        guard NativeCloudAccountAPI.ownerID != nil else { return }
         scheduled?.cancel()
         scheduled = Task {
             do { try await Task.sleep(for: .seconds(30)); try Task.checkCancellation() }
@@ -204,7 +213,7 @@ import ZEUSBrowser
             try output.write(contentsOf: data)
         }
         try output.synchronize()
-        guard bytes == file.bytes, try inspect(temp).1 == file.sha256 else { throw error("فشل التحقق من ملف الاستعادة.") }
+        guard bytes == file.bytes, try Self.inspect(temp).1 == file.sha256 else { throw error("فشل التحقق من ملف الاستعادة.") }
         try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
         guard !fm.fileExists(atPath: destination.path) else { return }
         try fm.moveItem(at: temp, to: destination)
@@ -215,6 +224,7 @@ import ZEUSBrowser
         try Data(owner.utf8).write(to: marker, options: .atomic)
     }
     func restoreAccountIfNeeded(progress: @escaping (String) -> Void) async throws {
+        defer { scheduleBackup() }
         guard let owner = NativeCloudAccountAPI.ownerID else { return }
         if (try? String(contentsOf: marker, encoding: .utf8)) == owner {
             if NativeCloudAccountAPI.usesCloud { try? await ZeusCloudRuntime.shared.restoreSessionIndex() }
@@ -239,11 +249,13 @@ import ZEUSBrowser
     }
     func prepareLocalExecution(progress: @escaping (String) -> Void) async throws {
         try requireIdle()
+        await ZeusDefaultSkills.shared.install(forceLocal: true)
         guard !NativeCloudAccountAPI.isMigrating else { throw error("عملية نقل أخرى جارية.") }
         NativeCloudAccountAPI.isMigrating = true
         try await ZeusCloudRuntime.shared.beginTransition()
-        guard let archive = try await NativeCloudAccountAPI.archive() else { throw error("نسخة الحساب غير متاحة. بقي التنفيذ السحابي كما هو.") }
-        try await restore(archive, includeFiles: true, progress: progress, manageMigrationFlag: false)
+        if let archive = try await NativeCloudAccountAPI.archive() {
+            try await restore(archive, includeFiles: true, progress: progress, manageMigrationFlag: false)
+        }
         try await ZeusCloudRuntime.shared.restoreAllTranscripts(progress: progress)
         // Cloud jobs may have produced newer files after the installation backup.
         try await ZeusCloudRuntime.shared.restoreWorkspaces(progress: progress)

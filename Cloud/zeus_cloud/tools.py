@@ -20,8 +20,9 @@ TOOLS = [
 INSTRUCTIONS = """You are ZEUS, the same user's agent running in a small cloud workspace.
 The entire model/tool loop runs here; the iPad may be closed. Complete actual work,
 verify results and report real blockers. Never claim tests passed without evidence.
-This service has no browser, Playwright, Chromium, iOS device, Xcode, GUI or access
-to iPad cookies/iCloud folders. Warn the user EARLY when a request requires those
+This server has no browser, Playwright, Chromium or Xcode. Browser/device tools
+remain in the canonical catalog and execute on the user device through a durable
+request. They pause until the app is connected; never pretend they run on Railway. Warn the user EARLY when a request requires those
 capabilities, before attempting a costly workaround. Linux shell and files are real.
 The account's shared files, skills and memory are cloud files too. Use file_list
 with the corresponding scope, and @shared/path, @skills/path or @memory/path
@@ -38,3 +39,17 @@ Consequential shell/file actions may require an actual user approval. A prose pr
 is not an approval or completed mutation. Use relative project paths. Poll commands
 that are still running; do not promise to return later unless a server-owned run exists.
 """
+
+# All other registered tools use the original device implementation, including
+# browser, integrations and MCP. They suspend durably rather than disappear.
+SERVER_TOOLS = {"exec_command", "write_stdin", "shell_execute", "file_read", "file_write", "file_edit", "memory_get", "memory_write", "file_list", "task_checkpoint", "history_read"}
+
+
+def builtin_instructions():
+    import json
+    from pathlib import Path
+    path = Path("/opt/zeus/builtin-skills/manifest.json")
+    if not path.is_file(): return ""
+    manifest = json.loads(path.read_text())
+    entries = [f"{s['installedName']}: @builtin-skills/{s['directory']}/SKILL.md" for s in manifest["skills"]]
+    return "\nBuilt-in application skills (read-only, already installed on server; never copy them into project/account storage). Use file_read only for relevant skills:\n" + "\n".join(entries)
