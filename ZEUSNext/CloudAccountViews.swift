@@ -135,6 +135,7 @@ struct CloudAccountSettingsView: View {
     @ObservedObject var model: BrowserModel
     @ObservedObject private var account = CloudAccount.shared
     @ObservedObject private var sync: BrowserCloudSync
+    @ObservedObject private var nativeBackup = NativeCloudBackupStatus.shared
     @State private var signOutPrompt = false
     init(model: BrowserModel) { self.model = model; self.sync = model.cloudSync }
     var body: some View {
@@ -151,6 +152,16 @@ struct CloudAccountSettingsView: View {
                     .accessibilityIdentifier("cloudSaveNow")
                 if let issue = sync.issue { Text(issue).foregroundStyle(.orange).textSelection(.enabled) }
                 Text("النسخة الحالية تشمل البروفايلات الدائمة وإعدادات المتصفح وسجلاته. حالة ملفات الوكيل والأسرار ستظهر منفصلة؛ لا تعتبر بياناتها محفوظة حتى يكتمل نقلها.").font(.footnote)
+            }
+            Section("نسخة الوكيل وملفات الحساب") {
+                if nativeBackup.busy { ProgressView(nativeBackup.progress) }
+                else { Text(nativeBackup.progress.isEmpty ? "لم تُتحقق نسخة الوكيل في هذه الجلسة بعد." : nativeBackup.progress).font(.footnote) }
+                if let saved = nativeBackup.saved { LabeledContent("آخر تحقق") { Text(saved, style: .relative) } }
+                Button("حفظ الوكيل والملفات والأسرار المشفرة") {
+                    Task { await sync.saveNow(); await nativeBackup.save() }
+                }.disabled(nativeBackup.busy || sync.busy || account.phase != .ready)
+                if let issue = nativeBackup.issue { Text(issue).foregroundStyle(.orange).textSelection(.enabled) }
+                Text("يُحفظ الوكيل تلقائيًا بعد انتهاء العمل المحلي. تعذّر رفع ملف أو انتهاء الحصة يُبقي النسخة المحلية ويظهر هنا.").font(.footnote)
             }
             Section("الدخول والأمان") {
                 Button("إرسال رابط تغيير كلمة المرور") { Task { await account.recover(email: account.identity?.email ?? "") } }.disabled(account.busy)

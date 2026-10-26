@@ -34,7 +34,9 @@ struct CloudSnapshotManifest: Codable {
     let deviceID: UUID
     let created: Date
     let browser: CloudObjectReference
-    let coverage: [String]
+    var coverage: [String]
+    var native: CloudObjectReference? = nil
+    var executionTarget: String? = nil
 }
 
 struct CloudSnapshotHead: Codable {
@@ -145,6 +147,7 @@ struct CloudSnapshotHead: Codable {
                     let payload = try JSONDecoder().decode(CloudBrowserPayload.self, from: await api.get(remote.manifest.browser)).validated()
                     try browser.profiles.installCloudBrowser(payload)
                     try browser.reloadCloudProfiles()
+                    try NativeCloudAccountAPI.adoptPreference(remote.manifest.executionTarget)
                     state?.revision = remote.revision; state?.fingerprint = try fingerprint()
                     state?.saved = remote.manifest.created; lastSaved = remote.manifest.created
                     try saveState()
@@ -152,6 +155,7 @@ struct CloudSnapshotHead: Codable {
                     throw CloudAccountError.conflict
                 }
             }
+            try await NativeCloudAccountAPI.dataDelegate?.restoreAccountIfNeeded(progress: { _ in })
             confirmedRevision = true; preparationSucceeded = true
             changed()
         } catch { issue = error.localizedDescription; pending = true }
@@ -167,19 +171,27 @@ struct CloudSnapshotHead: Codable {
         guard !busy, let transport, let browser, var state else { return }
         busy = true; issue = nil; let started = generation
         defer { busy = false }
+        await CloudCheckpointGate.shared.enter()
+        defer { Task { await CloudCheckpointGate.shared.leave() } }
         do {
-            if !confirmedRevision {
-                let remote = try await transport.head()
-                guard (remote?.revision ?? 0) == state.revision else { throw CloudAccountError.conflict }
-                confirmedRevision = true
+            let remote = try await transport.head()
+            if (remote?.revision ?? 0) != state.revision {
+                // A native-agent archive may advance the account checkpoint
+                // without changing this device's saved browser object.
+                guard remote?.manifest.browser.sha256 == state.fingerprint else { throw CloudAccountError.conflict }
+                state.revision = remote!.revision
             }
+            confirmedRevision = true
             browser.persist()
             let data = try encodedPayload()
             let digest = CloudSnapshotTransport.fingerprint(data)
             if digest == state.fingerprint { pending = false; return }
             let ref = try await transport.put(data)
-            let manifest = CloudSnapshotManifest(version: 1, deviceID: state.deviceID, created: Date(), browser: ref,
+            var manifest = CloudSnapshotManifest(version: 1, deviceID: state.deviceID, created: Date(), browser: ref,
                                                  coverage: ["browser_profiles", "browser_settings", "browser_records"])
+            manifest.native = remote?.manifest.native
+            manifest.executionTarget = remote?.manifest.executionTarget
+            manifest.coverage = Array(Set(manifest.coverage + (remote?.manifest.coverage.filter { !$0.hasPrefix("browser_") } ?? [])))
             let head = try await transport.commit(manifest, expected: state.revision, operation: UUID())
             state.revision = head.revision; state.fingerprint = digest; state.saved = manifest.created
             self.state = state; try saveState(); lastSaved = manifest.created

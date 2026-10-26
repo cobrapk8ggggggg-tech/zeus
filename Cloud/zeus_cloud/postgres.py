@@ -1,0 +1,31 @@
+"""HTTP storage adapter with no idle database-monitoring sockets."""
+from contextlib import asynccontextmanager
+import httpx
+
+
+class PostgresGatewayStore:
+    def __init__(self, url, token, client=None):
+        self.url, self.token = url, token
+        self.client = client or httpx.AsyncClient(timeout=30, follow_redirects=False)
+
+    @asynccontextmanager
+    async def active(self): yield self
+
+    async def call(self, command, **arguments):
+        if self.client.is_closed: self.client = httpx.AsyncClient(timeout=30, follow_redirects=False)
+        response = await self.client.post(self.url, params={"op": "runtime"}, json={"command": command, "args": arguments},
+            headers={"Authorization": "Bearer " + self.token})
+        response.raise_for_status(); return response.json()
+
+    async def initialize(self): return await self.call("initialize")
+    async def recover(self): return await self.call("recover")
+    async def close(self): await self.client.aclose()
+    async def get(self, owner, kind, identifier): return await self.call("get", owner=owner, kind=kind, id=identifier)
+    async def put(self, owner, kind, identifier, value): return await self.call("put", owner=owner, kind=kind, id=identifier, value=value)
+    async def list(self, owner, kind, limit=100): return await self.call("list", owner=owner, kind=kind)
+    async def create_run(self, owner, run): return await self.call("create_run", owner=owner, id=run["id"], value=run)
+    async def run(self, owner, identifier): return await self.call("run", owner=owner, id=identifier)
+    async def update_run(self, owner, identifier, **changes): return await self.call("update_run", owner=owner, id=identifier, value=changes)
+    async def claim(self): return await self.call("claim")
+    async def event(self, owner, run, kind, data): return await self.call("event", owner=owner, id=run, event_kind=kind, data=data)
+    async def events(self, owner, run, after=0): return await self.call("events", owner=owner, id=run, after=after)

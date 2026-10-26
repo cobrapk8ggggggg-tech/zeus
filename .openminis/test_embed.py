@@ -49,8 +49,11 @@ class NativeEmbeddingTests(unittest.TestCase):
                     continue
                 expected = file.read_text().replace("group.com.openminis.app", "group.tools.zeus.openminis").replace("iCloud.com.openminis.app", "iCloud.tools.zeus.openminis")
                 if str(relative) == "Views/ContentView.swift":
+                    expected = expected.replace("import SwiftUI", "import SwiftUI\nimport ZEUSBrowser")
+                    expected = expected.replace("                ISHTerminalView(showCloseButton: true)", "                if NativeCloudAccountAPI.usesCloud { ZeusCloudTerminalView() }\n                else { ISHTerminalView(showCloseButton: true) }")
                     expected = expected.replace('BrowserSheetView(pool:', 'ZeusAgentBrowserWindow(pool:')
                     expected = expected.replace('                Section("Agent Runtime") {', '''                Section("وكيل ZEUS") {
+                    NavigationLink { NativeCloudExecutionSettings() } label: { Label("التشغيل والتخزين — محلي أو سحابي", systemImage: "icloud") }
                     NavigationLink { ZeusAgentRuntimeSettings() } label: { Label("أدوات الوكيل وتنفيذه", systemImage: "terminal") }
                     NavigationLink { ZeusPluginsSettingsView() } label: { Label("الإضافات", systemImage: "puzzlepiece.extension") }
                 }

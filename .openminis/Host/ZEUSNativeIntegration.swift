@@ -41,6 +41,7 @@ struct ZEUSBrowserRootEntry: View {
 @MainActor
 private enum ZEUSNativeHostBootstrap {
     static let configured: Void = {
+        NativeCloudAccountAPI.dataDelegate = ZeusCloudArchive.shared
         let defaults = UserDefaults.standard
         if defaults.string(forKey: "appLanguage") != "ar" { defaults.set("ar", forKey: "appLanguage") }
         if defaults.string(forKey: "composerInputModePreference") != "text" { defaults.set("text", forKey: "composerInputModePreference") }
@@ -86,7 +87,10 @@ private struct OriginalPreferencesRoot: View {
             .foregroundStyle(.primary)
             .tint(.blue)
             .preferredColorScheme(appearanceMode == 1 ? .light : appearanceMode == 2 ? .dark : nil)
-            .sheet(isPresented: $showTerminal) { ISHTerminalView(showCloseButton: true) }
+            .sheet(isPresented: $showTerminal) {
+                if NativeCloudAccountAPI.usesCloud { ZeusCloudTerminalView() }
+                else { ISHTerminalView(showCloseButton: true) }
+            }
     }
 }
 

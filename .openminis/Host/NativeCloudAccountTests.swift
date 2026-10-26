@@ -33,16 +33,17 @@ import XCTest
         let root = try temporary(), store = ProfileStore(root: root, downloadsRoot: root.appendingPathComponent("downloads"))
         var admin = BrowserProfile(name: "الرئيسي"); admin.account = AccountOptions(role: .administrator)
         let second = BrowserProfile(name: "العمل")
+        var kiosk = BrowserProfile(name: "الكشك"); kiosk.account = AccountOptions(role: .kiosk, enabled: false)
         var first = ProfileData(); first.bookmarks = [Bookmark(title: "Example", url: "https://example.org")]
         first.settings.chromeLayout = .icab; first.settings.textScale = 1.25
         var other = ProfileData(); other.settings.chromeLayout = .dualBars
         let payload = CloudBrowserPayload(version: 1, profiles: [
-            .init(profile: admin, data: first), .init(profile: second, data: other)
+            .init(profile: admin, data: first), .init(profile: second, data: other), .init(profile: kiosk, data: ProfileData())
         ], activeID: second.id)
         try store.installCloudBrowser(payload)
         let reopened = ProfileStore(root: root, downloadsRoot: root.appendingPathComponent("downloads"))
         XCTAssertEqual(reopened.activeID, second.id)
-        XCTAssertEqual(Set(reopened.profiles.filter { !$0.isPrivate }.map(\.id)), Set([admin.id, second.id]))
+        XCTAssertEqual(Set(reopened.profiles.filter { !$0.isPrivate }.map(\.id)), Set([admin.id, second.id, kiosk.id]))
         XCTAssertEqual(reopened.load(admin).settings.chromeLayout, .icab)
         XCTAssertEqual(reopened.load(admin).settings.textScale, 1.25)
         XCTAssertEqual(reopened.load(admin).bookmarks.first?.id, first.bookmarks.first?.id)

@@ -73,7 +73,7 @@ def embed(native, browser, report):
     # The application remains OpenMinis' original @main/AppDelegate/root setup;
     # its root content now embeds the browser with the original AI UI alongside.
     replace(source / "MinisApp.swift", "                ContentView()", "                ZEUSBrowserRootEntry()")
-    for name in ("ZEUSNativeIntegration.swift", "ZeusToolPermissions.swift", "ZeusDefaultSkills.swift", "ZeusAgentSchemas.swift", "ZeusPatch.swift", "ZeusAgentHarness.swift", "ZeusConnections.swift", "ZeusGitHubAuthorization.swift", "ZeusProjectContract.swift", "ZeusGitHubTools.swift", "ZeusStorageExplorer.swift", "ZeusTaskDashboard.swift", "ZeusAgentControls.swift", "ZeusConversationFiles.swift", "ZeusAgentBrowserWindow.swift"):
+    for name in ("ZEUSNativeIntegration.swift", "ZeusToolPermissions.swift", "ZeusDefaultSkills.swift", "ZeusAgentSchemas.swift", "ZeusPatch.swift", "ZeusAgentHarness.swift", "ZeusConnections.swift", "ZeusGitHubAuthorization.swift", "ZeusProjectContract.swift", "ZeusGitHubTools.swift", "ZeusStorageExplorer.swift", "ZeusTaskDashboard.swift", "ZeusAgentControls.swift", "ZeusConversationFiles.swift", "ZeusAgentBrowserWindow.swift", "ZeusCloudArchive.swift", "ZeusCloudRuntime.swift", "ZeusCloudFiles.swift"):
         shutil.copyfile(browser / ".openminis/Host" / name, source / name)
     # Turn the original informational storage rows into drill-down links.
     storage = source / "Views/Settings/StorageManagementView.swift"
@@ -87,6 +87,20 @@ def embed(native, browser, report):
     # Reuse the exact native settings sheet from the browser's AI settings row.
     # Only its file-private visibility changes; its body is untouched.
     replace(source / "Views/ContentView.swift", "private struct SettingsSheet: View", "struct SettingsSheet: View")
+    replace(source / "Views/ContentView.swift", "import SwiftUI", "import SwiftUI\nimport ZEUSBrowser")
+    cloud_vm = source / "Agent/Chat/AIChatViewModel.swift"
+    replace(cloud_vm, "import Foundation", "import Foundation\nimport ZEUSBrowser")
+    replace(cloud_vm, "    func send(overrideText: String? = nil) {", "    func send(overrideText: String? = nil) {\n        guard !NativeCloudAccountAPI.isMigrating else { errorMessage = \"انتظر اكتمال نقل الحساب.\"; return }")
+    replace(cloud_vm, "    private func runAgentLoop(resumingAt existingMsgIdx: Int? = nil, committedBlocks: Int? = nil) async throws {", "    private func runAgentLoop(resumingAt existingMsgIdx: Int? = nil, committedBlocks: Int? = nil) async throws {\n        if NativeCloudAccountAPI.usesCloud { try await ZeusCloudRuntime.shared.run(self); return }")
+    cloud_text = cloud_vm.read_text()
+    cloud_text = cloud_text.replace("        ensureKernelBooted()", "        if !NativeCloudAccountAPI.usesCloud { ensureKernelBooted() }")
+    cloud_text = cloud_text.replace("while self.kernelStatus == .booting {", "while !NativeCloudAccountAPI.usesCloud && self.kernelStatus == .booting {")
+    cloud_text = cloud_text.replace("if case .failed(let msg) = self.kernelStatus {", "if !NativeCloudAccountAPI.usesCloud, case .failed(let msg) = self.kernelStatus {")
+    cloud_vm.write_text(cloud_text)
+    replace(cloud_vm, "            } else if !isProcessing && oldValue {", "            } else if !isProcessing && oldValue {\n                ZeusCloudArchive.shared.scheduleBackup()")
+    replace(cloud_vm, "    func cancel() {", "    func cancel() {\n        ZeusCloudRuntime.shared.cancel(session: sessionId)")
+    replace(source / "Agent/Chat/AIChatViewModel+Persistence.swift", "    func loadSession() async {\n        guard let sessionId else { return }", "    func loadSession() async {\n        guard let sessionId else { return }\n        defer { Task { await ZeusCloudRuntime.shared.reconnect(self) } }")
+    replace(source / "Views/ContentView.swift", "                ISHTerminalView(showCloseButton: true)", "                if NativeCloudAccountAPI.usesCloud { ZeusCloudTerminalView() }\n                else { ISHTerminalView(showCloseButton: true) }")
     # A compiler boundary around the unchanged native geometry expression.
     # The original giant modifier chain hit the type-checker limit in the
     # embedded target. No view, modifier or state is replaced or reordered.
@@ -485,6 +499,7 @@ def embed(native, browser, report):
     apply_text_only(source, browser)
     apply_native_ui(source, replace)
     replace(source / "Views/ContentView.swift", '                Section("Agent Runtime") {', '''                Section("وكيل ZEUS") {
+                    NavigationLink { NativeCloudExecutionSettings() } label: { Label("التشغيل والتخزين — محلي أو سحابي", systemImage: "icloud") }
                     NavigationLink { ZeusAgentRuntimeSettings() } label: { Label("أدوات الوكيل وتنفيذه", systemImage: "terminal") }
                     NavigationLink { ZeusPluginsSettingsView() } label: { Label("الإضافات", systemImage: "puzzlepiece.extension") }
                 }
