@@ -112,13 +112,11 @@ final class NativePersonalizationUITests: XCTestCase {
         XCTAssertTrue(fixture.waitForExistence(timeout: 10)); fixture.tap()
     }
     @MainActor private func cancelSystemFiles(_ app: XCUIApplication) {
-        // The confirmation sheet also has a Cancel button behind Files. Scope
-        // this action to the actual system navigation bar, never that sheet.
+        // The original OpenMinis folder sheet has only the system Cancel.
+        // It does not place a second placeholder Cancel behind the picker.
         let labels = NSPredicate(format: "label IN %@", ["Cancel", "Close", "إلغاء", "إغلاق"])
-        let sidebar = app.navigationBars["DOCSidebarView"].buttons.matching(labels).firstMatch
-        let browser = app.navigationBars["FullDocumentManagerViewControllerNavigationBar"].buttons.matching(labels).firstMatch
-        if sidebar.waitForExistence(timeout: 5) { sidebar.tap() }
-        else { XCTAssertTrue(browser.waitForExistence(timeout: 10)); browser.tap() }
+        let cancel = app.buttons.matching(labels).firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 15)); cancel.tap()
     }
     @MainActor func testFilesReferenceMultipleUsingOnlyUIKit() throws {
         let app = launchFiles(); app.buttons["referenceMultiple"].tap()

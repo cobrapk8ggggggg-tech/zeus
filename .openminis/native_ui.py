@@ -10,26 +10,11 @@ def apply(source, replace):
             file.write_text(text)
 
     folders = source / 'Views/Settings/MountedFoldersSettingsView.swift'
-    # A single sheet owns pick -> configure -> mount. Keep the in-place folder
-    # grant alive throughout configuration, and leave chat imports unchanged.
-    text = folders.read_text()
-    start = text.index('        .sheet(isPresented: $showingPicker) {')
-    end = text.index('\n    }\n', text.index('        .alert(AppLocalized("Error"),', start))
-    replace(folders, text[start:end], '''        .sheet(isPresented: $showingPicker) {
-            ZeusExternalFolderMountFlow { url, name, allowWrite in
-                _ = try model.add(pickedURL: url, customName: name, userAllowWrite: allowWrite)
-            }
-        }
-''')
-    replace(folders, '    @State private var pendingMount: PendingMount?\n', '')
-    replace(folders, '    @State private var errorText: String?\n', '', count=1)
-    replace(folders, '    var allowWrite: Bool\n}', '    var allowWrite: Bool\n    let scope: ZeusExternalFolderAccess\n}', count=1)
-    replace(folders, '    private static func defaultMountName(for url: URL)', '    fileprivate static func defaultMountName(for url: URL)')
+    # Keep the original OpenMinis folder picker, presentation and callback.
+    # Only stable accessibility IDs are added for the UI test route.
     replace(folders, '.disabled(model.isAtCapacity)', '.accessibilityIdentifier("mountExternalFolder")\n                .disabled(model.isAtCapacity)')
     replace(folders, 'Button(AppLocalized("Mount"), action: onConfirm)', 'Button(AppLocalized("Mount"), action: onConfirm)\n                        .accessibilityIdentifier("confirmExternalMount")')
     replace(folders, 'TextField("name", text: $name)', 'TextField("name", text: $name).accessibilityIdentifier("externalMountName")')
-    from pathlib import Path
-    folders.write_text('import ZEUSBrowser\n' + folders.read_text() + (Path(__file__).parent / 'ExternalFolderMountFlow.swift.inc').read_text())
     files = source / 'Views/Rootfs/FileBrowserView.swift'
     replace(files, '''        .sheet(isPresented: $showImportPicker) {
             FileImportPicker { urls in

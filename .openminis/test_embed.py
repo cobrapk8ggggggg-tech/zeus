@@ -90,6 +90,11 @@ class NativeEmbeddingTests(unittest.TestCase):
                 start = text.index('    private func detailContext(for entry: MountedFolderEntry)')
                 return text[start:text.index('    /// Trivial', start)]
             self.assertEqual(detail_context(adapted_mounts), detail_context(original_mounts))
+            expected_mounts = original_mounts.replace('"Minis"', '"Zeus"')
+            expected_mounts = expected_mounts.replace('.disabled(model.isAtCapacity)', '.accessibilityIdentifier("mountExternalFolder")\n                .disabled(model.isAtCapacity)')
+            expected_mounts = expected_mounts.replace('Button(AppLocalized("Mount"), action: onConfirm)', 'Button(AppLocalized("Mount"), action: onConfirm)\n                        .accessibilityIdentifier("confirmExternalMount")')
+            expected_mounts = expected_mounts.replace('TextField("name", text: $name)', 'TextField("name", text: $name).accessibilityIdentifier("externalMountName")')
+            self.assertEqual(adapted_mounts, expected_mounts, 'External folder selection must retain the complete upstream implementation')
             original_store = (UPSTREAM / "src/ios/Agent/Chat/ChatStore.swift").read_text()
             adapted_store = (native / "src/ios/Agent/Chat/ChatStore.swift").read_text()
             # Storage/protocol/sync methods after UI conversion remain untouched.
@@ -127,7 +132,7 @@ class NativeEmbeddingTests(unittest.TestCase):
             self.assertIn('FileBrowserView(rootPath: base', chat)
             # All used import routes share the same post-dismiss owner. The old
             # private picker declarations may remain, but have no call sites.
-            for relative in ['Views/Settings/MountedFoldersSettingsView.swift', 'Views/Settings/BackupDestinationPicker.swift', 'Views/Rootfs/FileBrowserView.swift', 'Views/Skills/SkillsManagementView.swift']:
+            for relative in ['Views/Settings/BackupDestinationPicker.swift', 'Views/Rootfs/FileBrowserView.swift', 'Views/Skills/SkillsManagementView.swift']:
                 adapted = (native / 'src/ios' / relative).read_text()
                 self.assertIn('.zeusFileImporter(', adapted)
                 for old in ['FolderPicker {', 'BackupFolderPicker {', 'FileImportPicker {', 'SkillFileDocumentPicker {']:
