@@ -42,7 +42,7 @@ that are still running; do not promise to return later unless a server-owned run
 
 # All other registered tools use the original device implementation, including
 # browser, integrations and MCP. They suspend durably rather than disappear.
-SERVER_TOOLS = {"exec_command", "write_stdin", "shell_execute", "file_read", "file_write", "file_edit", "memory_get", "memory_write", "file_list", "task_checkpoint", "history_read"}
+SERVER_TOOLS = {"exec_command", "write_stdin", "shell_execute", "file_read", "file_write", "file_edit", "memory_get", "memory_write", "apply_patch", "file_list", "task_checkpoint", "history_read"}
 
 
 def builtin_instructions():

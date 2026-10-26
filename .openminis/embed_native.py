@@ -73,8 +73,9 @@ def embed(native, browser, report):
     # The application remains OpenMinis' original @main/AppDelegate/root setup;
     # its root content now embeds the browser with the original AI UI alongside.
     replace(source / "MinisApp.swift", "                ContentView()", "                ZEUSBrowserRootEntry()")
-    for name in ("ZEUSNativeIntegration.swift", "ZeusToolPermissions.swift", "ZeusDefaultSkills.swift", "ZeusAgentSchemas.swift", "ZeusPatch.swift", "ZeusAgentHarness.swift", "ZeusConnections.swift", "ZeusGitHubAuthorization.swift", "ZeusProjectContract.swift", "ZeusGitHubTools.swift", "ZeusStorageExplorer.swift", "ZeusTaskDashboard.swift", "ZeusAgentControls.swift", "ZeusConversationFiles.swift", "ZeusAgentBrowserWindow.swift", "ZeusCloudArchive.swift", "ZeusCloudRuntime.swift", "ZeusCloudToolBridge.swift", "ZeusCloudFiles.swift"):
-        shutil.copyfile(browser / ".openminis/Host" / name, source / name)
+    for host in sorted((browser / ".openminis/Host").glob("*.swift")):
+        if host.name.endswith("Tests.swift"): continue
+        shutil.copyfile(host, source / host.name)
     # Turn the original informational storage rows into drill-down links.
     storage = source / "Views/Settings/StorageManagementView.swift"
     replace(storage, '        HStack {\n            Image(systemName: icon)', '        NavigationLink { ZeusStorageCategoryView(category: label) } label: {\n        HStack {\n            Image(systemName: icon)')
@@ -88,6 +89,20 @@ def embed(native, browser, report):
     # Only its file-private visibility changes; its body is untouched.
     replace(source / "Views/ContentView.swift", "private struct SettingsSheet: View", "struct SettingsSheet: View")
     replace(source / "Views/ContentView.swift", "import SwiftUI", "import SwiftUI\nimport ZEUSBrowser")
+    replace(source / "Views/Chat/AIChatView.swift", '''        .sheet(isPresented: $showFileBrowser) {
+            NavigationStack {
+                let base = RootfsManager.shared.dataPath
+                FileBrowserView(rootPath: base, initialPath: base.appendingPathComponent("var/minis"), rootLabel: "/")
+            }
+        }''', '''        .sheet(isPresented: $showFileBrowser) {
+            if NativeCloudAccountAPI.usesCloud { ZeusCloudFilesView(session: vm.sessionId, folders: true) }
+            else {
+                NavigationStack {
+                    let base = RootfsManager.shared.dataPath
+                    FileBrowserView(rootPath: base, initialPath: base.appendingPathComponent("var/minis"), rootLabel: "/")
+                }
+            }
+        }''')
     cloud_vm = source / "Agent/Chat/AIChatViewModel.swift"
     replace(cloud_vm, "import Foundation", "import Foundation\nimport ZEUSBrowser")
     replace(cloud_vm, "    func send(overrideText: String? = nil) {", "    func send(overrideText: String? = nil) {\n        guard !NativeCloudAccountAPI.isMigrating else { errorMessage = \"انتظر اكتمال نقل الحساب.\"; return }")

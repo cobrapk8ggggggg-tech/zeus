@@ -245,6 +245,7 @@ import ZEUSBrowser
                 await ZeusCloudRuntime.shared.endTransition(); NativeCloudAccountAPI.isMigrating = false; throw error
             }
         }
+        if !NativeCloudAccountAPI.usesCloud { await ZeusDefaultSkills.shared.install(forceLocal: true) }
         try markRestored()
     }
     func prepareLocalExecution(progress: @escaping (String) -> Void) async throws {

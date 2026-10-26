@@ -68,7 +68,8 @@ project.targets.each do |item|
     config.build_settings['LD_MAP_FILE_PATH'] = '$(TARGET_TEMP_DIR)/$(PRODUCT_NAME)-LinkMap-$(CURRENT_ARCH).txt'
   end
 end
-%w[ZEUSNativeIntegration.swift ZeusToolPermissions.swift ZeusDefaultSkills.swift ZeusAgentSchemas.swift ZeusPatch.swift ZeusAgentHarness.swift ZeusConnections.swift ZeusGitHubAuthorization.swift ZeusProjectContract.swift ZeusGitHubTools.swift ZeusStorageExplorer.swift ZeusTaskDashboard.swift ZeusAgentControls.swift ZeusConversationFiles.swift ZeusAgentBrowserWindow.swift ZeusCloudArchive.swift ZeusCloudRuntime.swift ZeusCloudFiles.swift].each do |name|
+Dir.glob((browser + '.openminis/Host/*.swift').to_s).reject { |path| path.end_with?('Tests.swift') }.sort.each do |path|
+  name = File.basename(path)
   bridge = project.main_group.new_file((native + 'src/ios' + name).to_s)
   app.source_build_phase.add_file_reference(bridge)
 end
@@ -108,7 +109,7 @@ app.build_configurations.each do |config|
   config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'tools.rea.ZEUSBrowserAnalysis'
   config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '18.1'
   config.build_settings['MARKETING_VERSION'] = '4.0.0'
-  config.build_settings['CURRENT_PROJECT_VERSION'] = '37'
+  config.build_settings['CURRENT_PROJECT_VERSION'] = '38'
   config.build_settings['INFOPLIST_KEY_CFBundleDisplayName'] = 'ZEUS'
 end
 # A device `build` (unlike archive/install) did not strip the original app's

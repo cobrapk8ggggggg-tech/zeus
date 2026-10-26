@@ -107,9 +107,17 @@ class Engine:
                         pending = run.get("pending_calls", [])
                         if not device or device.get("status") != "completed" or not pending or device["call"] != pending[0]:
                             raise ValueError("Device tool result does not match the saved operation")
-                        call, result = pending[0], device["result"]
-                        messages.append({"role": "tool", "tool_call_id": call["id"], "content": result["output"]})
-                        await self.store.event(owner, identifier, "tool_result", {"id": call["id"], **result})
+                        call, result = pending[0], dict(device["result"])
+                        if result.get("image"):
+                            import base64, hashlib
+                            image = result["image"]; extension = {"image/jpeg":"jpg","image/png":"png","image/webp":"webp"}[image["mime"]]
+                            name = hashlib.sha256(call["id"].encode()).hexdigest()[:20] + "." + extension
+                            await asyncio.to_thread(write_regular, root, "__zeus_inputs__/browser/"+name, base64.b64decode(image["data"], validate=True))
+                            self.own(root)
+                            result["output"] += "\nCloud image file: /var/minis/browser/" + name
+
+                        messages.append({"role": "tool", "tool_call_id": call["id"], "content": result["output"], **({"image": result["image"]} if result.get("image") else {})})
+                        await self.store.event(owner, identifier, "tool_result", {"id": call["id"], "output": result["output"], "success": result["success"]})
                         await self.save_conversation(run, messages, (saved or {}).get("title", run["prompt"][:120]))
                         await self.store.update_run(owner, identifier, resume_device=None, pending_device=None, pending_calls=[])
                         if len(pending) > 1: await self.perform_calls(run, pending[1:], root, grant, command_ids, messages)
@@ -197,6 +205,7 @@ class Engine:
     async def perform_calls(self, run, calls, root, grant, command_ids, messages, first_approval=None):
         owner, identifier, conversation = run["owner"], run["id"], run["conversation"]
         for index, call in enumerate(calls):
+            if run.get("tools") and call["name"] not in {t["name"] for t in self.catalog(run)}: raise ValueError("The tool is disabled or absent from this conversation registry")
             approved = first_approval if index == 0 else None
             if call["name"] not in SERVER_TOOLS:
                 if call["name"] not in {t["name"] for t in self.catalog(run)}: raise ValueError("The model requested an unregistered tool")
@@ -217,11 +226,16 @@ class Engine:
                 await self.checkpoint(owner, conversation, grant)
                 await self.approve(run, call, calls[index:])
             await self.store.event(owner, identifier, "tool_start", {"id": call["id"], "name": call["name"], "input": call["arguments"]})
-            output = "User declined this action; it was not executed" if approved is False else await self.tool(run, call, root, command_ids)
-            if approved is not False and (call["name"] in {"file_write", "file_edit", "apply_patch", "memory_write"} or call["name"] in {"exec_command", "shell_execute", "write_stdin"} and not any(self.terminals.active(owner, key) for key in command_ids)):
+            successful = approved is not False
+            try:
+                output = "User declined this action; it was not executed" if approved is False else await self.tool(run, call, root, command_ids)
+            except (ValueError, KeyError, OSError, UnicodeDecodeError) as error:
+                successful = False
+                output = "Tool error: " + str(error)[:2000]
+            if successful and (call["name"] in {"file_write", "file_edit", "apply_patch", "memory_write"} or call["name"] in {"exec_command", "shell_execute", "write_stdin"} and not any(self.terminals.active(owner, key) for key in command_ids)):
                 await self.checkpoint(owner, conversation, grant)
             messages.append({"role": "tool", "tool_call_id": call["id"], "content": output[:32_000]})
-            await self.store.event(owner, identifier, "tool_result", {"id": call["id"], "output": output[:32_000], "success": approved is not False})
+            await self.store.event(owner, identifier, "tool_result", {"id": call["id"], "output": output[:32_000], "success": successful})
             await self.save_conversation(run, messages, run["prompt"][:120])
 
     async def checkpoint(self, owner, conversation, grant):
@@ -272,6 +286,11 @@ class Engine:
                 if value.startswith("@" + scope + "/"):
                     return self.spaces.path(owner, GLOBAL_WORKSPACE) / scope, value[len(scope) + 2:]
             return root, value
+        if name == "apply_patch":
+            from .patches import apply_patch
+            if any(self.terminals.active(owner, key) for key in command_ids): raise ValueError("Finish the active command before applying a patch")
+            result = await asyncio.to_thread(apply_patch, root, str(args.get("patch", args.get("input", ""))))
+            self.own(root); return result
         if name in {"memory_get", "memory_write"}:
             import datetime
             memory = self.spaces.path(owner, GLOBAL_WORKSPACE) / "memory"

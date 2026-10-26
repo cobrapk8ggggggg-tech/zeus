@@ -105,6 +105,7 @@ import ZEUSBrowser
         }
         let kind: String, base: String
         switch instance.providerType {
+        case .openAIResponses: kind = "responses"; base = instance.resolvedBaseURL(default: "https://api.openai.com/v1").url
         case .openAI: kind = "openai"; base = instance.resolvedBaseURL(default: "https://api.openai.com/v1").url
         case .openRouter: kind = "openai"; base = instance.resolvedBaseURL(default: "https://openrouter.ai/api/v1").url
         case .xAI: kind = "openai"; base = instance.resolvedBaseURL(default: "https://api.x.ai/v1").url
@@ -180,9 +181,6 @@ import ZEUSBrowser
                 state.userID = state.userID ?? metadata?["native_user_id"] as? String
                 try JSONEncoder().encode(state).write(to: stateURL(sid), options: .atomic)
             }
-            if let metadata = page["run"] as? [String: Any], metadata["status"] as? String == "waiting_user", let device = metadata["pending_device"] as? String {
-                try await ZeusCloudToolBridge.perform(id: device, vm: vm, run: state.run)
-            }
             for event in page["events"] as? [[String: Any]] ?? [] {
                 let data = event["data"] as? [String: Any] ?? [:]
                 switch event["kind"] as? String {
@@ -219,6 +217,9 @@ import ZEUSBrowser
                 default: break
                 }
                 cursor = event["seq"] as? Int ?? cursor
+            }
+            if let metadata = page["run"] as? [String: Any], metadata["status"] as? String == "waiting_user", let device = metadata["pending_device"] as? String {
+                try await ZeusCloudToolBridge.perform(id: device, vm: vm, run: state.run)
             }
             display.error = nil; vm.scrollToBottomSignal.send()
             let run = page["run"] as? [String: Any] ?? [:], status = run["status"] as? String ?? ""

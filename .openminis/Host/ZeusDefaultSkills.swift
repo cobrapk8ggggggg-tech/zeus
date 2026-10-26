@@ -30,7 +30,10 @@ import ZEUSBrowser
             let catalog = try JSONDecoder().decode(Catalog.self, from: Data(contentsOf: root.appendingPathComponent("manifest.json")))
             entries = catalog.skills
             guard forceLocal || (NativeCloudAccountAPI.ownerID != nil && !NativeCloudAccountAPI.usesCloud) else { return }
-            guard UserDefaults.standard.string(forKey: revisionKey) != catalog.revision else { return }
+            guard UserDefaults.standard.string(forKey: revisionKey) != catalog.revision || (forceLocal && entries.contains(where: { entry in
+                guard let skill = SkillStore.shared.skills.first(where: { $0.name == entry.installedName }) else { return false }
+                return !FileManager.default.fileExists(atPath: SkillStore.shared.skillDirectoryURL(for: skill.id).appendingPathComponent("SKILL.md").path)
+            })) else { return }
             for entry in entries {
                 let source = root.appendingPathComponent(entry.directory)
                 let original = try String(contentsOf: source.appendingPathComponent("SKILL.md"), encoding: .utf8)
@@ -41,8 +44,14 @@ import ZEUSBrowser
                 // Preserve user edits/deletions after initial installation. The
                 // original SkillStore controls enablement, sync and discovery.
                 let parsedName = SkillStore.parse(skillMD: content).name
-                if SkillStore.shared.skills.contains(where: { $0.name == parsedName }) { continue }
-                let skill = try SkillStore.shared.importSkill(content: content, source: .bundled)
+                let skill: Skill
+                if let existing = SkillStore.shared.skills.first(where: { $0.name == parsedName }) {
+                    if FileManager.default.fileExists(atPath: SkillStore.shared.skillDirectoryURL(for: existing.id).appendingPathComponent("SKILL.md").path) { continue }
+                    skill = existing
+                    let directory = SkillStore.shared.skillDirectoryURL(for: skill.id)
+                    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                    try Data(content.utf8).write(to: directory.appendingPathComponent("SKILL.md"), options: .atomic)
+                } else { skill = try SkillStore.shared.importSkill(content: content, source: .bundled) }
                 let destination = SkillStore.shared.skillDirectoryURL(for: skill.id)
                 for file in try FileManager.default.contentsOfDirectory(at: source, includingPropertiesForKeys: nil) where file.lastPathComponent != "SKILL.md" {
                     let target = destination.appendingPathComponent(file.lastPathComponent)

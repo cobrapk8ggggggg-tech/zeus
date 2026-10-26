@@ -29,7 +29,7 @@ class Input(BaseModel):
 
 
 class ProviderInput(Input):
-    kind: str = Field(pattern="^(openai|anthropic)$")
+    kind: str = Field(pattern="^(openai|responses|anthropic)$")
     base_url: str = Field(max_length=2000)
     model: str = Field(min_length=1, max_length=200)
     api_key: SecretStr
@@ -195,7 +195,7 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
         return {"ready": app.state.ready, "reason": app.state.problem,
             "cloud_agent": True, "terminal": True, "browser": False, "xcode": False,
             "max_parallel_runs": 1, "workspace_bytes": WORKSPACE_LIMIT,
-            "provider_protocols": ["openai", "anthropic"], "owner_configured": bool(owner or owner_email),
+            "provider_protocols": ["openai", "responses", "anthropic"], "canonical_tools": True, "device_tool_bridge": True, "owner_configured": bool(owner or owner_email),
             "browser_notice": "الخادم بلا متصفح. أخبر المستخدم مبكرًا إن احتاجت المهمة تفاعلًا مع صفحة أو جلسة جهازه."}
 
     @app.get("/v1/account/state")
@@ -336,6 +336,12 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
             if operation != "result": raise HTTPException(404, "عملية غير متاحة.")
             if record.get("claimant") != claimant: raise HTTPException(409, "الجهاز لا يملك تنفيذ هذا الطلب.")
             result = {"output": str(body.get("output", ""))[:32000], "success": body.get("success") is True}
+            image = body.get("image")
+            if image:
+                import base64
+                if image.get("mime") not in {"image/jpeg", "image/png", "image/webp"} or len(base64.b64decode(image.get("data", ""), validate=True))>900000:
+                    raise ValueError("Invalid device tool image")
+                result["image"] = image
             if record["status"] == "completed":
                 if record.get("result") != result: raise HTTPException(409, "النتيجة محفوظة ولا يمكن استبدالها.")
                 return {"accepted": True}

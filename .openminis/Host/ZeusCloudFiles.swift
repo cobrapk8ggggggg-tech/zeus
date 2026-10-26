@@ -107,38 +107,111 @@ struct ZeusCloudFilesView: View {
     @State private var busy: String?
     @State private var preview: FileItem?
     @State private var showInputs = false
+    @State private var folders: Bool
+    @State private var kind: ZeusOutputKind?
+    init(session: String?, folders: Bool = false) { self.session = session; _folders = State(initialValue: folders) }
+    private var filtered: [ZeusCloudFiles.Entry] {
+        entries.filter { (showInputs || $0.origin != "input") && (query.isEmpty || $0.path.localizedCaseInsensitiveContains(query)) && (kind == nil || ZeusOutputKind.classify(URL(fileURLWithPath: $0.path)) == kind) }
+    }
     var body: some View {
         NavigationStack {
-            List {
-                if let issue { Text(issue).foregroundStyle(.orange) }
-                ForEach(entries.filter { (showInputs || $0.origin != "input") && (query.isEmpty || $0.path.localizedCaseInsensitiveContains(query)) }) { entry in
-                    Button {
-                        Task {
-                            guard let session else { return }; busy = entry.id; defer { busy = nil }
-                            do { preview = FileItem(url: try await ZeusCloudFiles.download(entry, session: session)) }
-                            catch { issue = error.localizedDescription }
-                        }
-                    } label: {
-                        HStack {
-                            Image(systemName: ZeusOutputKind.classify(URL(fileURLWithPath: entry.path)).symbol).font(.title2)
-                            VStack(alignment: .leading) { Text(entry.path).lineLimit(2); Text(ByteCountFormatter.string(fromByteCount: entry.bytes, countStyle: .file)).font(.caption).foregroundStyle(.secondary) }
-                            Spacer(); if busy == entry.id { ProgressView() } else { Image(systemName: "icloud.and.arrow.down") }
-                        }.padding(.vertical, 5)
-                    }.disabled(busy != nil)
+            VStack(spacing: 0) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 9) {
+                        chip("الكل", value: nil)
+                        ForEach(ZeusOutputKind.allCases, id: \.self) { chip($0.title, value: $0) }
+                    }.padding(.horizontal, 18).padding(.vertical, 12)
                 }
-            }.overlay { if entries.isEmpty && issue == nil { ContentUnavailableView("لا توجد ملفات سحابية بعد", systemImage: "icloud") } }
-                .navigationTitle("ملفات المحادثة السحابية").searchable(text: $query)
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) { Button("تم") { dismiss() } }
-                    ToolbarItem(placement: .topBarLeading) { Menu { Toggle("إظهار ملفات الإدخال والمرفقات", isOn: $showInputs) } label: { Image(systemName: "line.3.horizontal.decrease") } }
+                if let issue { Text(issue).font(.footnote).foregroundStyle(.orange).padding(.horizontal) }
+                if folders {
+                    ZeusCloudDirectory(entries: filtered, prefix: "", busy: busy, open: open)
+                } else {
+                    ScrollView {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 155, maximum: 230), spacing: 14)], spacing: 14) {
+                            ForEach(filtered) { entry in
+                                Button { open(entry) } label: {
+                                    VStack(alignment: .leading, spacing: 13) {
+                                        HStack {
+                                            Image(systemName: ZeusOutputKind.classify(URL(fileURLWithPath: entry.path)).symbol)
+                                                .font(.system(size: 32, weight: .light)).foregroundStyle(.primary)
+                                            Spacer()
+                                            if busy == entry.id { ProgressView() } else { Image(systemName: "icloud.and.arrow.down").foregroundStyle(.secondary) }
+                                        }.frame(height: 48)
+                                        Text(URL(fileURLWithPath: entry.path).lastPathComponent).font(.subheadline.weight(.semibold)).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
+                                        Text(ByteCountFormatter.string(fromByteCount: entry.bytes, countStyle: .file)).font(.caption).foregroundStyle(.secondary)
+                                    }.padding(17).frame(maxWidth: .infinity, minHeight: 152, alignment: .topLeading)
+                                        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
+                                        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(.primary.opacity(0.07)))
+                                }.buttonStyle(.plain).disabled(busy != nil)
+                            }
+                        }.padding(18)
+                    }.background(Color(uiColor: .systemGroupedBackground))
                 }
-                .sheet(item: $preview) { FilePreviewSheet(item: $0) }
-                .task { await refresh() }.refreshable { await refresh() }
+            }
+            .overlay { if filtered.isEmpty && issue == nil { ContentUnavailableView("لا توجد ملفات مطابقة", systemImage: "icloud") } }
+            .navigationTitle(folders ? "مجلدات المحادثة" : "ملفات المحادثة")
+            .searchable(text: $query)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("تم") { dismiss() } }
+                ToolbarItem(placement: .topBarLeading) {
+                    Menu {
+                        Toggle("استعراض المجلدات", isOn: $folders)
+                        Toggle("إظهار ملفات الإدخال والمرفقات", isOn: $showInputs)
+                    } label: { Image(systemName: folders ? "folder" : "square.grid.2x2") }
+                }
+            }
+            .sheet(item: $preview) { FilePreviewSheet(item: $0) }
+            .task { await refresh() }.refreshable { await refresh() }
+        }
+    }
+    private func chip(_ title: String, value: ZeusOutputKind?) -> some View {
+        Button { kind = value } label: {
+            Text(title).font(.subheadline.weight(.medium)).padding(.horizontal, 15).padding(.vertical, 8)
+                .background(kind == value ? Color.primary.opacity(0.13) : Color.secondary.opacity(0.06), in: Capsule())
+        }.buttonStyle(.plain)
+    }
+    @MainActor private func open(_ entry: ZeusCloudFiles.Entry) {
+        guard let session, busy == nil else { return }; busy = entry.id
+        Task {
+            defer { busy = nil }
+            do { preview = FileItem(url: try await ZeusCloudFiles.download(entry, session: session)) }
+            catch { issue = error.localizedDescription }
         }
     }
     @MainActor private func refresh() async {
         guard let session else { return }
         do { entries = try await ZeusCloudFiles.list(session: session); issue = nil } catch { issue = error.localizedDescription }
+    }
+}
+
+private struct ZeusCloudDirectory: View {
+    let entries: [ZeusCloudFiles.Entry]
+    let prefix: String
+    let busy: String?
+    let open: (ZeusCloudFiles.Entry) -> Void
+    private var directories: [String] {
+        Array(Set(entries.filter { $0.path.hasPrefix(prefix) }.compactMap { entry -> String? in
+            let suffix = String(entry.path.dropFirst(prefix.count)); guard let slash = suffix.firstIndex(of: "/") else { return nil }
+            return String(suffix[..<slash])
+        })).sorted()
+    }
+    var body: some View {
+        List {
+            ForEach(directories, id: \.self) { folder in
+                NavigationLink {
+                    AnyView(ZeusCloudDirectory(entries: entries, prefix: prefix + folder + "/", busy: busy, open: open).navigationTitle(folder))
+                } label: { Label(folder, systemImage: "folder.fill") }
+            }
+            ForEach(entries.filter { $0.path.hasPrefix(prefix) && !$0.path.dropFirst(prefix.count).contains("/") }) { entry in
+                Button { open(entry) } label: {
+                    HStack {
+                        Label(String(entry.path.dropFirst(prefix.count)), systemImage: ZeusOutputKind.classify(URL(fileURLWithPath: entry.path)).symbol)
+                        Spacer()
+                        if busy == entry.id { ProgressView() } else { Text(ByteCountFormatter.string(fromByteCount: entry.bytes, countStyle: .file)).font(.caption).foregroundStyle(.secondary) }
+                    }
+                }.disabled(busy != nil)
+            }
+        }
     }
 }
 
@@ -175,8 +248,7 @@ struct ZeusCloudTerminalView: View {
     @MainActor private func start() async {
         do {
             // One stable account-owned terminal workspace, reusable on reinstall.
-            let sessions = await ChatStore.shared.listSessions()
-            if let first = sessions.first { conversation = first.id }
+            conversation = "00000000-0000-4000-8000-000000000002"
             let grant = try await NativeCloudAccountAPI.fileGrant(conversation: conversation)
             let body = try JSONSerialization.data(withJSONObject: ["conversation": conversation, "file_grant": grant])
             let data = try await NativeCloudAccountAPI.runtime("v1/terminals", method: "POST", body: body)
