@@ -105,6 +105,15 @@ import NaturalLanguage
         running = true; autoAttempted = true; if !continuing { offered = true }; error = nil
         work = Task { [weak self] in
             guard let self else { return }
+            defer {
+                if ticket == epoch {
+                    running = false; work = nil
+                    if prefs.streamsLargeBatches(provider: provider), pending, error == nil {
+                        pending = false
+                        Task { @MainActor [weak self] in await Task.yield(); self?.translate(continuing: true) }
+                    }
+                }
+            }
             do {
                 // Resolve the current document directly, rather than executing
                 // through a WKFrameInfo retained from an earlier ready message.
@@ -114,6 +123,11 @@ import NaturalLanguage
                     liveID = try await call("return zeusTranslate.documentID", frame: nil) as? String ?? ""
                 }
                 guard !liveID.isEmpty, ticket == epoch else { throw CancellationError() }
+                if prefs.streamsLargeBatches(provider: provider), let provider {
+                    try await translateOpenAIPage(liveID: liveID, preferences: prefs, provider: provider, secret: secret, namespace: namespace, folder: folder, ticket: ticket)
+                    if !translated { error = "لم تُعثر على نصوص قابلة للترجمة في الصفحة الحالية." }
+                    return
+                }
                 var processedCharacters = 0
                 repeat {
                     pending = false
@@ -175,7 +189,6 @@ import NaturalLanguage
                 if !translated { error = "لم تُعثر على نصوص قابلة للترجمة في الصفحة الحالية." }
             } catch is CancellationError { }
             catch { if ticket == epoch { self.error = error.localizedDescription } }
-            if ticket == epoch { running = false; work = nil }
         }
     }
     func clearSessionCache() { stop(); cache.removeAll(); cacheNamespace = ""; reused = 0 }
@@ -189,5 +202,87 @@ import NaturalLanguage
     func excludeSite() {
         guard let model, let host = tab?.webView?.url?.host else { return }
         var p = preferences; if !p.excludedHosts.contains(host) { p.excludedHosts.append(host) }; model.data.settings.translation = p; model.persist(); dismiss()
+    }
+}
+
+private struct PageStreamDocument { let id: String; let frame: WKFrameInfo? }
+private struct PageStreamOccurrence { let document: String; let node: String }
+
+extension PageTranslation {
+    /// Gather a whole document snapshot before the two/three HTTP requests.
+    /// Keep DOM identities for placing streamed text back into its real node;
+    /// these identities never turn into individual paragraph API requests.
+    private func translateOpenAIPage(liveID: String, preferences prefs: TranslationPreferences, provider: AIProviderConfiguration,
+                                    secret: String, namespace: String, folder: URL?, ticket: UUID) async throws {
+        let targets = [PageStreamDocument(id: liveID, frame: nil)] + frames.filter { !$0.value.isMainFrame }.sorted { $0.key < $1.key }.map { PageStreamDocument(id: $0.key, frame: $0.value) }
+        var documents: [String: PageStreamDocument] = [:], occurrences: [String: [PageStreamOccurrence]] = [:]
+        var sourceByID: [String: String] = [:]
+        var missing: [TranslationSegment] = [], known = Set<String>(), applied = Set<String>(), total = 0
+        let token = ticket.uuidString
+        @MainActor func valid() throws {
+            try Task.checkCancellation()
+            guard ticket == epoch, let model, let tab, !model.requiresUnlock, model.profile.id == tab.profileID else { throw CancellationError() }
+        }
+        @MainActor func show(_ values: [TranslationSegment], final: Bool) async throws {
+            try valid()
+            var items: [String: [[String: Any]]] = [:]
+            for value in values {
+                guard !value.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                      let source = sourceByID[value.id] else { continue }
+                for occurrence in occurrences[source] ?? [] {
+                    items[occurrence.document, default: []].append(["id": occurrence.node, "text": value.text, "final": final])
+                }
+            }
+            for (documentID, rows) in items {
+                guard let document = documents[documentID] else { continue }
+                do {
+                    let result = try await call("return zeusTranslate.stream(items, expected, token)", arguments: ["items": rows, "expected": documentID, "token": token], frame: document.frame) as? [String: Any]
+                    try valid()
+                    for node in result?["ids"] as? [String] ?? [] {
+                        if applied.insert(documentID + ":" + node).inserted { completed += 1 }
+                        translated = true
+                    }
+                } catch is FrameUnavailable { frames.removeValue(forKey: documentID); documents.removeValue(forKey: documentID) }
+            }
+        }
+        for document in targets {
+            try valid()
+            do {
+                _ = try await call("zeusTranslate.start(language, token)", arguments: ["language": prefs.target, "token": token], frame: document.frame)
+                let raw = try await call("return zeusTranslate.collect(characters, count, false, true)", arguments: ["characters": 3_000_000, "count": 50_000], frame: document.frame) as? [String: Any]
+                guard raw?["documentID"] as? String == document.id else { frames.removeValue(forKey: document.id); continue }
+                guard raw?["more"] as? Bool != true else { throw TranslationFailure.message("نص الصفحة يتجاوز سعة الذاكرة المتاحة لجولة واحدة. افتح المقال في القارئ؛ لن تُرسل عشرات الطلبات بدلًا من الأجزاء الثلاثة.") }
+                let segments = (raw?["segments"] as? [[String: String]] ?? []).compactMap { row -> TranslationSegment? in guard let id = row["id"], let text = row["text"] else { return nil }; return TranslationSegment(id: id, text: text) }
+                total += segments.reduce(0) { $0 + $1.text.utf8.count }
+                guard total <= 12_000_000 else { throw TranslationFailure.message("نص الصفحة كبير جدًا لجولة واحدة. لم تُرسل طلبات إضافية أو دفعات فقرات صغيرة.") }
+                documents[document.id] = document
+                if let folder { cache.merge(await TranslationMemory.shared.lookup(segments, namespace: namespace, folder: folder)) { _, saved in saved } }
+                try valid()
+                let saved = segments.compactMap { item in cache[item.text].map { ["id": item.id, "text": $0, "final": true] as [String: Any] } }
+                if !saved.isEmpty {
+                    let result = try await call("return zeusTranslate.stream(items, expected, token)", arguments: ["items": saved, "expected": document.id, "token": token], frame: document.frame) as? [String: Any]
+                    for node in result?["ids"] as? [String] ?? [] { if applied.insert(document.id + ":" + node).inserted { completed += 1; reused += 1 }; translated = true }
+                }
+                for item in segments where cache[item.text] == nil {
+                    occurrences[item.text, default: []].append(PageStreamOccurrence(document: document.id, node: item.id))
+                    if known.insert(item.text).inserted {
+                        let id = "s\(missing.count)"; sourceByID[id] = item.text
+                        missing.append(TranslationSegment(id: id, text: item.text))
+                    }
+                }
+            } catch is FrameUnavailable { frames.removeValue(forKey: document.id) }
+        }
+        if !missing.isEmpty {
+            let fresh = try await TextTranslationService.translate(missing, preferences: prefs, provider: provider, secret: secret, context: context, onPartial: { values in
+                try await show(values, final: false)
+            })
+            try valid()
+            try await show(fresh, final: true)
+            let originals = Dictionary(uniqueKeysWithValues: missing.map { ($0.id, $0.text) })
+            var saved: [String: String] = [:]
+            for value in fresh { if let source = originals[value.id] { saved[source] = value.text; cache[source] = value.text } }
+            if let folder, !(await TranslationMemory.shared.save(saved, namespace: namespace, folder: folder)) { storageNotice = "تعذّر حفظ الترجمة على الجهاز؛ تبقى نتيجة هذه الجلسة في الذاكرة." }
+        }
+        if cache.count > 8000 || cache.reduce(0, { $0 + $1.key.utf8.count + $1.value.utf8.count }) > 8_000_000 { cache.removeAll(keepingCapacity: false) }
     }
 }

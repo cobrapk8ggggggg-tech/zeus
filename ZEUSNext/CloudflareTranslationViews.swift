@@ -45,7 +45,7 @@ struct CloudflareTranslationSettings: View {
                 secret = AISecretVault.read(profile: context.profileID, provider: "cloudflare-workers-ai")
             }
             .onDisappear { task?.cancel() }
-            .fileImporter(isPresented: $importing, allowedContentTypes: [.json], allowsMultipleSelection: false) { result in
+            .zeusFileImporter(isPresented: $importing, allowedContentTypes: [.json], allowsMultipleSelection: false) { result in
                 guard context.permitted else { return }
                 do {
                     let url = try result.get().first

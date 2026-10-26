@@ -652,6 +652,7 @@ final class NativeBrowserIntegrationTests: XCTestCase {
     private var continuation: CheckedContinuation<Void, Error>?
     private var watchdog: Task<Void, Never>?
     func load(_ html: String, view: WKWebView) async throws {
+        defer { withExtendedLifetime(self) {}; withExtendedLifetime(view) {} }
         try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
             view.navigationDelegate = self

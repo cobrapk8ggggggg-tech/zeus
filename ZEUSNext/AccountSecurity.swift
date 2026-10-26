@@ -75,7 +75,7 @@ enum AccountVault {
     static func remove(_ id: UUID) { SecItemDelete(query(id) as CFDictionary) }
 }
 
-enum ChromeLayout: String, Codable, CaseIterable, Identifiable {
+enum ChromeLayout: String, Codable, CaseIterable, Identifiable, Hashable {
     case original, dualBars, icab
     var id: String { rawValue }
     var title: String { switch self { case .original: return "ZEUS الأصلي"; case .dualBars: return "شريطان متحركان"; case .icab: return "توزيع iCab" } }

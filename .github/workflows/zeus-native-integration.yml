@@ -8,6 +8,7 @@ name: ZEUS native browser integration tests
     - feature/zeus-direct-integrations-20261023
     - feature/zeus-native-agent-harness-20261023
     - feature/zeus-project-contract-20261024
+    - feature/zeus-ipad-layout-studio-20261025
     paths:
     - ZEUSNext/**
     - .openminis/**
@@ -131,9 +132,9 @@ jobs:
                 output.write(kind.upper() + '_SIMULATOR=' + identifier + '\n')
         PY
       timeout-minutes: 4
-    - name: Start simulator boot before Swift compilation
+    - name: Start iPad boot before Swift compilation
       timeout-minutes: 4
-      run: xcrun simctl boot "$IPHONE_SIMULATOR" || true
+      run: xcrun simctl boot "$IPAD_SIMULATOR" || true
       continue-on-error: true
     - name: Build the native browser and integration tests
       run: |
@@ -153,13 +154,44 @@ jobs:
           ${{ runner.temp }}/OpenMinisOriginal/SourcePackages
           ${{ runner.temp }}/OpenMinisOriginal/ModuleCache.noindex
         key: zeus-native-deriveddata-263-v2-${{ github.run_id }}
+    - name: 'IPAD: Boot for Files and layout UI tests'
+      if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
+      timeout-minutes: 10
+      run: |
+        bash browser/.openminis/run_native_stage.sh boot IPAD "${IPAD_SIMULATOR}"
+    - name: 'IPAD: Verify system Files imports and saved layouts'
+      if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
+      timeout-minutes: 22
+      run: bash browser/.openminis/run_native_stage.sh personalization IPAD "${IPAD_SIMULATOR}"
+    - name: 'IPAD: Save UI diagnostics and shut down'
+      if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
+      timeout-minutes: 2
+      run: |
+        xcrun xcresulttool export attachments --path results/embedded-IPAD-ui.xcresult --output-path results/embedded-ui-attachments-IPAD || true
+        xcrun xcresulttool export diagnostics --path results/embedded-IPAD-ui.xcresult --output-path results/embedded-ui-diagnostics-IPAD || true
+        xcrun simctl spawn "$IPAD_SIMULATOR" log show --last 12m --style compact --predicate 'process == "Minis" AND (eventMessage CONTAINS "ZEUS Files" OR eventMessage CONTAINS "bookmark" OR eventMessage CONTAINS "array of items")' > results/embedded-IPAD-file-provider.log || true
+        xcrun simctl spawn "$IPAD_SIMULATOR" log show --last 22m --style compact --predicate 'eventMessage CONTAINS "ZEUS-Picker" OR eventMessage CONTAINS "Could not resolve bookmark" OR eventMessage CONTAINS "empty array of items" OR eventMessage CONTAINS "NSFileProviderResolverErrorDomain"' > results/embedded-IPAD-system-files.log || true
+        xcrun simctl shutdown "$IPAD_SIMULATOR" || true
+    - name: 'IPAD: Upload Files and layout diagnostics immediately'
+      if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: zeus-ipad-ui-diagnostics
+        path: |
+          results/embedded-IPAD-ui*
+          results/embedded-ui-attachments-IPAD
+          results/embedded-ui-diagnostics-IPAD
+          results/embedded-IPAD-file-provider.log
+          results/embedded-IPAD-system-files.log
+        retention-days: 14
+        if-no-files-found: warn
     - name: 'IPHONE: Boot'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
       timeout-minutes: 10
       run: bash browser/.openminis/run_native_stage.sh boot IPHONE "${IPHONE_SIMULATOR}"
     - name: 'IPHONE: Run browser and tool integration tests'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
-      timeout-minutes: 8
+      timeout-minutes: 15
       run: bash browser/.openminis/run_native_stage.sh tests IPHONE "${IPHONE_SIMULATOR}"
     - name: 'IPHONE: Save unit diagnostics immediately'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
@@ -197,7 +229,7 @@ jobs:
       run: bash browser/.openminis/run_native_stage.sh boot IPAD "${IPAD_SIMULATOR}"
     - name: 'IPAD: Run browser and tool integration tests'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
-      timeout-minutes: 8
+      timeout-minutes: 15
       run: bash browser/.openminis/run_native_stage.sh tests IPAD "${IPAD_SIMULATOR}"
     - name: 'IPAD: Save unit diagnostics immediately'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}

@@ -45,10 +45,11 @@ class NativeEmbeddingTests(unittest.TestCase):
             # addition to the existing permission card and app-group constants.
             for file in (UPSTREAM / "src/ios/Views").rglob("*.swift"):
                 relative = file.relative_to(UPSTREAM / "src/ios")
-                if str(relative) in {"Views/Chat/OffloadPermissionDialog.swift", "Views/Chat/AIChatView.swift", "Views/Chat/ToolLiveSheet.swift", "Views/Settings/OffloadPermissionSettingsView.swift", "Views/Chat/SelectableMarkdownView.swift", "Views/Settings/StorageManagementView.swift"}:
+                if str(relative) in {"Views/Chat/OffloadPermissionDialog.swift", "Views/Chat/AIChatView.swift", "Views/Chat/ToolLiveSheet.swift", "Views/Settings/OffloadPermissionSettingsView.swift", "Views/Chat/SelectableMarkdownView.swift", "Views/Settings/StorageManagementView.swift", "Views/Rootfs/FileBrowserView.swift", "Views/Settings/MountedFoldersSettingsView.swift", "Views/Settings/BackupDestinationPicker.swift", "Views/Skills/SkillsManagementView.swift"}:
                     continue
                 expected = file.read_text().replace("group.com.openminis.app", "group.tools.zeus.openminis").replace("iCloud.com.openminis.app", "iCloud.tools.zeus.openminis")
                 if str(relative) == "Views/ContentView.swift":
+                    expected = expected.replace('BrowserSheetView(pool:', 'ZeusAgentBrowserWindow(pool:')
                     expected = expected.replace('                Section("Agent Runtime") {', '''                Section("وكيل ZEUS") {
                     NavigationLink { ZeusAgentRuntimeSettings() } label: { Label("أدوات الوكيل وتنفيذه", systemImage: "terminal") }
                     NavigationLink { ZeusPluginsSettingsView() } label: { Label("الإضافات", systemImage: "puzzlepiece.extension") }
@@ -72,6 +73,8 @@ class NativeEmbeddingTests(unittest.TestCase):
                 if str(relative) == "Views/Providers/ProviderInstancesView.swift":
                     expected = expected.replace('let shadows = store.shadowVoiceProviders()', 'let shadows: [ProviderConfigStore.ShadowVoiceProvider] = []')
                 expected = expected.replace('"Minis"', '"Zeus"')
+                if '.fileImporter(' in expected:
+                    expected = 'import ZEUSBrowser\n' + expected.replace('.fileImporter(', '.zeusFileImporter(')
                 for tool in ("Shell", "Editor", "Browser", "Memory"):
                     expected = expected.replace('return "Minis is using ' + tool + '"', 'return String(localized: "Minis is using ' + tool + '")')
                 self.assertEqual((native / "src/ios" / relative).read_text(), expected, str(relative))
@@ -79,6 +82,19 @@ class NativeEmbeddingTests(unittest.TestCase):
             self.assertIn("ZeusStorageCategoryView(category: label)", storage)
             self.assertIn("ZeusStorageDirectoryView(root: minisURL)", storage)
             self.assertTrue((native / "src/ios/ZeusStorageExplorer.swift").exists())
+            # Replacing the picker/confirmation must preserve the folder's
+            # detail context and its filesystem browser routing.
+            original_mounts = (UPSTREAM / 'src/ios/Views/Settings/MountedFoldersSettingsView.swift').read_text()
+            adapted_mounts = (native / 'src/ios/Views/Settings/MountedFoldersSettingsView.swift').read_text()
+            def detail_context(text):
+                start = text.index('    private func detailContext(for entry: MountedFolderEntry)')
+                return text[start:text.index('    /// Trivial', start)]
+            self.assertEqual(detail_context(adapted_mounts), detail_context(original_mounts))
+            expected_mounts = original_mounts.replace('"Minis"', '"Zeus"')
+            expected_mounts = expected_mounts.replace('.disabled(model.isAtCapacity)', '.accessibilityIdentifier("mountExternalFolder")\n                .disabled(model.isAtCapacity)')
+            expected_mounts = expected_mounts.replace('Button(AppLocalized("Mount"), action: onConfirm)', 'Button(AppLocalized("Mount"), action: onConfirm)\n                        .accessibilityIdentifier("confirmExternalMount")')
+            expected_mounts = expected_mounts.replace('TextField("name", text: $name)', 'TextField("name", text: $name).accessibilityIdentifier("externalMountName")')
+            self.assertEqual(adapted_mounts, expected_mounts, 'External folder selection must retain the complete upstream implementation')
             original_store = (UPSTREAM / "src/ios/Agent/Chat/ChatStore.swift").read_text()
             adapted_store = (native / "src/ios/Agent/Chat/ChatStore.swift").read_text()
             # Storage/protocol/sync methods after UI conversion remain untouched.
@@ -107,6 +123,20 @@ class NativeEmbeddingTests(unittest.TestCase):
             self.assertIn("ZeusToolPermissions.shared.authorize", execution)
             self.assertNotIn(".offloadPermissionDialog()", (native / "src/ios/Views/Chat/AIChatView.swift").read_text())
             self.assertIn("@MainActor enum BrowserFixtureFactory", (browser / ".openminis/build/BrowserFixtureFactory.swift").read_text())
+            chat = (native / "src/ios/Views/Chat/AIChatView.swift").read_text()
+            self.assertIn('ZeusAgentBrowserWindow(pool: vm.browserTabPool', chat)
+            window = (native / 'src/ios/ZeusAgentBrowserWindow.swift').read_text()
+            self.assertIn('.fullScreenCover(isPresented: $expanded, onDismiss:', window)
+            self.assertIn('ZeusConversationFiles(sessionID: vm.sessionId)', chat)
+            self.assertIn('vm.zeusAddPickedFiles(urls)', chat)
+            self.assertIn('FileBrowserView(rootPath: base', chat)
+            # All used import routes share the same post-dismiss owner. The old
+            # private picker declarations may remain, but have no call sites.
+            for relative in ['Views/Settings/BackupDestinationPicker.swift', 'Views/Rootfs/FileBrowserView.swift', 'Views/Skills/SkillsManagementView.swift']:
+                adapted = (native / 'src/ios' / relative).read_text()
+                self.assertIn('.zeusFileImporter(', adapted)
+                for old in ['FolderPicker {', 'BackupFolderPicker {', 'FileImportPicker {', 'SkillFileDocumentPicker {']:
+                    self.assertNotIn(old, adapted)
 
 
 if __name__ == "__main__":

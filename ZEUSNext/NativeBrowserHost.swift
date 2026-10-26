@@ -90,6 +90,7 @@ private final class NativeToolCapture { var imageFilePath: String? }
             "location": "Integrated AI conversation panel", "profile_id": profileIdentifier,
             "profile_name": browser.profile.name, "profile_role": browser.profile.role.rawValue,
             "layout": (browser.data.settings.chromeLayout ?? .original).rawValue,
+            "custom_layout": browser.data.settings.chromeWorkspace?.active(for: browser.data.settings.chromeLayout ?? .original)?.name ?? "",
             "current_tab": current, "tab_count": browser.tabs.count,
             "user_browser_tool": "zeus_browser_*", "separate_automation_browser_tool": "browser_use"]
         return (try? NativeBrowserInspector.encode(context)) ?? "{}"

@@ -1,10 +1,19 @@
 import Foundation
 
 struct TextTranslationService {
-    static func translate(_ segments: [TranslationSegment], preferences: TranslationPreferences, provider: AIProviderConfiguration?, secret: String, context: UUID, session: URLSession = AIHTTP.shared) async throws -> [TranslationSegment] {
+    static func translate(_ segments: [TranslationSegment], preferences: TranslationPreferences, provider: AIProviderConfiguration?, secret: String, context: UUID, session: URLSession = AIHTTP.shared,
+                          onPartial: (@MainActor ([TranslationSegment]) async throws -> Void)? = nil) async throws -> [TranslationSegment] {
+        if preferences.streamsLargeBatches(provider: provider), let provider {
+            return try await OpenAIPageTranslation.translate(segments, target: preferences.target, provider: provider, secret: secret, session: session, onPartial: onPartial)
+        }
         var flattened: [TranslationSegment] = [], keys: [String: [String]] = [:]
         for item in segments {
-            let parts = preferences.engine == .cloudflare ? splitCloudflare(item.text, limit: preferences.cloudflare?.model.contains("llama-3.3") == true ? 16000 : 24000) : split(item.text, limit: preferences.usesAIBatches ? 24000 : 1800)
+            let parts: [String]
+            switch preferences.engine {
+            case .microsoftVisco: parts = try ViscoTranslationService.split(item.text)
+            case .cloudflare: parts = splitCloudflare(item.text, limit: preferences.cloudflare?.model.contains("llama-3.3") == true ? 16000 : 24000)
+            default: parts = split(item.text, limit: preferences.usesAIBatches ? 24000 : 1800)
+            }
             for (index, part) in parts.enumerated() {
                 let key = item.id + "_" + String(index); keys[item.id, default: []].append(key)
                 flattened.append(TranslationSegment(id: key, text: part))
@@ -68,6 +77,8 @@ struct TextTranslationService {
         guard !segments.isEmpty else { return [] }
         try Task.checkCancellation()
         switch preferences.engine {
+        case .microsoftVisco:
+            return try await ViscoTranslationService.translate(segments, target: preferences.target, session: session)
         case .cloudflare:
             return try await CloudflareTranslationService.translate(segments, target: preferences.target, config: preferences.cloudflare ?? CloudflareTranslationConfiguration(), secret: secret, session: session)
         case .googleCloud:
@@ -111,12 +122,12 @@ struct TextTranslationService {
             return TranslationSegment(id: item.id, text: text)
         }
     }
-    static func validateAIResponse(_ response: String, originals: [TranslationSegment]) throws -> [TranslationSegment] {
+    static func validateAIResponse(_ response: String, originals: [TranslationSegment], maximumTextCharacters: Int = 30_000) throws -> [TranslationSegment] {
         var text = response.trimmingCharacters(in: .whitespacesAndNewlines)
         if text.hasPrefix("```") { let lines = text.components(separatedBy: .newlines); text = lines.dropFirst().dropLast().joined(separator: "\n") }
         guard let data = text.data(using: .utf8), let values = try? JSONDecoder().decode([TranslationSegment].self, from: data), values.count == originals.count,
               Set(values.map(\.id)).count == values.count, Set(values.map(\.id)) == Set(originals.map(\.id)),
-              values.allSatisfy({ !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.text.count <= 30_000 }) else {
+              values.allSatisfy({ !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.text.count <= maximumTextCharacters }) else {
             throw TranslationFailure.message("لم يُرجع نموذج الذكاء الاصطناعي ترجمة مكتملة بالصيغة المطلوبة. بقيت النصوص الأصلية؛ جرّب نموذجًا آخر أو أعد المحاولة.")
         }
         let table = Dictionary(uniqueKeysWithValues: values.map { ($0.id, $0.text) })

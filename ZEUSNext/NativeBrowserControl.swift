@@ -14,6 +14,7 @@ import Foundation
                 "identity": "ZEUS Browser; Zeus is the integrated assistant. You are chatting inside its AI panel.",
                 "activeProfile": ["id": browser.profile.id.uuidString, "name": browser.profile.name, "role": browser.profile.role.rawValue],
                 "layout": (browser.data.settings.chromeLayout ?? .original).rawValue,
+                "customLayout": browser.data.settings.chromeWorkspace?.active(for: browser.data.settings.chromeLayout ?? .original)?.name ?? "",
                 "buttons": BrowserAction.allCases.map { ["action": $0.rawValue, "title": $0.title, "icon": $0.symbol, "accessibilityID": $0.identifier] },
                 "currentTab": browser.current.map { ["id": $0.id.uuidString, "title": $0.title, "url": $0.url] } ?? [:],
                 "browsers": ["zeus_browser": "User browser, actual open tabs and per-profile site sessions", "browser_use": "Separate automation browser, separate tabs/cookies, background research"],
@@ -22,7 +23,8 @@ import Foundation
                     "iCab": "Address/navigation toolbar, tools/bookmarks and tab strip; manual hide stays hidden until the side triangle is pressed. Profile button opens compact selector; account/settings button opens profile settings.",
                     "Top/bottom": "Address/profile controls above; navigation/actions below; scroll hides/shows chrome.",
                     "tabs": "Site icons, long-press menus, drag reorder, colored collapsible tab folders, persisted strip scroll position.",
-                    "assistant": "Sparkles opens original native agent UI. iPhone fullscreen; iPad real left split with expand/close. AI conversations/providers/memory are global; website sessions are profile-isolated."
+                    "assistant": "Sparkles opens original native agent UI. iPhone fullscreen; iPad left/right split chosen in Appearance. Its unified floating handle can be dragged and collapsed; expanded buttons close or resize. AI conversations/providers/memory are global; website sessions are profile-isolated.",
+                    "Custom layouts": "Appearance > Layout Studio edits built-ins or adds saved designs by dragging action/address/tabs/bookmarks/text/background blocks, with independent portrait/landscape arrangements. The recovery menu returns to built-in chrome without deleting saved designs."
                 ],
                 "features": [
                     "Reader": "Full-screen article reader with RTL, fonts, text opacity and custom foreground/background settings.",
@@ -34,7 +36,7 @@ import Foundation
                     "Profiles": "Admin/standard/guest/kiosk, avatars, password/biometric locks, per-profile browsing/site data and capability restrictions.",
                     "Settings sections": "Account, interface/themes/layouts, tabs, launch, privacy, personal data/storage, websites, network, tools, services/transfer, other, help, translation and native AI settings.",
                     "Storage": "Granular site-data deletion, caches, history/searches, downloads and backups; browser backup JSON does not include all authenticated website sessions or native AI secrets.",
-                    "Native agent": "Original chat/Markdown/code rendering, streaming, tool cards, providers/API keys/OAuth, model groups, usage, skills, memory, identity, MCP, terminal and file browser. Permissions have three global modes under AI Settings > Permissions."
+                    "Native agent": "Original chat/Markdown/code rendering, streaming, tool cards, providers/API keys/OAuth, model groups, usage, skills, memory, identity, MCP, terminal and file browser. Chat menu > Conversation Files opens a classified gallery of the same session workspace, with previews/export/reveal in tree. Open Browser has a real window expand/collapse button. Permissions have three global modes under AI Settings > Permissions."
                 ],
                 "configuration": "Read browser_settings for live full keys and values. Read browser_profiles for profiles and role-limited editable keys. Native agent preferences are managed with minis-config when its setting is enabled; technical command names remain compatible. Never invent settings or capabilities."
             ])
@@ -69,8 +71,10 @@ import Foundation
             let value = try JSONSerialization.jsonObject(with: Data(raw.utf8), options: [.fragmentsAllowed])
             try set(&object, path: key.split(separator: ".").map(String.init), value: value)
             if let providers = browser.data.settings.aiProviders { object["aiProviders"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(providers)) }
-            let updated = try JSONDecoder().decode(BrowserSettings.self, from: JSONSerialization.data(withJSONObject: object))
+            var updated = try JSONDecoder().decode(BrowserSettings.self, from: JSONSerialization.data(withJSONObject: object))
+            if key == "chromeLayout" { updated.chromeWorkspace?.selected = nil; updated.chromeWorkspace?.bypass = false }
             guard updated.textScale.isFinite, (0.5...3).contains(updated.textScale),
+                  updated.chromeWorkspace?.validated() != false,
                   updated.theme?.isValid != false,
                   (8...72).contains(updated.reading?.fontSize ?? 20),
                   (0.1...1).contains(updated.reading?.textOpacity ?? 1),

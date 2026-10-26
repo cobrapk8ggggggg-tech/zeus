@@ -211,6 +211,20 @@ class Handler(BaseHTTPRequestHandler):
             else: text = 'OK'
             if body.get('model') == 'broken-json': text = '[{"id":"wrong","text":"wrong"}]'
             if body.get('model') == 'slow-translator': time.sleep(0.4)
+            if body.get('stream') is True:
+                slow = 'slow-stream' in body.get('model', '')
+                width = 13 if slow else 96
+                events = []
+                for offset in range(0, len(text), width):
+                    event = {'choices': [{'delta': {'content': text[offset:offset + width]}, 'finish_reason': None}]}
+                    events.append(('data: ' + json.dumps(event, ensure_ascii=False) + '\r\n\r\n').encode())
+                events.append(b'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\r\n\r\n')
+                events.append(b'data: [DONE]\r\n\r\n')
+                self.send_response(200); self.send_header('Content-Type', 'text/event-stream; charset=utf-8')
+                self.send_header('Content-Length', str(sum(map(len, events)))); self.end_headers()
+                for event in events:
+                    self.wfile.write(event); self.wfile.flush(); time.sleep(0.03 if slow else 0.001)
+                return
             result = json.dumps({'choices': [{'message': {'content': text}}]}, ensure_ascii=False).encode()
             self.send_response(200); self.send_header('Content-Type', 'application/json'); self.send_header('Content-Length', str(len(result))); self.end_headers(); self.wfile.write(result)
         except Exception as error:

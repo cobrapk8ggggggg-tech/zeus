@@ -12,6 +12,7 @@ import shutil
 import subprocess
 from debug_fixture import prepare_fixture
 from text_only import apply as apply_text_only
+from native_ui import apply as apply_native_ui
 
 
 def replace(file, before, after, count=1):
@@ -72,7 +73,7 @@ def embed(native, browser, report):
     # The application remains OpenMinis' original @main/AppDelegate/root setup;
     # its root content now embeds the browser with the original AI UI alongside.
     replace(source / "MinisApp.swift", "                ContentView()", "                ZEUSBrowserRootEntry()")
-    for name in ("ZEUSNativeIntegration.swift", "ZeusToolPermissions.swift", "ZeusDefaultSkills.swift", "ZeusAgentSchemas.swift", "ZeusPatch.swift", "ZeusAgentHarness.swift", "ZeusConnections.swift", "ZeusGitHubAuthorization.swift", "ZeusProjectContract.swift", "ZeusGitHubTools.swift", "ZeusStorageExplorer.swift", "ZeusTaskDashboard.swift"):
+    for name in ("ZEUSNativeIntegration.swift", "ZeusToolPermissions.swift", "ZeusDefaultSkills.swift", "ZeusAgentSchemas.swift", "ZeusPatch.swift", "ZeusAgentHarness.swift", "ZeusConnections.swift", "ZeusGitHubAuthorization.swift", "ZeusProjectContract.swift", "ZeusGitHubTools.swift", "ZeusStorageExplorer.swift", "ZeusTaskDashboard.swift", "ZeusAgentControls.swift", "ZeusConversationFiles.swift", "ZeusAgentBrowserWindow.swift"):
         shutil.copyfile(browser / ".openminis/Host" / name, source / name)
     # Turn the original informational storage rows into drill-down links.
     storage = source / "Views/Settings/StorageManagementView.swift"
@@ -482,6 +483,7 @@ def embed(native, browser, report):
     (generated / "BrowserFixtureFactory.swift").write_text("import SwiftUI\n@MainActor enum BrowserFixtureFactory {\n" + factory + "}\n")
 
     apply_text_only(source, browser)
+    apply_native_ui(source, replace)
     replace(source / "Views/ContentView.swift", '                Section("Agent Runtime") {', '''                Section("وكيل ZEUS") {
                     NavigationLink { ZeusAgentRuntimeSettings() } label: { Label("أدوات الوكيل وتنفيذه", systemImage: "terminal") }
                     NavigationLink { ZeusPluginsSettingsView() } label: { Label("الإضافات", systemImage: "puzzlepiece.extension") }

@@ -74,7 +74,11 @@ struct TranslationSettingsPage: View {
                         ForEach(context.settings.aiProviders ?? []) { p in Text(p.name).tag(Optional(p.id)) }
                     }
                     NavigationLink { AISettingsPage(context: context) } label: { Label("إدارة مزودي الذكاء الاصطناعي", systemImage: "sparkles") }
+                    if prefs.streamsLargeBatches(provider: context.settings.aiProviders?.first { $0.id == prefs.providerID }) {
+                        Text("تُرسل الصفحة في جزأين، أو ثلاثة للصفحات الطويلة، وتظهر الترجمة تدريجيًا أثناء وصول الرد.").font(.footnote).foregroundStyle(.secondary)
+                    }
                 }
+                if prefs.engine == .microsoftVisco { Text("viscodev.x10.mx • بدون مفتاح API").font(.footnote).foregroundStyle(.secondary) }
                 if let message { Text(message).font(.footnote) }
             }
             if !prefs.excludedHosts.isEmpty {
@@ -268,7 +272,7 @@ struct AIWorkspace: View {
             }
             if !response.isEmpty { ThemedSection("الرد") { Text(response).textSelection(.enabled) } }
         }.settingsPage("مساحة الذكاء الاصطناعي")
-            .fileImporter(isPresented: $selectingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
+            .zeusFileImporter(isPresented: $selectingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
                 do { let urls = try result.get(); let items = try urls.map { try AIAttachment.load($0) }; guard (attachments + items).reduce(0, { $0 + $1.data.count }) <= 20_000_000 else { throw TranslationFailure.message("مجموع المرفقات يتجاوز 20 ميجابايت.") }; attachments += items }
                 catch { response = error.localizedDescription }
             }.onAppear { selected = context.settings.translation?.providerID }

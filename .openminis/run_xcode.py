@@ -4,7 +4,9 @@ Large upstream header-warning dumps exceed the connected log reader's limit;
 filtering console output must never change Xcode's exit status or stored log.
 """
 from pathlib import Path
+import os
 import re
+import signal
 import subprocess
 import sys
 import time
@@ -15,9 +17,21 @@ def run(log: Path, command: list[str]) -> int:
     pattern = re.compile(r"error:|\*\* (?:BUILD|TEST)|Test (?:Case|Suite)|Executed \d+|XCTAssert|Testing (?:started|failed)|^SwiftCompile|^\s*t =")
     last_update = time.monotonic()
     with log.open("w") as output:
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace")
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace", start_new_session=True)
+        def stop(signum, _frame):
+            if process.poll() is None:
+                os.killpg(process.pid, signal.SIGTERM)
+                try:
+                    process.wait(timeout=8)
+                except subprocess.TimeoutExpired:
+                    os.killpg(process.pid, signal.SIGKILL)
+                    process.wait()
+            raise SystemExit(128 + signum)
+        signal.signal(signal.SIGTERM, stop)
+        signal.signal(signal.SIGINT, stop)
         for line in process.stdout:
             output.write(line)
+            output.flush()
             if pattern.search(line):
                 print(line, end="", flush=True)
                 last_update = time.monotonic()

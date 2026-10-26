@@ -42,9 +42,14 @@ import CoreGraphics
         if namespace != cacheNamespace { cache.removeAll(); results.removeAll(); cacheNamespace = namespace }
         let id = context
         task = Task {
+            defer { if id == context { running = false } }
             do {
                 await Task.yield() // allow first layout to publish its visible paragraphs
                 let originals = [article.title] + article.paragraphs
+                if prefs.streamsLargeBatches(provider: provider) {
+                    try await translateOpenAIArticle(originals, article: article, model: model, preferences: prefs, provider: provider, secret: secret, namespace: namespace, folder: folder, owner: owner, id: id)
+                    return
+                }
                 var processed = 0
                 while results.count < originals.count {
                     try Task.checkCancellation(); guard owner == model.profile.id, !model.requiresUnlock, id == context else { throw CancellationError() }
@@ -79,12 +84,43 @@ import CoreGraphics
                     await Task.yield()
                 }
             } catch is CancellationError { } catch { if id == context { self.error = error.localizedDescription } }
-            if id == context { running = false }
         }
     }
     private func priority(_ index: Int) -> (Int, CGFloat, Int) {
         guard let rect = rectangles[index] else { return (index < 6 ? 0 : 2, CGFloat(index), index) }
         let distance = max(-rect.maxY, rect.minY - viewportHeight, 0)
         return (rect.maxY > 0 && rect.minY < viewportHeight ? 0 : distance < viewportHeight * 2 ? 1 : 2, distance, index)
+    }
+    private func translateOpenAIArticle(_ originals: [String], article: ReaderArticle, model: BrowserModel, preferences: TranslationPreferences,
+                                       provider: AIProviderConfiguration?, secret: String, namespace: String, folder: URL?, owner: UUID, id: UUID) async throws {
+        @MainActor func valid() throws { try Task.checkCancellation(); guard owner == model.profile.id, !model.requiresUnlock, id == context else { throw CancellationError() } }
+        let all = originals.enumerated().map { TranslationSegment(id: String($0.offset), text: $0.element) }
+        if let folder { cache.merge(await TranslationMemory.shared.lookup(all, namespace: namespace, folder: folder)) { _, saved in saved } }
+        try valid()
+        var unique = Set<String>(), occurrences: [String: [Int]] = [:]
+        for (index, source) in originals.enumerated() {
+            occurrences[source, default: []].append(index)
+            if source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { results[index] = source }
+            else if let cached = cache[source] { results[index] = cached; reused += 1 }
+        }
+        let missing = all.filter { cache[$0.text] == nil && !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && unique.insert($0.text).inserted }
+        let sources = Dictionary(uniqueKeysWithValues: missing.map { ($0.id, $0.text) })
+        @MainActor func show(_ values: [TranslationSegment]) throws {
+            try valid()
+            for value in values {
+                guard let source = sources[value.id] else { continue }
+                for index in occurrences[source] ?? [] { results[index] = value.text }
+            }
+            completed = results.count; title = results[0]
+            paragraphs = article.paragraphs.enumerated().map { results[$0.offset + 1] ?? $0.element }
+        }
+        try show([])
+        if !missing.isEmpty {
+            let values = try await TextTranslationService.translate(missing, preferences: preferences, provider: provider, secret: secret, context: id, onPartial: { values in try show(values) })
+            try valid(); try show(values)
+            var saved: [String: String] = [:]
+            for value in values { if let source = sources[value.id] { saved[source] = value.text; cache[source] = value.text } }
+            if let folder, !(await TranslationMemory.shared.save(saved, namespace: namespace, folder: folder)) { storageNotice = "تعذّر حفظ الترجمة على الجهاز؛ تبقى نتيجة هذه الجلسة في الذاكرة." }
+        }
     }
 }

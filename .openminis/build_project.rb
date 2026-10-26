@@ -53,7 +53,7 @@ project.targets.each do |item|
     config.build_settings['LD_MAP_FILE_PATH'] = '$(TARGET_TEMP_DIR)/$(PRODUCT_NAME)-LinkMap-$(CURRENT_ARCH).txt'
   end
 end
-%w[ZEUSNativeIntegration.swift ZeusToolPermissions.swift ZeusDefaultSkills.swift ZeusAgentSchemas.swift ZeusPatch.swift ZeusAgentHarness.swift ZeusConnections.swift ZeusGitHubAuthorization.swift ZeusProjectContract.swift ZeusGitHubTools.swift ZeusStorageExplorer.swift ZeusTaskDashboard.swift].each do |name|
+%w[ZEUSNativeIntegration.swift ZeusToolPermissions.swift ZeusDefaultSkills.swift ZeusAgentSchemas.swift ZeusPatch.swift ZeusAgentHarness.swift ZeusConnections.swift ZeusGitHubAuthorization.swift ZeusProjectContract.swift ZeusGitHubTools.swift ZeusStorageExplorer.swift ZeusTaskDashboard.swift ZeusAgentControls.swift ZeusConversationFiles.swift ZeusAgentBrowserWindow.swift].each do |name|
   bridge = project.main_group.new_file((native + 'src/ios' + name).to_s)
   app.source_build_phase.add_file_reference(bridge)
 end
@@ -92,8 +92,8 @@ app.build_configurations.each do |config|
   config.build_settings['CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]'] = 'ZeusSimulator.entitlements'
   config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'tools.rea.ZEUSBrowserAnalysis'
   config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '18.1'
-  config.build_settings['MARKETING_VERSION'] = '3.1.0'
-  config.build_settings['CURRENT_PROJECT_VERSION'] = '26'
+  config.build_settings['MARKETING_VERSION'] = '3.2.3'
+  config.build_settings['CURRENT_PROJECT_VERSION'] = '31'
   config.build_settings['INFOPLIST_KEY_CFBundleDisplayName'] = 'ZEUS'
 end
 # A device `build` (unlike archive/install) did not strip the original app's
@@ -124,6 +124,8 @@ tests.add_dependency(target)
 tests.frameworks_build_phase.add_file_reference(target.product_reference)
 tests.source_build_phase.add_file_reference(group.new_file((browser + '.openminis/Host/NativeBrowserIntegrationTests.swift').to_s))
 tests.source_build_phase.add_file_reference(group.new_file((browser + '.openminis/Host/NativeProjectContractTests.swift').to_s))
+tests.source_build_phase.add_file_reference(group.new_file((browser + '.openminis/Host/NativePersonalizationTests.swift').to_s))
+tests.source_build_phase.add_file_reference(group.new_file((browser + '.openminis/Host/NativeTranslationStreamingTests.swift').to_s))
 tests.build_configurations.each do |config|
   app_config = app.build_configurations.find { |candidate| candidate.name == config.name }
   %w[HEADER_SEARCH_PATHS FRAMEWORK_SEARCH_PATHS LIBRARY_SEARCH_PATHS].each do |key|
@@ -141,6 +143,19 @@ end
 scheme_path = native + 'src/ios/Minis.xcodeproj/xcshareddata/xcschemes/Minis.xcscheme'
 scheme = Xcodeproj::XCScheme.new(scheme_path)
 scheme.add_test_target(tests)
+ui_tests = project.new_target(:ui_test_bundle, 'ZEUSPersonalizationUITests', :ios, '26.2')
+ui_tests.product_name = 'ZEUSPersonalizationUITests'
+ui_tests.add_dependency(app)
+ui_tests.source_build_phase.add_file_reference(group.new_file((browser + '.openminis/UITests/NativePersonalizationUITests.swift').to_s))
+ui_tests.build_configurations.each do |config|
+  config.build_settings.merge!({
+    'SWIFT_VERSION' => '5.0', 'GENERATE_INFOPLIST_FILE' => 'YES',
+    'PRODUCT_BUNDLE_IDENTIFIER' => 'tools.zeus.personalization.uitests',
+    'PRODUCT_NAME' => 'ZEUSPersonalizationUITests', 'CODE_SIGNING_ALLOWED' => 'NO',
+    'TEST_TARGET_NAME' => 'Minis', 'TARGETED_DEVICE_FAMILY' => '1,2'
+  })
+end
+scheme.add_test_target(ui_tests)
 scheme.save_as(native + 'src/ios/Minis.xcodeproj', 'Minis', true)
 project.save
 
