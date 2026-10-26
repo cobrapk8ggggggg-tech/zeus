@@ -2,7 +2,7 @@ name: ZEUS cloud runtime
 on:
   push:
     branches: [feature/zeus-cloud-account-20261026]
-    paths: [Cloud/**, supabase/functions/**, .github/workflows/zeus-cloud-runtime.yml]
+    paths: [Cloud/**, supabase/functions/**, .dockerignore, .github/workflows/zeus-cloud-runtime.yml]
   workflow_dispatch:
 permissions:
   contents: read

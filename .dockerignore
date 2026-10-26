@@ -10,3 +10,8 @@
 !.openminis/
 !.openminis/ZEUSDefaultSkills/
 !.openminis/ZEUSDefaultSkills/**
+!Cloud/
+!Cloud/Dockerfile
+!Cloud/requirements.lock
+!Cloud/zeus_cloud/
+!Cloud/zeus_cloud/*.py
