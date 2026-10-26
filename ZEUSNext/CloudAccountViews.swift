@@ -24,6 +24,7 @@ struct CloudAccountGate<Content: View>: View {
 
 private struct CloudWelcomeView: View {
     @ObservedObject var account: CloudAccount
+    @State private var emailLink = ""
     @State private var email = ""
     @State private var password = ""
     @State private var confirmation = ""
@@ -97,6 +98,11 @@ private struct CloudWelcomeView: View {
                 .accessibilityIdentifier("cloudSubmit")
             if !recovering { Button(creating ? "لدي حساب بالفعل" : "إنشاء حساب جديد") { creating.toggle(); password = ""; confirmation = "" } }
             Button(recovering ? "العودة للدخول" : "نسيت كلمة المرور") { recovering.toggle(); creating = false; password = "" }
+            DisclosureGroup("تأكيد البريد أو الاستعادة باستخدام رابط الرسالة") {
+                Text("انسخ رابط التأكيد من رسالة البريد والصقه هنا إذا لم يفتح التطبيق تلقائيًا.").font(.footnote)
+                SecureField("رابط التأكيد من بريدك", text: $emailLink).textInputAutocapitalization(.never).autocorrectionDisabled()
+                action("التحقق من الرابط") { await account.verifyEmailLink(emailLink); emailLink = "" }.disabled(emailLink.isEmpty)
+            }.font(.subheadline)
             Text("Google سيضاف لاحقًا. الدخول الحالي بالبريد وكلمة المرور.").font(.footnote).foregroundStyle(.white.opacity(0.65))
         }
         if let issue = account.issue, account.phase != .blocked { Text(issue).font(.footnote).foregroundStyle(.orange).textSelection(.enabled) }

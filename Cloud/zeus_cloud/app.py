@@ -46,6 +46,9 @@ class RunInput(Input):
     file_grant: SecretStr
     permission_mode: str = Field(default="consequential", pattern="^(ask_all|consequential|unrestricted)$")
     max_seconds: int = Field(default=7200, ge=30, le=7200)
+    native_user_id: uuid.UUID | None = None
+    native_assistant_id: uuid.UUID | None = None
+    native_session: dict | None = None
 
 
 class ApprovalInput(Input):
@@ -93,7 +96,7 @@ class Authorizer:
 
 def public_run(run):
     if run is None: raise HTTPException(404, "المهمة غير موجودة.")
-    return {key: run[key] for key in ["id", "conversation", "status", "seq", "created", "updated", "checkpoint", "error", "pending_approval"] if key in run}
+    return {key: run[key] for key in ["id", "conversation", "status", "seq", "created", "updated", "checkpoint", "error", "pending_approval", "native_user_id", "native_assistant_id"] if key in run}
 
 
 class BodyLimit:
@@ -200,6 +203,8 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
     async def submit(value: RunInput, account=Depends(auth)):
         ready()
         conversation, identifier = str(value.conversation), str(value.id)
+        if value.native_session and (str(value.native_session.get("id", "")).lower() != conversation or len(json.dumps(value.native_session)) > 16_000):
+            raise ValueError("بيانات المحادثة الأصلية غير صالحة.")
         existing = await store.run(account, identifier)
         fingerprint = hashlib.sha256(json.dumps(value.model_dump(mode="json", exclude={"file_grant"}), sort_keys=True).encode()).hexdigest()
         if existing:
@@ -221,9 +226,14 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
         run = await store.create_run(account, {"id": identifier, "conversation": conversation, "prompt": value.prompt,
             "history": value.history, "provider": provider["encrypted"], "grant": vault.seal(account, grant),
             "permission_mode": value.permission_mode, "max_seconds": value.max_seconds,
+            "native_user_id": str(value.native_user_id).upper() if value.native_user_id else None,
+            "native_assistant_id": str(value.native_assistant_id).upper() if value.native_assistant_id else None,
+            "native_session": value.native_session,
             "fingerprint": fingerprint, "status": "queued", "created": time.time()})
         if run.get("fingerprint") != fingerprint: raise HTTPException(409, "معرف الطلب مستخدم لمهمة أخرى.")
         record = await store.get(account, "conversation", conversation) or {"messages": value.history, "title": value.prompt[:120]}
+        if value.native_session:
+            record["native_session"] = value.native_session
         await store.put(account, "conversation", conversation, {**record, "latest_run": identifier})
         engine.wakeup.set()
         return public_run(run)
@@ -233,18 +243,18 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
         ready(); return public_run(await store.run(account, str(identifier)))
 
     @app.get("/v1/runs/{identifier}/events")
-    async def events(identifier: uuid.UUID, after: int = 0, account=Depends(auth)):
+    async def events(identifier: uuid.UUID, after: int = 0, authorization: str = Header(default=""), account=Depends(auth)):
         ready(); current = public_run(await store.run(account, str(identifier)))
-        items = await store.events(account, str(identifier), after)
+        items = await engine.history.events(account, str(identifier), after, authorization.removeprefix("Bearer "))
         return {"run": current, "events": items, "cursor": items[-1]["seq"] if items else after}
 
     @app.get("/v1/runs/{identifier}/stream")
-    async def stream(identifier: uuid.UUID, request: Request, after: int = 0, account=Depends(auth)):
+    async def stream(identifier: uuid.UUID, request: Request, after: int = 0, authorization: str = Header(default=""), account=Depends(auth)):
         ready(); public_run(await store.run(account, str(identifier)))
         async def lines():
             nonlocal after
             while not await request.is_disconnected():
-                items = await store.events(account, str(identifier), after)
+                items = await engine.history.events(account, str(identifier), after, authorization.removeprefix("Bearer "))
                 for item in items:
                     after = item["seq"]
                     yield "id: " + str(after) + "\ndata: " + json.dumps(item, ensure_ascii=False) + "\n\n"
@@ -277,7 +287,7 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
     @app.get("/v1/conversations")
     async def conversations(account=Depends(auth)):
         ready(); records = await store.list(account, "conversation")
-        return {"conversations": [{"id": r["id"], "title": r.get("title", ""), "updated": r["updated"]} for r in records]}
+        return {"conversations": [{"id": r["id"], "title": r.get("title", ""), "updated": r["updated"], "native_session": r.get("native_session")} for r in records]}
 
     @app.get("/v1/conversations/{identifier}/files")
     async def files(identifier: uuid.UUID, account=Depends(auth)):
@@ -289,6 +299,12 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
         ready(); record = await store.get(account, "conversation", str(identifier))
         if not record: raise HTTPException(404, "المحادثة غير موجودة.")
         return {"id": str(identifier), "messages": record.get("messages", [])[-100:], "latest_run": record.get("latest_run")}
+
+    @app.get("/v1/conversations/{identifier}/runs")
+    async def conversation_runs(identifier: uuid.UUID, before: float = 4102444800, account=Depends(auth)):
+        ready(); rows = await store.list_runs(account, str(identifier), before)
+        return {"runs": [{**public_run(r), "prompt": r["prompt"], "native_user_id": r.get("native_user_id"), "native_assistant_id": r.get("native_assistant_id")} for r in rows],
+                "before": min((r["created"] for r in rows), default=None)}
 
     @app.put("/v1/conversations/{identifier}/import")
     async def import_conversation(identifier: uuid.UUID, value: ImportInput, account=Depends(auth)):

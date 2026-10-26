@@ -100,6 +100,8 @@ def embed(native, browser, report):
     replace(cloud_vm, "            } else if !isProcessing && oldValue {", "            } else if !isProcessing && oldValue {\n                ZeusCloudArchive.shared.scheduleBackup()")
     replace(cloud_vm, "    func cancel() {", "    func cancel() {\n        ZeusCloudRuntime.shared.cancel(session: sessionId)")
     replace(source / "Agent/Chat/AIChatViewModel+Persistence.swift", "    func loadSession() async {\n        guard let sessionId else { return }", "    func loadSession() async {\n        guard let sessionId else { return }\n        defer { Task { await ZeusCloudRuntime.shared.reconnect(self) } }")
+    replace(source / "Agent/Chat/AIChatViewModel+Persistence.swift", "            id: UUID().uuidString, sessionId: sessionId,", "            id: NativeCloudAccountAPI.usesCloud ? (msg.dbMessageId ?? UUID().uuidString) : UUID().uuidString, sessionId: sessionId,")
+    replace(source / "Agent/Chat/AIChatViewModel+Persistence.swift", "import Foundation", "import Foundation\nimport ZEUSBrowser")
     replace(source / "Views/ContentView.swift", "                ISHTerminalView(showCloseButton: true)", "                if NativeCloudAccountAPI.usesCloud { ZeusCloudTerminalView() }\n                else { ISHTerminalView(showCloseButton: true) }")
     # A compiler boundary around the unchanged native geometry expression.
     # The original giant modifier chain hit the type-checker limit in the

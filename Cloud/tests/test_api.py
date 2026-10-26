@@ -161,5 +161,40 @@ class APITests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(await self.app.state.engine.spaces.read_cloud_file(self.owner, self.conversation, "terminal.txt", "grant"), b"terminal file")
 
+    async def test_completed_events_restore_from_verified_cold_archive_with_fresh_identity(self):
+        identifier, _ = await self.submit()
+        await self.wait_state(identifier, {"completed"})
+        for _ in range(100):
+            if not await self.store.events(self.owner, identifier): break
+            await asyncio.sleep(0.01)
+        record = await self.store.run(self.owner, identifier)
+        self.assertTrue(record["event_archives"])
+        self.assertEqual(await self.store.events(self.owner, identifier), [])
+        original_get = self.gateway.get
+        async def current_identity_only(token, ref):
+            if token != "fixture-owner": raise ValueError("Previous task capability expired")
+            return await original_get(token, ref)
+        self.gateway.get = current_identity_only
+        response = await self.client.get(f"/v1/runs/{identifier}/events")
+        self.assertEqual(response.status_code, 200)
+        events = response.json()["events"]
+        self.assertEqual(events[-1]["seq"], record["seq"])
+        self.assertIn("tool_result", [e["kind"] for e in events])
+        with self.assertRaises(ValueError): await self.app.state.engine.history.events(self.owner, identifier)
+
+    async def test_native_identity_is_preserved_and_run_index_never_returns_provider_secrets(self):
+        user, assistant = str(uuid.uuid4()).upper(), str(uuid.uuid4()).upper()
+        body = {"id": str(uuid.uuid4()), "conversation": self.conversation, "prompt": "create", "provider": self.provider,
+                "native_user_id": user, "native_assistant_id": assistant, "native_session": {"id": self.conversation.upper(), "title": "Restorable"},
+                "file_grant": "grant", "permission_mode": "unrestricted", "max_seconds": 30}
+        response = await self.client.post("/v1/runs", json=body); self.assertEqual(response.status_code, 200, response.text)
+        await self.wait_state(body["id"], {"completed"})
+        response = await self.client.get(f"/v1/conversations/{self.conversation}/runs")
+        self.assertEqual(response.json()["runs"][0]["native_user_id"], user)
+        self.assertEqual(response.json()["runs"][0]["native_assistant_id"], assistant)
+        self.assertNotIn("provider", response.json()["runs"][0]); self.assertNotIn("grant", response.json()["runs"][0])
+        index = (await self.client.get("/v1/conversations")).json()["conversations"]
+        self.assertEqual(index[0]["native_session"]["id"], self.conversation.upper())
+
 
 if __name__ == "__main__": unittest.main()

@@ -10,6 +10,7 @@ import uuid
 from cryptography.fernet import Fernet
 from .files import contained, inventory, open_regular, write_regular
 from .tools import TOOLS, INSTRUCTIONS
+from .history import History
 
 TERMINAL = {"completed", "failed", "cancelled", "interrupted"}
 
@@ -34,6 +35,7 @@ class Engine:
         self.approvals = {}
         self._stopping = False
         self.execution_gate = asyncio.Lock()
+        self.history = History(store, spaces.gateway, vault)
 
     async def loop(self):
         while not self._stopping:
@@ -75,6 +77,8 @@ class Engine:
                 root = await self.spaces.restore(owner, conversation, grant); self.own(root)
                 provider = self.vault.open(owner, run["provider"])
                 saved = await self.store.get(owner, "conversation", conversation)
+                run["_context_archives"] = (saved or {}).get("archives", [])[:]
+                run["_native_session"] = run.get("native_session") or (saved or {}).get("native_session")
                 messages = (saved or {}).get("messages", run.get("history", []))[:]
                 if not run.get("resume_approval"): messages.append({"role": "user", "content": run["prompt"]})
                 await self.save_conversation(run, messages, (saved or {}).get("title", run["prompt"][:120]))
@@ -135,6 +139,9 @@ class Engine:
             # Keep a failed/unverified workspace for inspection. A successful
             # cloud checkpoint is required before releasing ephemeral files.
             current = await self.store.run(owner, identifier)
+            if current and current.get("status") in TERMINAL:
+                try: await self.history.archive_events(owner, identifier)
+                except Exception: pass  # Keep hot rows if archival fails; never discard unverified events.
             if current and current.get("status") in {"completed", "waiting_user"}:
                 await asyncio.to_thread(shutil.rmtree, self.spaces.path(owner, conversation), True)
 
@@ -158,7 +165,19 @@ class Engine:
             await self.save_conversation(run, messages, run["prompt"][:120])
 
     async def save_conversation(self, run, messages, title):
-        await self.store.put(run["owner"], "conversation", run["conversation"], {"messages": messages, "title": title, "latest_run": run["id"]})
+        if len(json.dumps(messages, ensure_ascii=False)) > 180_000:
+            # Start the retained suffix at a complete user/assistant message,
+            # never in the middle of a tool-result batch.
+            half = len(messages) // 2
+            cut = next((i for i in range(half, len(messages) - 2) if messages[i].get("role") in {"user", "assistant"}), 0)
+            if cut:
+                grant = self.vault.open(run["owner"], run["grant"])
+                ref = await self.history.put(run["owner"], grant, messages[:cut])
+                run["_context_archives"].append(ref)
+                checkpoint = (await self.store.run(run["owner"], run["id"])) or {}
+                messages[:cut] = [{"role": "user", "content": "Earlier conversation context was encrypted and archived without deletion. Use history_read to inspect it. Current request: " + run["prompt"][:4000] + "\nProgress checkpoint: " + checkpoint.get("checkpoint", "")}]
+                await self.store.event(run["owner"], run["id"], "context_archived", {"pages": len(run["_context_archives"])})
+        await self.store.put(run["owner"], "conversation", run["conversation"], {"messages": messages, "title": title, "latest_run": run["id"], "archives": run.get("_context_archives", []), "native_session": run.get("_native_session")})
 
     async def approve(self, run, call, pending):
         key = str(uuid.uuid4()); owner, identifier = run["owner"], run["id"]
@@ -176,6 +195,15 @@ class Engine:
                 with open_regular(root, args["path"]) as file: return file.read(32_001)
             data = await asyncio.to_thread(read)
             return data[:32_000].decode(errors="replace") + ("\n[truncated]" if len(data) > 32_000 else "")
+        if name == "history_read":
+            record = await self.store.get(owner, "conversation", conversation) or {}
+            archives = record.get("archives", [])
+            if "page" not in args: return json.dumps({"pages": len(archives), "instruction": "Use page (zero based) and offset to read a 32K-character window."})
+            page, offset = int(args["page"]), max(0, int(args.get("offset", 0)))
+            if not 0 <= page < len(archives): raise ValueError("History page not found")
+            value = await self.history.get(owner, self.vault.open(owner, run["grant"]), archives[page])
+            data = json.dumps(value, ensure_ascii=False)
+            return data[offset:offset + 32_000] + ("\n[more: increase offset]" if len(data) > offset + 32_000 else "")
         if name == "file_write":
             data = args["content"].encode()
             if len(data) > 256_000: raise ValueError("File tool payload too large")

@@ -128,3 +128,14 @@ class MongoStore:
         async with self.active() as db:
             rows = await db.events.find({"owner": owner, "run": run, "seq": {"$gt": max(after, 0)}}).sort("seq", 1).limit(200).to_list()
         return [self.clean(row) for row in rows]
+
+    async def list_runs(self, owner, conversation, before=4102444800):
+        async with self.active() as db:
+            rows = await db.runs.find({"owner": owner, "conversation": conversation, "created": {"$lt": before}}).sort([("created", -1), ("id", -1)]).limit(25).to_list()
+        return [self.clean(row) for row in rows]
+
+    async def prune_events(self, owner, run, through):
+        record = await self.run(owner, run)
+        if not record or record["status"] not in {"completed", "failed", "cancelled", "interrupted"} or not record.get("event_archives"):
+            raise ValueError("Verified archive required before pruning events")
+        async with self.active() as db: await db.events.delete_many({"owner": owner, "run": run, "seq": {"$lte": through}})

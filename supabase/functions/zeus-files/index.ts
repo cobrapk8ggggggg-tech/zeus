@@ -75,6 +75,16 @@ return async (request: Request): Promise<Response> => {
     const url = new URL(request.url), op = url.searchParams.get("op");
     if (request.method === "GET" && op === "health") return json({ service: "zeus-files", version: 1 });
     const token = request.headers.get("Authorization")?.replace(/^Bearer /, "") ?? "";
+    if (request.method === "GET" && op === "userget") {
+      const user = await verifiedUser(token), hash = url.searchParams.get("sha") ?? "";
+      if (!digestPattern.test(hash)) return json({ error: "invalid_object" }, 400);
+      const stored = await fetch(base + "/storage/v1/object/zeus-private/" + user.id + "/objects/" + hash,
+        { headers: { apikey: adminKey, Authorization: "Bearer " + adminKey } });
+      if (!stored.ok) return json({ error: "not_found" }, 404);
+      const blob = await stored.blob(); if (blob.size > ceiling) throw new Error("size");
+      const data = new Uint8Array(await blob.arrayBuffer()); if (await sha(data) !== hash) throw new Error("storage");
+      return new Response(data, { headers: { ...headers, "Content-Type": "application/octet-stream" } });
+    }
     if (request.method === "POST" && op === "runtime") {
       if (!/^zdb1_[a-f0-9]{64}$/.test(token)) return json({ error: "unauthorized" }, 401);
       const lookup = await admin("/rest/v1/zeus_runtime_access?token_sha256=eq." + await sha(new TextEncoder().encode(token)) + "&revoked_at=is.null&select=label&limit=1");

@@ -190,9 +190,13 @@ import ZEUSBrowser
     }
     func restoreAccountIfNeeded(progress: @escaping (String) -> Void) async throws {
         guard let owner = NativeCloudAccountAPI.ownerID else { return }
-        if (try? String(contentsOf: marker, encoding: .utf8)) == owner { return }
+        if (try? String(contentsOf: marker, encoding: .utf8)) == owner {
+            if NativeCloudAccountAPI.usesCloud { try? await ZeusCloudRuntime.shared.restoreSessionIndex() }
+            return
+        }
         guard let archive = try await NativeCloudAccountAPI.archive() else { return }
         try await restore(archive, includeFiles: !NativeCloudAccountAPI.usesCloud, progress: progress)
+        if NativeCloudAccountAPI.usesCloud { try await ZeusCloudRuntime.shared.restoreSessionIndex() }
         try markRestored()
     }
     func prepareLocalExecution(progress: @escaping (String) -> Void) async throws {

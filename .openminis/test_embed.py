@@ -94,6 +94,27 @@ class NativeEmbeddingTests(unittest.TestCase):
                 return text[start:text.index('    /// Trivial', start)]
             self.assertEqual(detail_context(adapted_mounts), detail_context(original_mounts))
             expected_mounts = original_mounts.replace('"Minis"', '"Zeus"')
+            expected_mounts = 'import ZEUSBrowser\n' + expected_mounts
+            expected_mounts = expected_mounts.replace('private struct PendingMount: Identifiable {', '''private final class ZeusMountFolderLease {
+    let url: URL
+    let active: Bool
+    init(_ url: URL) { self.url = url; active = url.startAccessingSecurityScopedResource() }
+    deinit { if active { url.stopAccessingSecurityScopedResource() } }
+}
+
+private struct PendingMount: Identifiable {''')
+            expected_mounts = expected_mounts.replace('    var allowWrite: Bool\n}', '    var allowWrite: Bool\n    var access: ZeusMountFolderLease? = nil\n}')
+            start = expected_mounts.index('        .sheet(isPresented: $showingPicker) {')
+            end = expected_mounts.index('        .sheet(item: $pendingMount)', start)
+            expected_mounts = expected_mounts[:start] + '''        .zeusFileImporter(isPresented: $showingPicker, allowedContentTypes: [.folder]) { result in
+            switch result {
+            case .success(let url):
+                pendingMount = PendingMount(url: url, name: Self.defaultMountName(for: url), allowWrite: true, access: ZeusMountFolderLease(url))
+            case .failure(let error):
+                if (error as NSError).code != NSUserCancelledError { errorText = error.localizedDescription }
+            }
+        }
+''' + expected_mounts[end:]
             expected_mounts = expected_mounts.replace('.disabled(model.isAtCapacity)', '.accessibilityIdentifier("mountExternalFolder")\n                .disabled(model.isAtCapacity)')
             expected_mounts = expected_mounts.replace('Button(AppLocalized("Mount"), action: onConfirm)', 'Button(AppLocalized("Mount"), action: onConfirm)\n                        .accessibilityIdentifier("confirmExternalMount")')
             expected_mounts = expected_mounts.replace('TextField("name", text: $name)', 'TextField("name", text: $name).accessibilityIdentifier("externalMountName")')

@@ -10,8 +10,31 @@ def apply(source, replace):
             file.write_text(text)
 
     folders = source / 'Views/Settings/MountedFoldersSettingsView.swift'
-    # Keep the original OpenMinis folder picker, presentation and callback.
-    # Only stable accessibility IDs are added for the UI test route.
+    # Present the full system Files controller through the same retained UIKit
+    # host as working chat imports. Deliver the URL after dismissal, then open
+    # the stock mount confirmation. Never embed Files in a SwiftUI sheet.
+    folders.write_text('import ZEUSBrowser\n' + folders.read_text())
+    replace(folders, 'private struct PendingMount: Identifiable {', '''private final class ZeusMountFolderLease {
+    let url: URL
+    let active: Bool
+    init(_ url: URL) { self.url = url; active = url.startAccessingSecurityScopedResource() }
+    deinit { if active { url.stopAccessingSecurityScopedResource() } }
+}
+
+private struct PendingMount: Identifiable {''')
+    replace(folders, '    var allowWrite: Bool\n}', '    var allowWrite: Bool\n    var access: ZeusMountFolderLease? = nil\n}')
+    text = folders.read_text()
+    start = text.index('        .sheet(isPresented: $showingPicker) {')
+    end = text.index('        .sheet(item: $pendingMount)', start)
+    folders.write_text(text[:start] + '''        .zeusFileImporter(isPresented: $showingPicker, allowedContentTypes: [.folder]) { result in
+            switch result {
+            case .success(let url):
+                pendingMount = PendingMount(url: url, name: Self.defaultMountName(for: url), allowWrite: true, access: ZeusMountFolderLease(url))
+            case .failure(let error):
+                if (error as NSError).code != NSUserCancelledError { errorText = error.localizedDescription }
+            }
+        }
+''' + text[end:])
     replace(folders, '.disabled(model.isAtCapacity)', '.accessibilityIdentifier("mountExternalFolder")\n                .disabled(model.isAtCapacity)')
     replace(folders, 'Button(AppLocalized("Mount"), action: onConfirm)', 'Button(AppLocalized("Mount"), action: onConfirm)\n                        .accessibilityIdentifier("confirmExternalMount")')
     replace(folders, 'TextField("name", text: $name)', 'TextField("name", text: $name).accessibilityIdentifier("externalMountName")')

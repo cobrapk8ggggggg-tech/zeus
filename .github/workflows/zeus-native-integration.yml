@@ -117,6 +117,14 @@ jobs:
           ${{ runner.temp }}/OpenMinisOriginal/ModuleCache.noindex
         key: zeus-native-deriveddata-263-v2-${{ github.run_id }}
         restore-keys: zeus-native-deriveddata-263-v2-
+    - name: Discard SDK module caches tied to the previous runner image
+      run: |
+        python3 - <<'PYCODE'
+        import os, pathlib, shutil
+        root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'OpenMinisOriginal'
+        for relative in ['ModuleCache.noindex', 'SDKStatCaches.noindex', 'Build/Intermediates.noindex/ExplicitPrecompiledModules']:
+            shutil.rmtree(root / relative, ignore_errors=True)
+        PYCODE
     - name: Select available iPhone and iPad simulators
       run: |
         set -euo pipefail

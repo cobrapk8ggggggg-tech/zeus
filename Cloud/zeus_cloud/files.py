@@ -114,7 +114,7 @@ class FilesGateway:
         digest, size = ref.get("sha256", ""), ref.get("bytes", -1)
         if len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest) or not 0 <= size <= CHUNK:
             raise ValueError("Invalid object reference")
-        async with self.client.stream("GET", self.url, params={"op": "get", "sha": digest}, headers={"Authorization": "Bearer " + token}) as response:
+        async with self.client.stream("GET", self.url, params={"op": "get" if token.startswith("zg1_") else "userget", "sha": digest}, headers={"Authorization": "Bearer " + token}) as response:
             response.raise_for_status(); data = bytearray()
             async for part in response.aiter_bytes():
                 if len(data) + len(part) > size: raise ValueError("Object response exceeds declared size")

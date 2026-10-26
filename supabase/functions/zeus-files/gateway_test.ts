@@ -67,3 +67,18 @@ Deno.test("account secrets round-trip without exporting the key; tampered cipher
   cipher[cipher.length - 1] ^= 1;
   assert((await app(request("unseal", cipher))).status === 400);
 });
+Deno.test("fresh account identity reads only its own content-addressed archive", async () => {
+  const bytes = new TextEncoder().encode("encrypted archive bytes");
+  const digest = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))).map(n => n.toString(16).padStart(2, "0")).join("");
+  let storagePath = "";
+  const app = createGateway("https://project.test", "admin-secret", async (url) => {
+    if (String(url).endsWith("/auth/v1/user")) return Response.json({ id: owner });
+    storagePath = String(url); return new Response(bytes);
+  });
+  const response = await app(new Request("https://function.test?op=userget&sha=" + digest + "&user_id=" + other, { headers: { Authorization: "Bearer " + jwt } }));
+  assert(response.status === 200 && await response.text() === "encrypted archive bytes");
+  assert(storagePath.includes("/" + owner + "/objects/" + digest) && !storagePath.includes(other));
+  storagePath = "";
+  const bad = await app(new Request("https://function.test?op=userget&sha=../" + other, { headers: { Authorization: "Bearer " + jwt } }));
+  assert(bad.status === 400 && storagePath === "");
+});

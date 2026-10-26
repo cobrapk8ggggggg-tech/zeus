@@ -14,6 +14,7 @@ TOOLS = [
         {"path": {"type": "string"}, "content": {"type": "string"}}, ["path", "content"]),
     tool("file_list", "List saved project files relative to this cloud workspace.", {}, []),
     tool("task_checkpoint", "Persist a concise progress note. The actual project checkpoint is recorded by the runtime.", {"note": {"type": "string"}}, ["note"]),
+    tool("history_read", "List archived context pages, or read a 32K-character window using page (zero based) and offset. Earlier history is retained encrypted in cloud storage.", {"page": {"type": "integer"}, "offset": {"type": "integer"}}, []),
 ]
 
 INSTRUCTIONS = """You are ZEUS, the same user's agent running in a small cloud workspace.

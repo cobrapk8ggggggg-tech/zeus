@@ -37,6 +37,8 @@ class MemoryStore:
         run = self.runs[owner, identifier]; run["seq"] += 1
         self.timeline.append({"owner": owner, "run": identifier, "seq": run["seq"], "kind": kind, "data": data})
     async def events(self, owner, identifier, after=0): return [v for v in self.timeline if v["owner"] == owner and v["run"] == identifier and v["seq"] > after]
+    async def list_runs(self, owner, conversation, before=4102444800): return sorted([r for (o,_),r in self.runs.items() if o == owner and r["conversation"] == conversation and r["created"] < before], key=lambda r:r["created"], reverse=True)[:25]
+    async def prune_events(self, owner, run, through): self.timeline[:] = [e for e in self.timeline if not (e["owner"] == owner and e["run"] == run and e["seq"] <= through)]
 
 
 class RuntimeTests(unittest.IsolatedAsyncioTestCase):

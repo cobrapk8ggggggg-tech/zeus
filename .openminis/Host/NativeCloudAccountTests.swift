@@ -14,6 +14,13 @@ import XCTest
         XCTAssertNil(try owner.read()); try owner.claim(a); try owner.claim(a)
         XCTAssertThrowsError(try owner.claim(b)); XCTAssertEqual(try owner.read(), a)
     }
+    func testEmailVerificationOnlyAcceptsThisProjectsConfirmationAndRecoveryLinks() throws {
+        let token = String(repeating: "a", count: 64), base = ZeusCloudConfiguration.projectURL.absoluteString
+        XCTAssertEqual(try CloudAccount.emailVerification(URL(string: base + "/auth/v1/verify?token=" + token + "&type=signup")!).0, token)
+        for link in ["https://example.org/auth/v1/verify?token=" + token + "&type=signup", base + "/auth/v1/verify?token=short&type=signup", base + "/auth/v1/verify?token=" + token + "&type=email_change", base + "/other?token=" + token + "&type=signup"] {
+            XCTAssertThrowsError(try CloudAccount.emailVerification(URL(string: link)!))
+        }
+    }
     func testCorruptOwnerMarkerFailsClosedInsteadOfReassigningData() throws {
         let owner = CloudLocalOwner(root: try temporary())
         try Data("broken".utf8).write(to: owner.file)
