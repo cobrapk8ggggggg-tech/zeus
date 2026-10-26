@@ -42,6 +42,21 @@ async function verifiedUser(token: string) {
   return { id: user.id, session: claims.session_id };
 }
 
+async function storeObject(owner: string, hash: string, data: Uint8Array) {
+  const reserved = await admin("/rest/v1/rpc/zeus_reserve_object", "POST", { user_id: owner, object_sha: hash, object_bytes: data.length });
+  if (reserved.status === 507) return json({ error: "storage_allowance_reached" }, 507);
+  if (!reserved.ok) throw new Error("storage");
+  const path = "/storage/v1/object/zeus-private/" + owner + "/objects/" + hash;
+  const upload = await fetch(base + path, { method: "POST", headers: { apikey: adminKey, Authorization: "Bearer " + adminKey,
+    "Content-Type": "application/octet-stream", "x-upsert": "false" }, body: new Uint8Array(data).buffer });
+  if (!upload.ok && upload.status !== 409 && upload.status !== 400) throw new Error("storage");
+  const check = await fetch(base + path, { headers: { apikey: adminKey, Authorization: "Bearer " + adminKey } });
+  if (!check.ok) throw new Error("storage");
+  const blob = await check.blob();
+  if (blob.size !== data.length || blob.size > ceiling || await sha(new Uint8Array(await blob.arrayBuffer())) !== hash) throw new Error("storage");
+  return json({ sha256: hash, bytes: data.length, verified: true });
+}
+
 async function accountKey(owner: string, create: boolean) {
   const path = "/rest/v1/zeus_account_keyring?user_id=eq." + owner + "&select=key_b64&limit=1";
   let response = await admin(path); if (!response.ok) throw new Error("storage");
@@ -75,6 +90,19 @@ return async (request: Request): Promise<Response> => {
     const url = new URL(request.url), op = url.searchParams.get("op");
     if (request.method === "GET" && op === "health") return json({ service: "zeus-files", version: 1 });
     const token = request.headers.get("Authorization")?.replace(/^Bearer /, "") ?? "";
+    if (request.method === "GET" && op === "usage") {
+      const user = await verifiedUser(token);
+      const response = await admin("/rest/v1/rpc/zeus_storage_usage", "POST", { user_id: user.id });
+      if (!response.ok) throw new Error("storage");
+      return new Response(response.body, { headers: { ...headers, "Content-Type": "application/json" } });
+    }
+    if (request.method === "PUT" && op === "userput") {
+      const user = await verifiedUser(token), hash = url.searchParams.get("sha") ?? "";
+      if (!digestPattern.test(hash)) return json({ error: "invalid_object" }, 400);
+      const data = await bounded(request, ceiling);
+      if (await sha(data) !== hash) return json({ error: "digest_mismatch" }, 400);
+      return await storeObject(user.id, hash, data);
+    }
     if (request.method === "GET" && op === "userget") {
       const user = await verifiedUser(token), hash = url.searchParams.get("sha") ?? "";
       if (!digestPattern.test(hash)) return json({ error: "invalid_object" }, 400);
@@ -129,14 +157,7 @@ return async (request: Request): Promise<Response> => {
     if (request.method === "PUT" && op === "put") {
       const data = await bounded(request, ceiling);
       if (await sha(data) !== hash) return json({ error: "digest_mismatch" }, 400);
-      const upload = await fetch(base + path, { method: "POST", headers: { apikey: adminKey, Authorization: "Bearer " + adminKey,
-        "Content-Type": "application/octet-stream", "x-upsert": "false" }, body: data });
-      if (!upload.ok && upload.status !== 409 && upload.status !== 400) throw new Error("storage");
-      // Duplicate names and HTTP success do not prove the stored bytes match.
-      const check = await fetch(base + path, { headers: { apikey: adminKey, Authorization: "Bearer " + adminKey } });
-      if (!check.ok) throw new Error("storage");
-      const blob = await check.blob(); if (blob.size !== data.length || blob.size > ceiling || await sha(new Uint8Array(await blob.arrayBuffer())) !== hash) throw new Error("storage");
-      return json({ sha256: hash, bytes: data.length, verified: true });
+      return await storeObject(grant.user_id, hash, data);
     }
     if (request.method === "GET" && op === "get") {
       const stored = await fetch(base + path, { headers: { apikey: adminKey, Authorization: "Bearer " + adminKey } });

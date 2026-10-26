@@ -55,10 +55,22 @@ import ZEUSBrowser
             else { try fm.copyItem(at: result, to: destination) }
             return destination
         }
-        // Bound this disposable cache; account storage remains authoritative.
-        let folder = cache.deletingLastPathComponent()
-        let old = (try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
-        for url in old.sorted(by: { ((try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast) > ((try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast) }).dropFirst(8) where url != cache { try? fm.removeItem(at: url) }
+        // One byte budget across conversations, with an exception for the
+        // file the user is currently opening. Remote originals are untouched.
+        try? fm.setAttributes([.modificationDate: Date()], ofItemAtPath: result.path)
+        let cacheRoot = fm.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("ZEUSCloudFiles")
+        let keys: Set<URLResourceKey> = [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey]
+        var files: [(URL, Int64, Date)] = []
+        if let scan = fm.enumerator(at: cacheRoot, includingPropertiesForKeys: Array(keys), options: [.skipsHiddenFiles]) {
+            for case let url as URL in scan {
+                guard let value = try? url.resourceValues(forKeys: keys), value.isRegularFile == true, value.isSymbolicLink != true else { continue }
+                files.append((url, Int64(value.fileSize ?? 0), value.contentModificationDate ?? .distantPast))
+            }
+        }
+        var used = files.reduce(Int64(0)) { $0 + $1.1 }
+        for file in files.sorted(by: { $0.2 < $1.2 }) where used > 64 * 1024 * 1024 && file.0 != result {
+            do { try fm.removeItem(at: file.0); used -= file.1 } catch { }
+        }
         return result
     }
     static func downloadAll(session: String) async throws {

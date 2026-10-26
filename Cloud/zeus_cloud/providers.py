@@ -5,6 +5,23 @@ from urllib.parse import urlsplit
 import httpx
 
 
+def normalize_history(messages):
+    """Rebuild complete legacy tool pairs before sending a portable history."""
+    results = {m.get("tool_call_id"): m for m in messages if m.get("role") == "tool" and m.get("tool_call_id")}
+    normalized, used = [], set()
+    for message in messages:
+        if message.get("role") == "tool": continue
+        if message.get("role") not in {"user", "assistant"}: raise ValueError("Invalid history role")
+        row = {"role": message["role"], "content": message.get("content") or ""}
+        calls = [c for c in message.get("tool_calls", []) if c.get("id") in results and c["id"] not in used]
+        if calls: row["tool_calls"] = calls
+        if row["content"] or calls: normalized.append(row)
+        for call in calls:
+            used.add(call["id"])
+            normalized.append({"role": "tool", "tool_call_id": call["id"], "content": results[call["id"]].get("content") or ""})
+    return normalized
+
+
 def provider_url(value):
     parsed = urlsplit(value)
     if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:

@@ -53,6 +53,18 @@ final class NativePersonalizationUITests: XCTestCase {
         expectation(for: NSPredicate(format: "label == %@", "1:readable:ZEUS-Import-Test"), evaluatedWith: result)
         waitForExpectations(timeout: 15)
     }
+    @MainActor func testCloudLoginScreenRendersArabicAndRequiresCredentials() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--zeus-cloud-login", "-AppleLanguages", "(ar)", "-AppleLocale", "ar_SA"]
+        app.launch()
+        XCTAssertTrue(app.textFields["cloudEmail"].waitForExistence(timeout: 40))
+        XCTAssertTrue(app.secureTextFields["cloudPassword"].exists)
+        XCTAssertTrue(app.buttons["cloudSubmit"].exists)
+        XCTAssertFalse(app.buttons["cloudSubmit"].isEnabled)
+        let image = XCTAttachment(screenshot: app.screenshot())
+        image.name = "ZEUS-Cloud-Login-Arabic-iPad"; image.lifetime = .keepAlways; add(image)
+    }
     @MainActor func testExternalFolderSettingsCancellationLeavesSettingsUsable() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

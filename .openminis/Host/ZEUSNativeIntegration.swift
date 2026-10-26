@@ -42,6 +42,7 @@ struct ZEUSBrowserRootEntry: View {
 private enum ZEUSNativeHostBootstrap {
     static let configured: Void = {
         NativeCloudAccountAPI.dataDelegate = ZeusCloudArchive.shared
+        NativeCloudAccountAPI.sharedFilesView = { AnyView(ZeusCloudFilesView(session: ZeusCloudRuntime.globalWorkspace)) }
         let defaults = UserDefaults.standard
         if defaults.string(forKey: "appLanguage") != "ar" { defaults.set("ar", forKey: "appLanguage") }
         if defaults.string(forKey: "composerInputModePreference") != "text" { defaults.set("text", forKey: "composerInputModePreference") }

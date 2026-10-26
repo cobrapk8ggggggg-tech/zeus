@@ -160,20 +160,21 @@ struct CloudLocalOwner {
     }
     /// Allows verification directly from the emailed Supabase link when the
     /// system mail app cannot return through the custom URL scheme.
-    static func emailVerification(_ url: URL) throws -> (String, EmailOTPType) {
+    static func emailVerification(_ url: URL) throws -> (String, String) {
         guard url.scheme == "https", url.host == ZeusCloudConfiguration.projectURL.host,
               url.path == "/auth/v1/verify", url.user == nil, url.password == nil,
               let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { throw CloudAccountError.invalidResponse }
         let items = components.queryItems ?? []
         guard let token = items.first(where: { $0.name == "token_hash" || $0.name == "token" })?.value,
               (32...512).contains(token.count), let value = items.first(where: { $0.name == "type" })?.value,
-              let type = EmailOTPType(rawValue: value), [.signup, .recovery, .email, .magiclink].contains(type) else { throw CloudAccountError.invalidResponse }
-        return (token, type)
+              ["signup", "recovery", "email", "magiclink"].contains(value) else { throw CloudAccountError.invalidResponse }
+        return (token, value)
     }
     func verifyEmailLink(_ value: String) async {
         await perform {
             guard let url = URL(string: value.trimmingCharacters(in: .whitespacesAndNewlines)) else { throw CloudAccountError.invalidResponse }
-            let (token, type) = try Self.emailVerification(url)
+            let (token, name) = try Self.emailVerification(url)
+            guard let type = EmailOTPType(rawValue: name) else { throw CloudAccountError.invalidResponse }
             let response = try await self.auth.verifyOTP(tokenHash: token, type: type)
             guard let session = response.session else { throw CloudAccountError.invalidResponse }
             self.accept(session); self.passwordRecovery = type == .recovery

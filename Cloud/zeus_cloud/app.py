@@ -16,8 +16,8 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr
 from .database import MongoStore
 from .postgres import PostgresGatewayStore
 from .engine import Engine, Vault, TERMINAL
-from .files import FilesGateway, Workspaces, WORKSPACE_LIMIT
-from .providers import Models, provider_url
+from .files import FilesGateway, Workspaces, WORKSPACE_LIMIT, GLOBAL_WORKSPACE
+from .providers import Models, provider_url, normalize_history
 from .terminal import Terminals
 
 PROJECT = "https://pdfzdcwkkgapcwsnezvn.supabase.co"
@@ -138,6 +138,7 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
             grant = terminal_grants.pop(terminal.id)
             try:
                 await spaces.checkpoint(terminal.owner, terminal.conversation, grant)
+                if spaces.path(terminal.owner, GLOBAL_WORKSPACE).is_dir(): await spaces.checkpoint(terminal.owner, GLOBAL_WORKSPACE, grant)
             finally: engine.wakeup.set()
     terminals = Terminals(terminal_event)
     engine = Engine(store, spaces, models, terminals, vault, child_uid) if vault else None
@@ -224,14 +225,14 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
         for message in value.history:
             if message.get("role") not in {"user", "assistant", "tool"}: raise ValueError("سجل محادثة غير صالح.")
         run = await store.create_run(account, {"id": identifier, "conversation": conversation, "prompt": value.prompt,
-            "history": value.history, "provider": provider["encrypted"], "grant": vault.seal(account, grant),
+            "history": normalize_history(value.history), "provider": provider["encrypted"], "grant": vault.seal(account, grant),
             "permission_mode": value.permission_mode, "max_seconds": value.max_seconds,
             "native_user_id": str(value.native_user_id).upper() if value.native_user_id else None,
             "native_assistant_id": str(value.native_assistant_id).upper() if value.native_assistant_id else None,
             "native_session": value.native_session,
             "fingerprint": fingerprint, "status": "queued", "created": time.time()})
         if run.get("fingerprint") != fingerprint: raise HTTPException(409, "معرف الطلب مستخدم لمهمة أخرى.")
-        record = await store.get(account, "conversation", conversation) or {"messages": value.history, "title": value.prompt[:120]}
+        record = await store.get(account, "conversation", conversation) or {"messages": normalize_history(value.history), "title": value.prompt[:120]}
         if value.native_session:
             record["native_session"] = value.native_session
         await store.put(account, "conversation", conversation, {**record, "latest_run": identifier})
@@ -316,7 +317,7 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
         if await store.get(account, "conversation", key) is None:
             for message in value.history:
                 if message.get("role") not in {"user", "assistant", "tool"}: raise ValueError("سجل محادثة غير صالح.")
-            await store.put(account, "conversation", key, {"title": value.title, "messages": value.history})
+            await store.put(account, "conversation", key, {"title": value.title, "messages": normalize_history(value.history)})
         return {"imported": True, "files": len(value.files)}
 
     @app.post("/v1/conversations/{identifier}/file")
@@ -337,7 +338,10 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
         async with engine.execution_gate:
             if engine.running and not engine.running.done(): raise HTTPException(409, "الوكيل يستخدم خانة التنفيذ. انتظر انتهاء مهمته أو أوقفها.")
             root = await spaces.restore(account, conversation, grant); engine.own(root)
-            terminal = await terminals.start(account, conversation, root, uid=child_uid, seconds=900)
+            global_root = await spaces.restore(account, GLOBAL_WORKSPACE, grant)
+            for folder in ["shared", "skills", "memory"]: (global_root / folder).mkdir(exist_ok=True)
+            engine.own(global_root)
+            terminal = await terminals.start(account, conversation, root, uid=child_uid, seconds=900, global_root=global_root)
             terminal_grants[terminal.id] = grant
         return terminals.read(account, terminal.id)
 

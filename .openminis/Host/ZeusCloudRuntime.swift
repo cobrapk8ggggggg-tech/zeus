@@ -7,6 +7,7 @@ import ZEUSBrowser
 /// loop to Railway. A dropped observer never cancels the server's job.
 @MainActor final class ZeusCloudRuntime {
     static let shared = ZeusCloudRuntime()
+    static let globalWorkspace = "00000000-0000-4000-8000-000000000001"
     private var observers: Set<String> = []
     private struct State: Codable {
         let owner: String
@@ -248,6 +249,15 @@ import ZEUSBrowser
             let grant = try await NativeCloudAccountAPI.fileGrant(conversation: session.id)
             _ = try await request("v1/conversations/\(session.id)/import", ["title": session.title ?? "", "history": Array(history.suffix(150)), "files": files, "file_key": fileKey.base64EncodedString(), "file_grant": grant], method: "PUT")
         }
+        progress("نقل الملفات المشتركة والمهارات والذاكرة إلى الخادم…")
+        let scopes = ["agent_shared": "shared", "agent_skills": "skills", "agent_memory": "memory"]
+        let globals: [[String: Any]] = archive.files.compactMap { entry in
+            guard let scope = scopes[entry.scope] else { return nil }
+            return ["path": scope + "/" + entry.path, "bytes": entry.bytes, "sha256": entry.sha256,
+                    "parts": entry.parts.map { ["sha256": $0.sha256, "bytes": $0.bytes] }]
+        }
+        let grant = try await NativeCloudAccountAPI.fileGrant(conversation: Self.globalWorkspace)
+        _ = try await request("v1/conversations/\(Self.globalWorkspace)/import", ["title": "ملفات الحساب المشتركة", "files": globals, "file_key": fileKey.base64EncodedString(), "file_grant": grant], method: "PUT")
     }
     private func uploadAttachments(_ sid: String, grant: String) async throws {
         let root = AIChatViewModel.minisAttachmentsPersistentDir(for: sid)
@@ -274,9 +284,17 @@ import ZEUSBrowser
     func restoreWorkspaces(progress: @escaping (String) -> Void) async throws {
         let data = try await NativeCloudAccountAPI.runtime("v1/conversations")
         for record in try json(data)["conversations"] as? [[String: Any]] ?? [] {
-            guard let id = record["id"] as? String else { continue }
+            guard let serverID = record["id"] as? String, serverID != Self.globalWorkspace else { continue }
+            let id = (record["native_session"] as? [String: Any])?["id"] as? String ?? serverID
             progress("استعادة الملفات الأحدث للمحادثة…")
             try await ZeusCloudFiles.downloadAll(session: id)
+        }
+        for entry in try await ZeusCloudFiles.list(session: Self.globalWorkspace) {
+            let parts = entry.path.split(separator: "/", maxSplits: 1)
+            guard parts.count == 2 else { continue }
+            let roots = ["shared": AIChatViewModel.minisSharedPersistentDir, "skills": AIChatViewModel.minisSkillsPersistentDir, "memory": AIChatViewModel.minisMemoryPersistentDir]
+            guard let root = roots[String(parts[0])] else { continue }
+            _ = try await ZeusCloudFiles.download(entry, session: Self.globalWorkspace, to: root.appendingPathComponent(String(parts[1])))
         }
     }
 }

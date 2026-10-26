@@ -82,3 +82,39 @@ Deno.test("fresh account identity reads only its own content-addressed archive",
   const bad = await app(new Request("https://function.test?op=userget&sha=../" + other, { headers: { Authorization: "Bearer " + jwt } }));
   assert(bad.status === 400 && storagePath === "");
 });
+Deno.test("storage allowance failure stops before upload and never deletes an object", async () => {
+  const bytes = new TextEncoder().encode("new file");
+  const digest = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))).map(n => n.toString(16).padStart(2, "0")).join("");
+  let calls = 0;
+  const app = createGateway("https://project.test", "admin-secret", async (url, options) => {
+    calls++;
+    if (String(url).endsWith("/auth/v1/user")) return Response.json({ id: owner });
+    assert(String(url).endsWith("/rpc/zeus_reserve_object"));
+    assert(JSON.parse(String(options?.body)).user_id === owner);
+    return Response.json({ message: "storage_allowance_reached" }, { status: 507 });
+  });
+  const response = await app(new Request("https://function.test?op=userput&sha=" + digest, {
+    method: "PUT", headers: { Authorization: "Bearer " + jwt }, body: bytes }));
+  assert(response.status === 507 && calls === 2);
+});
+Deno.test("account upload reserves actual bytes and verifies the stored object", async () => {
+  const bytes = new TextEncoder().encode("verified content");
+  const digest = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))).map(n => n.toString(16).padStart(2, "0")).join("");
+  let stored: Uint8Array | undefined, reserved = false;
+  const app = createGateway("https://project.test", "admin-secret", async (url, options) => {
+    const path = String(url);
+    if (path.endsWith("/auth/v1/user")) return Response.json({ id: owner });
+    if (path.endsWith("/rpc/zeus_reserve_object")) {
+      const value = JSON.parse(String(options?.body));
+      assert(value.user_id === owner && value.object_sha === digest && value.object_bytes === bytes.length);
+      reserved = true; return Response.json({ verified_reservation: true });
+    }
+    assert(path.endsWith("/" + owner + "/objects/" + digest));
+    if (options?.method === "POST") { assert(reserved); stored = new Uint8Array(options.body as ArrayBuffer); return Response.json({}); }
+    assert(stored); return new Response(new Uint8Array(stored).buffer);
+  });
+  const response = await app(new Request("https://function.test?op=userput&sha=" + digest + "&user_id=" + other, {
+    method: "PUT", headers: { Authorization: "Bearer " + jwt }, body: bytes }));
+  const value = await response.json();
+  assert(response.status === 200 && value.verified === true && value.bytes === bytes.length && value.sha256 === digest);
+});

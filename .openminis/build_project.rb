@@ -108,7 +108,7 @@ app.build_configurations.each do |config|
   config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'tools.rea.ZEUSBrowserAnalysis'
   config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '18.1'
   config.build_settings['MARKETING_VERSION'] = '4.0.0'
-  config.build_settings['CURRENT_PROJECT_VERSION'] = '34'
+  config.build_settings['CURRENT_PROJECT_VERSION'] = '35'
   config.build_settings['INFOPLIST_KEY_CFBundleDisplayName'] = 'ZEUS'
 end
 # A device `build` (unlike archive/install) did not strip the original app's

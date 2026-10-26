@@ -134,7 +134,7 @@ class APITests(unittest.IsolatedAsyncioTestCase):
         # Same archive is safe to import again; a different owner-bound key is not.
         self.assertEqual((await self.client.put(path, json=body)).status_code, 200)
         body["file_key"] = base64.b64encode(os.urandom(32)).decode()
-        with self.assertRaises(Exception): await self.client.put(path, json=body)
+        self.assertEqual((await self.client.put(path, json=body)).status_code, 400)
         self.assertEqual((await self.store.get(self.owner, "workspace", self.conversation))["files"], record["files"])
 
     async def test_inline_provider_snapshot_does_not_require_a_separate_configuration_write(self):
@@ -195,6 +195,26 @@ class APITests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("provider", response.json()["runs"][0]); self.assertNotIn("grant", response.json()["runs"][0])
         index = (await self.client.get("/v1/conversations")).json()["conversations"]
         self.assertEqual(index[0]["native_session"]["id"], self.conversation.upper())
+
+    async def test_account_memory_is_cloud_persistent_and_separate_from_conversation_files(self):
+        class MemoryWriter:
+            async def stream(self, provider, messages, tools, instructions):
+                if not any(m.get("tool_calls") for m in messages):
+                    yield {"kind": "tool", "id": "remember", "name": "file_write", "arguments": {"path": "@memory/preference.md", "content": "persistent account memory"}}
+                else: yield {"kind": "text", "text": "Saved memory"}
+        self.app.state.engine.models = MemoryWriter()
+        identifier, _ = await self.submit()
+        self.assertEqual((await self.wait_state(identifier, {"completed", "failed"}))["status"], "completed")
+        for _ in range(100):
+            if self.app.state.engine.running is None: break
+            await asyncio.sleep(0.01)
+        from zeus_cloud.files import GLOBAL_WORKSPACE
+        record = await self.store.get(self.owner, "workspace", GLOBAL_WORKSPACE)
+        self.assertEqual(record["files"][0]["path"], "memory/preference.md")
+        self.assertEqual((await self.store.get(self.owner, "workspace", self.conversation))["files"], [])
+        self.assertFalse(self.app.state.engine.spaces.path(self.owner, GLOBAL_WORKSPACE).exists())
+        root = await self.app.state.engine.spaces.restore(self.owner, GLOBAL_WORKSPACE, "grant")
+        self.assertEqual((root / "memory/preference.md").read_text(), "persistent account memory")
 
 
 if __name__ == "__main__": unittest.main()

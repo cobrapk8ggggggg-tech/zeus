@@ -42,6 +42,16 @@ class MemoryStore:
 
 
 class RuntimeTests(unittest.IsolatedAsyncioTestCase):
+    def test_legacy_history_has_contiguous_tool_pairs_and_never_replays_incomplete_calls(self):
+        from zeus_cloud.providers import normalize_history
+        call = {"id": "done", "type": "function", "function": {"name": "file_write", "arguments": "{}"}}
+        history = [{"role": "tool", "tool_call_id": "orphan", "content": "orphan"},
+                   {"role": "assistant", "content": "", "tool_calls": [call, {**call, "id": "incomplete"}]},
+                   {"role": "user", "content": "next message"}, {"role": "tool", "tool_call_id": "done", "content": "success"}]
+        result = normalize_history(history)
+        self.assertEqual([r["role"] for r in result], ["assistant", "tool", "user"])
+        self.assertEqual(result[0]["tool_calls"], [call]); self.assertEqual(result[1]["tool_call_id"], "done")
+
     async def asyncSetUp(self):
         self.temp = tempfile.TemporaryDirectory(); self.root = Path(self.temp.name)
         self.owner, self.conversation = str(uuid.uuid4()), str(uuid.uuid4())

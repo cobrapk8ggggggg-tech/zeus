@@ -63,8 +63,9 @@ struct CloudSnapshotHead: Codable {
     func put(_ data: Data) async throws -> CloudObjectReference {
         guard data.count <= 8 * 1024 * 1024 else { throw CloudAccountError.incomplete("حجم سجل المتصفح أكبر من حد النقل الآمن؛ بقيت بيانات الجهاز محفوظة.") }
         let ref = CloudObjectReference(sha256: Self.fingerprint(data), bytes: data.count)
-        let path = "storage/v1/object/zeus-private/" + (try ref.path(owner: owner))
-        _ = try await request(path, method: "POST", body: data, type: "application/octet-stream", acceptable: [200, 201, 409])
+        _ = try ref.path(owner: owner)
+        _ = try await request("functions/v1/zeus-files", method: "PUT", body: data, type: "application/octet-stream",
+                              query: [URLQueryItem(name: "op", value: "userput"), URLQueryItem(name: "sha", value: ref.sha256)])
         // A name/ETag/409 response is not evidence that the stored contents match.
         guard try await get(ref) == data else { throw CloudAccountError.invalidResponse }
         return ref
@@ -93,6 +94,7 @@ struct CloudSnapshotHead: Codable {
         let (result, response) = try await network.data(for: request)
         guard let response = response as? HTTPURLResponse else { throw CloudAccountError.invalidResponse }
         guard acceptable.contains(response.statusCode) else {
+            if response.statusCode == 507 { throw CloudAccountError.incomplete("وصلت إلى حصة التخزين السحابي المحددة. بقيت بيانات الجهاز محفوظة؛ راجع المساحة قبل نقل المزيد.") }
             if response.statusCode == 409 { throw CloudAccountError.conflict }
             throw CloudAccountError.incomplete("تعذر الحفظ في الحساب (HTTP \(response.statusCode)). بقيت البيانات المحلية محفوظة.")
         }

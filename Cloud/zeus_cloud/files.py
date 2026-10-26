@@ -7,10 +7,12 @@ from pathlib import Path, PurePosixPath
 import stat
 import uuid
 import base64
+from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from contextlib import contextmanager
 import httpx
 
+GLOBAL_WORKSPACE = "00000000-0000-4000-8000-000000000001"
 CHUNK = 8 * 1024 * 1024
 WORKSPACE_LIMIT = 128 * 1024 * 1024
 MAX_FILES = 4096
@@ -104,6 +106,7 @@ class FilesGateway:
         digest = hashlib.sha256(data).hexdigest()
         response = await self.client.put(self.url, params={"op": "put", "sha": digest}, content=data,
             headers={"Authorization": "Bearer " + token, "Content-Type": "application/octet-stream"})
+        if response.status_code == 507: raise ValueError("وصلت إلى حصة التخزين السحابي المحددة. لم تحذف النسخة المحلية أو ملفات الاستعادة؛ حرر مساحة قبل المتابعة.")
         response.raise_for_status()
         result = response.json()
         if result.get("sha256") != digest or result.get("bytes") != len(data) or result.get("verified") is not True:
@@ -142,7 +145,8 @@ class Workspaces:
         data = await self.gateway.get(grant, file["parts"][index])
         if file.get("encrypted"):
             if not key or len(data) < 28: raise ValueError("Encrypted workspace key is unavailable")
-            data = AESGCM(key).decrypt(data[:12], data[12:], self.aad(owner, file["sha256"], index))
+            try: data = AESGCM(key).decrypt(data[:12], data[12:], self.aad(owner, file["sha256"], index))
+            except InvalidTag: raise ValueError("Encrypted file integrity check failed") from None
         return data
 
     async def import_files(self, owner, conversation, files, key_text, grant):

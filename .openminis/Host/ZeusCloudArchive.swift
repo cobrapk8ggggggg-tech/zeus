@@ -28,7 +28,9 @@ import ZEUSBrowser
         [ .init(scope: "agent_sessions", url: AIChatViewModel.minisPersistentBase),
           .init(scope: "agent_shared", url: AIChatViewModel.minisSharedPersistentDir),
           .init(scope: "agent_skills", url: AIChatViewModel.minisSkillsPersistentDir),
-          .init(scope: "agent_memory", url: AIChatViewModel.minisMemoryPersistentDir) ] + NativeCloudAccountAPI.browserFileRoots
+          .init(scope: "agent_memory", url: AIChatViewModel.minisMemoryPersistentDir),
+          .init(scope: "agent_mcp_config", url: AIChatViewModel.minisMcpServersPersistentDir),
+          .init(scope: "agent_task_notes", url: ZeusAgentHarness.shared.taskStorageDirectory) ] + NativeCloudAccountAPI.browserFileRoots
     }
     private func error(_ message: String) -> NSError { NSError(domain: "ZEUSCloud", code: 1, userInfo: [NSLocalizedDescriptionKey: message]) }
     private func requireIdle() throws {
@@ -208,6 +210,16 @@ import ZEUSBrowser
     }
     private func restore(_ archive: NativeCloudArchive, includeFiles: Bool, progress: @escaping (String) -> Void) async throws {
         try requireIdle()
+        if includeFiles {
+            let missing = try archive.files.filter { file in
+                guard file.scope != "native_database" else { return false }
+                let target = try destination(file)
+                return !fm.fileExists(atPath: target.path)
+            }
+            let required = missing.reduce(Int64(64 * 1024 * 1024)) { $0 + $1.bytes }
+            let available = try fm.urls(for: .documentDirectory, in: .userDomainMask)[0].resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]).volumeAvailableCapacityForImportantUsage
+            if let available, available < required { throw error("تحتاج استعادة الملفات محليًا إلى نحو \(required / 1_000_000) MB متاحة. بقيت النسخة السحابية محفوظة.") }
+        }
         NativeCloudAccountAPI.isMigrating = true; defer { NativeCloudAccountAPI.isMigrating = false }
         progress("استعادة المحادثات والإعدادات المشفرة…")
         let secrets = try await secretBundle(archive), key = SymmetricKey(data: secrets.fileKey)

@@ -15,11 +15,14 @@ import uuid
 from .files import contained
 
 
-def environment(home):
+def environment(home, global_root=None):
     # Never copy os.environ: it contains Atlas credentials and the seal key.
-    return {"PATH": "/usr/local/bin:/usr/bin:/bin", "HOME": str(home), "TMPDIR": str(home / ".tmp"),
+    value = {"PATH": "/usr/local/bin:/usr/bin:/bin", "HOME": str(home), "TMPDIR": str(home / ".tmp"),
             "TERM": "xterm-256color", "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8",
             "GIT_TERMINAL_PROMPT": "0", "PYTHONDONTWRITEBYTECODE": "1"}
+    if global_root:
+        for name in ["shared", "skills", "memory"]: value["ZEUS_" + name.upper() + "_DIR"] = str(Path(global_root) / name)
+    return value
 
 
 def child_limits(uid):
@@ -54,8 +57,8 @@ class Terminals:
     def __init__(self, event, limit=1):
         self.sessions, self.event, self.limit = {}, event, limit
 
-    async def start(self, owner, conversation, workspace, command="/bin/bash --noprofile --norc", uid=None, seconds=7200):
-        if sum(t.process.returncode is None for t in self.sessions.values()) >= self.limit:
+    async def start(self, owner, conversation, workspace, command="/bin/bash --noprofile --norc", uid=None, seconds=7200, global_root=None):
+        if sum(t.process.returncode is None or t.reader and not t.reader.done() for t in self.sessions.values()) >= self.limit:
             raise ValueError("A terminal is already active; close it before starting another")
         closed = [key for key, value in self.sessions.items() if value.closed]
         for key in closed[:-16]: self.sessions.pop(key, None)
@@ -65,7 +68,7 @@ class Terminals:
         master, slave = pty.openpty()
         try:
             process = await asyncio.create_subprocess_exec("/bin/bash", "--noprofile", "--norc", "-c", command,
-                stdin=slave, stdout=slave, stderr=slave, cwd=root, env=environment(root), preexec_fn=child_limits(uid))
+                stdin=slave, stdout=slave, stderr=slave, cwd=root, env=environment(root, global_root), preexec_fn=child_limits(uid))
         except BaseException:
             os.close(master); raise
         finally: os.close(slave)
@@ -119,7 +122,11 @@ class Terminals:
         start = max(offset, t.offset) - t.offset
         return {"id": t.id, "output": bytes(t.output[start:]).decode(errors="replace"),
                 "next_offset": t.offset + len(t.output), "truncated": offset < t.offset,
-                "exit_code": t.process.returncode}
+                "exit_code": None if self.active(owner, identifier) else t.process.returncode}
+
+    def active(self, owner, identifier):
+        value = self.get(owner, identifier)
+        return value.process.returncode is None or value.reader is not None and not value.reader.done()
 
     def input(self, owner, identifier, data):
         t = self.get(owner, identifier)

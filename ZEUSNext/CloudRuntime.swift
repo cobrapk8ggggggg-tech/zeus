@@ -41,10 +41,18 @@ public struct NativeCloudArchive: Codable, Sendable {
     @Published public private(set) var progress = ""
     @Published public private(set) var issue: String?
     @Published public private(set) var saved: Date?
+    @Published public private(set) var storageUsed: Int64?
+    @Published public private(set) var storageLimit: Int64?
+    public func refreshUsage() async {
+        do {
+            let value = try await NativeCloudAccountAPI.storageUsage()
+            storageUsed = value.used; storageLimit = value.limit
+        } catch { if issue == nil { issue = error.localizedDescription } }
+    }
     public func save() async {
         guard !busy, NativeCloudAccountAPI.ownerID != nil, let delegate = NativeCloudAccountAPI.dataDelegate else { return }
         busy = true; issue = nil; defer { busy = false }
-        do { try await delegate.backupAccount { self.progress = $0 }; saved = Date(); progress = "اكتملت نسخة الوكيل والملفات والأسرار المشفرة." }
+        do { try await delegate.backupAccount { self.progress = $0 }; saved = Date(); progress = "اكتملت نسخة الوكيل والملفات والأسرار المشفرة."; await refreshUsage() }
         catch { issue = error.localizedDescription }
     }
 }
@@ -67,6 +75,7 @@ actor CloudCheckpointGate {
 @MainActor public enum NativeCloudAccountAPI {
     public static let runtimeURL = URL(string: "https://zeus-cloud-production.up.railway.app")!
     public static weak var dataDelegate: NativeCloudDataDelegate?
+    public static var sharedFilesView: (() -> AnyView)?
     public static var isMigrating = false
     public static var ownerID: String? { CloudAccount.shared.phase == .ready ? CloudAccount.shared.identity?.id.uuidString.lowercased() : nil }
     private static var preferencesURL: URL { BrowserDisk.applicationRoot.appendingPathComponent("cloud-execution.json") }
@@ -106,7 +115,7 @@ actor CloudCheckpointGate {
     private struct CookieRecord: Codable { let profile: UUID; let properties: Data }
     private struct BrowserSecrets: Codable { let version: Int; let keychain: [BrowserSecret]; let cookies: [CookieRecord] }
     private static func allowedSecret(_ service: String) -> Bool {
-        service == "tools.zeus.accounts" || service.hasPrefix("tools.zeus.forms.") || service.hasPrefix("tools.zeus.ai.")
+        service == "tools.zeus.accounts" || service.hasPrefix("tools.zeus.forms.") || service.hasPrefix("tools.zeus.ai.") || service == "com.openminis.app.mcp-oauth"
     }
     public static func browserSecrets() async throws -> Data {
         var value: CFTypeRef?
@@ -170,6 +179,12 @@ actor CloudCheckpointGate {
     public static func sealSecrets(_ data: Data) async throws -> Data {
         guard data.count <= 1024 * 1024 else { throw CloudAccountError.incomplete("حزمة الأسرار أكبر من حد النقل الآمن.") }
         return try await callFiles("seal", body: data)
+    }
+    public struct StorageUsage: Decodable { public let used: Int64; public let limit: Int64 }
+    public static func storageUsage() async throws -> StorageUsage {
+        var url = URLComponents(url: ZeusCloudConfiguration.projectURL.appendingPathComponent("functions/v1/zeus-files"), resolvingAgainstBaseURL: false)!
+        url.queryItems = [URLQueryItem(name: "op", value: "usage")]
+        return try JSONDecoder().decode(StorageUsage.self, from: await request(url.url!, method: "GET", body: nil))
     }
     public static func unsealSecrets(_ data: Data) async throws -> Data { try await callFiles("unseal", body: data) }
     public static func fileGrant(conversation: String) async throws -> String {
@@ -241,6 +256,9 @@ public struct NativeCloudExecutionSettings: View {
                 Text(enabled ? "الوكيل والطرفية والمهام تعمل على الخادم. المتصفح وأدوات الجهاز متاحة عندما يكون جهازك حاضرًا فقط." : "يعمل الوكيل بأدواته وبيئة iSH المحلية الحالية.").font(.footnote)
             }
             Section("النقل والمساحة") {
+                if enabled, let files = NativeCloudAccountAPI.sharedFilesView {
+                    NavigationLink { files() } label: { Label("الملفات المشتركة والمهارات والذاكرة", systemImage: "folder.badge.gearshape") }
+                }
                 if busy { ProgressView(progress) }
                 else if !progress.isEmpty { Text(progress) }
                 if let issue { Text(issue).foregroundStyle(.orange).textSelection(.enabled) }
@@ -249,6 +267,7 @@ public struct NativeCloudExecutionSettings: View {
             Section("الخادم") {
                 LabeledContent("التنفيذ المتزامن", value: "مهمة واحدة، والباقي في الطابور")
                 Text("موارد محدودة، دون متصفح سحابي. تُغلق الاتصالات عند الخمول ليتمكن Railway من النوم بعد انتهاء العمل.").font(.footnote)
+                Text("المزودات الحالية: OpenAI المتوافق وAnthropic وGemini بمفتاح API. اشتراكات OAuth وأدوات MCP وأدوات iPad تحتاج الوضع المحلي حاليًا.").font(.footnote).foregroundStyle(.secondary)
             }
         }.navigationTitle("التشغيل والتخزين")
             .onChange(of: enabled) { previous, requested in

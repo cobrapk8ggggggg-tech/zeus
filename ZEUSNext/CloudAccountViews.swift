@@ -160,6 +160,11 @@ struct CloudAccountSettingsView: View {
                 Text("النسخة الحالية تشمل البروفايلات الدائمة وإعدادات المتصفح وسجلاته. حالة ملفات الوكيل والأسرار ستظهر منفصلة؛ لا تعتبر بياناتها محفوظة حتى يكتمل نقلها.").font(.footnote)
             }
             Section("نسخة الوكيل وملفات الحساب") {
+                if let used = nativeBackup.storageUsed, let limit = nativeBackup.storageLimit {
+                    ProgressView(value: Double(used), total: Double(limit))
+                    Text("\(ByteCountFormatter.string(fromByteCount: used, countStyle: .file)) من \(ByteCountFormatter.string(fromByteCount: limit, countStyle: .file))").font(.caption)
+                    if used > limit * 8 / 10 { Text("المساحة المتبقية قليلة. يحتفظ الجهاز بالأصول إذا تعذر إكمال الرفع.").font(.footnote).foregroundStyle(.orange) }
+                }
                 if nativeBackup.busy { ProgressView(nativeBackup.progress) }
                 else { Text(nativeBackup.progress.isEmpty ? "لم تُتحقق نسخة الوكيل في هذه الجلسة بعد." : nativeBackup.progress).font(.footnote) }
                 if let saved = nativeBackup.saved { LabeledContent("آخر تحقق") { Text(saved, style: .relative) } }
@@ -176,7 +181,7 @@ struct CloudAccountSettingsView: View {
                 if let issue = account.issue { Text(issue).foregroundStyle(.orange) }
                 if let notice = account.notice { Text(notice).foregroundStyle(.secondary) }
             }
-        }.navigationTitle("الحساب والمزامنة")
+        }.navigationTitle("الحساب والمزامنة").task { await nativeBackup.refreshUsage() }
             .confirmationDialog("تسجيل الخروج؟", isPresented: $signOutPrompt) {
                 Button("تسجيل الخروج", role: .destructive) { Task { await account.signOut() } }
             } message: { Text(sync.pending ? "توجد تغييرات لم تحفظ سحابيًا بعد. ستبقى محليًا في هذا التثبيت." : "تبقى نسخ الحساب محفوظة في السحابة.") }

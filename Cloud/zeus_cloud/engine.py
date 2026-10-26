@@ -8,7 +8,7 @@ import shutil
 import time
 import uuid
 from cryptography.fernet import Fernet
-from .files import contained, inventory, open_regular, write_regular
+from .files import contained, inventory, open_regular, write_regular, GLOBAL_WORKSPACE
 from .tools import TOOLS, INSTRUCTIONS
 from .history import History
 
@@ -43,7 +43,7 @@ class Engine:
             while not self._stopping:
                 try:
                     async with self.execution_gate:
-                        if any(t.process.returncode is None for t in self.terminals.sessions.values()): break
+                        if any(t.process.returncode is None or t.reader and not t.reader.done() for t in self.terminals.sessions.values()): break
                         run = await self.store.claim()
                         if run: self.running = asyncio.create_task(self.execute(run), name=run["id"])
                 except Exception:
@@ -75,6 +75,9 @@ class Engine:
         try:
             async with self.store.active():
                 root = await self.spaces.restore(owner, conversation, grant); self.own(root)
+                global_root = await self.spaces.restore(owner, GLOBAL_WORKSPACE, grant)
+                for folder in ["shared", "skills", "memory"]: (global_root / folder).mkdir(exist_ok=True)
+                self.own(global_root)
                 provider = self.vault.open(owner, run["provider"])
                 saved = await self.store.get(owner, "conversation", conversation)
                 run["_context_archives"] = (saved or {}).get("archives", [])[:]
@@ -102,15 +105,16 @@ class Engine:
                                     await self.store.event(owner, identifier, "text", {"delta": buffered}); buffered = ""; last_flush = time.monotonic()
                             elif event["kind"] == "tool": calls.append(event)
                         if buffered: await self.store.event(owner, identifier, "text", {"delta": buffered})
+                        if not text.strip() and not calls: raise ValueError("The model returned an empty response; no completion was inferred")
                         message = {"role": "assistant", "content": text}
                         if calls: message["tool_calls"] = [{"id": c["id"], "type": "function", "function": {"name": c["name"], "arguments": json.dumps(c["arguments"])}} for c in calls]
                         messages.append(message)
                         await self.save_conversation(run, messages, (saved or {}).get("title", run["prompt"][:120]))
                         if not calls:
-                            if any(self.terminals.get(owner, key).process.returncode is None for key in command_ids):
+                            if any(self.terminals.active(owner, key) for key in command_ids):
                                 messages.append({"role": "user", "content": "Runtime: your command is still active. Poll it with write_stdin and verify its result before finishing."})
                                 continue
-                            await self.spaces.checkpoint(owner, conversation, grant)
+                            await self.checkpoint(owner, conversation, grant)
                             await self.store.update_run(owner, identifier, status="completed")
                             await self.store.event(owner, identifier, "state", {"status": "completed"})
                             break
@@ -123,7 +127,7 @@ class Engine:
                 try: await self.terminals.stop(owner, key)
                 except KeyError: pass
             try:
-                if self.spaces.path(owner, conversation).is_dir(): await self.spaces.checkpoint(owner, conversation, grant)
+                if self.spaces.path(owner, conversation).is_dir(): await self.checkpoint(owner, conversation, grant)
             except Exception: pass  # Retain unverified recovery files, never replay commands.
             await self.store.update_run(owner, identifier, status="interrupted" if self._stopping else "cancelled")
             await self.store.event(owner, identifier, "state", {"status": "interrupted" if self._stopping else "cancelled"})
@@ -139,11 +143,15 @@ class Engine:
             # Keep a failed/unverified workspace for inspection. A successful
             # cloud checkpoint is required before releasing ephemeral files.
             current = await self.store.run(owner, identifier)
+            if current and current.get("status") in TERMINAL | {"waiting_user"} and self.spaces.path(owner, conversation).is_dir():
+                try:
+                    await self.checkpoint(owner, conversation, grant)
+                    await asyncio.to_thread(shutil.rmtree, self.spaces.path(owner, conversation), True)
+                    await asyncio.to_thread(shutil.rmtree, self.spaces.path(owner, GLOBAL_WORKSPACE), True)
+                except Exception: pass  # Never remove failed/unverified recovery data.
             if current and current.get("status") in TERMINAL:
                 try: await self.history.archive_events(owner, identifier)
                 except Exception: pass  # Keep hot rows if archival fails; never discard unverified events.
-            if current and current.get("status") in {"completed", "waiting_user"}:
-                await asyncio.to_thread(shutil.rmtree, self.spaces.path(owner, conversation), True)
 
     async def perform_calls(self, run, calls, root, grant, command_ids, messages, first_approval=None):
         owner, identifier, conversation = run["owner"], run["id"], run["conversation"]
@@ -152,17 +160,22 @@ class Engine:
             if approved is None and (run.get("permission_mode") == "ask_all" or call["name"] in {"exec_command", "file_write"} and run.get("permission_mode") != "unrestricted"):
                 # A live command cannot be suspended into a portable approval.
                 for key in command_ids:
-                    if self.terminals.get(owner, key).process.returncode is None:
+                    if self.terminals.active(owner, key):
                         raise ValueError("Finish the active command before requesting another consequential action")
-                await self.spaces.checkpoint(owner, conversation, grant)
+                await self.checkpoint(owner, conversation, grant)
                 await self.approve(run, call, calls[index:])
             await self.store.event(owner, identifier, "tool_start", {"id": call["id"], "name": call["name"], "input": call["arguments"]})
             output = "User declined this action; it was not executed" if approved is False else await self.tool(run, call, root, command_ids)
-            if approved is not False and (call["name"] == "file_write" or call["name"] in {"exec_command", "write_stdin"} and not any(self.terminals.get(owner, key).process.returncode is None for key in command_ids)):
-                await self.spaces.checkpoint(owner, conversation, grant)
+            if approved is not False and (call["name"] == "file_write" or call["name"] in {"exec_command", "write_stdin"} and not any(self.terminals.active(owner, key) for key in command_ids)):
+                await self.checkpoint(owner, conversation, grant)
             messages.append({"role": "tool", "tool_call_id": call["id"], "content": output[:32_000]})
             await self.store.event(owner, identifier, "tool_result", {"id": call["id"], "output": output[:32_000], "success": approved is not False})
             await self.save_conversation(run, messages, run["prompt"][:120])
+
+    async def checkpoint(self, owner, conversation, grant):
+        await self.spaces.checkpoint(owner, conversation, grant)
+        global_root = self.spaces.path(owner, GLOBAL_WORKSPACE)
+        if global_root.is_dir(): await self.spaces.checkpoint(owner, GLOBAL_WORKSPACE, grant)
 
     async def save_conversation(self, run, messages, title):
         if len(json.dumps(messages, ensure_ascii=False)) > 180_000:
@@ -190,9 +203,15 @@ class Engine:
     async def tool(self, run, call, root, command_ids):
         owner, conversation = run["owner"], run["conversation"]
         name, args = call["name"], call["arguments"]
+        def scoped_path(value):
+            for scope in ["shared", "skills", "memory"]:
+                if value.startswith("@" + scope + "/"):
+                    return self.spaces.path(owner, GLOBAL_WORKSPACE) / scope, value[len(scope) + 2:]
+            return root, value
         if name == "file_read":
             def read():
-                with open_regular(root, args["path"]) as file: return file.read(32_001)
+                selected, path = scoped_path(args["path"])
+                with open_regular(selected, path) as file: return file.read(32_001)
             data = await asyncio.to_thread(read)
             return data[:32_000].decode(errors="replace") + ("\n[truncated]" if len(data) > 32_000 else "")
         if name == "history_read":
@@ -207,16 +226,22 @@ class Engine:
         if name == "file_write":
             data = args["content"].encode()
             if len(data) > 256_000: raise ValueError("File tool payload too large")
-            await asyncio.to_thread(write_regular, root, args["path"], data)
-            self.own(root)
+            selected, path = scoped_path(args["path"])
+            await asyncio.to_thread(write_regular, selected, path, data)
+            self.own(root); self.own(self.spaces.path(owner, GLOBAL_WORKSPACE))
             return "File written and checkpoint verified"
-        if name == "file_list": return json.dumps([{"path": p, "bytes": n} for p, n, _, _ in await asyncio.to_thread(inventory, root)], ensure_ascii=False)
+        if name == "file_list":
+            scope = args.get("scope", "workspace")
+            if scope not in {"workspace", "shared", "skills", "memory"}: raise ValueError("Invalid file scope")
+            selected = root if scope == "workspace" else self.spaces.path(owner, GLOBAL_WORKSPACE) / scope
+            prefix = "" if scope == "workspace" else "@" + scope + "/"
+            return json.dumps([{"path": prefix + p, "bytes": n} for p, n, _, _ in await asyncio.to_thread(inventory, selected)], ensure_ascii=False)
         if name == "task_checkpoint":
             note = str(args["note"])[:4000]
             await self.store.update_run(owner, run["id"], checkpoint=note); return "Progress note saved"
         if name == "exec_command":
             terminal = await self.terminals.start(owner, conversation, root, args["cmd"], self.child_uid,
-                                                   min(max(int(args.get("timeout_seconds", 300)), 1), 7200))
+                                                   min(max(int(args.get("timeout_seconds", 300)), 1), 7200), self.spaces.path(owner, GLOBAL_WORKSPACE))
             command_ids.add(terminal.id)
             await asyncio.sleep(min(max(int(args.get("yield_time_ms", 1000)), 0), 10_000) / 1000)
             return json.dumps(self.terminals.read(owner, terminal.id), ensure_ascii=False)
