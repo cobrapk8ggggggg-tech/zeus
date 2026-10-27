@@ -1,6 +1,6 @@
 # فهرس البحث وحالة الاعتماد
 
-هذه نقطة بداية قابلة للاستئناف، وليست موسوعة مكتملة. جميع النصوص فُهرست آليًا؛ القراءة السياقية المسجلة حتى الآن تخص الملفات 1–40. اكتملت القراءة الأولية للدفعة1–20 مع بقاء مراجعة المقارنة.
+هذه نقطة بداية قابلة للاستئناف، وليست موسوعة مكتملة. جميع النصوص فُهرست آليًا؛ القراءة السياقية المسجلة حتى الآن تخص الملفات 1–50. اكتملت القراءة الأولية للدفعة1–20 مع بقاء مراجعة المقارنة.
 
 - [تدقيق المصدر](00-source-audit.md)
 - [دليل البيانات والتوثيق](data/README.md)
@@ -26,3 +26,5 @@
 [بداية الدفعة التالية21–22](19-research-progress/batch-0021-0022.md).
 
 الدفعة23–40: [دفتر القراءة](19-research-progress/batch-0023-0040.md)، [نموذج الأكبر](06-fang-yuan/model-update-0040.md)، [تطور الأصغر](07-fang-zheng/development-0023-0040.md)، [المؤسسات](08-factions/institutions-0040.md)، [الموارد والغو](03-gu-system/resources-and-refinement-0040.md)، [الانحراف](16-divergence-simulator/dependencies-0040.md)، [معايرة الاتساق](17-consistency-audits/audit-calibration-0040.md).
+
+الدفعة41–50: [دفتر القراءة](19-research-progress/batch-0041-0050.md)، [دراسات القرار](06-fang-yuan/decision-studies-0041-0050.md)، [تطور الأصغر](07-fang-zheng/development-0041-0050.md)، [هندسة الكشف](13-narrative-techniques/causal-revelations-0050.md)، [الغو والزراعة](03-gu-system/systems-0050.md)، [اعتمادات الانحراف](16-divergence-simulator/dependencies-0050.md).

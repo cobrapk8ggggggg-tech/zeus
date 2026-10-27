@@ -17,3 +17,8 @@
 {"id": "GU-LIQUOR", "kind": "gu", "canonical_name": "دودة الخمور", "aliases_json": "[]"}
 {"id": "FAC-MO", "kind": "faction", "canonical_name": "فرع عائلة مو", "aliases_json": "[]"}
 {"id": "FAC-CHI", "kind": "faction", "canonical_name": "فرع عائلة تشي", "aliases_json": "[]"}
+{"id": "CHAR-JIA-JINSHENG", "kind": "character", "canonical_name": "جيا جين شينغ", "aliases_json": "[]"}
+{"id": "CHAR-JIA-GUI", "kind": "character", "canonical_name": "جيا جوي", "aliases_json": "[]"}
+{"id": "GU-MUDSKIN", "kind": "gu", "canonical_name": "ضفدع الجلد الطيني", "aliases_json": "[]"}
+{"id": "GU-GREEN-SILK", "kind": "gu", "canonical_name": "غو الحرير الأخضر", "aliases_json": "[]"}
+{"id": "FAC-JIA", "kind": "faction", "canonical_name": "عائلة جيا", "aliases_json": "[]"}

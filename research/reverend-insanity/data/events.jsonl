@@ -58,3 +58,19 @@
 {"id": "EV-MAIN-0056", "timeline": "main", "description": "تأكيد تنفيذ التعويض والغرامة", "chapter_id": "SRC-0039", "line_start": 197, "line_end": 205, "confidence": "high"}
 {"id": "EV-MAIN-0057", "timeline": "main", "description": "تجاوز العشب والذهاب إلى فرصة المقامرة", "chapter_id": "SRC-0039", "line_start": 217, "line_end": 223, "confidence": "high"}
 {"id": "EV-MAIN-0058", "timeline": "main", "description": "فرز20 حفرية وتحديد6 دون فتحها بعد", "chapter_id": "SRC-0040", "line_start": 139, "line_end": 225, "confidence": "high"}
+{"id": "EV-MAIN-0059", "timeline": "main", "description": "شراء6 وفتح5 قطع تحت نظر الجمهور", "chapter_id": "SRC-0041", "line_start": 53, "line_end": 179, "confidence": "high"}
+{"id": "EV-MAIN-0060", "timeline": "main", "description": "حماية حقه من عرض شراء قسري باستدعاء قواعد التجارة والعشيرة", "chapter_id": "SRC-0042", "line_start": 21, "line_end": 57, "confidence": "high"}
+{"id": "EV-MAIN-0061", "timeline": "main", "description": "صقل الضفدع وبيعه500 وحمل السادسة", "chapter_id": "SRC-0042", "line_start": 109, "line_end": 193, "confidence": "high"}
+{"id": "EV-MAIN-0062", "timeline": "main", "description": "فتح السادسة سرًا وبناء ادعاء مصدر للدودة", "chapter_id": "SRC-0043", "line_start": 65, "line_end": 119, "confidence": "high"}
+{"id": "EV-MAIN-0063", "timeline": "main", "description": "كشف الدودة المحسوب ورفض بيعها ثم خيبة بطء انتشار الخبر", "chapter_id": "SRC-0044", "line_start": 73, "line_end": 127, "confidence": "high"}
+{"id": "EV-MAIN-0064", "timeline": "main", "description": "تعويض جيا فو العلني عن احتيال أخيه", "chapter_id": "SRC-0045", "line_start": 29, "line_end": 55, "confidence": "high"}
+{"id": "EV-MAIN-0065", "timeline": "main", "description": "تفاوض حول الجدار إلى2000 مشروطة بالمعاينة", "chapter_id": "SRC-0045", "line_start": 153, "line_end": 237, "confidence": "high"}
+{"id": "EV-MAIN-0066", "timeline": "main", "description": "معلومة العنكبوت تكشف نقص تصور الأكبر للكهف", "chapter_id": "SRC-0046", "line_start": 43, "line_end": 55, "confidence": "high"}
+{"id": "EV-MAIN-0067", "timeline": "main", "description": "التسجيل يتغير معلنًا إرثًا بشرط إبادة العشيرة", "chapter_id": "SRC-0046", "line_start": 59, "line_end": 67, "confidence": "high"}
+{"id": "EV-MAIN-0068", "timeline": "main", "description": "جيا جين شينغ يخطط سرًا للقتل؛ الأكبر يقتله أولًا", "chapter_id": "SRC-0046", "line_start": 81, "line_end": 105, "confidence": "high"}
+{"id": "EV-MAIN-0069", "timeline": "main", "description": "تنظيف المشهد وتأجيل الكهف وتغيير خطة كشف الدودة", "chapter_id": "SRC-0047", "line_start": 117, "line_end": 165, "confidence": "high"}
+{"id": "EV-MAIN-0070", "timeline": "main", "description": "33 انتصارًا وانسحاب يحمي الردع قبل كشف الإرهاق", "chapter_id": "SRC-0048", "line_start": 21, "line_end": 159, "confidence": "high"}
+{"id": "EV-MAIN-0071", "timeline": "main", "description": "تبلور3 دوائر شبابية كما يراها الشيخ", "chapter_id": "SRC-0049", "line_start": 79, "line_end": 107, "confidence": "high"}
+{"id": "EV-MAIN-0072", "timeline": "main", "description": "تغذية فتحة تشي تشينغ بجوهر الجد وخطة معالجة التداعيات", "chapter_id": "SRC-0050", "line_start": 33, "line_end": 65, "confidence": "high"}
+{"id": "EV-MAIN-0073", "timeline": "main", "description": "الأصغر يحصي3 أحجار ويقدر قرب اختراقه", "chapter_id": "SRC-0050", "line_start": 71, "line_end": 111, "confidence": "high"}
+{"id": "EV-MAIN-0074", "timeline": "main", "description": "اختراق الأكبر إلى المرحلة الوسطى", "chapter_id": "SRC-0050", "line_start": 123, "line_end": 167, "confidence": "high"}
