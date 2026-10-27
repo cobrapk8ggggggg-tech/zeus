@@ -144,7 +144,14 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
     durable_event = store.event
     async def publish_event(owner, run, kind, data):
         result = await durable_event(owner, run, kind, data)
-        for signal in tuple(observers.get((owner, run), ())): signal.set()
+        for signal, buffered in tuple(observers.get((owner, run), {}).items()):
+            # This is only a bounded hand-off to requests already waiting,
+            # never a second transcript cache or a substitute for durable replay.
+            size = len(json.dumps(result, ensure_ascii=False).encode()) if isinstance(result, dict) else 0
+            if size and len(buffered["events"]) < 200 and buffered["bytes"] + size <= 2 * 1024 * 1024:
+                buffered["events"].append(result); buffered["bytes"] += size
+            else: buffered["complete"] = False
+            signal.set()
         return result
     store.event = publish_event
 
@@ -304,18 +311,29 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
     @app.get("/v1/runs/{identifier}/events")
     async def events(identifier: uuid.UUID, after: int = 0, wait: float = 0, authorization: str = Header(default=""), account=Depends(auth)):
         ready(); key = (account, str(identifier)); signal = asyncio.Event()
-        observers.setdefault(key, set()).add(signal)
+        buffered = {"events": [], "bytes": 0, "complete": True}
+        observers.setdefault(key, {})[signal] = buffered
         try:
             current = public_run(await store.run(account, str(identifier)))
             items = await engine.history.events(account, str(identifier), after, authorization.removeprefix("Bearer "))
             if not items and current["status"] not in TERMINAL | {"waiting_user"} and wait > 0:
                 try: await asyncio.wait_for(signal.wait(), min(wait, 20))
                 except asyncio.TimeoutError: pass
-                current = public_run(await store.run(account, str(identifier)))
-                items = await engine.history.events(account, str(identifier), after, authorization.removeprefix("Bearer "))
+                live = sorted((item for item in buffered["events"] if item["seq"] > after), key=lambda item: item["seq"])
+                contiguous = buffered["complete"] and live and [item["seq"] for item in live] == list(range(after + 1, after + len(live) + 1))
+                # Text does not change approval/state metadata. Deliver the
+                # already committed event without three extra database trips.
+                # State changes, replay gaps and unknown store contracts always
+                # re-read the authoritative record and encrypted cold history.
+                if contiguous and current["status"] in {"queued", "running"} and all(item["kind"] in {"text", "thinking", "tool_output"} for item in live):
+                    items = live
+                    current = {**current, "status": "running", "seq": max(current.get("seq", 0), live[-1]["seq"])}
+                else:
+                    current = public_run(await store.run(account, str(identifier)))
+                    items = await engine.history.events(account, str(identifier), after, authorization.removeprefix("Bearer "))
             return {"run": current, "events": items, "cursor": items[-1]["seq"] if items else after}
         finally:
-            observers[key].discard(signal)
+            observers[key].pop(signal, None)
             if not observers[key]: observers.pop(key, None)
 
     @app.get("/v1/runs/{identifier}/stream")

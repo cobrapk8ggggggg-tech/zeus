@@ -399,6 +399,45 @@ class APITests(unittest.IsolatedAsyncioTestCase):
         response=await asyncio.wait_for(waiter,2);self.assertEqual(response.status_code,200)
         await self.wait_state(run,{"completed"})
 
+    async def test_waiting_client_gets_committed_text_without_post_wake_database_reads(self):
+        ready, first, finish, read_started = (asyncio.Event() for _ in range(4))
+        class GatedModel:
+            async def stream(self, provider, messages, tools, instructions):
+                ready.set(); await first.wait()
+                yield {"kind": "text", "text": "visible before completion"}
+                await finish.wait()
+        self.app.state.engine.models = GatedModel()
+        run, _ = await self.submit(); await asyncio.wait_for(ready.wait(), 2)
+        initial = (await self.client.get(f"/v1/runs/{run}/events")).json()
+        original_run, original_events = self.store.run, self.store.events
+        reads = []
+        async def read_run(*args):
+            reads.append(args)
+            if len(reads) > 2: raise AssertionError("A live committed text part waited for another database read")
+            return await original_run(*args)
+        async def read_events(*args):
+            result = await original_events(*args)
+            read_started.set(); return result
+        self.store.run, self.store.events = read_run, read_events
+        waiter = asyncio.create_task(self.client.get(f"/v1/runs/{run}/events?after={initial['cursor']}&wait=20"))
+        try:
+            await asyncio.wait_for(read_started.wait(), 2)
+            self.assertFalse(waiter.done()); first.set()
+            response = await asyncio.wait_for(waiter, 2)
+            self.assertEqual(response.status_code, 200, response.text)
+            page = response.json()
+            self.assertEqual([event["data"]["delta"] for event in page["events"]], ["visible before completion"])
+            self.assertEqual(page["run"]["status"], "running")
+            self.assertEqual(page["run"]["seq"], page["cursor"])
+            self.assertEqual(len(reads), 2)
+            self.assertFalse(finish.is_set())
+        finally:
+            self.store.run, self.store.events = original_run, original_events
+            first.set(); finish.set()
+            if not waiter.done(): waiter.cancel()
+            await asyncio.gather(waiter, return_exceptions=True)
+        await self.wait_state(run, {"completed"})
+
     async def test_new_user_turn_preempts_background_storage_collection(self):
         started=asyncio.Event();released=[]
         async def snapshot(owner): started.set();await asyncio.sleep(60)
