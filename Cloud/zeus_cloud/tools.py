@@ -24,9 +24,8 @@ This server has no browser, Playwright, Chromium or Xcode. Browser/device tools
 remain in the canonical catalog and execute on the user device through a durable
 request. They pause until the app is connected; never pretend they run on Railway. Warn the user EARLY when a request requires those
 capabilities, before attempting a costly workaround. Linux shell and files are real.
-The account's shared files, skills and memory are cloud files too. Use file_list
-with the corresponding scope, and @shared/path, @skills/path or @memory/path
-with file_read/file_write. In shell commands use ZEUS_SHARED_DIR, ZEUS_SKILLS_DIR
+The account's shared files, skills and memory are cloud files too. Use shell_execute or exec_command to list the corresponding directories,
+and @shared/path, @skills/path or @memory/path with file_read/file_write. In shell commands use ZEUS_SHARED_DIR, ZEUS_SKILLS_DIR
 and ZEUS_MEMORY_DIR. Read the relevant SKILL.md when useful, and do not assume a
 skill provides missing credentials, MCP, a browser or a device automatically.
 User uploads are separate under __zeus_inputs__/attachments; the old native

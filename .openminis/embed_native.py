@@ -370,6 +370,10 @@ def embed(native, browser, report):
 
     stream = source / "Agent/Chat/AIChatViewModel+SSEStream.swift"
     text = stream.read_text()
+    # Both execution locations use the stock tool cards and their input metadata.
+    first = text.index('                    let blockKind: AssistantBlockKind = switch name {')
+    last = text.index('\n                    if name == "file_write"', first)
+    text = text[:first] + '                    let blockKind = ZeusToolPresentation.kind(name)' + text[last:]
     if 'case "browser_use":' not in text:
         raise RuntimeError("Original browser card mapping was not found")
     text = text.replace('case "browser_use":', 'case let browserName where browserName == "browser_use" || browserName == "zeus_browser" || zeusBrowserOperation(browserName) != nil:')

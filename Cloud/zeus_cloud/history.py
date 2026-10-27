@@ -50,3 +50,14 @@ class History:
             # Publish verified references before pruning any hot rows.
             await self.store.update_run(owner, run, event_archives=pages)
             await self.store.prune_events(owner, run, after)
+
+    async def archive_run_payload(self, owner, identifier):
+        record = await self.store.run(owner, identifier)
+        if not record or record["status"] not in {"completed", "cancelled", "failed", "interrupted"} or record.get("payload_archive"): return
+        fields = {k: record[k] for k in ["history", "provider", "instructions", "tools", "pending_calls"] if record.get(k)}
+        if not fields: return
+        token = self.vault.open(owner, record["grant"])
+        ref = await self.put(owner, token, fields)
+        # Publish only a verified encrypted archive before clearing duplicated
+        # private input/context. Prompts and native identities remain searchable.
+        await self.store.update_run(owner, identifier, payload_archive=ref, history=[], provider=None, instructions="", tools=[], pending_calls=[])

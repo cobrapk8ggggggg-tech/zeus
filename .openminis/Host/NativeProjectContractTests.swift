@@ -3,6 +3,17 @@ import UIKit
 @testable import Minis
 
 @MainActor final class NativeProjectContractTests: XCTestCase {
+    func testCloudToolEventsUseTheOriginalNativeCardKindsAndReadableTerminalOutput() {
+        XCTAssertEqual(ZeusToolPresentation.kind("shell_execute", input: ["command": "uname -a"]), .shellTool(command: "uname -a"))
+        XCTAssertEqual(ZeusToolPresentation.kind("file_edit", input: ["path": "main.py"]), .fileEditTool(path: "main.py"))
+        XCTAssertEqual(ZeusToolPresentation.kind("memory_get"), .memoryTool(action: "memory_get"))
+        XCTAssertEqual(ZeusToolPresentation.kind("browser_use", input: ["action": "get_state"]), .browserTool(action: "get_state"))
+        XCTAssertEqual(ZeusToolPresentation.kind("read_image", input: ["path": "screen.png"]), .readImageTool(path: "screen.png"))
+        XCTAssertEqual(ZeusToolPresentation.kind("integration_call"), .shellTool(command: "integration_call"))
+        let result = #"{"id":"pty-1","output":"Linux\nfile.txt\n","exit_code":0,"next_offset":20}"#
+        XCTAssertEqual(ZeusToolPresentation.output(result, name: "shell_execute"), "Linux\nfile.txt\n")
+        XCTAssertEqual(ZeusToolPresentation.output(result, name: "file_read"), result, "Actual file JSON must remain unchanged")
+    }
     private func proposal(remote: Bool = false, repository: String = "fixture-owner/project") throws -> [String: Any] {
         let raw = remote ? #"""
         {"title":"Audio app project","objective":"Implement and verify the approved audio product","platform":"ios",
@@ -301,6 +312,8 @@ import UIKit
         do { _ = try await runtime.execute("propose_project_plan", args: ["proposal": changed], callID: "forged-approval", vm: vm); XCTFail("Different plan hash requires new approval") } catch {}
     }
     func testActualGitHubRESTChecksRouteCommitJobsArtifactsAndReadsDownloadedUIScreenshot() async throws {
+        // This contract exercises local project discovery and its local skill assets.
+        await ZeusDefaultSkills.shared.install(forceLocal: true)
         let key = "zeus.contract.fixture." + UUID().uuidString
         defer { UserDefaults.standard.removeObject(forKey: key) }
         let connections = ZeusConnections(storageKey: key)

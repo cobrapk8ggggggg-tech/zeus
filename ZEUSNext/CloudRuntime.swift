@@ -40,6 +40,7 @@ struct CloudExecutionPreference: Codable {
     let owner: UUID
     let enabled: Bool
     var choiceVersion: Int? = nil
+    var pendingCommit: Bool? = nil
     static func resolved(owner: UUID, secure: Self?, disk: Self?) -> Bool {
         for candidate in [secure, disk] {
             if let candidate, candidate.owner == owner, candidate.choiceVersion == 2 { return candidate.enabled }
@@ -49,6 +50,8 @@ struct CloudExecutionPreference: Codable {
 }
 
 @MainActor public protocol NativeCloudDataDelegate: AnyObject {
+    func restoreBrowserFile(at url: URL) async throws -> URL?
+    func validateLocalExecutionIdle() throws
     func prepareCloudExecution(progress: @escaping (String) -> Void) async throws
     func migrateToCloud(progress: @escaping (String) -> Void) async throws
     func prepareLocalExecution(progress: @escaping (String) -> Void) async throws
@@ -100,6 +103,7 @@ actor CloudCheckpointGate {
     public static let runtimeURL = URL(string: "https://zeus-cloud-production.up.railway.app")!
     public static weak var dataDelegate: NativeCloudDataDelegate?
     public static var sharedFilesView: (() -> AnyView)?
+    public static var browserFilesDidChange: (() -> Void)?
     public static var prepareBrowserBackup: (() async throws -> Void)?
     public static var isMigrating = false
     public static var ownerID: String? { CloudAccount.shared.phase == .ready ? CloudAccount.shared.identity?.id.uuidString.lowercased() : nil }
@@ -114,7 +118,7 @@ actor CloudCheckpointGate {
         guard let id = CloudAccount.shared.identity?.id, CloudAccount.shared.phase == .ready else { throw CloudAccountError.wrongOwner }
         // Persist the user's selection before any network request. A suspended
         // transfer must never turn cloud execution back into local execution.
-        let preference = Preference(owner: id, enabled: value, choiceVersion: 2)
+        let preference = Preference(owner: id, enabled: value, choiceVersion: 2, pendingCommit: true)
         try CloudSessionStorage().store(key: "zeus-execution:" + id.uuidString, value: JSONEncoder().encode(preference))
         try? BrowserDisk.write(preference, to: preferencesURL)
         try await prepareBrowserBackup?()
@@ -125,12 +129,21 @@ actor CloudCheckpointGate {
             var manifest = head.manifest; manifest.executionTarget = value ? "cloud" : "local"; manifest.executionChoiceVersion = 2
             if value { manifest.coverage = Array(Set(manifest.coverage + ["cloud_runtime"])) }
             _ = try await api.commit(manifest, expected: head.revision, operation: UUID())
+            try markPreferenceCommitted(value)
             await CloudCheckpointGate.shared.leave()
         } catch { await CloudCheckpointGate.shared.leave(); throw error }
     }
     static func adoptPreference(_ value: String?, version: Int?) throws {
         guard version == 2, let value, let id = CloudAccount.shared.identity?.id else { return }
+        if let data = try? CloudSessionStorage().retrieve(key: "zeus-execution:" + id.uuidString),
+           let local = try? JSONDecoder().decode(Preference.self, from: data), local.owner == id, local.pendingCommit == true { return }
         let preference = Preference(owner: id, enabled: value == "cloud", choiceVersion: 2)
+        try CloudSessionStorage().store(key: "zeus-execution:" + id.uuidString, value: JSONEncoder().encode(preference))
+        try? BrowserDisk.write(preference, to: preferencesURL)
+    }
+    static func markPreferenceCommitted(_ enabled: Bool) throws {
+        guard let id = CloudAccount.shared.identity?.id, usesCloud == enabled else { return }
+        let preference = Preference(owner: id, enabled: enabled, choiceVersion: 2, pendingCommit: false)
         try CloudSessionStorage().store(key: "zeus-execution:" + id.uuidString, value: JSONEncoder().encode(preference))
         try? BrowserDisk.write(preference, to: preferencesURL)
     }
@@ -334,6 +347,7 @@ public struct NativeCloudExecutionSettings: View {
         do {
             guard let delegate = NativeCloudAccountAPI.dataDelegate else { throw CloudAccountError.incomplete("مسار نقل بيانات الوكيل غير متاح حاليًا.") }
             if value {
+                try delegate.validateLocalExecutionIdle()
                 try await NativeCloudAccountAPI.setEnabled(true)
                 let data = try await NativeCloudAccountAPI.runtime("v1/capabilities")
                 guard let capability = try JSONSerialization.jsonObject(with: data) as? [String: Any], capability["ready"] as? Bool == true else {

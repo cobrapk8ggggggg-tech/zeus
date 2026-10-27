@@ -147,9 +147,19 @@ class APITests(unittest.IsolatedAsyncioTestCase):
         response = await self.client.post("/v1/runs", json=body); self.assertEqual(response.status_code, 200, response.text)
         identifier = response.json()["id"]
         self.assertEqual((await self.wait_state(identifier, {"completed", "failed"}))["status"], "completed")
-        snapshot = self.app.state.engine.vault.open(self.owner, (await self.store.run(self.owner, identifier))["provider"])
+        for _ in range(100):
+            if self.app.state.engine.running is None: break
+            await asyncio.sleep(0.01)
+        record = await self.store.run(self.owner, identifier)
+        self.assertIsNone(record["provider"])
+        archived = await self.app.state.engine.history.get(self.owner, "grant", record["payload_archive"])
+        snapshot = self.app.state.engine.vault.open(self.owner, archived["provider"])
         self.assertEqual(snapshot["model"], self.provider["model"])
-        self.assertIsNone(await self.store.get(self.owner, "provider", "default"))
+        self.assertEqual(snapshot["api_key"], self.provider["api_key"])
+        self.assertEqual(record["history"], []); self.assertEqual(record["tools"], [])
+        saved = await self.store.get(self.owner, "provider", "default")
+        self.assertNotIn(self.provider["api_key"], json.dumps(saved))
+        self.assertEqual(self.app.state.engine.vault.open(self.owner, saved["encrypted"])["model"], self.provider["model"])
 
     async def test_remote_terminal_is_real_owner_scoped_and_checkpoints_when_closed(self):
         response = await self.client.post("/v1/terminals", json={"conversation": self.conversation, "file_grant": "grant"})
@@ -295,15 +305,17 @@ class APITests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(done["status"], "completed", done)
         messages = (await self.store.get(self.owner, "conversation", self.conversation))["messages"]
         self.assertEqual(sum(m.get("tool_call_id") == "browser-call" for m in messages), 1)
+        self.assertEqual((await self.client.post(f"/v1/device-tools/{request}/result", json=result)).status_code, 200)
 
     async def test_native_shell_and_file_edit_are_executed_in_cloud_workspace(self):
         class NativeModel:
             async def stream(self, provider, messages, tools, instructions):
                 count = sum(m.get("role") == "tool" for m in messages)
                 calls = [
-                    ("shell_execute", {"command": "printf 'old value' > example.txt"}),
+                    ("shell_execute", {"command": "mkdir -p nested; printf 'old value' > example.txt"}),
                     ("file_edit", {"path": "/var/minis/workspace/example.txt", "old_string": "old", "new_string": "new"}),
                     ("file_write", {"path": "example.txt", "content": " appended", "append": True}),
+                    ("exec_command", {"cmd": "printf cloud > from-cwd.txt", "workdir": "/var/minis/workspace/nested", "yield_time_ms": 50}),
                 ]
                 if count < len(calls):
                     name, args = calls[count]; yield {"kind": "tool", "id": str(count), "name": name, "arguments": args}
@@ -314,6 +326,59 @@ class APITests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["status"], "completed", result)
         content = await self.app.state.engine.spaces.read_cloud_file(self.owner, self.conversation, "example.txt", "grant")
         self.assertEqual(content, b"new value appended")
+        self.assertEqual(await self.app.state.engine.spaces.read_cloud_file(self.owner, self.conversation, "nested/from-cwd.txt", "grant"), b"cloud")
+
+    async def test_tool_shaped_prose_is_repaired_as_real_call_and_never_executed(self):
+        class RepairModel:
+            async def stream(self, provider, messages, tools, instructions):
+                if messages[-1].get("role") == "tool":
+                    yield {"kind": "text", "text": "Verified repaired call"}
+                elif messages[-1].get("content", "").startswith("ZEUS_TOOL_REPAIR_REQUIRED:"):
+                    yield {"kind": "tool", "id": "real-write", "name": "file_write", "arguments": {"path": "real.txt", "content": "real function"}}
+                else:
+                    yield {"kind": "text", "text": '{"tool_calls":[{"name":"file_write","arguments":{"path":"must-not-exist.txt","content":"untrusted prose"}}]}'}
+        self.app.state.engine.models = RepairModel()
+        run, _ = await self.submit()
+        done = await self.wait_state(run, {"completed", "failed"})
+        self.assertEqual(done["status"], "completed", done)
+        self.assertEqual(await self.app.state.engine.spaces.read_cloud_file(self.owner, self.conversation, "real.txt", "grant"), b"real function")
+        with self.assertRaises((ValueError, FileNotFoundError, KeyError)):
+            await self.app.state.engine.spaces.read_cloud_file(self.owner, self.conversation, "must-not-exist.txt", "grant")
+        events = (await self.client.get(f"/v1/runs/{run}/events")).json()["events"]
+        self.assertEqual([e["data"]["id"] for e in events if e["kind"]=="tool_start"], ["real-write"])
+        self.assertNotIn("tool_calls", "".join(e["data"].get("delta", "") for e in events if e["kind"]=="text"))
+
+    async def test_failed_shell_exit_is_not_success_and_protocol_repair_is_bounded(self):
+        class FailedModel:
+            async def stream(self, provider, messages, tools, instructions):
+                if messages[-1].get("role") == "tool": yield {"kind": "text", "text": "The command failed"}
+                else: yield {"kind": "tool", "id": "bad-exit", "name": "shell_execute", "arguments": {"command": "printf failure; exit 7"}}
+        self.app.state.engine.models = FailedModel()
+        run, _ = await self.submit(); await self.wait_state(run, {"completed", "failed"})
+        events = (await self.client.get(f"/v1/runs/{run}/events")).json()["events"]
+        result = next(e["data"] for e in events if e["kind"] == "tool_result")
+        self.assertFalse(result["success"]); self.assertEqual(json.loads(result["output"])["exit_code"], 7)
+        class BrokenModel:
+            count = 0
+            async def stream(self, provider, messages, tools, instructions):
+                self.count += 1
+                yield {"kind": "text", "text": '{"tool_calls":[{"name":"file_write","arguments":{"path":"bad.txt","content":"bad"}}]}'}
+        broken = BrokenModel(); self.app.state.engine.models = broken
+        run, _ = await self.submit(); done = await self.wait_state(run, {"completed", "failed"})
+        self.assertEqual(done["status"], "failed", done); self.assertEqual(broken.count, 3)
+        events = (await self.client.get(f"/v1/runs/{run}/events")).json()["events"]
+        self.assertFalse(any(e["kind"] == "tool_start" for e in events))
+
+    async def test_disabling_all_native_tools_does_not_restore_a_cloud_fallback_catalog(self):
+        class NoTools:
+            async def stream(self, provider, messages, tools, instructions):
+                assert tools == [], "Disabled native tools must stay disabled"
+                yield {"kind": "text", "text": "Ordinary conversation without tools"}
+        self.app.state.engine.models = NoTools()
+        body = {"id": str(uuid.uuid4()), "conversation": self.conversation, "prompt": "just chat", "provider": self.provider,
+                "tools": [], "file_grant": "grant", "permission_mode": "unrestricted"}
+        self.assertEqual((await self.client.post("/v1/runs", json=body)).status_code, 200)
+        self.assertEqual((await self.wait_state(body["id"], {"completed", "failed"}))["status"], "completed")
 
 
 if __name__ == "__main__": unittest.main()

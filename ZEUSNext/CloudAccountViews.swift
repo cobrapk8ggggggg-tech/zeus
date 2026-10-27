@@ -143,7 +143,7 @@ private struct CloudWelcomeView: View {
                     Text("أو").font(.system(size: 16)).foregroundStyle(.white.opacity(0.45))
                     Rectangle().fill(.white.opacity(0.1)).frame(height: 1)
                 }.padding(.vertical, 2)
-                Button {} label: {
+                Button { account.notice = "الدخول باستخدام Google سيُضاف لاحقًا. استخدم البريد وكلمة المرور حاليًا." } label: {
                     HStack(spacing: 13) {
                         Text("G").font(.system(size: 28, weight: .bold)).accessibilityHidden(true)
                         Text("المتابعة باستخدام Google").font(.system(size: 20, weight: .bold))
@@ -152,7 +152,7 @@ private struct CloudWelcomeView: View {
                     .foregroundStyle(.black).frame(maxWidth: .infinity, minHeight: 64)
                     .background(.white, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
-                .buttonStyle(.plain).disabled(true)
+                .buttonStyle(.plain)
                 .accessibilityLabel("المتابعة باستخدام Google، ستتوفر لاحقًا")
                 .accessibilityIdentifier("cloudGoogleDeferred")
             }

@@ -9,6 +9,7 @@ import time
 import uuid
 from cryptography.fernet import Fernet
 from .files import contained, inventory, open_regular, write_regular, GLOBAL_WORKSPACE
+from .terminal import protocol_result
 from .tools import SERVER_TOOLS, TOOLS, INSTRUCTIONS, builtin_instructions
 from .history import History
 
@@ -129,22 +130,42 @@ class Engine:
                             raise ValueError("Approval cannot be applied to this saved tool call")
                         await self.perform_calls(run, pending, root, grant, command_ids, messages, approval["status"] == "allowed")
                         await self.store.update_run(owner, identifier, resume_approval=None, pending_calls=[])
+                    from .tool_protocol import candidate, repair
+                    repair_count = run.get("tool_text_repairs", 0)
                     for _ in range(100):
                         text, calls, buffered = "", [], ""
+                        thinking, thinking_count = "", 0
+                        thinking_flush = time.monotonic()
                         last_flush = time.monotonic()
                         async for event in self.models.stream(provider, messages, self.catalog(run), run.get("instructions", "") + "\n" + INSTRUCTIONS + builtin_instructions()):
                             if event["kind"] == "text":
                                 text += event["text"]; buffered += event["text"]
                                 if len(text) > 512_000: raise ValueError("Reply exceeds the configured limit")
-                                if len(buffered) >= 2048 or time.monotonic() - last_flush >= 0.5:
+                                possible_protocol = text.lstrip().startswith(("{", "<tool_call>")) and len(text) <= 12000
+                                if not possible_protocol and (len(buffered) >= 2048 or time.monotonic() - last_flush >= 0.5):
                                     await self.store.event(owner, identifier, "text", {"delta": buffered}); buffered = ""; last_flush = time.monotonic()
                             elif event["kind"] == "tool": calls.append(event)
-                        if buffered: await self.store.event(owner, identifier, "text", {"delta": buffered})
+                            elif event["kind"] == "thinking":
+                                thinking += event["text"]
+                                thinking_count += len(event["text"])
+                                if thinking_count > 512_000: raise ValueError("Reasoning exceeds the configured limit")
+                                if len(thinking) >= 2048 or time.monotonic() - thinking_flush >= 0.5:
+                                    await self.store.event(owner, identifier, "thinking", {"delta": thinking})
+                                    thinking = ""; thinking_flush = time.monotonic()
+                        malformed = candidate(text, self.catalog(run)) if not calls else None
+                        if buffered and not malformed: await self.store.event(owner, identifier, "text", {"delta": buffered})
+                        if thinking: await self.store.event(owner, identifier, "thinking", {"delta": thinking})
                         if not text.strip() and not calls: raise ValueError("The model returned an empty response; no completion was inferred")
                         message = {"role": "assistant", "content": text}
                         if calls: message["tool_calls"] = [{"id": c["id"], "type": "function", "function": {"name": c["name"], "arguments": json.dumps(c["arguments"])}} for c in calls]
                         messages.append(message)
                         await self.save_conversation(run, messages, (saved or {}).get("title", run["prompt"][:120]))
+                        if malformed:
+                            repair_count += 1
+                            await self.store.update_run(owner, identifier, tool_text_repairs=repair_count)
+                            if repair_count > 2: raise ValueError("أرسل المزود طلب الأداة كنص وتعذّر تصحيح بروتوكوله بعد محاولتين. لم يُنفذ هذا النص؛ اختر نموذجًا يدعم الأدوات ثم أعد المحاولة.")
+                            messages.append({"role": "user", "content": repair(malformed)})
+                            continue
                         if not calls:
                             if any(self.terminals.active(owner, key) for key in command_ids):
                                 messages.append({"role": "user", "content": "Runtime: your command is still active. Poll it with write_stdin and verify its result before finishing."})
@@ -185,29 +206,33 @@ class Engine:
                     await asyncio.to_thread(shutil.rmtree, self.spaces.path(owner, GLOBAL_WORKSPACE), True)
                 except Exception: pass  # Never remove failed/unverified recovery data.
             if current and current.get("status") in TERMINAL:
-                try: await self.history.archive_events(owner, identifier)
+                try:
+                    await self.history.archive_events(owner, identifier)
+                    await self.history.archive_run_payload(owner, identifier)
                 except Exception: pass  # Keep hot rows if archival fails; never discard unverified events.
 
     @staticmethod
     def catalog(run):
         # The app sends its canonical registry, including enabled MCP tools.
         # Cloud adds only durable-history support; it does not replace that list.
-        entries = run.get("tools") or TOOLS
+        entries = run.get("tools")
+        if entries is None: entries = TOOLS
         result = {}
         for entry in entries:
             name = entry.get("name", "")
             if not isinstance(name, str) or not name or len(name) > 200 or not isinstance(entry.get("parameters"), dict):
                 raise ValueError("Invalid canonical tool catalog")
             result[name] = {k: entry[k] for k in ["name", "description", "parameters"]}
-        result.setdefault("history_read", TOOLS[-1])
+        if entries: result.setdefault("history_read", TOOLS[-1])
         return list(result.values())
 
     async def perform_calls(self, run, calls, root, grant, command_ids, messages, first_approval=None):
         owner, identifier, conversation = run["owner"], run["id"], run["conversation"]
         for index, call in enumerate(calls):
-            if run.get("tools") and call["name"] not in {t["name"] for t in self.catalog(run)}: raise ValueError("The tool is disabled or absent from this conversation registry")
+            if run.get("tools") is not None and call["name"] not in {t["name"] for t in self.catalog(run)}: raise ValueError("The tool is disabled or absent from this conversation registry")
             approved = first_approval if index == 0 else None
-            if call["name"] not in SERVER_TOOLS:
+            device_path = str(call["arguments"].get("path", "")).startswith(("/var/minis/mounts/", "minis://mounts/"))
+            if call["name"] not in SERVER_TOOLS or device_path:
                 if call["name"] not in {t["name"] for t in self.catalog(run)}: raise ValueError("The model requested an unregistered tool")
                 if any(self.terminals.active(owner, key) for key in command_ids): raise ValueError("Finish the active command before waiting for the device")
                 await self.checkpoint(owner, conversation, grant)
@@ -229,6 +254,9 @@ class Engine:
             successful = approved is not False
             try:
                 output = "User declined this action; it was not executed" if approved is False else await self.tool(run, call, root, command_ids)
+                if successful and call["name"] in {"shell_execute", "exec_command", "write_stdin"}:
+                    exit_code = json.loads(output).get("exit_code")
+                    successful = exit_code is None or exit_code == 0
             except (ValueError, KeyError, OSError, UnicodeDecodeError) as error:
                 successful = False
                 output = "Tool error: " + str(error)[:2000]
@@ -320,8 +348,16 @@ class Engine:
             terminal = await self.terminals.start(owner, conversation, root, str(args["command"]), self.child_uid,
                 min(max(int(args.get("timeout", 900)), 1), 7200), self.spaces.path(owner, GLOBAL_WORKSPACE))
             command_ids.add(terminal.id)
-            while self.terminals.active(owner, terminal.id): await asyncio.sleep(0.2)
-            return json.dumps(self.terminals.read(owner, terminal.id), ensure_ascii=False)
+            offset, sent, last_flush = 0, 0, time.monotonic()
+            while self.terminals.active(owner, terminal.id):
+                await asyncio.sleep(0.2)
+                if time.monotonic() - last_flush >= 0.5 and sent < 32000:
+                    value = self.terminals.read(owner, terminal.id, offset)
+                    if value["output"]:
+                        delta = value["output"][:32000-sent]; sent += len(delta); offset = value["next_offset"]
+                        await self.store.event(owner, run["id"], "tool_output", {"id": call["id"], "delta": delta})
+                    last_flush = time.monotonic()
+            return protocol_result(self.terminals.read(owner, terminal.id))
         if name == "file_read":
             def read():
                 selected, path = scoped_path(args["path"])
@@ -363,21 +399,28 @@ class Engine:
             prefix = "" if scope == "workspace" else "@" + scope + "/"
             return json.dumps([{"path": prefix + p, "bytes": n} for p, n, _, _ in await asyncio.to_thread(inventory, selected)], ensure_ascii=False)
         if name == "task_checkpoint":
-            note = str(args["note"])[:4000]
-            await self.store.update_run(owner, run["id"], checkpoint=note); return "Progress note saved"
+            if args.get("action") == "save" or "note" in args:
+                await self.store.update_run(owner, run["id"], checkpoint=str(args.get("note", ""))[:16000])
+            current = await self.store.run(owner, run["id"])
+            return json.dumps({"checkpoint": current.get("checkpoint", ""), "status": current["status"]}, ensure_ascii=False)
         if name == "exec_command":
-            terminal = await self.terminals.start(owner, conversation, root, args["cmd"], self.child_uid,
+            selected_root = root
+            if args.get("workdir") and args["workdir"] not in {"/var/minis/workspace", "/var/minis/workspace/", "."}:
+                parent, relative = scoped_path(str(args["workdir"]))
+                selected_root = contained(parent, relative)
+                if not selected_root.is_dir(): raise ValueError("workdir does not exist in the selected project")
+            terminal = await self.terminals.start(owner, conversation, selected_root, args["cmd"], self.child_uid,
                                                    min(max(int(args.get("timeout_seconds", 300)), 1), 7200), self.spaces.path(owner, GLOBAL_WORKSPACE))
             command_ids.add(terminal.id)
             await asyncio.sleep(min(max(int(args.get("yield_time_ms", 1000)), 0), 10_000) / 1000)
-            return json.dumps(self.terminals.read(owner, terminal.id), ensure_ascii=False)
+            return protocol_result(self.terminals.read(owner, terminal.id))
         if name == "write_stdin":
             identifier = args["session_id"]
             if identifier not in command_ids: raise ValueError("Command does not belong to this run")
             if args.get("terminate"): await self.terminals.stop(owner, identifier)
             elif args.get("chars"): self.terminals.input(owner, identifier, args["chars"])
             else: await asyncio.sleep(0.5)
-            return json.dumps(self.terminals.read(owner, identifier, int(args.get("offset", 0))), ensure_ascii=False)
+            return protocol_result(self.terminals.read(owner, identifier, int(args.get("offset", 0))))
         raise ValueError("This tool is unavailable on the cloud server; device/browser tools require the iPad")
 
     async def shutdown(self):

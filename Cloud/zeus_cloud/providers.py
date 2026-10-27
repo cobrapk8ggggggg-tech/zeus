@@ -3,6 +3,7 @@ import ipaddress
 import json
 from urllib.parse import urlsplit
 import httpx
+from .tool_protocol import forced
 
 
 def normalize_history(messages):
@@ -55,6 +56,7 @@ class Models:
         self.client = client or httpx.AsyncClient(timeout=httpx.Timeout(1800, connect=20), follow_redirects=False)
 
     async def stream(self, provider, messages, tools, instructions):
+        forced_name = forced(messages, tools)
         messages = with_tool_images(messages)
         base = provider_url(provider["base_url"])
         kind = provider["kind"]
@@ -107,6 +109,9 @@ class Models:
                     "max_tokens": provider.get("max_tokens", 4096),
                     "tools": [{"name": t["name"], "description": t["description"], "input_schema": t["parameters"]} for t in tools]}
         else: raise ValueError("This provider protocol is not available in cloud mode yet")
+        if forced_name:
+            body["tool_choice"] = {"type": "tool", "name": forced_name} if kind == "anthropic" else {"type": "function", "name": forced_name} if kind == "responses" else {"type": "function", "function": {"name": forced_name}}
+        if not tools: body.pop("tools", None)
         if len(json.dumps(body).encode()) > 2 * 1024 * 1024: raise ValueError("Cloud context limit reached; compact the conversation before continuing")
         calls = {}; ended = False
         async with self.client.stream("POST", url, json=body, headers=headers) as response:

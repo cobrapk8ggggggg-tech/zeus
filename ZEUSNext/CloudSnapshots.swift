@@ -190,8 +190,14 @@ struct CloudSnapshotHead: Codable {
             browser.persist()
             let data = try encodedPayload()
             let digest = CloudSnapshotTransport.fingerprint(data)
-            if digest == state.fingerprint { self.state = state; try saveState(); pending = false; return }
-            let ref = try await transport.put(data)
+            let selectedTarget = NativeCloudAccountAPI.usesCloud ? "cloud" : "local"
+            if digest == state.fingerprint, remote?.manifest.executionTarget == selectedTarget, remote?.manifest.executionChoiceVersion == 2 {
+                self.state = state; try saveState(); pending = false
+                try NativeCloudAccountAPI.markPreferenceCommitted(selectedTarget == "cloud"); return
+            }
+            let ref: CloudObjectReference
+            if digest == state.fingerprint, let existing = remote?.manifest.browser { ref = existing }
+            else { ref = try await transport.put(data) }
             var manifest = CloudSnapshotManifest(version: 1, deviceID: state.deviceID, created: Date(), browser: ref,
                                                  coverage: ["browser_profiles", "browser_settings", "browser_records"])
             manifest.native = remote?.manifest.native
@@ -199,6 +205,7 @@ struct CloudSnapshotHead: Codable {
             manifest.executionChoiceVersion = 2
             manifest.coverage = Array(Set(manifest.coverage + (remote?.manifest.coverage.filter { !$0.hasPrefix("browser_") } ?? [])))
             let head = try await transport.commit(manifest, expected: state.revision, operation: UUID())
+            try NativeCloudAccountAPI.markPreferenceCommitted(manifest.executionTarget == "cloud")
             state.revision = head.revision; state.fingerprint = digest; state.saved = manifest.created
             self.state = state; try saveState(); lastSaved = manifest.created
             pending = generation != started

@@ -50,7 +50,7 @@ class RunInput(Input):
     native_user_id: uuid.UUID | None = None
     native_assistant_id: uuid.UUID | None = None
     native_session: dict | None = None
-    tools: list[dict] = Field(default_factory=list, max_length=256)
+    tools: list[dict] | None = Field(default=None, max_length=256)
     instructions: str = Field(default="", max_length=120000)
 
 
@@ -258,6 +258,7 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
         async with engine.execution_gate:
             if (await store.account_state(account)).get("lease"):
                 raise HTTPException(409, "نقل الحساب جارٍ. انتظر اكتماله قبل إرسال مهمة سحابية.")
+            if value.provider: await store.put(account, "provider", value.provider_id, provider)
             run = await store.create_run(account, {"id": identifier, "conversation": conversation, "prompt": value.prompt,
                 "history": normalize_history(value.history), "provider": provider["encrypted"], "grant": vault.seal(account, grant),
                 "permission_mode": value.permission_mode, "max_seconds": value.max_seconds,
@@ -326,9 +327,16 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
             record = await store.get(account, "approval", key)
             if not record or record.get("type") != "device": raise HTTPException(404, "طلب الأداة غير موجود.")
             run = await store.run(account, record["run"])
-            if not run or run.get("pending_device") != key: raise HTTPException(409, "طلب الأداة لم يعد نشطًا.")
+            if not run: raise HTTPException(409, "طلب الأداة لم يعد نشطًا.")
             claimant = str(uuid.UUID(body.get("claimant", "")))
+            if operation == "result" and record["status"] == "completed" and record.get("claimant") == claimant:
+                prior = record.get("result", {})
+                if prior.get("output") == str(body.get("output", ""))[:32000] and prior.get("success") == (body.get("success") is True) and prior.get("image") == body.get("image"):
+                    return {"accepted": True}
+                raise HTTPException(409, "النتيجة محفوظة ولا يمكن استبدالها.")
+            if run.get("pending_device") != key: raise HTTPException(409, "طلب الأداة لم يعد نشطًا.")
             if operation == "claim":
+                if run["status"] != "waiting_user": raise HTTPException(409, "المهمة لا تنتظر تنفيذ هذه الأداة.")
                 if record["status"] not in {"pending", "claimed"} or record.get("claimant", claimant) != claimant:
                     raise HTTPException(409, "الأداة محجوزة لجهاز آخر أو نُفذت بالفعل.")
                 await store.put(account, "approval", key, {**record, "status": "claimed", "claimant": claimant})
@@ -339,7 +347,7 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
             image = body.get("image")
             if image:
                 import base64
-                if image.get("mime") not in {"image/jpeg", "image/png", "image/webp"} or len(base64.b64decode(image.get("data", ""), validate=True))>900000:
+                if not isinstance(image, dict) or image.get("mime") not in {"image/jpeg", "image/png", "image/webp"} or len(base64.b64decode(image.get("data", ""), validate=True))>900000:
                     raise ValueError("Invalid device tool image")
                 result["image"] = image
             if record["status"] == "completed":

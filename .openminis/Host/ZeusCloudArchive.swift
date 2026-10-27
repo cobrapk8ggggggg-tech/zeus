@@ -49,8 +49,9 @@ import ZEUSBrowser
         while let part = try handle.read(upToCount: 1024 * 1024), !part.isEmpty { digest.update(data: part); bytes += Int64(part.count) }
         return (bytes, digest.finalize().map { String(format: "%02x", $0) }.joined())
     }
-    private func inventory() async throws -> [Item] {
-        let roots = self.roots, bundled = try ZeusDefaultSkills.shared.bundledCopies()
+    private func inventory(includeSessions: Bool = true) async throws -> [Item] {
+        let roots = self.roots.filter { includeSessions || ["browser_accounts", "browser_downloads", "agent_skills", "agent_mcp_config", "agent_task_notes"].contains($0.scope) }
+        let bundled = try ZeusDefaultSkills.shared.bundledCopies()
         return try await Task.detached(priority: .utility) {
         let fm = FileManager.default
         func error(_ message: String) -> NSError { NSError(domain: "ZEUSCloud", code: 1, userInfo: [NSLocalizedDescriptionKey: message]) }
@@ -112,10 +113,10 @@ import ZEUSBrowser
     /// Also used for automatic account backup in local mode. Cleanup is a
     /// separate step, after the runtime has accepted the migrated workspaces.
     func backup(progress: @escaping (String) -> Void, duringTransition: Bool = false, includeLocalFiles: Bool = true) async throws -> NativeCloudArchive {
-        try requireIdle()
+        if includeLocalFiles { try requireIdle() }
         guard !NativeCloudAccountAPI.isMigrating || duringTransition else { throw error("عملية نقل أخرى قيد التنفيذ.") }
-        if !duringTransition { NativeCloudAccountAPI.isMigrating = true }
-        defer { if !duringTransition { NativeCloudAccountAPI.isMigrating = false } }
+        if !duringTransition && includeLocalFiles { NativeCloudAccountAPI.isMigrating = true }
+        defer { if !duringTransition && includeLocalFiles { NativeCloudAccountAPI.isMigrating = false } }
         try await NativeCloudAccountAPI.prepareBrowserBackup?()
         progress("تجهيز نسخة مشفرة للمحادثات والإعدادات…")
         let old = try await NativeCloudAccountAPI.archive()
@@ -123,17 +124,19 @@ import ZEUSBrowser
         let keyData = oldSecrets?.fileKey ?? keyBytes(), passphrase = keyBytes().base64EncodedString()
         let summary = try await BackupExporter().export(options: .init(maxFileBytes: 0, includeCredentials: true, passphrase: passphrase))
         defer { try? fm.removeItem(at: summary.packageURL) }
-        let before = includeLocalFiles ? try await inventory() : []
+        let before = try await inventory(includeSessions: includeLocalFiles)
         let package = try Self.inspect(summary.packageURL)
         var files = [try await upload(Item(scope: "native_database", path: "account.minisbak", url: summary.packageURL, bytes: package.0, digest: package.1, mode: 0o600), key: SymmetricKey(data: keyData), previous: [])]
         if !includeLocalFiles { files += old?.files.filter { $0.scope != "native_database" } ?? [] }
         for (index, item) in before.enumerated() {
             progress("تشفير الملفات والتحقق منها \(index + 1)/\(before.count)…")
-            files.append(try await upload(item, key: SymmetricKey(data: keyData), previous: old?.files ?? []))
+            let uploaded = try await upload(item, key: SymmetricKey(data: keyData), previous: old?.files ?? [])
+            files.removeAll { $0.scope == uploaded.scope && $0.path == uploaded.path }
+            files.append(uploaded)
             await Task.yield()
         }
-        try requireIdle()
-        let after = includeLocalFiles ? try await inventory() : []
+        if includeLocalFiles { try requireIdle() }
+        let after = try await inventory(includeSessions: includeLocalFiles)
         guard same(before, after) else { throw error("تغيرت الملفات أثناء النقل؛ تبقى النسخة المحلية محفوظة.") }
         let secrets = Secrets(version: 1, fileKey: keyData, passphrase: passphrase, browser: try await NativeCloudAccountAPI.browserSecrets(), preferences: try preferences())
         let raw = try JSONEncoder().encode(secrets)
@@ -144,6 +147,17 @@ import ZEUSBrowser
         try markRestored()
         return archive
     }
+    func restoreBrowserFile(at url: URL) async throws -> URL? {
+        guard let root = roots.first(where: { $0.scope == "browser_downloads" }),
+              url.standardizedFileURL.path.hasPrefix(root.url.standardizedFileURL.path + "/") else { return nil }
+        let relative = String(url.standardizedFileURL.path.dropFirst(root.url.standardizedFileURL.path.count + 1))
+        guard let archive = try await NativeCloudAccountAPI.archive(), let file = archive.files.first(where: { $0.scope == root.scope && $0.path == relative }) else { return nil }
+        let target = try destination(file)
+        let secrets = try await secretBundle(archive)
+        try await download(file, to: target, key: SymmetricKey(data: secrets.fileKey))
+        return target
+    }
+    func validateLocalExecutionIdle() throws { try requireIdle() }
     func prepareCloudExecution(progress: @escaping (String) -> Void) async throws {
         try requireIdle()
         NativeCloudAccountAPI.isMigrating = true
@@ -183,7 +197,7 @@ import ZEUSBrowser
         guard NativeCloudAccountAPI.ownerID != nil else { return }
         scheduled?.cancel()
         scheduled = Task {
-            do { try await Task.sleep(for: .seconds(30)); try Task.checkCancellation() }
+            do { try await Task.sleep(for: .seconds(NativeCloudAccountAPI.usesCloud ? 2 : 30)); try Task.checkCancellation() }
             catch { return }
             guard SessionActivityTracker.shared.activeSessions.isEmpty else { return }
             await NativeCloudBackupStatus.shared.save()
@@ -227,13 +241,11 @@ import ZEUSBrowser
         defer { scheduleBackup() }
         guard let owner = NativeCloudAccountAPI.ownerID else { return }
         if (try? String(contentsOf: marker, encoding: .utf8)) == owner {
-            if NativeCloudAccountAPI.usesCloud { try? await ZeusCloudRuntime.shared.restoreSessionIndex() }
             return
         }
         guard let archive = try await NativeCloudAccountAPI.archive() else { return }
         try await restore(archive, includeFiles: !NativeCloudAccountAPI.usesCloud, progress: progress)
-        if NativeCloudAccountAPI.usesCloud { try await ZeusCloudRuntime.shared.restoreSessionIndex() }
-        else if try await NativeCloudAccountAPI.hasCloudHistory() {
+        if !NativeCloudAccountAPI.usesCloud, try await NativeCloudAccountAPI.hasCloudHistory() {
             NativeCloudAccountAPI.isMigrating = true
             do {
                 try await ZeusCloudRuntime.shared.beginTransition()
@@ -306,10 +318,15 @@ import ZEUSBrowser
         var options = BackupImporter.Options(); options.passphrase = secrets.passphrase
         let report = try await BackupImporter().import(from: package, options: options)
         guard report.integrityFailed.isEmpty, report.categories.allSatisfy({ $0.failed == nil && $0.unreadable == 0 && $0.missingBlobs == 0 }) else { throw error("لم تكتمل استعادة بعض فئات الحساب؛ أعد المحاولة.") }
-        if includeFiles {
-            for (index, file) in archive.files.filter({ $0.scope != "native_database" }).enumerated() {
-                progress("استعادة الملفات \(index + 1)…")
-                try await download(file, to: destination(file), key: key)
+        let smallScopes = ["browser_accounts", "agent_skills", "agent_mcp_config", "agent_task_notes"]
+        let skillPaths = Set(archive.files.filter { $0.scope == "agent_skills" }.map(\.path))
+        let reproducible = try ZeusDefaultSkills.shared.bundledCopies(including: skillPaths)
+        if includeFiles || archive.files.contains(where: { smallScopes.contains($0.scope) }) {
+            for (index, file) in archive.files.filter({ $0.scope != "native_database" && (includeFiles || smallScopes.contains($0.scope)) }).enumerated() {
+                let target = try destination(file)
+                if file.scope == "agent_skills", let builtIn = reproducible[target.path], hash(builtIn) == file.sha256 { continue }
+                progress("استعادة ملفاتك \(index + 1)…")
+                try await download(file, to: target, key: key)
             }
         }
         if let preferences = try PropertyListSerialization.propertyList(from: secrets.preferences, format: nil) as? [String: Any] {

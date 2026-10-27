@@ -53,6 +53,18 @@ final class NativePersonalizationUITests: XCTestCase {
         expectation(for: NSPredicate(format: "label == %@", "1:readable:ZEUS-Import-Test"), evaluatedWith: result)
         waitForExpectations(timeout: 15)
     }
+    @MainActor func testCloudToolsRenderWithTheOriginalNativeCards() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--zeus-cloud-tool-cards", "-AppleLanguages", "(ar)", "-AppleLocale", "ar_SA"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["فحص نظام Linux"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.staticTexts["قراءة ملف المشروع"].exists)
+        XCTAssertTrue(app.staticTexts["تعديل ملف المشروع"].exists)
+        XCTAssertFalse(app.staticTexts["أُرسلت الموافقة إلى الخادم."].exists)
+        let image = XCTAttachment(screenshot: app.screenshot())
+        image.name = "ZEUS-Cloud-Original-Tool-Cards-iPad"; image.lifetime = .keepAlways; add(image)
+    }
     @MainActor func testCloudLoginScreenRendersArabicAndRequiresCredentials() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

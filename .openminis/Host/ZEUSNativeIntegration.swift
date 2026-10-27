@@ -16,7 +16,9 @@ struct ZEUSBrowserRootEntry: View {
     init() { _ = ZEUSNativeHostBootstrap.configured }
     var body: some View {
         #if DEBUG
-        if CommandLine.arguments.contains("--zeus-file-picker") {
+        if CommandLine.arguments.contains("--zeus-cloud-tool-cards") {
+            ZeusCloudToolCardsTestEntry()
+        } else if CommandLine.arguments.contains("--zeus-file-picker") {
             ZEUSFileImportDiagnostics()
         } else if CommandLine.arguments.contains("--zeus-mounted-folders") {
             ZeusMountedFoldersTestEntry()
@@ -42,6 +44,7 @@ struct ZEUSBrowserRootEntry: View {
 private enum ZEUSNativeHostBootstrap {
     static let configured: Void = {
         NativeCloudAccountAPI.dataDelegate = ZeusCloudArchive.shared
+        NativeCloudAccountAPI.browserFilesDidChange = { ZeusCloudArchive.shared.scheduleBackup() }
         NativeCloudAccountAPI.sharedFilesView = { AnyView(ZeusCloudFilesView(session: ZeusCloudRuntime.globalWorkspace)) }
         let defaults = UserDefaults.standard
         if defaults.string(forKey: "appLanguage") != "ar" { defaults.set("ar", forKey: "appLanguage") }
@@ -57,6 +60,34 @@ private enum ZEUSNativeHostBootstrap {
 }
 
 #if DEBUG
+/// Exercises the production remote-event mapping in the stock native renderer.
+private struct ZeusCloudToolCardsTestEntry: View {
+    @State private var message: ChatMessage = {
+        let samples: [(String, [String: Any], String)] = [
+            ("shell_execute", ["command": "uname -a", "tool_title": "فحص نظام Linux"], #"{"id":"sample","output":"Linux · UID 10001\nexit 0","exit_code":0}"#),
+            ("file_read", ["path": "project/README.md", "tool_title": "قراءة ملف المشروع"], "# ZEUS project"),
+            ("file_edit", ["path": "project/main.py", "tool_title": "تعديل ملف المشروع"], "File edited"),
+            ("memory_get", ["tool_title": "قراءة الذاكرة"], "Project notes")
+        ]
+        let blocks = samples.enumerated().map { index, sample in
+            let block = AssistantBlock(kind: ZeusToolPresentation.kind(sample.0, input: sample.1), content: ZeusToolPresentation.output(sample.2, name: sample.0), toolStatus: .success, toolUseId: "sample-\(index)")
+            block.toolSummary = sample.1["tool_title"] as? String
+            block.toolInputArgs = String(decoding: try! JSONSerialization.data(withJSONObject: sample.1), as: UTF8.self)
+            return block
+        }
+        return ChatMessage(role: .assistant, content: "", blocks: blocks)
+    }()
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Zeus").font(.title2.bold())
+                ForEach(message.blocks) { block in
+                    AssistantBlockView(block: block, message: message, isActiveMessage: false, highlightedBlockId: .constant(nil), detailBlock: .constant(nil))
+                }
+            }.padding(24).frame(maxWidth: 840)
+        }.frame(maxWidth: .infinity, maxHeight: .infinity).preferredColorScheme(.dark)
+    }
+}
 /// Use the real settings view inside a sheet, as in browser preferences.
 private struct ZeusMountedFoldersTestEntry: View {
     @State private var settings = true
@@ -100,10 +131,28 @@ private struct OriginalPreferencesRoot: View {
 private struct NativeAgentContainer: View {
     let session: NativeBrowserSession
     let presentation: NativeAssistantPresentation
+    @State private var cloudIssue: String?
     var body: some View {
         NativeAgentControllerView()
             .overlay { ZeusAgentControls(presentation: presentation) }
             .onAppear { ZEUSNativeAgentBridge.shared.bind(session) }
+            .task { await refreshCloudIndex() }
+            .safeAreaInset(edge: .top) {
+                if let cloudIssue {
+                    HStack {
+                        Label(cloudIssue, systemImage: "icloud.slash").font(.caption).lineLimit(2)
+                        Spacer()
+                        Button("إعادة الاتصال") { Task { await refreshCloudIndex() } }.font(.caption.bold())
+                    }.padding(10).background(.regularMaterial)
+                }
+            }
+    }
+    @MainActor private func refreshCloudIndex() async {
+        guard NativeCloudAccountAPI.usesCloud else { return }
+        do {
+            try await ZeusCloudRuntime.shared.restoreSessionIndex(); cloudIssue = nil
+            NotificationCenter.default.post(name: .cloudSyncDidFetchChanges, object: nil)
+        } catch { cloudIssue = error.localizedDescription }
     }
 }
 

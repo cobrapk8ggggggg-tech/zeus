@@ -1,6 +1,7 @@
 #if ZEUS_NATIVE_HOST
 import SwiftUI
 import WebKit
+import UIKit
 
 public struct NativeAssistantPresentation {
     public let fullScreen: Bool
@@ -20,6 +21,7 @@ extension EnvironmentValues {
 
 /// Browser shell only. The app supplies the unmodified OpenMinis chat root.
 @MainActor public struct NativeBrowserHostView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var holder = NativeBrowserHolder()
     private let assistant: NativeAssistantFactory
     private let preferences: NativePreferencesFactory?
@@ -31,6 +33,9 @@ extension EnvironmentValues {
                     .environment(\.nativeAgentPreferences, preferences)
                     .preferredColorScheme(holder.model.data.settings.theme?.light == true ? .light : .dark)
                     .environment(\.layoutDirection, .rightToLeft)
+                    .onChange(of: scenePhase) { _, phase in
+                        if phase == .background { CloudBackgroundSave.shared.start(holder.model) }
+                    }
                     .task {
                         NativeCloudAccountAPI.prepareBrowserBackup = { [weak model = holder.model] in
                             guard let model else { throw CloudAccountError.invalidResponse }
@@ -42,6 +47,25 @@ extension EnvironmentValues {
                     }
             }
         }
+    }
+}
+@MainActor private final class CloudBackgroundSave {
+    static let shared = CloudBackgroundSave()
+    private var token: UIBackgroundTaskIdentifier = .invalid
+    func start(_ model: BrowserModel) {
+        guard token == .invalid, CloudAccount.shared.phase == .ready else { return }
+        token = UIApplication.shared.beginBackgroundTask(withName: "ZEUS account checkpoint") { [weak self] in
+            Task { @MainActor in self?.finish() }
+        }
+        Task { @MainActor in
+            defer { finish() }
+            model.persist(); await model.cloudSync.saveNow()
+            if NativeCloudAccountAPI.usesCloud { await NativeCloudBackupStatus.shared.save() }
+        }
+    }
+    private func finish() {
+        guard token != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(token); token = .invalid
     }
 }
 @MainActor private final class NativeBrowserHolder: ObservableObject {

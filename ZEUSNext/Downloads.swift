@@ -131,6 +131,12 @@ enum DownloadFiles {
         let file = store.downloads(for: profile).appendingPathComponent(DownloadFiles.safeName(item.filename))
         return FileManager.default.fileExists(atPath: file.path) ? file : nil
     }
+    func restoreFile(_ item: BrowserDownload) async throws -> URL? {
+        if let existing = fileURL(item) { return existing }
+        guard let profile = store.profile(item.profileID), !profile.isPrivate, item.state == .completed else { return nil }
+        let target = store.downloads(for: profile).appendingPathComponent(DownloadFiles.safeName(item.filename))
+        return try await NativeCloudAccountAPI.dataDelegate?.restoreBrowserFile(at: target)
+    }
     private func save() {
         for profile in store.profiles where !profile.isPrivate {
             do { try BrowserDisk.write(forProfile(profile.id), to: store.folder(for: profile).appendingPathComponent("downloads.json")) }
@@ -300,6 +306,7 @@ enum DownloadFiles {
             var item = BrowserDownload(profileID: profile.id, source: "", filename: target.lastPathComponent, state: .completed, engine: .backgroundSession)
             item.received = size; item.expected = item.received
             records.insert(item, at: 0); preferencesDidChange(profile); save()
+            if !profile.isPrivate { NativeCloudAccountAPI.browserFilesDidChange?() }
         } catch { message = "تعذر استيراد الملف: \(error.localizedDescription)" }
     }
     private func id(for download: WKDownload) -> UUID? { webDownloads.first(where: { $0.value === download })?.key }
@@ -308,7 +315,10 @@ enum DownloadFiles {
         if let item = records.first(where: { $0.id == id }), let resume = resumeURL(item) { try? FileManager.default.removeItem(at: resume) }
         tasks.removeValue(forKey: id); webDownloads.removeValue(forKey: id); progressObservers.removeValue(forKey: id)
         destinations.removeValue(forKey: id); queuedDestinations.removeValue(forKey: id); confirmed.remove(id)
-        if let profileID = records.first(where: { $0.id == id })?.profileID, let profile = store.profile(profileID) { preferencesDidChange(profile) }; pump()
+        if let profileID = records.first(where: { $0.id == id })?.profileID, let profile = store.profile(profileID) {
+            preferencesDidChange(profile)
+            if !profile.isPrivate { NativeCloudAccountAPI.browserFilesDidChange?() }
+        }; pump()
     }
     private func failed(_ id: UUID, error: Error, resumeData: Data? = nil) {
         guard let item = records.first(where: { $0.id == id }), item.state != .pausing && item.state != .paused && item.state != .failed else { return }

@@ -3,6 +3,7 @@ import asyncio
 import codecs
 from dataclasses import dataclass
 import fcntl
+import json
 import os
 from pathlib import Path
 import pty
@@ -13,6 +14,17 @@ import termios
 import time
 import uuid
 from .files import contained
+
+
+def protocol_result(value, limit=32000):
+    """Keep session metadata valid when bounding terminal output for a model."""
+    value = dict(value)
+    encoded = json.dumps(value, ensure_ascii=False)
+    while len(encoded) > limit:
+        value["output"] = value["output"][:max(0, len(value["output"]) - (len(encoded) - limit))]
+        value["truncated"] = True
+        encoded = json.dumps(value, ensure_ascii=False)
+    return encoded
 
 
 def environment(home, global_root=None):
@@ -32,7 +44,12 @@ def child_limits(uid):
         if uid is not None:
             os.setgroups([]); os.setgid(uid); os.setuid(uid)
         resource.setrlimit(resource.RLIMIT_NOFILE, (128, 128))
-        resource.setrlimit(resource.RLIMIT_NPROC, (48, 48))
+        # NPROC counts every thread with this real UID, including other
+        # containers when the provider shares a user namespace. It is NOT a
+        # per-terminal/process-group cap. A 48 limit made even /bin/true fail
+        # on Railway with only four container tasks. Inherit the provider's
+        # limit; the container PID cgroup, one execution slot, process-group
+        # cancellation and expiry bound work without poisoning this UID.
         resource.setrlimit(resource.RLIMIT_FSIZE, (128 * 1024 * 1024,) * 2)
         resource.setrlimit(resource.RLIMIT_AS, (256 * 1024 * 1024,) * 2)
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))

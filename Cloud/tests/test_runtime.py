@@ -126,6 +126,38 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.addAsyncCleanup(truncated.close)
         with self.assertRaises(ValueError): _ = [event async for event in truncated.stream(provider, [], [], "system")]
 
+    async def test_repair_forces_only_registered_structured_tools_in_each_provider_protocol(self):
+        from zeus_cloud.tool_protocol import candidate, repair
+        tool = {"name":"file_read", "description":"Read", "parameters":{"type":"object", "properties":{"path":{"type":"string"}}}}
+        for text in ['normal prose {"tool_calls":[{"name":"file_read"}]}', '```json\n{"tool_calls":[{"name":"file_read"}]}\n```', '{"tool_calls":[{"name":"unknown"}]}']:
+            self.assertIsNone(candidate(text, [tool]))
+        self.assertEqual(candidate('{"tool_calls":[{"name":"file_read"}]}', [tool]), "file_read")
+        for kind, expected, final in [
+            ("openai", {"type":"function","function":{"name":"file_read"}}, '[DONE]'),
+            ("responses", {"type":"function","name":"file_read"}, '{"type":"response.completed"}'),
+            ("anthropic", {"type":"tool","name":"file_read"}, '{"type":"message_stop"}'),
+        ]:
+            bodies=[]
+            def serve(request):
+                bodies.append(json.loads(request.content)); return httpx.Response(200, content="data: "+final+"\n\n")
+            models=Models(httpx.AsyncClient(transport=httpx.MockTransport(serve)))
+            try:
+                provider={"kind":kind,"base_url":"https://model.test/v1","model":"test","api_key":"fixture"}
+                _=[e async for e in models.stream(provider,[{"role":"user","content":repair("file_read")}],[tool],"system")]
+                self.assertEqual(bodies[-1]["tool_choice"], expected)
+                _=[e async for e in models.stream(provider,[{"role":"user","content":repair("unknown")}],[tool],"system")]
+                self.assertNotIn("tool_choice", bodies[-1])
+            finally: await models.close()
+
+    def test_terminal_result_remains_valid_json_when_output_is_truncated(self):
+        from zeus_cloud.terminal import protocol_result
+        value = {"id":"pty", "output": "\n\x1b مرحبا "*10000, "next_offset":90000, "exit_code":7, "truncated":False}
+        result = protocol_result(value)
+        self.assertLessEqual(len(result), 32000)
+        decoded = json.loads(result)
+        self.assertEqual(decoded["id"], "pty"); self.assertEqual(decoded["exit_code"], 7)
+        self.assertTrue(decoded["truncated"])
+
     async def test_terminal_is_a_real_pty_and_does_not_inherit_backend_secrets(self):
         events = []
         async def event(terminal, kind, value): events.append((kind, value))

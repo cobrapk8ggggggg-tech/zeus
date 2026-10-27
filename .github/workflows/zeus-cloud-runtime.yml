@@ -27,3 +27,5 @@ jobs:
         run: docker build -f Cloud/Dockerfile -t zeus-cloud:test .
       - name: Verify no browser or model runner is bundled
         run: docker run --rm --entrypoint sh zeus-cloud:test -c 'test ! -d /opt/zeus/Runtime && ! command -v chromium && ! command -v codex && python -c "from zeus_cloud.app import create_app; print(create_app().title)"'
+      - name: Verify real Linux execution as the production tool user
+        run: docker run --rm --pids-limit 128 --memory 500m --cpus 0.25 -v "$PWD/Cloud/tests/container_smoke.py:/opt/zeus/container_smoke.py:ro" --entrypoint python zeus-cloud:test /opt/zeus/container_smoke.py

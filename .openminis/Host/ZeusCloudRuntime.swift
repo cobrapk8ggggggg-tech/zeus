@@ -134,7 +134,8 @@ import ZEUSBrowser
             var body: [String: Any] = ["id": state!.run, "conversation": sid, "prompt": prompt,
                 "history": Array(history.dropLast().suffix(150)), "provider": selectedProvider,
                 "file_grant": grant, "permission_mode": ZeusToolPermissions.shared.mode == .askAll ? "ask_all" : ZeusToolPermissions.shared.mode.rawValue,
-                "native_assistant_id": state!.assistantID!, "tools": ZeusCloudToolBridge.catalog(vm), "instructions": vm.baseSystemPrompt]
+                "native_assistant_id": state!.assistantID!, "tools": ZeusCloudToolBridge.catalog(vm), "instructions": try ZeusDefaultSkills.shared.cloudInstructions(vm.baseSystemPrompt)]
+            if let entry = vm.resolveCurrentEntry() { body["provider_id"] = entry.providerInstanceId }
             if let userID = vm.agentHistory.last?.dbMessageId { body["native_user_id"] = userID }
             if let session = await ChatStore.shared.getSession(sid) { body["native_session"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(session)) }
             // Preserve the exact request, including the selected provider, as
@@ -144,7 +145,11 @@ import ZEUSBrowser
             var pending = state!
             try await submitPending(&pending, refreshGrant: false); state = pending
         } else {
-            do { _ = try await NativeCloudAccountAPI.runtime("v1/runs/\(state!.run)") }
+            do {
+                _ = try await NativeCloudAccountAPI.runtime("v1/runs/\(state!.run)")
+                state!.submission = nil
+                try JSONEncoder().encode(state!).write(to: stateURL(sid), options: .atomic)
+            }
             catch let error as NativeCloudHTTPError where error.statusCode == 404 {
                 if state!.submission != nil {
                     var pending = state!
@@ -160,10 +165,12 @@ import ZEUSBrowser
         guard var state else { return }
         // Replay from the server instead of trusting a device cursor that could
         // have been saved just before an iOS termination. Rendering is bounded.
-        let display = ChatMessage(role: .assistant, content: "", blocks: [AssistantBlock(kind: .info, content: "التنفيذ سحابي. يمكنك مغادرة التطبيق؛ ستبقى المهمة على الخادم.")])
+        let display = ChatMessage(role: .assistant, content: "", blocks: [])
         vm.messages.append(display)
         var cursor = 0, text = "", tools: [String: AssistantBlock] = [:]
         var parts: [AgentContentPart] = []
+        var toolNames: [String: String] = [:]
+        var thinkingBlock: AssistantBlock?
         var textBlock: AssistantBlock?
         while true {
             try Task.checkCancellation()
@@ -188,31 +195,47 @@ import ZEUSBrowser
                     let delta = data["delta"] as? String ?? ""
                     if textBlock == nil { let block = AssistantBlock(kind: .text, content: ""); display.blocks.append(block); textBlock = block }
                     text += delta; textBlock?.content += delta
+                case "thinking":
+                    if thinkingBlock == nil { let block = AssistantBlock(kind: .thinking, content: ""); display.blocks.append(block); thinkingBlock = block }
+                    thinkingBlock?.content += data["delta"] as? String ?? ""
                 case "tool_start":
                     if !text.isEmpty { parts.append(.text(text)); text = "" }; textBlock = nil
                     let id = data["id"] as? String ?? UUID().uuidString, name = data["name"] as? String ?? ""
                     let input = data["input"] as? [String: Any] ?? [:]
-                    let kind: AssistantBlockKind = name == "exec_command" ? .shellTool(command: input["cmd"] as? String ?? "") : name == "file_write" ? .fileWriteTool(path: input["path"] as? String ?? "") : name == "file_read" ? .fileReadTool(path: input["path"] as? String ?? "") : .info
-                    let block = AssistantBlock(kind: kind, content: "جارٍ التنفيذ على الخادم…", toolStatus: .running, toolUseId: id)
-                    display.blocks.append(block); tools[id] = block
+                    let block = tools[id] ?? AssistantBlock(kind: ZeusToolPresentation.kind(name, input: input), content: "", toolStatus: .running, toolUseId: id)
+                    block.kind = ZeusToolPresentation.kind(name, input: input)
+                    block.toolSummary = input["tool_title"] as? String
+                    block.toolInputArgs = String(decoding: try JSONSerialization.data(withJSONObject: input), as: UTF8.self)
+                    block.toolStatus = .running
+                    if tools[id] == nil { display.blocks.append(block) }
+                    tools[id] = block; toolNames[id] = name; thinkingBlock = nil
                     parts.append(.toolUse(id: id, name: name, input: input))
+                case "tool_output":
+                    let id = data["id"] as? String ?? ""
+                    if let block = tools[id] { block.content = String((block.content + (data["delta"] as? String ?? "")).suffix(64000)) }
                 case "tool_result":
                     let id = data["id"] as? String ?? "", output = data["output"] as? String ?? ""
                     let success = data["success"] as? Bool ?? false
-                    tools[id]?.content = output; tools[id]?.toolStatus = success ? .success : .failed(message: output)
-                    parts.append(.toolResult(id: id, name: "cloud_tool", content: output, isError: !success))
+                    let visible = ZeusToolPresentation.output(output, name: toolNames[id] ?? "")
+                    tools[id]?.content = visible; tools[id]?.toolStatus = success ? .success : .failed(message: visible)
+                    parts.append(.toolResult(id: id, name: toolNames[id] ?? "cloud_tool", content: output, isError: !success))
                 case "approval":
                     if let id = data["id"] as? String, let call = data["call"] as? [String: Any] {
                         let run = page["run"] as? [String: Any] ?? [:]
                         guard run["status"] as? String == "waiting_user", run["pending_approval"] as? String == id else { break }
-                        let block = AssistantBlock(kind: .info, content: "بانتظار موافقتك على إجراء سحابي…")
-                        display.blocks.append(block)
+                        let callID = call["id"] as? String ?? id, name = call["name"] as? String ?? "cloud"
+                        let input = call["arguments"] as? [String: Any] ?? [:]
+                        let block = tools[callID] ?? AssistantBlock(kind: ZeusToolPresentation.kind(name, input: input), content: "", toolStatus: .running, toolUseId: callID)
+                        block.toolSummary = input["tool_title"] as? String
+                        block.toolInputArgs = String(decoding: try JSONSerialization.data(withJSONObject: input), as: UTF8.self)
+                        if tools[callID] == nil { display.blocks.append(block) }
+                        tools[callID] = block; toolNames[callID] = name
                         var allowed = true
                         do { try await ZeusToolPermissions.shared.authorize(tool: call["name"] as? String ?? "cloud", args: call["arguments"] as? [String: Any] ?? [:], sessionID: sid, blockID: block.id) }
                         catch is CancellationError { throw CancellationError() }
                         catch { allowed = false }
                         _ = try await request("v1/approvals/\(id)", ["allowed": allowed])
-                        block.content = allowed ? "أُرسلت الموافقة إلى الخادم." : "رُفض الإجراء."
+                        if !allowed { block.toolStatus = .failed(message: "رُفض الإجراء.") }
                     }
                 default: break
                 }
@@ -230,7 +253,7 @@ import ZEUSBrowser
                 saved.dbMessageId = await vm.persistAgentMessage(saved)
                 vm.agentHistory.append(saved)
                 ZeusCloudArchive.shared.scheduleBackup()
-                state.complete = true; try JSONEncoder().encode(state).write(to: stateURL(sid), options: .atomic)
+                state.complete = true; state.submission = nil; try JSONEncoder().encode(state).write(to: stateURL(sid), options: .atomic)
                 if status != "completed" { display.error = run["error"] as? String ?? "توقفت المهمة: \(status). الملفات المحفوظة متاحة في السحابة." }
                 return
             }

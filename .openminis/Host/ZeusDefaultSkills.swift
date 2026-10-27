@@ -19,6 +19,7 @@ import ZEUSBrowser
     @Published var entries: [Entry] = []
     @Published var error: String?
     @Published var busy = false
+    private var catalogFileCache: [String: Data] = [:]
     private let revisionKey = "zeus.defaultSkills.revision"
     func install(forceLocal: Bool = false) async {
         guard !busy else { return }
@@ -64,26 +65,47 @@ import ZEUSBrowser
     }
     /// Only byte-identical catalog files are reproducible. Custom edits remain
     /// user data even if the skill was originally shipped with the application.
-    func bundledCopies() throws -> [String: Data] {
+    func bundledCopies(including paths: Set<String>? = nil) throws -> [String: Data] {
         guard let root = Bundle.main.url(forResource: "ZEUSDefaultSkills", withExtension: nil) else { return [:] }
         var copies: [String: Data] = [:]
         for entry in entries {
-            guard let skill = SkillStore.shared.skills.first(where: { $0.name == entry.installedName }) else { continue }
+            let id = SkillStore.slugify(entry.installedName)
+            if let paths, !paths.contains(where: { $0.hasPrefix(id + "/") }) { continue }
             let source = root.appendingPathComponent(entry.directory)
-            let destination = SkillStore.shared.skillDirectoryURL(for: skill.id)
+            let destination = SkillStore.shared.skillDirectoryURL(for: id)
+            if paths == nil && !FileManager.default.fileExists(atPath: destination.path) { continue }
             guard let files = FileManager.default.enumerator(at: source, includingPropertiesForKeys: [.isRegularFileKey]) else { continue }
             for case let file as URL in files {
                 guard try file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true else { continue }
                 let relative = String(file.path.dropFirst(source.path.count + 1))
+                if let paths, !paths.contains(id + "/" + relative) { continue }
+                let target = destination.appendingPathComponent(relative)
+                if paths == nil && !FileManager.default.fileExists(atPath: target.path) { continue }
+                if let cached = catalogFileCache[file.path] { copies[target.path] = cached; continue }
                 var data = try Data(contentsOf: file)
                 if relative == "SKILL.md", let text = String(data: data, encoding: .utf8) {
                     let regex = try NSRegularExpression(pattern: "(?m)^name:.*$")
                     data = Data(regex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "name: " + entry.installedName).utf8)
                 }
-                copies[destination.appendingPathComponent(relative).path] = data
+                catalogFileCache[file.path] = data
+                copies[target.path] = data
             }
         }
         return copies
+    }
+
+    func cloudInstructions(_ text: String) throws -> String {
+        let paths = Set(entries.map { SkillStore.slugify($0.installedName) + "/SKILL.md" })
+        let originals = try bundledCopies(including: paths)
+        var result = text
+        for entry in entries {
+            let id = SkillStore.slugify(entry.installedName)
+            let path = SkillStore.shared.skillDirectoryURL(for: id).appendingPathComponent("SKILL.md")
+            guard let expected = originals[path.path] else { continue }
+            if let current = try? Data(contentsOf: path), current != expected { continue }
+            result = result.replacingOccurrences(of: "/var/minis/skills/" + id + "/", with: "@builtin-skills/" + entry.directory + "/")
+        }
+        return result
     }
 
 }

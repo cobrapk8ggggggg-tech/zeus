@@ -21,6 +21,7 @@ import ZEUSBrowser
         let owner: String
         let claimant: String
         var executing = false
+        var acknowledged: Bool? = nil
         var output: String?
         var success: Bool?
         var image: Data?
@@ -33,6 +34,7 @@ import ZEUSBrowser
         let existing = (try? Data(contentsOf: file)).flatMap { try? JSONDecoder().decode(Journal.self, from: $0) }
         if let existing, existing.owner != owner { throw issue("طلب الأداة يخص حسابًا آخر.") }
         var journal = existing ?? Journal(owner: owner, claimant: UUID().uuidString.lowercased())
+        if journal.acknowledged == true { return }
         func save() throws { try JSONEncoder().encode(journal).write(to: file, options: .atomic) }
         func request(_ operation: String, _ body: [String: Any]) async throws -> [String: Any] {
             let data = try await NativeCloudAccountAPI.runtime("v1/device-tools/\(id)/\(operation)", method: "POST", body: JSONSerialization.data(withJSONObject: body))
@@ -66,7 +68,10 @@ import ZEUSBrowser
             let index: Int
             if let found = vm.messages[msgIdx].blocks.firstIndex(where: { $0.toolUseId == callID }) { index = found }
             else {
-                vm.messages[msgIdx].blocks.append(AssistantBlock(kind: .info, content: "التنفيذ بالأداة الأصلية على الجهاز…", toolStatus: .running, toolUseId: callID))
+                let block = AssistantBlock(kind: ZeusToolPresentation.kind(name, input: args), content: "", toolStatus: .running, toolUseId: callID)
+                block.toolSummary = args["tool_title"] as? String
+                block.toolInputArgs = String(decoding: try JSONSerialization.data(withJSONObject: args), as: UTF8.self)
+                vm.messages[msgIdx].blocks.append(block)
                 index = vm.messages[msgIdx].blocks.count - 1
             }
             journal.executing = true; try save()
@@ -89,6 +94,8 @@ import ZEUSBrowser
         var result: [String: Any] = ["claimant": journal.claimant, "output": journal.output ?? "", "success": journal.success == true]
         if let image = journal.image { result["image"] = ["mime": journal.imageMime ?? "image/jpeg", "data": image.base64EncodedString()] }
         _ = try await request("result", result)
+        journal.acknowledged = true; journal.executing = false
+        journal.output = nil; journal.image = nil; journal.imageMime = nil; try save()
         // Retain the small journal until the job leaves waiting_user. Replaying
         // its result is idempotent; its actual side effect is never repeated.
     }
