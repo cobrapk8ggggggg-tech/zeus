@@ -71,8 +71,10 @@ private struct ZeusCloudPartialStreamTestEntry: View {
             CollectionViewMessageListV3(vm: vm, inputFocused: false, onRetryMessage: nil, onRetryLast: nil, onEdit: nil, onWithdraw: nil, onResume: nil, onStop: nil, onCompact: nil, maxContentWidth: 0, floatingBarHeight: 0, inputBarHeight: 0)
             Button("إكمال الرد التجريبي") {
                 guard let message else { return }
-                block = ZeusCloudPresentation.append("\n\nاكتمل الرد التجريبي", vm: vm, message: message, block: block)
-                vm.isProcessing = false
+                Task { @MainActor in
+                    block = await ZeusCloudPresentation.append("\n\nاكتمل الرد التجريبي", vm: vm, message: message, block: block, final: true)
+                    vm.isProcessing = false
+                }
             }.accessibilityIdentifier("finishCloudReply")
         }.preferredColorScheme(.dark)
         .task {
@@ -81,7 +83,7 @@ private struct ZeusCloudPartialStreamTestEntry: View {
             vm.isProcessing = true
             let current = ZeusCloudPresentation.begin(vm); message = current
             try? await Task.sleep(for: .milliseconds(300))
-            block = ZeusCloudPresentation.append("الجزء الأول من الرد السحابي", vm: vm, message: current, block: nil)
+            block = await ZeusCloudPresentation.append("الجزء الأول من الرد السحابي", vm: vm, message: current, block: nil)
         }
     }
 }

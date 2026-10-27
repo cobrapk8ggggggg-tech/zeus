@@ -195,11 +195,14 @@ import ZEUSBrowser
                 case "text":
                     let delta = data["delta"] as? String ?? ""
                     text += delta
-                    textBlock = ZeusCloudPresentation.append(delta, vm: vm, message: display, block: textBlock)
+                    textBlock = await ZeusCloudPresentation.append(delta, vm: vm, message: display, block: textBlock, snapshot: text)
                 case "thinking":
+                    display.isAwaitingModelResponse = false
                     if thinkingBlock == nil { let block = AssistantBlock(kind: .thinking, content: ""); display.blocks.append(block); thinkingBlock = block }
                     thinkingBlock?.content += data["delta"] as? String ?? ""
                 case "tool_start":
+                    display.isAwaitingModelResponse = false
+                    if let block = textBlock { _ = await ZeusCloudPresentation.append("", vm: vm, message: display, block: block, snapshot: text, final: true) }
                     if !text.isEmpty { parts.append(.text(text)); text = "" }; textBlock = nil
                     let id = data["id"] as? String ?? UUID().uuidString, name = data["name"] as? String ?? ""
                     let input = data["input"] as? [String: Any] ?? [:]
@@ -219,6 +222,9 @@ import ZEUSBrowser
                     let success = data["success"] as? Bool ?? false
                     let visible = ZeusToolPresentation.output(output, name: toolNames[id] ?? "")
                     tools[id]?.content = visible; tools[id]?.toolStatus = success ? .success : .failed(message: visible)
+                    display.isAwaitingModelResponse = !tools.values.contains { block in
+                        switch block.toolStatus { case .some(.running), .some(.streaming(_)): return true; default: return false }
+                    }
                     parts.append(.toolResult(id: id, name: toolNames[id] ?? "cloud_tool", content: output, isError: !success))
                 case "approval":
                     if let id = data["id"] as? String, let call = data["call"] as? [String: Any] {
@@ -248,6 +254,7 @@ import ZEUSBrowser
             display.error = nil; vm.publishUnlessTransitioning(); vm.scrollToBottomSignal.send()
             let run = page["run"] as? [String: Any] ?? [:], status = run["status"] as? String ?? ""
             if ["completed", "failed", "cancelled", "interrupted"].contains(status), cursor >= (run["seq"] as? Int ?? 0) {
+                if let block = textBlock { _ = await ZeusCloudPresentation.append("", vm: vm, message: display, block: block, snapshot: text, final: true) }
                 if !text.isEmpty { parts.append(.text(text)) }
                 let message = AgentMessage(role: .assistant, parts: parts)
                 var saved = message; saved.dbMessageId = state.assistantID

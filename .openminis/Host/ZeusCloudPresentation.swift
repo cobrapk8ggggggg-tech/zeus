@@ -8,12 +8,15 @@ import Foundation
         vm.messages.append(message); vm.publishUnlessTransitioning()
         return message
     }
-    @discardableResult static func append(_ delta: String, vm: AIChatViewModel, message: ChatMessage, block: AssistantBlock?) -> AssistantBlock {
+    @discardableResult static func append(_ delta: String, vm: AIChatViewModel, message: ChatMessage, block: AssistantBlock?, snapshot: String? = nil, final: Bool = false) async -> AssistantBlock {
         let current = block ?? AssistantBlock(kind: .text, content: "")
         if block == nil { message.blocks.append(current) }
         message.isAwaitingModelResponse = false
+        let text = snapshot ?? (current.content + delta)
+        let parsed = await Task.detached(priority: .userInitiated) { MarkdownContent(prepareMarkdownForRender(text)) }.value
+        if !final { current.cachedAttributedString = nil }
         if let msgIdx = vm.messages.firstIndex(where: { $0.id == message.id }), let blockIdx = message.blocks.firstIndex(where: { $0.id == current.id }) {
-            vm.setStreamingTextBlockContent(msgIdx: msgIdx, blockIdx: blockIdx, text: current.content + delta, parsedMarkdown: nil, cacheAttributedString: true, requestScroll: true)
+            vm.setStreamingTextBlockContent(msgIdx: msgIdx, blockIdx: blockIdx, text: text, parsedMarkdown: parsed, cacheAttributedString: final, requestScroll: true)
             vm.publishUnlessTransitioning()
         }
         return current

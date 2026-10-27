@@ -21,17 +21,20 @@ import UIKit
         XCTAssertEqual(ZeusCloudCache.signature(original), ZeusCloudCache.eventsSignature(events))
         XCTAssertNotEqual(ZeusCloudCache.signature(edited), ZeusCloudCache.eventsSignature(events))
     }
-    func testCloudWaitPlaceholderIsImmediateAndReusedWhenTheNetworkLoopStarts() {
+    func testCloudWaitPlaceholderIsImmediateAndReusedWhenTheNetworkLoopStarts() async {
         let vm = AIChatViewModel()
         vm.messages = [ChatMessage(role: .user, content: "hello")]
         vm.isProcessing = true
         let beforeNetwork = ZeusCloudPresentation.begin(vm)
         XCTAssertTrue(beforeNetwork.isAwaitingModelResponse)
         XCTAssertEqual(ZeusCloudPresentation.begin(vm).id, beforeNetwork.id)
-        let block = ZeusCloudPresentation.append("first partial", vm: vm, message: beforeNetwork, block: nil)
+        let block = await ZeusCloudPresentation.append("first partial", vm: vm, message: beforeNetwork, block: nil)
         XCTAssertFalse(beforeNetwork.isAwaitingModelResponse)
         XCTAssertEqual(block.content, "first partial")
         XCTAssertEqual(vm.messages.count, 2)
+        _ = await ZeusCloudPresentation.append(" then final", vm: vm, message: beforeNetwork, block: block, final: true)
+        XCTAssertEqual(block.cachedMarkdown, MarkdownContent(prepareMarkdownForRender("first partial then final")))
+        XCTAssertNotNil(block.cachedAttributedString)
         vm.isProcessing = false
     }
     private func proposal(remote: Bool = false, repository: String = "fixture-owner/project") throws -> [String: Any] {
