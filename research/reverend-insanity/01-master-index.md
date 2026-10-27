@@ -1,6 +1,6 @@
 # فهرس البحث وحالة الاعتماد
 
-هذه نقطة بداية قابلة للاستئناف، وليست موسوعة مكتملة. جميع النصوص فُهرست آليًا؛ القراءة السياقية المسجلة حتى الآن تخص الملفات 1–100. اكتملت القراءة الأولية للدفعة1–20 مع بقاء مراجعة المقارنة.
+هذه نقطة بداية قابلة للاستئناف، وليست موسوعة مكتملة. جميع النصوص فُهرست آليًا؛ القراءة السياقية المسجلة حتى الآن تخص الملفات 1–111. اكتملت القراءة الأولية للدفعة1–20 مع بقاء مراجعة المقارنة.
 
 - [تدقيق المصدر](00-source-audit.md)
 - [دليل البيانات والتوثيق](data/README.md)
@@ -32,3 +32,5 @@
 القراءة51–90: [دفتر51–70](19-research-progress/batch-0051-0070.md)، [دفتر71–90](19-research-progress/batch-0071-0090.md)، [النموذج السببي للأكبر](06-fang-yuan/decision-studies-0051-0090.md)، [الأصغر](07-fang-zheng/development-0051-0090.md)، [المؤسسات](08-factions/institutions-0090.md)، [الغو والزراعة](03-gu-system/systems-0051-0090.md)، [حدود المعرفة](12-knowledge-states/knowledge-boundaries-0090.md)، [هندسة الكشف](13-narrative-techniques/causal-revelations-0090.md)، [الانحرافات](16-divergence-simulator/dependencies-0090.md)، [معايرة الاتساق](17-consistency-audits/audit-calibration-0090.md)، [التعارضات](18-open-questions/contradictions-0090.md).
 
 القراءة91–100: [دفتر القراءة](19-research-progress/batch-0091-0100.md)، [دراسات القرار](06-fang-yuan/decision-studies-0091-0100.md)، [الأصغر](07-fang-zheng/development-0091-0100.md)، [الصقل والتغذية](03-gu-system/refinement-and-feeding-0100.md)، [الاعتمادات](16-divergence-simulator/dependencies-0100.md). لا يُعد رقم100 حد توقف؛ التالي101 ضمن العمل المباشر.
+
+قراءة101–111: [دفتر القراءة](19-research-progress/batch-0101-0111.md)، [التفاوض والإخفاق](06-fang-yuan/negotiation-and-failure-0111.md)، [الأصغر](07-fang-zheng/development-0101-0111.md)، [الغو والأسواق](03-gu-system/recipes-and-markets-0111.md)، [حدود المعرفة](12-knowledge-states/knowledge-boundaries-0111.md)، [الهندسة](13-narrative-techniques/revealed-motives-0111.md)، [الانحراف](16-divergence-simulator/dependencies-0111.md).

@@ -52,3 +52,10 @@
 {"id": "CHAR-UNCLE", "kind": "character", "canonical_name": "غو يوي دونغ تو — خال الأخوين في الترجمة", "aliases_json": "[]"}
 {"id": "GU-SNAKE-TONGUE", "kind": "gu", "canonical_name": "غو لسان الأفعى", "aliases_json": "[]"}
 {"id": "FAC-GY-HOUSEHOLD", "kind": "household", "canonical_name": "بيت الخال والخالة", "aliases_json": "[]"}
+{"id": "GU-NINE-LEAF", "kind": "gu", "canonical_name": "غو عشب الحيوية ذي التسع أوراق", "aliases_json": "[]"}
+{"id": "GU-MOON-GLOW", "kind": "gu", "canonical_name": "غو وهج القمر", "aliases_json": "[]"}
+{"id": "GU-VITAL", "kind": "mechanism", "canonical_name": "صفة الغو الحيوية", "aliases_json": "[]"}
+{"id": "GU-RELIC-SERIES", "kind": "gu_family", "canonical_name": "سلسلة غو الأثر الرافع للمرحلة", "aliases_json": "[]"}
+{"id": "GU-THREE-STAR-HOUSE", "kind": "gu", "canonical_name": "غو كهف النجوم الثلاثة", "aliases_json": "[]"}
+{"id": "CHAR-MAN-SHI", "kind": "character", "canonical_name": "غو يوي مان شي", "aliases_json": "[]"}
+{"id": "CHAR-YAO-JI", "kind": "character", "canonical_name": "غو يوي ياو جي", "aliases_json": "[]"}

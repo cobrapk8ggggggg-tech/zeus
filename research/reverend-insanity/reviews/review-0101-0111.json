@@ -1,0 +1,1369 @@
+{
+  "reviewed_files": [
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109,
+    110,
+    111
+  ],
+  "next_action": "Continue direct close reading from112, no schedule or arbitrary chapter stop; examine financing red-steel Relic and new investigation, preserve negotiation and recipe constraints.",
+  "next_batch_end": 130,
+  "records": {
+    "facts": [
+      {
+        "id": "F-0248",
+        "subject": "CHAR-UNCLE",
+        "predicate": "self_history",
+        "value": "يروي موهبةB وتقدم2 مبكرًا ثم إصابة عند20 خفضتهC وتحولًا إلى العلاقات بعد ثماني سنوات وانسحابًا45؛ هذه سيرة يرويها عن نفسه",
+        "epistemic_type": "speaker_report",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0101",
+        "line_start": 29,
+        "line_end": 57,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0249",
+        "subject": "CHAR-FY",
+        "predicate": "previous_social_model",
+        "value": "تبنى فلسفة النفوذ مدة طويلة سابقًا وبنى طائفة الجناح الدموي؛ بعد بلوغ6 أدرك منفعتها وعبئها؛ ليس جاهلًا بالتنظيم",
+        "epistemic_type": "memory",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0101",
+        "line_start": 79,
+        "line_end": 93,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0250",
+        "subject": "CHAR-FY",
+        "predicate": "refuses_offer",
+        "value": "الخال يعرض1000 وصلاته؛ الأكبر يواجه عائد الأصول وهدف الصقل مقابل ترف الخال؛ خطاب الخصم لا يحد بدائله",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0101",
+        "line_start": 115,
+        "line_end": 139,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0251",
+        "subject": "CHAR-FY",
+        "predicate": "reveals_completed_mission",
+        "value": "يكشف النبيذ ثم يمضي؛ ترتفع عروض الخال2500 فيستدل على قيمة الأصول؛ الخال لا ينتزع الكيس بالقوة رغم التهديد",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0101",
+        "line_start": 165,
+        "line_end": 219,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0252",
+        "subject": "CHAR-FY",
+        "predicate": "no_fixed_hatred",
+        "value": "لا يكره الخال ولا يصارع للأصول لو توافرت موارد كافية؛ عائق هدفه هو سبب المواجهة هنا",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0101",
+        "line_start": 221,
+        "line_end": 233,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0253",
+        "subject": "CHAR-FY",
+        "predicate": "formal_completion",
+        "value": "يسلم النبيذ ويقدم قصة دب للاستتار ثم يطلب الاطلاع على المحضر حسب اللوائح؛ التقييم جيد؛ استلام مؤجل3أيام",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0102",
+        "line_start": 1,
+        "line_end": 43,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0254",
+        "subject": "CHAR-FY",
+        "predicate": "asset_receipt",
+        "value": "يقبض صكوكًا وعقود خدمة؛ أكثر من10مو وثمانية خدم وثلاثة مبانٍ وحانة؛ قصة السلف مبتورة فلا تستكمل",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0102",
+        "line_start": 83,
+        "line_end": 101,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0255",
+        "subject": "GU-NINE-LEAF",
+        "predicate": "healing_production",
+        "value": "غو2، الورقة المنتزعة تصبح غو حيوية1 مستهلكة؛ تكرار أثر الورقة على الشخص نفسه مقيد بساعة؛ الإنتاج يحتاج جوهرًا",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0102",
+        "line_start": 103,
+        "line_end": 133,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0256",
+        "subject": "CHAR-FY",
+        "predicate": "tavern_management",
+        "value": "يفحص16دفترًا ويجد دخل الشهر أخذه الخال وأخطاء صغيرة؛ يثبت السلطة ثم يرفع أجور النادل20% والمدير40%",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0103",
+        "line_start": 55,
+        "line_end": 97,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0257",
+        "subject": "CHAR-FY",
+        "predicate": "rental_management",
+        "value": "يبقي إيجارات المباني التي رأى إدارتها مناسبة؛ وفرة المال لا تجعله يختار التقاعد أو الزواج",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0103",
+        "line_start": 135,
+        "line_end": 187,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0258",
+        "subject": "CHAR-FZ",
+        "predicate": "adoption_and_duel",
+        "value": "يعلم حق الأب والأم الأصليين وأن التبني يفقده الميراث؛ يطالب بجزء للمتبنين ثم يتحدى أخاه كتابيًا",
+        "epistemic_type": "speaker_report",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0104",
+        "line_start": 11,
+        "line_end": 47,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0259",
+        "subject": "CHAR-FZ",
+        "predicate": "mixed_motive",
+        "value": "يكره ضعفه السابق ويريد إثبات نفسه إلى جانب مساعدة المتبنين؛ صقل رداء القمر2 بعد فشله السابق",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0104",
+        "line_start": 65,
+        "line_end": 91,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0260",
+        "subject": "GU-MOON-RAIMENT",
+        "predicate": "defense",
+        "value": "دفاع2 أقل قليلًا من اليشم الأبيض ويساعد دفاع الآخرين؛ القبضة وضوء القمر1 لا يخترقانه هنا، وبدون كشف الأبيض قد يخسر الأكبر",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0104",
+        "line_start": 103,
+        "line_end": 123,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0261",
+        "subject": "CHAR-FY",
+        "predicate": "redirects_duel",
+        "value": "يسأل موافقة فريق الأصغر ثم يحيله إلى تشينغ شو ويحدد الحانة للقاء؛ الأصغر لم يحسب التزام المهمة",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0104",
+        "line_start": 129,
+        "line_end": 145,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0262",
+        "subject": "CHAR-FZ",
+        "predicate": "mentor_relation",
+        "value": "انضم فعليًا لفريق تشينغ شو الذي يراه كأخ أكبر؛ القائد يفهم من كأسين رغبة الأكبر في انفراد ويخرج الأصغر",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0104",
+        "line_start": 183,
+        "line_end": 225,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0263",
+        "subject": "CHAR-QING-SHU",
+        "predicate": "loyal_background",
+        "value": "يتيم رباه الزعيم وموهبةB عالية؛ لا يحقد على بديل الخلافة؛ موته الشجاع بعدعام ذاكرة من خط الأكبر السابق لا حادثة وقعت الآن",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0105",
+        "line_start": 1,
+        "line_end": 31,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0264",
+        "subject": "CHAR-QING-SHU",
+        "predicate": "worm_offer",
+        "value": "يرى الدودة1 لا تفيد جوهر2؛ يعرض شراءها أو ضمان تعويض الصقل وحق استخدام العطور السبعة3 خمس سنوات عند النجاح",
+        "epistemic_type": "speaker_report",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0105",
+        "line_start": 37,
+        "line_end": 107,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0265",
+        "subject": "CHAR-FY",
+        "predicate": "hidden_recipe",
+        "value": "توقف سابقًا عند2 أكثر من100سنة حتى رفع موهبته؛ يحتفظ بالدودة لوصفة النكهات الأربع2 ثم العطور السبعة3 مع بقاء تكرير الجوهر؛ يحتاج دودة ثانية وأربعة أذواق",
+        "epistemic_type": "memory",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0105",
+        "line_start": 115,
+        "line_end": 161,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0266",
+        "subject": "CHAR-QING-SHU",
+        "predicate": "duel_pressure",
+        "value": "يستخدم وساطة نزاع الأصول ضغطًا للشراء؛ لا يضمن منع تحديات لأسباب أخرى، ويخشى على ظل الأصغر وثقته",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0105",
+        "line_start": 167,
+        "line_end": 209,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0267",
+        "subject": "CHAR-FY",
+        "predicate": "asymmetric_threat",
+        "value": "يهدد خسارة مدوية وتسليم الأصول والتسول لإيذاء سمعة المرشح للزعامة؛ تشينغ شو يشكك في تحمله لكنه يتنازل",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0105",
+        "line_start": 211,
+        "line_end": 287,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0268",
+        "subject": "CHAR-FY",
+        "predicate": "fusion_failure",
+        "value": "يفشل وهج القمر وتموت ضوء صغيرة وتجرح الباقيتان؛ ينتظر التعافي3أيام بدل تكرار يضعف النجاح",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0106",
+        "line_start": 21,
+        "line_end": 67,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0269",
+        "subject": "GU-NINE-LEAF",
+        "predicate": "production_cost",
+        "value": "يجدد ورقتين لكل44% لأن الواحدة20نقطة في العينة؛ يعيد التسع خلال نصف يوم؛ سعر50للورقة وربح دفعة مقدر400؛ الماء والشمس غذاء الغو",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0106",
+        "line_start": 95,
+        "line_end": 139,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0270",
+        "subject": "FAC-GY",
+        "predicate": "collective_supply",
+        "value": "العشيرة تملك خمس غو تسع أوراق وتنتج بها؛ الأكبر يقدر أن انفراده بالمورد كان سيدفع الشراء القسري",
+        "epistemic_type": "self_report",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0106",
+        "line_start": 141,
+        "line_end": 153,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0271",
+        "subject": "GU-MOON-GLOW",
+        "predicate": "successful_retry",
+        "value": "ينجح الصقل بعد3أيام؛ قوة هجومية3أضعاف ضوء القمر ونطاق10م؛ دعم ضوء صغير لا يتراكم عند إضافة ثانية",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0106",
+        "line_start": 155,
+        "line_end": 179,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0272",
+        "subject": "GU-VITAL",
+        "predicate": "failure_protection",
+        "value": "في سياق فشل الدمج تبقى الحيوية ولا تموت مادام مالكها حيًا، بخلاف المكونات؛ تفسير رابطة الحياة تخمين ناس، لا برهان من النص",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0106",
+        "line_start": 205,
+        "line_end": 259,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0273",
+        "subject": "CHAR-FY",
+        "predicate": "trade_experience",
+        "value": "يفحص وزن النقود بخبرة تجارة أكثر من100عام؛ يبيع لجيانغ يا لتوفير الوقت والجهد بدل بناء شبكة زبائن شخصية",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0107",
+        "line_start": 21,
+        "line_end": 63,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0274",
+        "subject": "CHAR-FY",
+        "predicate": "output_cap",
+        "value": "يوجه البيع50مقابل55للعشيرة؛ يرفض زيادة9أوراق يوميًا لحفظ وقت الصقل، لا لاستحالة كل إنتاج إضافي فيزيائيًا",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0107",
+        "line_start": 111,
+        "line_end": 147,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0275",
+        "subject": "CHAR-FY",
+        "predicate": "combat_limits",
+        "value": "مازال أولية2 وأضعف من تشي شان ومو يان وتشينغ شو؛ الأصغر ند محتمل ودودة2 أولوية لسرعة الصقل؛ يحتاج كشفًا وحركة",
+        "epistemic_type": "self_report",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0107",
+        "line_start": 159,
+        "line_end": 225,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0276",
+        "subject": "CHAR-UNCLE",
+        "predicate": "harassment",
+        "value": "بعد تحذير تشينغ شو لا يستعمل الأصغر، فيدفع آخرين للتخريب؛ الأكبر جمع معلومات معظم سادة2 في العشيرة ويعرف مان شي",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0107",
+        "line_start": 229,
+        "line_end": 277,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0277",
+        "subject": "CHAR-FY",
+        "predicate": "initiative",
+        "value": "يبادر بأنصال وهج القمر قبل اكتمال حجر الخصم؛ زيادة وزن مان شي تسقط الطاولة فيستغل الثغرة",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0108",
+        "line_start": 89,
+        "line_end": 163,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0278",
+        "subject": "CHAR-FY",
+        "predicate": "limited_violence",
+        "value": "يعلن أنه لن يقتل ويهدد بإعاقة مع غرامة وسجن حسب قوله؛ يرصد استسلام مان شي ويفاجأ بشدة خوفه ثم يطلقه",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0108",
+        "line_start": 197,
+        "line_end": 271,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0279",
+        "subject": "CHAR-MAN-SHI",
+        "predicate": "hidden_trauma",
+        "value": "يتذكر باي نينغ بينغ قبلعامين ويرى شبه عينيه في الأكبر؛ السبب الداخلي لخوفه لا يعرفه الأكبر ويظنه جبنًا",
+        "epistemic_type": "memory",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0108",
+        "line_start": 229,
+        "line_end": 263,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0280",
+        "subject": "CHAR-UNCLE",
+        "predicate": "withdrawal",
+        "value": "يوقف المضايقات لأن المال ينفد بلا دخل والأكبر ينمو وله موارد؛ هزيمة مان شي تكشف انعدام جدوى الاستمرار",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0109",
+        "line_start": 55,
+        "line_end": 81,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0281",
+        "subject": "CHAR-JIA-FU",
+        "predicate": "early_caravan",
+        "value": "القافلة جاءت ربيعًا قبل الموعد المعتاد2–3أشهر؛ خداع وفاة جيا جين شينغ أشعل منافسة جيا فو وجيا جوي وعجل التجارة",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0109",
+        "line_start": 113,
+        "line_end": 161,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0282",
+        "subject": "CHAR-JIA-FU",
+        "predicate": "investigation_returns",
+        "value": "يجلب خبراء تحقيق عشيرته ويطلب تسهيلات؛ لا تصريح بأن تي شيوي لينغ بينهم؛ ندبة الشجار تفسير مرجح للزعيم",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0109",
+        "line_start": 149,
+        "line_end": 161,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0283",
+        "subject": "GU-THREE-STAR-HOUSE",
+        "predicate": "mobile_shop",
+        "value": "غو نبات3 تنمو بالجوهر ولها3طبقات وتشكيلات أثاث وحراسة وغلق جماعي؛ يديرها دعم3",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0109",
+        "line_start": 193,
+        "line_end": 229,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0284",
+        "subject": "CHAR-FY",
+        "predicate": "power_conditioned_purchase",
+        "value": "يفكر في أخذ أو سرقة عند قوة أعلى، لكنه بالأولية2 يشتري؛500سعر إغراء لا بيع نهائي والقيمة المعتادة580",
+        "epistemic_type": "self_report",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0110",
+        "line_start": 19,
+        "line_end": 41,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0285",
+        "subject": "CHAR-YAO-JI",
+        "predicate": "institutional_bidder",
+        "value": "ياو جي رئيسة الطب ذات علاقات إنقاذ الشيوخ تدخل مزايدة الدودة لحفيدتها؛ لا يرى الأكبر رقم عرضها",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0110",
+        "line_start": 55,
+        "line_end": 101,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0286",
+        "subject": "CHAR-FY",
+        "predicate": "bid_logic",
+        "value": "يميز بين ثروة المنافس وسعره المختار؛ يريد أعلى من عرضه ولو بحجر، ويقدر لا يعلم قيمة المزايدة",
+        "epistemic_type": "self_report",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0110",
+        "line_start": 157,
+        "line_end": 179,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0287",
+        "subject": "GU-RELIC-SERIES",
+        "predicate": "rank_specific",
+        "value": "الأثر سلاسل ترفع مرحلة صغيرة بحسب رتبة المستعمل1–4؛ ليست غو تتبع الأقدام57؛ العرض1نصف يوم و2يوم و3يومين",
+        "epistemic_type": "speaker_report",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0111",
+        "line_start": 17,
+        "line_end": 31,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0288",
+        "subject": "CHAR-FY",
+        "predicate": "worm_bought",
+        "value": "يحصل على الثانية؛ عرض ياو جي أقل20؛ ضغطها يكشف السعر ويتيح لها أخرى من المخزون رغم سياسة السرية",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0111",
+        "line_start": 37,
+        "line_end": 103,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0289",
+        "subject": "CHAR-FY",
+        "predicate": "material_missing",
+        "value": "يجد الحامض والحار ومعه الحلو من النبيذ السابق؛ لا يجد المر فيؤجل الدمج؛ يترك ماء التنقية للسيولة وعدم الحاجة وتجنب تحقيق تشي ليان",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0111",
+        "line_start": 105,
+        "line_end": 141,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0290",
+        "subject": "CHAR-FY",
+        "predicate": "black_boar_and_relic",
+        "value": "يشتري الأسود لأن قوته تتراكم مع الأبيض بخلاف أبيض آخر؛ يعثر اليوم7على أثر الحديد الأحمر بسعر افتتاح3000ويتوقع5000–8000ولا يملك كفايته",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; opinions and memories remain attributed",
+        "chapter_id": "SRC-0111",
+        "line_start": 153,
+        "line_end": 181,
+        "status": "reviewed"
+      }
+    ],
+    "events": [
+      {
+        "id": "EV-MAIN-0160",
+        "timeline": "main",
+        "description": "رفض صفقة الخال وإظهار النبيذ والذهاب للتسليم",
+        "chapter_id": "SRC-0101",
+        "line_start": 115,
+        "line_end": 219,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0161",
+        "timeline": "main",
+        "description": "تسليم النبيذ وتأكيد المحضر رسميًا",
+        "chapter_id": "SRC-0102",
+        "line_start": 1,
+        "line_end": 43,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0162",
+        "timeline": "main",
+        "description": "استلام الأصول وغو التسع أوراق",
+        "chapter_id": "SRC-0102",
+        "line_start": 83,
+        "line_end": 133,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0163",
+        "timeline": "main",
+        "description": "فحص حسابات الحانة وترهيب محدود ثم رفع الأجور",
+        "chapter_id": "SRC-0103",
+        "line_start": 55,
+        "line_end": 97,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0164",
+        "timeline": "main",
+        "description": "مطالبة الأصغر بحصة وتحديه بعد صقل رداء القمر",
+        "chapter_id": "SRC-0104",
+        "line_start": 11,
+        "line_end": 123,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0165",
+        "timeline": "main",
+        "description": "تحويل التحدي إلى لقاء خاص مع تشينغ شو",
+        "chapter_id": "SRC-0104",
+        "line_start": 129,
+        "line_end": 225,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0166",
+        "timeline": "main",
+        "description": "ضغط شراء دودة مقابل وساطة التحدي",
+        "chapter_id": "SRC-0105",
+        "line_start": 37,
+        "line_end": 209,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0167",
+        "timeline": "main",
+        "description": "تهديد سياسي بخسارة الأصول والتسول وانتزاع التنازل",
+        "chapter_id": "SRC-0105",
+        "line_start": 211,
+        "line_end": 287,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0168",
+        "timeline": "main",
+        "description": "فشل وهج القمر وموت مكون ثم قرار انتظار التعافي",
+        "chapter_id": "SRC-0106",
+        "line_start": 21,
+        "line_end": 67,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0169",
+        "timeline": "main",
+        "description": "إنتاج تسع أوراق حيوية وتجديد النبات",
+        "chapter_id": "SRC-0106",
+        "line_start": 95,
+        "line_end": 139,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0170",
+        "timeline": "main",
+        "description": "نجاح وهج القمر في المحاولة التالية",
+        "chapter_id": "SRC-0106",
+        "line_start": 155,
+        "line_end": 179,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0171",
+        "timeline": "main",
+        "description": "وساطة بيع الأوراق ورفض توسيع الإنتاج على حساب الصقل",
+        "chapter_id": "SRC-0107",
+        "line_start": 21,
+        "line_end": 147,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0172",
+        "timeline": "main",
+        "description": "مضايقات بديلة من الخال ووصول مان شي",
+        "chapter_id": "SRC-0107",
+        "line_start": 229,
+        "line_end": 277,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0173",
+        "timeline": "main",
+        "description": "هزيمة مان شي بالمبادرة وتهديد الإعاقة ثم تركه",
+        "chapter_id": "SRC-0108",
+        "line_start": 89,
+        "line_end": 271,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0174",
+        "timeline": "main",
+        "description": "الخال يوقف استنزافه بعد خسارة الردع",
+        "chapter_id": "SRC-0109",
+        "line_start": 55,
+        "line_end": 81,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0175",
+        "timeline": "main",
+        "description": "قافلة مبكرة وتسهيلات لتحقيق جديد",
+        "chapter_id": "SRC-0109",
+        "line_start": 113,
+        "line_end": 161,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0176",
+        "timeline": "main",
+        "description": "ياو جي تقدم عرضًا سريًا",
+        "chapter_id": "SRC-0110",
+        "line_start": 55,
+        "line_end": 101,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0177",
+        "timeline": "main",
+        "description": "فوز الأكبر بالدودة الثانية واختراق سر السعر",
+        "chapter_id": "SRC-0111",
+        "line_start": 37,
+        "line_end": 103,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0178",
+        "timeline": "main",
+        "description": "غياب النبيذ المر وتأجيل الصقل وترك ماء التنقية",
+        "chapter_id": "SRC-0111",
+        "line_start": 105,
+        "line_end": 141,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0179",
+        "timeline": "main",
+        "description": "شراء الخنزير الأسود وانتظار موارد أخرى",
+        "chapter_id": "SRC-0111",
+        "line_start": 153,
+        "line_end": 163,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0180",
+        "timeline": "main",
+        "description": "العثور على أثر الحديد الأحمر ونقص التمويل",
+        "chapter_id": "SRC-0111",
+        "line_start": 165,
+        "line_end": 181,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-PREV-QING-SHU-DEATH",
+        "timeline": "previous_life",
+        "description": "موت تشينغ شو في موجة العام التالي ضمن ذاكرة الخط السابق، باستخدام غو3 بصقل2 للدفاع عن القرية",
+        "chapter_id": "SRC-0105",
+        "line_start": 23,
+        "line_end": 31,
+        "confidence": "high for attributed memory"
+      },
+      {
+        "id": "EV-PREV-LONG-RANK-TWO",
+        "timeline": "previous_life",
+        "description": "الأكبر مكث عند2 أكثر من100عام ثم تجاوزها بمورد رفع الموهبة",
+        "chapter_id": "SRC-0105",
+        "line_start": 117,
+        "line_end": 121,
+        "confidence": "high for attributed memory"
+      },
+      {
+        "id": "EV-PREV-ORGANIZATION-REAPPRAISAL",
+        "timeline": "previous_life",
+        "description": "تبنى النفوذ وبنى طائفة ثم أعاد تقدير عبء المنظمة بعد6",
+        "chapter_id": "SRC-0101",
+        "line_start": 79,
+        "line_end": 93,
+        "confidence": "high for attributed memory"
+      }
+    ],
+    "causal_edges": [
+      {
+        "id": "CE-0136",
+        "source_event": "EV-MAIN-0158",
+        "target_event": "EV-MAIN-0160",
+        "relation_type": "necessary_condition",
+        "evidence": "101:165–183؛ وجود النبيذ يتيح كشف إنجاز المهمة للخال",
+        "confidence": "high",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0137",
+        "source_event": "EV-MAIN-0160",
+        "target_event": "EV-MAIN-0161",
+        "relation_type": "contributing_factor",
+        "evidence": "101:173–219؛102:1؛ الذهاب للتسليم لا الرضوخ للمساومة",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0138",
+        "source_event": "EV-MAIN-0161",
+        "target_event": "EV-MAIN-0162",
+        "relation_type": "necessary_condition",
+        "evidence": "102:33–35،83؛ سير رسمي ينتج التسليم بعد3أيام",
+        "confidence": "high",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0139",
+        "source_event": "EV-MAIN-0162",
+        "target_event": "EV-MAIN-0163",
+        "relation_type": "contributing_factor",
+        "evidence": "103:55–75؛ ملكية المورد تدفع الفحص",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0140",
+        "source_event": "EV-MAIN-0162",
+        "target_event": "EV-MAIN-0164",
+        "relation_type": "contributing_factor",
+        "evidence": "104:11–47؛ فقد المتبنين للأصول مع رغبة إثبات الذات",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0141",
+        "source_event": "EV-MAIN-0155",
+        "target_event": "EV-MAIN-0164",
+        "relation_type": "temporal_only",
+        "evidence": "98:255؛104:91؛ فشل سابق لا يثبت سبب نجاح لاحق دون إعادة محاولات",
+        "confidence": "high",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0142",
+        "source_event": "EV-MAIN-0164",
+        "target_event": "EV-MAIN-0165",
+        "relation_type": "direct_cause",
+        "evidence": "104:129–145؛ الرد يطلب موافقة القائد",
+        "confidence": "high",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0143",
+        "source_event": "EV-MAIN-0165",
+        "target_event": "EV-MAIN-0166",
+        "relation_type": "contributing_factor",
+        "evidence": "104:223–245؛105:37–107؛ لقاء رتبه الأكبر يتيح ضغطًا مستقلاً للوسيط",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0144",
+        "source_event": "EV-MAIN-0166",
+        "target_event": "EV-MAIN-0167",
+        "relation_type": "direct_cause",
+        "evidence": "105:211–287؛ تهديد سمعة المرشح رد على ابتزاز الوساطة",
+        "confidence": "high",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0145",
+        "source_event": "EV-MAIN-0167",
+        "target_event": "EV-MAIN-0172",
+        "relation_type": "contributing_factor",
+        "evidence": "107:237–243؛ تحذير تشينغ شو يغلق أداة الأصغر فينتقل الخال لآخرين",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0146",
+        "source_event": "EV-MAIN-0162",
+        "target_event": "EV-MAIN-0168",
+        "relation_type": "contributing_factor",
+        "evidence": "106:49–55؛ السيولة تتيح تحمل الفشل وشراء مكون بديل",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0147",
+        "source_event": "EV-MAIN-0162",
+        "target_event": "EV-MAIN-0169",
+        "relation_type": "necessary_condition",
+        "evidence": "102:109–127؛106:95–119؛ امتلاك النبات شرط الإنتاج هنا",
+        "confidence": "high",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0148",
+        "source_event": "EV-MAIN-0168",
+        "target_event": "EV-MAIN-0170",
+        "relation_type": "contributing_factor",
+        "evidence": "106:61–67،155–165؛ التعافي يمنع انخفاض فرصة المحاولة الجديدة لا يضمنها",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0149",
+        "source_event": "EV-MAIN-0169",
+        "target_event": "EV-MAIN-0171",
+        "relation_type": "contributing_factor",
+        "evidence": "107:49–63؛ الإنتاج أصل الوساطة التجارية",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0150",
+        "source_event": "EV-MAIN-0172",
+        "target_event": "EV-MAIN-0173",
+        "relation_type": "direct_cause",
+        "evidence": "107:249–277؛108:89–107؛ استفزاز مان شي يثير الرد",
+        "confidence": "high",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0151",
+        "source_event": "EV-MAIN-0170",
+        "target_event": "EV-MAIN-0173",
+        "relation_type": "contributing_factor",
+        "evidence": "108:93–107؛ ترقية الهجوم والمفاجأة تدمران الدفاع غير المكتمل",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0152",
+        "source_event": "EV-MAIN-0173",
+        "target_event": "EV-MAIN-0174",
+        "relation_type": "contributing_factor",
+        "evidence": "109:55–77؛ الكلفة الاقتصادية وانعدام الجدوى توقفان الخال",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0153",
+        "source_event": "EV-MAIN-0089",
+        "target_event": "EV-MAIN-0175",
+        "relation_type": "contributing_factor",
+        "evidence": "59:27–33؛109:123–129؛ اعتقاد جيا فو الخاطئ يزيد المنافسة ويعجل القافلة",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0154",
+        "source_event": "EV-MAIN-0175",
+        "target_event": "EV-MAIN-0176",
+        "relation_type": "contributing_factor",
+        "evidence": "109:231؛110:43–101؛ حضور متجر القافلة يتيح المزايدة",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0155",
+        "source_event": "EV-MAIN-0176",
+        "target_event": "EV-MAIN-0177",
+        "relation_type": "contributing_factor",
+        "evidence": "111:37–99؛ فوز الأكبر بعرض أعلى20 لا بثروة أكبر",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0156",
+        "source_event": "EV-MAIN-0177",
+        "target_event": "EV-MAIN-0178",
+        "relation_type": "contributing_factor",
+        "evidence": "111:103–113؛ لا يكفي شراء الدودة دون النبيذ المر",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0157",
+        "source_event": "EV-MAIN-0171",
+        "target_event": "EV-MAIN-0177",
+        "relation_type": "contributing_factor",
+        "evidence": "110:137–141؛ ادخار بيع الأوراق يساعد المزايدة ولا يلغي محدودية المال",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0158",
+        "source_event": "EV-MAIN-0177",
+        "target_event": "EV-MAIN-0180",
+        "relation_type": "contributing_factor",
+        "evidence": "111:179؛ إنفاق الدودة والخنزير والنبيذ يقلل التمويل المتبقي",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0159",
+        "source_event": "EV-MAIN-0179",
+        "target_event": "EV-MAIN-0180",
+        "relation_type": "contributing_factor",
+        "evidence": "111:179؛ شراء الأسود جزء من المصروف السابق",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0160",
+        "source_event": "EV-MAIN-0174",
+        "target_event": "EV-MAIN-0175",
+        "relation_type": "temporal_only",
+        "evidence": "109:81–83؛ توقف المضايقات لا يسبب القافلة",
+        "confidence": "high",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0161",
+        "source_event": "EV-PREV-QING-SHU-DEATH",
+        "target_event": "EV-MAIN-0167",
+        "relation_type": "contributing_factor",
+        "evidence": "105:257–263؛ سابقة التضحية تؤسس معرفة الأكبر بولاء الطرف، لا علمًا كليًا بكل نية",
+        "confidence": "high",
+        "status": "reviewed"
+      }
+    ],
+    "knowledge": [
+      {
+        "id": "K-FY-0048",
+        "character_id": "CHAR-FY",
+        "valid_from": "SRC-0101:L197",
+        "valid_until": null,
+        "epistemic_type": "inference",
+        "proposition": "رفع الخال عرضه يرجح أن الأصول أثمن من تقديره؛ لا يعرف كل الجرد حتى102",
+        "source_ref": "101:191–197",
+        "confidence": "high for attribution; first attestation not necessarily acquisition moment"
+      },
+      {
+        "id": "K-FY-0049",
+        "character_id": "CHAR-FY",
+        "valid_from": "SRC-0102:L131",
+        "valid_until": null,
+        "epistemic_type": "inference",
+        "proposition": "إنتاج أوراق العلاج يفسر النفوذ التجاري للمتقاعد؛ الدخل شبكة لا مال فقط",
+        "source_ref": "102:125–133",
+        "confidence": "high for attribution; first attestation not necessarily acquisition moment"
+      },
+      {
+        "id": "K-FZ-0017",
+        "character_id": "CHAR-FZ",
+        "valid_from": "SRC-0104:L43",
+        "valid_until": null,
+        "epistemic_type": "known",
+        "proposition": "يعرف أن تبنيه أخرجه من وراثة الأصل، لكن يريد جزءًا لوالديه المتبنين",
+        "source_ref": "104:19–47",
+        "confidence": "high for attribution; first attestation not necessarily acquisition moment"
+      },
+      {
+        "id": "K-FZ-0018",
+        "character_id": "CHAR-FZ",
+        "valid_from": "SRC-0104:L91",
+        "valid_until": null,
+        "epistemic_type": "belief",
+        "proposition": "يرى أن رداء القمر2 سيمنع القبضة ويمنحه فوزًا جديدًا؛ لا يعرف اليشم الأبيض",
+        "source_ref": "104:87–117",
+        "confidence": "high for attribution; first attestation not necessarily acquisition moment"
+      },
+      {
+        "id": "K-FY-0050",
+        "character_id": "CHAR-FY",
+        "valid_from": "SRC-0104:L103",
+        "valid_until": null,
+        "epistemic_type": "known",
+        "proposition": "يتعرف على رداء القمر بعد أن كشفه الأصغر ويقدر القيود القتالية",
+        "source_ref": "104:91–117",
+        "confidence": "high for attribution; first attestation not necessarily acquisition moment"
+      },
+      {
+        "id": "K-QS-0001",
+        "character_id": "CHAR-QING-SHU",
+        "valid_from": "SRC-0105:L35",
+        "valid_until": "SRC-0105:L231",
+        "epistemic_type": "belief",
+        "proposition": "يفسر تنهد الأكبر بأنه فقد الدودة، ثم يظن مصلحته بالأصول مانعًا من تهديد السمعة",
+        "source_ref": "105:33–35،265–269",
+        "confidence": "high for attribution; first attestation not necessarily acquisition moment"
+      },
+      {
+        "id": "K-FY-0051",
+        "character_id": "CHAR-FY",
+        "valid_from": "SRC-0105:L131",
+        "valid_until": null,
+        "epistemic_type": "memory",
+        "proposition": "وصفة بديلة تحفظ تكرير الجوهر في2 و3؛ تبرر رفض صفقة تبدو مغرية",
+        "source_ref": "105:131–161",
+        "confidence": "high for attribution; first attestation not necessarily acquisition moment"
+      },
+      {
+        "id": "K-FY-0052",
+        "character_id": "CHAR-FY",
+        "valid_from": "SRC-0108:L267",
+        "valid_until": null,
+        "epistemic_type": "inference",
+        "proposition": "يرى مان شي شديد الجبن لكنه لا يعرف صدمة باي نينغ بينغ التي عُرضت للقارئ",
+        "source_ref": "108:229–267",
+        "confidence": "high for attribution; first attestation not necessarily acquisition moment"
+      },
+      {
+        "id": "K-FY-0053",
+        "character_id": "CHAR-FY",
+        "valid_from": "SRC-0110:L169",
+        "valid_until": null,
+        "epistemic_type": "inference",
+        "proposition": "يقدر حد عرض ياو جي ولا يقرأ الورقة؛ فوز20فوقها يظهر للقارئ111:97 ويقدره الأكبر111:133",
+        "source_ref": "110:157–179؛111:97،133–139",
+        "confidence": "high for attribution; first attestation not necessarily acquisition moment"
+      },
+      {
+        "id": "K-FY-0054",
+        "character_id": "CHAR-FY",
+        "valid_from": "SRC-0111:L143",
+        "valid_until": null,
+        "epistemic_type": "belief",
+        "proposition": "لا يضمن اكتمال الإرث أو نوع الغو المقبلة؛ القافلة قد لا تعود زمن الموجة، فيحفظ السيولة",
+        "source_ref": "111:141–149",
+        "confidence": "high for attribution; first attestation not necessarily acquisition moment"
+      }
+    ],
+    "relationships": [
+      {
+        "id": "REL-0022",
+        "subject": "CHAR-QING-SHU",
+        "object": "CHAR-FZ",
+        "relation": "قائد فريق بالفعل يعتني به ويُرى كأخ أكبر؛ يؤثر في قبوله أو ترك التحدي",
+        "valid_from": "SRC-0104:L193",
+        "valid_until": null,
+        "source_ref": "104:183–213؛105:277",
+        "confidence": "high"
+      },
+      {
+        "id": "REL-0023",
+        "subject": "CHAR-QING-SHU",
+        "object": "CHAR-FY",
+        "relation": "تنازل تفاوضي عن الشراء ووساطة التحدي؛ لا ولاء للأكبر بدل العشيرة",
+        "valid_from": "SRC-0105:L287",
+        "valid_until": null,
+        "source_ref": "105:211–287؛107:237–239",
+        "confidence": "high"
+      },
+      {
+        "id": "REL-0024",
+        "subject": "CHAR-UNCLE",
+        "object": "CHAR-FY",
+        "relation": "توقف المضايقات بعد إدراك استنزاف ماله وانعدام جدواها؛ لا صلح عاطفي مثبت",
+        "valid_from": "SRC-0109:L55",
+        "valid_until": null,
+        "source_ref": "109:55–81",
+        "confidence": "high"
+      }
+    ],
+    "decisions": [
+      {
+        "id": "DEC-FY-0077",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0101",
+        "record": {
+          "situation": "عرض الخال1000ومعرفة إنجاز النبيذ",
+          "information": "يملك النبيذ والقواعد تسمح التسليم؛ الخال قادر على رشوة وتأخير محدود",
+          "unknown": "القيمة الكاملة للميراث وآخر وسائل الخال",
+          "goal": "دخل ثابت للصقل بدل مقايضة قصيرة",
+          "decision": "يرفض ويكشف الإنجاز ثم يمضي",
+          "options": "قبول1000أو2500لاحقًا أو طلب أعلى أو التسليم؛ تحليل",
+          "risks": "عداء وتهديد بعد التسليم",
+          "resources": "نبيذ وإنجاز المهمة وحماية النظام",
+          "reason": "101:195–223 قيمة الأصل وهدفه لا ضغينة مطلقة",
+          "result": "يقبل الموظف ثم يستلم102",
+          "evaluation": "لا ينسب معرفة تفصيل الإيراد إليه قبل الجرد؛ رفض المقابل يستند لقيمة مرجحة",
+          "impact": "تستبدل مشكلة السيولة بإدارة مورد",
+          "source_refs": "101:115–233؛102:1–43،83–133",
+          "confidence": "high for text; reconstructed alternatives marked"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0078",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0103",
+        "record": {
+          "situation": "إدارة حانة ورثها مع عمال خائفين",
+          "information": "دفاتر تظهر دخل الشهر مأخوذًا وأجورًا قليلة وأخطاء صغيرة",
+          "unknown": "استمرار استجابتهم لكل حافز لاحق",
+          "goal": "دخل مستقر بأقل عبء يومي",
+          "decision": "يفحص ويثبت السلطة دون تماد ثم يرفع الأجور ويبقي الإيجارات المناسبة",
+          "options": "عقاب أو استبدال أو حوافز؛ تحليل",
+          "risks": "فساد أو تراجع حافز أو فقد دخل",
+          "resources": "سلطة المالك وخبرة تنظيمية قديمة",
+          "reason": "103:91–115 يربط القوة والحافز",
+          "result": "تأييد العمال وشروط إيجار لم يغيرها",
+          "evaluation": "يطبق معرفة إدارة سبقتها ممارسة؛ لا عبقرية تجارية من منصب وحده",
+          "impact": "تتفرغ موارده للصقل ويستعين بوسيط بيع107",
+          "source_refs": "103:55–115،161–187؛107:53–63",
+          "confidence": "high for text; reconstructed alternatives marked"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0079",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0104",
+        "record": {
+          "situation": "تحدي الأصغر ودفاع2قد يجبر كشف السر",
+          "information": "رأى رداء القمر ويعرف سلطة قائد الفريق وولاءه السابق",
+          "unknown": "كل مطالب الوسيط قبل اللقاء ورد فعله للتهديد",
+          "goal": "حفظ الأصول والدودة والسر دون حلبة مفروضة",
+          "decision": "يحول الطلب إلى لقاء قائد ثم يهدد خسارة تضر صورة المرشح",
+          "options": "قتال وكشف الأبيض أو استسلام أو مساومة؛ النص يبين",
+          "risks": "تخلي أصول أو قتال أو كشف إرث إذا صعدت المساومة",
+          "resources": "معرفة قيم العشيرة وشخصية تشينغ شو وخيار الظهور متضررًا",
+          "reason": "105:237–263 كلفة السمعة على خصم يقدس العشيرة",
+          "result": "تنازل تشينغ شو بعد أن يشكك بقدرة الأكبر على خسارة الأصول",
+          "evaluation": "لا يثبت أن التهديد سينفذ حتمًا؛ خصمه واع بالتناقض وله حافز منع المخاطرة",
+          "impact": "يُنهي أداة الأصغر ويجعل الخال يتحول إلى مضايقات",
+          "source_refs": "104:103–145؛105:167–287؛107:237–243",
+          "confidence": "high for text; reconstructed alternatives marked"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0080",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0105",
+        "record": {
+          "situation": "عرض استخدام غو3خمس سنوات مقابل الدودة",
+          "information": "يعرف أنه توقف سابقًا عند2أكثر من100عام ووصفة2تحفظ فائدتها",
+          "unknown": "إمكان تحصيل الثانية والنبيذ المر",
+          "goal": "تسريع صقل2أولًا بدل منفعة3بعيدة",
+          "decision": "يرفض بيع الدودة أو تبادل حق الاستخدام",
+          "options": "بيع أو قبول حق أو احتفاظ؛ منصوص",
+          "risks": "ضغط الوساطة وفقد مال وثقل تغذية مؤقت",
+          "resources": "وصفة النكهات الأربع ومعرفة حدود الموهبة",
+          "reason": "105:115–161 يظهر اختلاف القيمة الخاصة عن عرض السوق",
+          "result": "يحتفظ بها لكنه يظل يحتاج مكونات",
+          "evaluation": "لا الرفض لمجرد بغض العشيرة ولا المعرفة وحدها تنجز المكونات",
+          "impact": "شراء الثانية111لا يزيل عنق زجاجة النبيذ المر",
+          "source_refs": "105:99–161؛111:103–113",
+          "confidence": "high for text; reconstructed alternatives marked"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0081",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0106",
+        "record": {
+          "situation": "فشل وهج القمر مع موت ضوء صغير",
+          "information": "الأخريان مجروحتان وإصابتهما تخفض احتمال الصقل؛ يستطيع شراء بديل",
+          "unknown": "المحاولة التالية احتمالية",
+          "goal": "رفع الهجوم مع عدم مضاعفة الفشل",
+          "decision": "ينتظر3أيام ويعوض المكون ثم يحاول",
+          "options": "تكرار فوري أو انتظار أو ترك؛ منصوص",
+          "risks": "مال ومكونات إضافية واحتمال فشل جديد",
+          "resources": "دخل الأصول ومعرفة إصابة الغو",
+          "reason": "106:41–67 يحدد سبب الانتظار",
+          "result": "نجاح التالية106:165",
+          "evaluation": "المورد يسمح بإخفاق يتحمله لا بعصمة؛ لا السبب قوة عزيمة تحمي الغو",
+          "impact": "يملك هجوم2في مواجهة مان شي",
+          "source_refs": "106:21–67،155–179؛108:93",
+          "confidence": "high for text; reconstructed alternatives marked"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0082",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0107",
+        "record": {
+          "situation": "الوسيط يطلب إنتاج أوراق أكثر",
+          "information": "إنتاج9يأخذ وقتًا ودخله يكفي حاليًا؛ الوسيط يجني فرق السعر",
+          "unknown": "حجم الطلب المستمر وخطر سياسة العشيرة لاحقًا",
+          "goal": "وقت صقل ودخل كاف بدل تعظيم المال",
+          "decision": "يفوض البيع ويقف عند9يوميًا",
+          "options": "توزيع مباشر أو زيادة إنتاج أو وساطة؛ منصوص",
+          "risks": "أرباح فائتة وعمولة واعتماد على وسيط",
+          "resources": "غو منتجة وشريك تجاري وعلاقة مع أخيه",
+          "reason": "107:53–63،119–129 المال وسيلة لا هدف",
+          "result": "وساطة قائمة وأموال تتراكم",
+          "evaluation": "حد9اختيار أولوية لا طاقة مطلقة لاستنساخ غوأخرى أو جسم آخر",
+          "impact": "يتفرغ لتجديد المخزون ومواجهة المضايقات",
+          "source_refs": "106:111–129؛107:21–147",
+          "confidence": "high for text; reconstructed alternatives marked"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0083",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0108",
+        "record": {
+          "situation": "مان شي يبتز500ويحاول فرض اعتذار",
+          "information": "يعرف معلوماته ودفاعه الحجري ويملك هجوم2؛ جريمة قتل أخطر من إيذاء",
+          "unknown": "الصدمة الخفية بسبب باي نينغ بينغ",
+          "goal": "وقف تقويض المورد وردع الاستغلال",
+          "decision": "يبادر قبل تمام الدفاع ثم يهدد الإعاقة ويتركه بعد الخضوع",
+          "options": "اعتذار أو مال أو قتال معلن أو مبادرة؛ تحليل",
+          "risks": "عقاب وغرامة وسجن أو وفاة لم يقصدها",
+          "resources": "وهج القمر وقوة ومبادرة",
+          "reason": "108:203–207 يميز كلفة الإيذاء عن القتل",
+          "result": "يخضع مان شي وتتوقف المضايقات109",
+          "evaluation": "لا نجعل تاريخ صدمته معرفة للأكبر؛ هو يفاجأ بشدة خوفه267",
+          "impact": "الخال يحسب عدم جدوى استنزافه",
+          "source_refs": "107:263–269؛108:89–163،203–271؛109:55–81",
+          "confidence": "high for text; reconstructed alternatives marked"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0084",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0110",
+        "record": {
+          "situation": "دودة نادرة في متجر قوي ومنافس ثري",
+          "information": "500سعر افتتاح؛ ثروة ياو جي لا تحدد عرضها؛ يعرف طريقة تسعير محلية",
+          "unknown": "رقم مزايدتها والمنافسون الآخرون",
+          "goal": "الدودة الثانية بأقل إنفاق يبقي بدائل",
+          "decision": "يشتري بمزايدة محسوبة بدل سرقة أو انسحاب للهيبة",
+          "options": "مزاد سري أو سرقة أو ترك؛ النص يربط بالقوة",
+          "risks": "دفع أعلى من القيمة أو خسارة السلعة أو مواجهة أمن3/4",
+          "resources": "ادخار وخبرة تسعير ودخل",
+          "reason": "110:19–41،157–179 يفصل القوة والوسيلة وتقدير العرض",
+          "result": "يحصل عليها بفارق20عن ياو جي111:97",
+          "evaluation": "حدسه تقدير لا قراءة ورقة؛80%111:139 خبرة يدعيها لا ضمان لهذه الصفقة",
+          "impact": "بقي المر غائبًا رغم النجاح ونقص تمويل الأثر",
+          "source_refs": "110:19–41،157–179؛111:97–141،179",
+          "confidence": "high for text; reconstructed alternatives marked"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0085",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0111",
+        "record": {
+          "situation": "ماء التنقية مرغوب من فصيل تشي",
+          "information": "لا يحتاجه وقد يجر تحقيقًا؛ أموال محدودة وموارد لاحقة أفضل",
+          "unknown": "أسعار الغو القادمة ونجاح تقدير عرض تشي ليان",
+          "goal": "حفظ سيولة لتغطية نواقصه",
+          "decision": "لا يزايد ولو قدر عرضًا أعلى10يكسبه",
+          "options": "شراء احتكار أو ترك؛ منصوص",
+          "risks": "ربح ابتزاز فائت مقابل كشف سر وعداوة وسيولة",
+          "resources": "مال متبق وخبرة وشروط سوق",
+          "reason": "111:141 يصرح أن السبب الأساسي حفظ المال",
+          "result": "يشتري الأسود لاحقًا لكن الأثر يبقى فوق التمويل",
+          "evaluation": "الثقة في ثمن المنافس لا توجب استعمالها في كل سلعة؛ تقدير ربح ليس ربحًا محققًا",
+          "impact": "لا تحل الثروة كل فرص القافلة",
+          "source_refs": "111:125–181",
+          "confidence": "high for text; reconstructed alternatives marked"
+        },
+        "status": "reviewed"
+      }
+    ],
+    "entities": [
+      {
+        "id": "GU-NINE-LEAF",
+        "kind": "gu",
+        "canonical_name": "غو عشب الحيوية ذي التسع أوراق",
+        "aliases_json": "[]"
+      },
+      {
+        "id": "GU-MOON-GLOW",
+        "kind": "gu",
+        "canonical_name": "غو وهج القمر",
+        "aliases_json": "[]"
+      },
+      {
+        "id": "GU-VITAL",
+        "kind": "mechanism",
+        "canonical_name": "صفة الغو الحيوية",
+        "aliases_json": "[]"
+      },
+      {
+        "id": "GU-RELIC-SERIES",
+        "kind": "gu_family",
+        "canonical_name": "سلسلة غو الأثر الرافع للمرحلة",
+        "aliases_json": "[]"
+      },
+      {
+        "id": "GU-THREE-STAR-HOUSE",
+        "kind": "gu",
+        "canonical_name": "غو كهف النجوم الثلاثة",
+        "aliases_json": "[]"
+      },
+      {
+        "id": "CHAR-MAN-SHI",
+        "kind": "character",
+        "canonical_name": "غو يوي مان شي",
+        "aliases_json": "[]"
+      },
+      {
+        "id": "CHAR-YAO-JI",
+        "kind": "character",
+        "canonical_name": "غو يوي ياو جي",
+        "aliases_json": "[]"
+      }
+    ]
+  }
+}
