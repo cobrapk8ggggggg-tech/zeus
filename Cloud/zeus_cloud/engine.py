@@ -12,6 +12,7 @@ from .files import contained, inventory, open_regular, write_regular, GLOBAL_WOR
 from .terminal import protocol_result
 from .tools import SERVER_TOOLS, TOOLS, INSTRUCTIONS, builtin_instructions
 from .history import History
+from .resources import instructions as resource_instructions
 
 TERMINAL = {"completed", "failed", "cancelled", "interrupted"}
 
@@ -137,7 +138,7 @@ class Engine:
                         thinking, thinking_count = "", 0
                         thinking_flush = time.monotonic()
                         last_flush = time.monotonic()
-                        async for event in self.models.stream(provider, messages, self.catalog(run), run.get("instructions", "") + "\n" + INSTRUCTIONS + builtin_instructions()):
+                        async for event in self.models.stream(provider, messages, self.catalog(run), run.get("instructions", "") + "\n" + INSTRUCTIONS + resource_instructions() + builtin_instructions()):
                             if event["kind"] == "text":
                                 text += event["text"]; buffered += event["text"]
                                 if len(text) > 512_000: raise ValueError("Reply exceeds the configured limit")

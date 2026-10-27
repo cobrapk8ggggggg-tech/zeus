@@ -192,7 +192,9 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
 
     @app.get("/v1/capabilities")
     async def capabilities(account=Depends(auth)):
+        from .resources import limits
         return {"ready": app.state.ready, "reason": app.state.problem,
+            "container_limits": limits(),
             "cloud_agent": True, "terminal": True, "browser": False, "xcode": False,
             "max_parallel_runs": 1, "workspace_bytes": WORKSPACE_LIMIT,
             "provider_protocols": ["openai", "responses", "anthropic"], "canonical_tools": True, "device_tool_bridge": True, "owner_configured": bool(owner or owner_email),
