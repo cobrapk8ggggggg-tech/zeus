@@ -119,6 +119,7 @@ import ZEUSBrowser
         defer { if !duringTransition && includeLocalFiles { NativeCloudAccountAPI.isMigrating = false } }
         try await NativeCloudAccountAPI.prepareBrowserBackup?()
         progress("تجهيز نسخة مشفرة للمحادثات والإعدادات…")
+        try await ZeusCloudDeletion.shared.sync()
         let old = try await NativeCloudAccountAPI.archive()
         let oldSecrets = try await old.mapAsync { try await self.secretBundle($0) }
         let keyData = oldSecrets?.fileKey ?? keyBytes(), passphrase = keyBytes().base64EncodedString()

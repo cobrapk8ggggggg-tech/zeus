@@ -14,14 +14,23 @@ from zeus_cloud.terminal import Terminals
 
 
 class MemoryStore:
-    def __init__(self): self.rows = {}; self.runs = {}; self.timeline = []; self.leases = {}
+    def __init__(self): self.rows = {}; self.runs = {}; self.timeline = []; self.leases = {}; self.deleted = set()
     @asynccontextmanager
     async def active(self): yield self
+    async def deletions(self, owner): return [c for o,c in self.deleted if o==owner]
+    async def delete_conversation(self, owner, conversation):
+        self.deleted.add((owner, conversation))
+        ids = {r["id"] for (o,_),r in self.runs.items() if o==owner and r["conversation"]==conversation}
+        self.runs = {k:v for k,v in self.runs.items() if not (k[0]==owner and k[1] in ids)}
+        self.timeline[:] = [e for e in self.timeline if not(e["owner"]==owner and e["run"] in ids)]
+        self.rows = {k:v for k,v in self.rows.items() if not(k[0]==owner and (k[1] in {"workspace","conversation"} and k[2]==conversation or k[1]=="approval" and v.get("run") in ids))}
+        return {"deleted":True,"runs":len(ids)}
     async def initialize(self): pass
     async def recover(self): pass
     async def close(self): pass
     async def get(self, owner, kind, identifier): return self.rows.get((owner, kind, identifier))
     async def put(self, owner, kind, identifier, value):
+        if kind in {"conversation","workspace"} and (owner,identifier) in self.deleted: raise ValueError("conversation_deleted")
         row = {**value, "id": identifier, "owner": owner, "updated": 0}
         self.rows[owner, kind, identifier] = row; return row
     async def list_conversations(self, owner, after=""):
@@ -29,6 +38,7 @@ class MemoryStore:
     async def list(self, owner, kind): return [v for (o, k, _), v in self.rows.items() if o == owner and k == kind]
     async def run(self, owner, identifier): return self.runs.get((owner, identifier))
     async def create_run(self, owner, value):
+        if (owner,value["conversation"]) in self.deleted: raise ValueError("conversation_deleted")
         if owner in self.leases: raise ValueError("Account transition is in progress")
         return self.runs.setdefault((owner, value["id"]), {**value, "owner": owner, "seq": 0})
     async def update_run(self, owner, identifier, **changes):

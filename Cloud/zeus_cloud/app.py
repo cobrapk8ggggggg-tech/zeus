@@ -137,6 +137,15 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
     models = models or Models()
     auth = auth or Authorizer(owner, owner_email)
 
+    # Wake connected observers after a durable event. No repeated idle DB poll.
+    observers = {}
+    durable_event = store.event
+    async def publish_event(owner, run, kind, data):
+        result = await durable_event(owner, run, kind, data)
+        for signal in tuple(observers.get((owner, run), ())): signal.set()
+        return result
+    store.event = publish_event
+
     terminal_grants = {}
     async def terminal_event(terminal, kind, value):
         # Terminal replay is bounded in memory. Agent output and command
@@ -281,10 +290,21 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
         ready(); return public_run(await store.run(account, str(identifier)))
 
     @app.get("/v1/runs/{identifier}/events")
-    async def events(identifier: uuid.UUID, after: int = 0, authorization: str = Header(default=""), account=Depends(auth)):
-        ready(); current = public_run(await store.run(account, str(identifier)))
-        items = await engine.history.events(account, str(identifier), after, authorization.removeprefix("Bearer "))
-        return {"run": current, "events": items, "cursor": items[-1]["seq"] if items else after}
+    async def events(identifier: uuid.UUID, after: int = 0, wait: float = 0, authorization: str = Header(default=""), account=Depends(auth)):
+        ready(); key = (account, str(identifier)); signal = asyncio.Event()
+        observers.setdefault(key, set()).add(signal)
+        try:
+            current = public_run(await store.run(account, str(identifier)))
+            items = await engine.history.events(account, str(identifier), after, authorization.removeprefix("Bearer "))
+            if not items and current["status"] not in TERMINAL | {"waiting_user"} and wait > 0:
+                try: await asyncio.wait_for(signal.wait(), min(wait, 20))
+                except asyncio.TimeoutError: pass
+                current = public_run(await store.run(account, str(identifier)))
+                items = await engine.history.events(account, str(identifier), after, authorization.removeprefix("Bearer "))
+            return {"run": current, "events": items, "cursor": items[-1]["seq"] if items else after}
+        finally:
+            observers[key].discard(signal)
+            if not observers[key]: observers.pop(key, None)
 
     @app.get("/v1/runs/{identifier}/stream")
     async def stream(identifier: uuid.UUID, request: Request, after: int = 0, authorization: str = Header(default=""), account=Depends(auth)):
@@ -359,6 +379,25 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
             await store.put(account, "approval", key, {**record, "status": "completed", "result": result})
             await store.update_run(account, run["id"], status="queued", resume_device=key)
             engine.wakeup.set(); return {"accepted": True}
+
+    @app.get("/v1/deletions")
+    async def deletions(account=Depends(auth)):
+        ready(); return {"conversations": await store.deletions(account)}
+
+    @app.delete("/v1/conversations/{identifier}")
+    async def delete_conversation(identifier: uuid.UUID, account=Depends(auth)):
+        ready(); conversation = str(identifier)
+        async with engine.execution_gate:
+            if engine.running and not engine.running.done():
+                active = await store.run(account, engine.running.get_name())
+                if active and active["conversation"] == conversation:
+                    engine.running.cancel(); await asyncio.gather(engine.running, return_exceptions=True)
+            for terminal in list(terminals.sessions.values()):
+                if terminal.owner == account and terminal.conversation == conversation: await terminals.stop(account, terminal.id)
+            result = await store.delete_conversation(account, conversation)
+            import shutil
+            await asyncio.to_thread(shutil.rmtree, spaces.path(account, conversation), True)
+            return result
 
     @app.get("/v1/conversations")
     async def conversations(after: str = "", account=Depends(auth)):

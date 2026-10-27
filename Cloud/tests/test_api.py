@@ -369,6 +369,36 @@ class APITests(unittest.IsolatedAsyncioTestCase):
         events = (await self.client.get(f"/v1/runs/{run}/events")).json()["events"]
         self.assertFalse(any(e["kind"] == "tool_start" for e in events))
 
+    async def test_delete_removes_conversation_runs_events_and_blocks_resurrection(self):
+        run, _ = await self.submit(); await self.wait_state(run, {"completed", "failed"})
+        await self.store.put(self.other,"conversation",self.conversation,{"messages":[{"content":"other owner"}]})
+        result = await self.client.delete("/v1/conversations/"+self.conversation)
+        self.assertEqual(result.status_code,200,result.text)
+        self.assertIsNone(await self.store.run(self.owner,run))
+        self.assertIsNone(await self.store.get(self.owner,"conversation",self.conversation))
+        self.assertFalse(await self.store.events(self.owner,run))
+        self.assertIsNotNone(await self.store.get(self.other,"conversation",self.conversation))
+        self.assertIn(self.conversation,(await self.client.get("/v1/deletions")).json()["conversations"])
+        with self.assertRaises(ValueError): await self.store.put(self.owner,"conversation",self.conversation,{"messages":[]})
+        self.assertEqual((await self.client.delete("/v1/conversations/"+self.conversation)).status_code,200)
+
+    async def test_long_poll_wakes_on_first_partial_reply_before_completion(self):
+        started, release = asyncio.Event(), asyncio.Event()
+        class SlowModel:
+            async def stream(self, provider, messages, tools, instructions):
+                yield {"kind":"text","text":"first partial"}
+                started.set(); await release.wait()
+                yield {"kind":"text","text":" final"}
+        self.app.state.engine.models=SlowModel()
+        run,_=await self.submit(); await started.wait()
+        page=(await self.client.get(f"/v1/runs/{run}/events?wait=20")).json()
+        self.assertIn("first partial", "".join(e["data"].get("delta","") for e in page["events"]))
+        self.assertEqual(page["run"]["status"],"running")
+        waiter=asyncio.create_task(self.client.get(f"/v1/runs/{run}/events?after={page['cursor']}&wait=20"))
+        await asyncio.sleep(.02);self.assertFalse(waiter.done());release.set()
+        response=await asyncio.wait_for(waiter,2);self.assertEqual(response.status_code,200)
+        await self.wait_state(run,{"completed"})
+
     async def test_disabling_all_native_tools_does_not_restore_a_cloud_fallback_catalog(self):
         class NoTools:
             async def stream(self, provider, messages, tools, instructions):

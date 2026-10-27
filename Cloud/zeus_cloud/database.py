@@ -72,6 +72,7 @@ class MongoStore:
         return self.clean(value)
 
     async def put(self, owner, kind, identifier, value):
+        if kind in {"conversation", "workspace"} and identifier in await self.deletions(owner): raise ValueError("conversation_deleted")
         row = {**value, "id": identifier, "owner": owner, "kind": kind, "updated": time.time()}
         async with self.active() as db:
             await db.records.replace_one({"_id": f"{owner}:{kind}:{identifier}", "owner": owner}, row, upsert=True)
@@ -83,6 +84,7 @@ class MongoStore:
         return [self.clean(row) for row in rows]
 
     async def create_run(self, owner, run):
+        if run["conversation"] in await self.deletions(owner): raise ValueError("conversation_deleted")
         # Caller-provided UUID doubles as a durable idempotency key. Mongo's
         # atomic _id uniqueness prevents duplicate work across retries/restarts.
         key = owner + ":" + run["id"]
@@ -165,3 +167,19 @@ class MongoStore:
         async with self.active() as db:
             rows = await db.records.find({"owner": owner, "kind": "conversation", "id": {"$gt": after}}, {"id": 1, "title": 1, "updated": 1, "native_session": 1}).sort("id", 1).limit(100).to_list()
         return [self.clean(row) for row in rows]
+
+    async def deletions(self, owner):
+        async with self.active() as db:
+            rows = await db.records.find({"owner":owner,"kind":"conversation_deletion"},{"id":1}).to_list()
+            return [row["id"] for row in rows]
+
+    async def delete_conversation(self, owner, conversation):
+        async with self.active() as db:
+            await db.records.update_one({"owner":owner,"kind":"conversation_deletion","id":conversation}, {"$setOnInsert":{"owner":owner,"kind":"conversation_deletion","id":conversation,"updated":time.time()}}, upsert=True)
+            rows = await db.runs.find({"owner":owner,"conversation":conversation},{"id":1}).to_list()
+            ids=[row["id"] for row in rows]
+            await db.events.delete_many({"owner":owner,"run":{"$in":ids}})
+            await db.records.delete_many({"owner":owner,"kind":"approval","run":{"$in":ids}})
+            deleted=await db.runs.delete_many({"owner":owner,"conversation":conversation})
+            await db.records.delete_many({"owner":owner,"kind":{"$in":["conversation","workspace"]},"id":conversation})
+            return {"deleted":True,"runs":deleted.deleted_count}

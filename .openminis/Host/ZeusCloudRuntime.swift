@@ -121,6 +121,11 @@ import ZEUSBrowser
         guard let sid = vm.sessionId, UUID(uuidString: sid) != nil, let owner = NativeCloudAccountAPI.ownerID else { throw failure("المحادثة أو جلسة الحساب غير متاحة.") }
         guard !observers.contains(sid) else { return }
         observers.insert(sid); defer { observers.remove(sid) }
+        let display = ChatMessage(role: .assistant, content: "", blocks: [])
+        display.isAwaitingModelResponse = true
+        vm.messages.append(display); vm.publishUnlessTransitioning()
+        await Task.yield()
+        defer { display.isAwaitingModelResponse = false; vm.publishUnlessTransitioning() }
         var state = (try? Data(contentsOf: stateURL(sid))).flatMap { try? JSONDecoder().decode(State.self, from: $0) }
         let currentUserID = vm.agentHistory.last(where: { $0.role == .user })?.dbMessageId
         let newUserTurn = state?.userID != nil && state?.userID != currentUserID
@@ -165,8 +170,6 @@ import ZEUSBrowser
         guard var state else { return }
         // Replay from the server instead of trusting a device cursor that could
         // have been saved just before an iOS termination. Rendering is bounded.
-        let display = ChatMessage(role: .assistant, content: "", blocks: [])
-        vm.messages.append(display)
         var cursor = 0, text = "", tools: [String: AssistantBlock] = [:]
         var parts: [AgentContentPart] = []
         var toolNames: [String: String] = [:]
@@ -177,7 +180,7 @@ import ZEUSBrowser
             guard NativeCloudAccountAPI.ownerID == owner else { throw failure("تغير حساب التطبيق.") }
             if UIApplication.shared.applicationState != .active { try await Task.sleep(for: .seconds(2)); continue }
             let page: [String: Any]
-            do { page = try json(await NativeCloudAccountAPI.runtime("v1/runs/\(state.run)/events?after=\(cursor)")) }
+            do { page = try json(await NativeCloudAccountAPI.runtime("v1/runs/\(state.run)/events?after=\(cursor)&wait=20")) }
             catch {
                 display.error = "انقطع الاتصال بالمراقبة. المهمة مستقلة على الخادم؛ أعد فتح المحادثة للمتابعة."
                 throw error
@@ -194,7 +197,12 @@ import ZEUSBrowser
                 case "text":
                     let delta = data["delta"] as? String ?? ""
                     if textBlock == nil { let block = AssistantBlock(kind: .text, content: ""); display.blocks.append(block); textBlock = block }
-                    text += delta; textBlock?.content += delta
+                    display.isAwaitingModelResponse = false
+                    text += delta
+                    if let block = textBlock, let msgIdx = vm.messages.firstIndex(where: { $0.id == display.id }), let blockIdx = display.blocks.firstIndex(where: { $0.id == block.id }) {
+                        vm.setStreamingTextBlockContent(msgIdx: msgIdx, blockIdx: blockIdx, text: block.content + delta, parsedMarkdown: nil, cacheAttributedString: true, requestScroll: true)
+                        vm.publishUnlessTransitioning()
+                    }
                 case "thinking":
                     if thinkingBlock == nil { let block = AssistantBlock(kind: .thinking, content: ""); display.blocks.append(block); thinkingBlock = block }
                     thinkingBlock?.content += data["delta"] as? String ?? ""
@@ -244,7 +252,7 @@ import ZEUSBrowser
             if let metadata = page["run"] as? [String: Any], metadata["status"] as? String == "waiting_user", let device = metadata["pending_device"] as? String {
                 try await ZeusCloudToolBridge.perform(id: device, vm: vm, run: state.run)
             }
-            display.error = nil; vm.scrollToBottomSignal.send()
+            display.error = nil; vm.publishUnlessTransitioning(); vm.scrollToBottomSignal.send()
             let run = page["run"] as? [String: Any] ?? [:], status = run["status"] as? String ?? ""
             if ["completed", "failed", "cancelled", "interrupted"].contains(status), cursor >= (run["seq"] as? Int ?? 0) {
                 if !text.isEmpty { parts.append(.text(text)) }
@@ -253,11 +261,12 @@ import ZEUSBrowser
                 saved.dbMessageId = await vm.persistAgentMessage(saved)
                 vm.agentHistory.append(saved)
                 ZeusCloudArchive.shared.scheduleBackup()
+                try? await trimTranscriptCache(keeping: sid)
                 state.complete = true; state.submission = nil; try JSONEncoder().encode(state).write(to: stateURL(sid), options: .atomic)
                 if status != "completed" { display.error = run["error"] as? String ?? "توقفت المهمة: \(status). الملفات المحفوظة متاحة في السحابة." }
                 return
             }
-            try await Task.sleep(for: .milliseconds((page["events"] as? [Any])?.isEmpty == false ? 350 : 1000))
+            if status == "waiting_user" { try await Task.sleep(for: .milliseconds(250)) }
         }
     }
     private func submitPending(_ state: inout State, refreshGrant: Bool) async throws {
@@ -301,6 +310,38 @@ import ZEUSBrowser
         vm.isProcessing = true; defer { vm.isProcessing = false }
         do { try await self.run(vm) } catch { vm.errorMessage = error.localizedDescription }
     }
+    func trimTranscriptCache(keeping session: String) async throws {
+        guard NativeCloudAccountAPI.usesCloud else { return }
+        var retained = 1, bytes = await ChatStore.shared.zeusCachedMessageBytes(session)
+        let rows = try await allConversations().sorted { ($0["updated"] as? Double ?? 0) > ($1["updated"] as? Double ?? 0) }
+        for row in rows {
+            guard let raw = row["native_session"] as? [String: Any], let sid = raw["id"] as? String,
+                  sid.lowercased() != session.lowercased(), !observers.contains(sid) else { continue }
+            let size = await ChatStore.shared.zeusCachedMessageBytes(sid)
+            guard size > 0 else { continue }
+            if retained < 3 && bytes + size <= 16 * 1024 * 1024 { retained += 1; bytes += size; continue }
+            var expected: [String: String] = [:], before = 4102444800.0
+            while true {
+                let page = try json(await NativeCloudAccountAPI.runtime("v1/conversations/\(sid)/runs?before=\(before)"))
+                let runs = page["runs"] as? [[String: Any]] ?? []
+                for run in runs where ["completed", "failed", "cancelled", "interrupted"].contains(run["status"] as? String ?? "") {
+                    if let id = run["native_user_id"] as? String, let prompt = run["prompt"] as? String { expected[id.uppercased()] = ZeusCloudCache.encode([["type": "text", "text": prompt]]) }
+                    if let id = run["native_assistant_id"] as? String, let runID = run["id"] as? String {
+                        var events: [[String: Any]] = [], cursor = 0
+                        while cursor < (run["seq"] as? Int ?? 0) {
+                            let data = try json(await NativeCloudAccountAPI.runtime("v1/runs/\(runID)/events?after=\(cursor)"))
+                            let batch = data["events"] as? [[String: Any]] ?? []
+                            guard !batch.isEmpty else { throw failure("سجل السحابة غير مكتمل؛ تبقى النسخة المحلية.") }
+                            events += batch; cursor = batch.last?["seq"] as? Int ?? cursor
+                        }
+                        expected[id.uppercased()] = ZeusCloudCache.eventsSignature(events)
+                    }
+                }
+                guard runs.count == 25, let next = page["before"] as? Double, next < before else { break }; before = next
+            }
+            _ = await ChatStore.shared.zeusEvictVerifiedCloudMessages(sid, expected: expected)
+        }
+    }
     private func allConversations() async throws -> [[String: Any]] {
         var result: [[String: Any]] = [], after = ""
         while true {
@@ -312,6 +353,7 @@ import ZEUSBrowser
         return result
     }
     func restoreSessionIndex() async throws {
+        try await ZeusCloudDeletion.shared.sync(fetchRemote: true)
         for record in try await allConversations() {
             guard let raw = record["native_session"] as? [String: Any] else { continue }
             let session = try JSONDecoder().decode(ChatSession.self, from: JSONSerialization.data(withJSONObject: raw))

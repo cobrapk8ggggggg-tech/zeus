@@ -14,6 +14,13 @@ import UIKit
         XCTAssertEqual(ZeusToolPresentation.output(result, name: "shell_execute"), "Linux\nfile.txt\n")
         XCTAssertEqual(ZeusToolPresentation.output(result, name: "file_read"), result, "Actual file JSON must remain unchanged")
     }
+    func testCloudCacheRequiresMatchingContentAndRefusesEditedMessages() {
+        let original: [ContentPart] = [.text("original cloud reply")]
+        let edited: [ContentPart] = [.text("user edited reply")]
+        let events: [[String: Any]] = [["kind": "text", "data": ["delta": "original cloud reply"]]]
+        XCTAssertEqual(ZeusCloudCache.signature(original), ZeusCloudCache.eventsSignature(events))
+        XCTAssertNotEqual(ZeusCloudCache.signature(edited), ZeusCloudCache.eventsSignature(events))
+    }
     private func proposal(remote: Bool = false, repository: String = "fixture-owner/project") throws -> [String: Any] {
         let raw = remote ? #"""
         {"title":"Audio app project","objective":"Implement and verify the approved audio product","platform":"ios",

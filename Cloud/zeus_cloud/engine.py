@@ -137,13 +137,13 @@ class Engine:
                         text, calls, buffered = "", [], ""
                         thinking, thinking_count = "", 0
                         thinking_flush = time.monotonic()
-                        last_flush = time.monotonic()
+                        last_flush = time.monotonic() - 1
                         async for event in self.models.stream(provider, messages, self.catalog(run), run.get("instructions", "") + "\n" + INSTRUCTIONS + resource_instructions() + builtin_instructions()):
                             if event["kind"] == "text":
                                 text += event["text"]; buffered += event["text"]
                                 if len(text) > 512_000: raise ValueError("Reply exceeds the configured limit")
                                 possible_protocol = text.lstrip().startswith(("{", "<tool_call>")) and len(text) <= 12000
-                                if not possible_protocol and (len(buffered) >= 2048 or time.monotonic() - last_flush >= 0.5):
+                                if not possible_protocol and (len(buffered) >= 2048 or time.monotonic() - last_flush >= 0.15):
                                     await self.store.event(owner, identifier, "text", {"delta": buffered}); buffered = ""; last_flush = time.monotonic()
                             elif event["kind"] == "tool": calls.append(event)
                             elif event["kind"] == "thinking":
