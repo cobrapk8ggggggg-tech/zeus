@@ -132,6 +132,31 @@ def embed(native, browser, report):
     replace(rootfs, "    func installIfNeeded() throws {", "    func installIfNeeded() throws {\n        Self.zeusLifecycleLock.lock(); defer { Self.zeusLifecycleLock.unlock() }")
     replace(rootfs, "    func reset(keepUserData: Bool = false) throws -> URL? {", "    func reset(keepUserData: Bool = false) throws -> URL? {\n        Self.zeusLifecycleLock.lock(); defer { Self.zeusLifecycleLock.unlock() }")
     # Math rendering is on demand and never needs a persistent website store.
+    crash = source / "Diagnostics/CrashReporter.swift"
+    replace(crash, "import Foundation", "import Foundation\nimport Darwin")
+    crash_code = crash.read_text()
+    scan_start = crash_code.index("    /// [T-crash-injected-dylib-tag] Names of loaded images")
+    scan_end = crash_code.index("\n    }", crash_code.index("    static func detectInjectedDylibs()", scan_start)) + len("\n    }")
+    replace(crash, crash_code[scan_start:scan_end], '''    /// Optional diagnostic markers only, never enforcement. dyld image-name
+    /// enumeration can race image loading/unloading; startup SIGSEGV reports
+    /// pointed into the former String.contains scan. Resolve a bounded set of
+    /// known exports through the loader's supported synchronized API instead.
+    private static let injectedMarkersLock = NSLock()
+    private static var cachedInjectedDylibs: [String]?
+    static func detectInjectedDylibs() -> [String] {
+        injectedMarkersLock.lock(); defer { injectedMarkersLock.unlock() }
+        if let cached = cachedInjectedDylibs { return cached }
+        let handle = UnsafeMutableRawPointer(bitPattern: -2) // Darwin RTLD_DEFAULT
+        let exports = ["MSHookFunction", "MSHookMessageEx", "substitute_hook_functions", "substitute_hook_objc_message", "LHHookFunctions", "LBHookMessage"]
+        var found: [String] = []
+        for name in exports {
+            if dlsym(handle, name) != nil { found.append(name) }
+        }
+        cachedInjectedDylibs = found
+        return found
+    }''')
+    replace(crash, "Injected tweak/hook dylibs detected in-process:", "Runtime hook exports detected:")
+    replace(crash, 'report += "\\n⚠️ Injected:', 'report += "\\nRuntime hook exports:')
     replace(app, "        KaTeXRenderer.shared.warmUp()", "        // ZEUS: create the math renderer only when a formula needs it.")
     replace(source / "Agent/Markdown/KaTeXRenderer.swift", "        let config = WKWebViewConfiguration()", "        let config = WKWebViewConfiguration()\n        config.websiteDataStore = .nonPersistent()")
     logging = source / "Shared/LoggingManager.swift"

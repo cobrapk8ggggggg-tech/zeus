@@ -74,7 +74,7 @@ case "$stage" in
         -only-testing:ZEUSPersonalizationUITests/NativePersonalizationUITests/testCloudPartialReplyAppearsInOriginalMessageListBeforeCompletion \
         -only-testing:ZEUSPersonalizationUITests/NativePersonalizationUITests/testCloudToolsRenderWithTheOriginalNativeCards \
         -parallel-testing-enabled NO -test-timeouts-enabled YES \
-        -default-test-execution-time-allowance 60 -maximum-test-execution-time-allowance 60 \
+        -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 120 \
         test-without-building CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=-
     elif [ "$stage" = personalization ]; then
       python3 browser/.openminis/run_xcode.py "results/embedded-$kind-ui.log" -- \

@@ -4,6 +4,17 @@ import CryptoKit
 @testable import Minis
 
 @MainActor final class NativeProjectContractTests: XCTestCase {
+    func testCrashDiagnosticsRemainStableWhenRequestedConcurrently() async {
+        let initial = CrashReporter.detectInjectedDylibs()
+        let results = await withTaskGroup(of: [String].self, returning: [[String]].self) { group in
+            for _ in 0..<16 { group.addTask { CrashReporter.detectInjectedDylibs() } }
+            var values: [[String]] = []
+            for await value in group { values.append(value) }
+            return values
+        }
+        XCTAssertEqual(results.count, 16)
+        XCTAssertTrue(results.allSatisfy { $0 == initial })
+    }
     func testPristineLocalOSCanBeRemovedButEditsUnknownFilesAndSymlinksArePreserved() throws {
         let fm = FileManager.default
         let parent = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
