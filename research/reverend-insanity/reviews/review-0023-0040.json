@@ -1,0 +1,1249 @@
+{
+  "reviewed_files": [
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40
+  ],
+  "next_action": "Read41–60 in full; assess rock gamble outcome ex ante; extend corpus evidence and continue toward500 without treating automatic indexing as reading.",
+  "next_batch_end": 60,
+  "records": {
+    "facts": [
+      {
+        "id": "F-0041",
+        "subject": "GU-MOONLIGHT",
+        "predicate": "feeding",
+        "value": "وجبتان يوميًا كل منهما بتلتان؛ الخمر الجيد يدعم الدودة4 أيام؛ السادسة تتغذى من نهر الزمن",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0023",
+        "line_start": 119,
+        "line_end": 147,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0042",
+        "subject": "CHAR-FY",
+        "predicate": "inventory",
+        "value": "يشتري5 جرار إضافية بعشرة أحجار؛ البتلات لا تصمد أكثر من5 أيام دون تخزين خاص",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0023",
+        "line_start": 249,
+        "line_end": 257,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0043",
+        "subject": "WORLD",
+        "predicate": "gu_limits",
+        "value": "عدد الغو المصقول غير محدود نظريًا لكن الغذاء والجوهر يحدان الحمل العملي",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0023",
+        "line_start": 299,
+        "line_end": 337,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0044",
+        "subject": "CHAR-FY",
+        "predicate": "learning",
+        "value": "يستمع إلى مدرب أقل خبرة للتحقق والمراجعة وينتقد طريقة التعليم لا قيمة كل محتواه",
+        "epistemic_type": "self_report",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0024",
+        "line_start": 117,
+        "line_end": 155,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0045",
+        "subject": "CHAR-FZ",
+        "predicate": "anxiety",
+        "value": "الضربة الأولى أخطأت الصدر نحو الرقبة بسبب توتره ثم استعاد التحكم",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0025",
+        "line_start": 13,
+        "line_end": 39,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0046",
+        "subject": "CHAR-ACADEMY-ELDER",
+        "predicate": "politics",
+        "value": "يفضل الأصغر عند تساوي النتائج لتجنب صراع مو/تشي ولصلته بفصيل الزعيم",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0025",
+        "line_start": 121,
+        "line_end": 131,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0047",
+        "subject": "CHAR-FY",
+        "predicate": "assessment",
+        "value": "أخطأ النصل الأول عمدًا ثم فصل رأس الدمية بنصلين متتاليين",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0025",
+        "line_start": 139,
+        "line_end": 193,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0048",
+        "subject": "CHAR-FY",
+        "predicate": "resources",
+        "value": "استلم3 أحجار بدلًا و10 مكافأة التقييم",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0026",
+        "line_start": 15,
+        "line_end": 29,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0049",
+        "subject": "CHAR-FY",
+        "predicate": "institution_experience",
+        "value": "أنشأ في حياته السابقة تسلسل رتب ومنافع بطائفته واستخدمه لإدارة أتباعه",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0026",
+        "line_start": 151,
+        "line_end": 159,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0050",
+        "subject": "CHAR-FY",
+        "predicate": "restraint",
+        "value": "يضبط ضربات الطلاب بحيث لا يحدث جرح خطير فعلًا في هذا المشهد",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0027",
+        "line_start": 105,
+        "line_end": 113,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0051",
+        "subject": "CHAR-ACADEMY-ELDER",
+        "predicate": "tolerance",
+        "value": "يقبل انتزاع حجر واحد من بدل3، وكان سيتدخل عند حجرين",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0028",
+        "line_start": 189,
+        "line_end": 203,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0052",
+        "subject": "CHAR-FY",
+        "predicate": "bounded_taking",
+        "value": "يأخذ حجرًا واحدًا فقط من فتاة عرضت كل مالها",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0028",
+        "line_start": 157,
+        "line_end": 173,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0053",
+        "subject": "CHAR-FY",
+        "predicate": "balance",
+        "value": "يسجل النص56 من الزملاء ورصيدًا79 قبل شراء خمر جديد",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0028",
+        "line_start": 265,
+        "line_end": 269,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0054",
+        "subject": "CHAR-FY",
+        "predicate": "inventory",
+        "value": "شراء20 جرة مقابل40 ورصيد39",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0029",
+        "line_start": 11,
+        "line_end": 15,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0055",
+        "subject": "GU-LIQUOR",
+        "predicate": "conversion",
+        "value": "10 نقاط مئوية لتشغيل الدودة ثم10 تتحول إلى5 من جوهر الوسطى؛ تقدير180 لملء44",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0029",
+        "line_start": 59,
+        "line_end": 101,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0056",
+        "subject": "CHAR-CHI-LIAN",
+        "predicate": "incentives",
+        "value": "رفض تدخل علني لإنقاذ صورة الوارث المستقل؛ دعم مستتر ممكن؛ أقر بغش الموهبة",
+        "epistemic_type": "speaker_report",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0029",
+        "line_start": 203,
+        "line_end": 225,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0057",
+        "subject": "CHAR-FZ",
+        "predicate": "conflict",
+        "value": "يفكر بالترافع عن أخيه بين رابطة الدم والخوف من حكم الناس والاستياء",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0030",
+        "line_start": 29,
+        "line_end": 47,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0058",
+        "subject": "FAC-GY",
+        "predicate": "social_effect",
+        "value": "لا عقاب بعد الابتزاز؛ حماس تدريب وعداء وعزلة جماعية للأكبر",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0030",
+        "line_start": 101,
+        "line_end": 143,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0059",
+        "subject": "CHAR-MO-YAN",
+        "predicate": "cultivation",
+        "value": "أخت مو بي؛ المرتبة2 المرحلة الوسطى",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0031",
+        "line_start": 17,
+        "line_end": 19,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0060",
+        "subject": "FAC-GY",
+        "predicate": "wolf_intelligence",
+        "value": "تقرير مو يان يتوقع موجة العام المقبل ويقدر3 ذئاب تاج رعدي",
+        "epistemic_type": "speaker_report",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0031",
+        "line_start": 65,
+        "line_end": 79,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0061",
+        "subject": "CHAR-FY",
+        "predicate": "misdirection",
+        "value": "أثار الشك في هويته دون تصريح أنه الأصغر ثم نقل المواجهة للمهجع",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0032",
+        "line_start": 115,
+        "line_end": 151,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0062",
+        "subject": "FAC-GY",
+        "predicate": "dorm_rule",
+        "value": "حماية الطلاب داخل المهجع من دخول آخرين للقبض عليهم",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0033",
+        "line_start": 19,
+        "line_end": 47,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0063",
+        "subject": "CHAR-FY",
+        "predicate": "physical_limit",
+        "value": "تلقى صدًا مؤلمًا فعرف أن القتال الجسدي وحده لا يكفي ضد غاو وان",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0034",
+        "line_start": 103,
+        "line_end": 131,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0064",
+        "subject": "CHAR-GAO-WAN",
+        "predicate": "wrong_model",
+        "value": "توقع نصل بداية ضعيفًا ولم يعرف جوهر الوسطى الذي تتيحه الدودة",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0035",
+        "line_start": 51,
+        "line_end": 59,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0065",
+        "subject": "CHAR-FY",
+        "predicate": "secrecy",
+        "value": "يفكر أن الجروح تكشف الجوهر والدودة؛ لا جوهر كافيًا لقتل كل الشهود فيأخذ الجثة والسيف",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0035",
+        "line_start": 137,
+        "line_end": 165,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0066",
+        "subject": "CHAR-ACADEMY-ELDER",
+        "predicate": "counterweight",
+        "value": "سمح بمضايقة مو يان لتخفيف نفوذ الأكبر ولم يتوقع قتل الخادم",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0036",
+        "line_start": 87,
+        "line_end": 107,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0067",
+        "subject": "CHAR-FY",
+        "predicate": "framing",
+        "value": "اعترف باستعمال الغو وذكر30 غرامة؛ ادعى دفاعًا عن النفس وشبهة جاسوس",
+        "epistemic_type": "speaker_report",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0036",
+        "line_start": 175,
+        "line_end": 213,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0068",
+        "subject": "CHAR-MO-ELDER",
+        "predicate": "interpretation",
+        "value": "يفسر وضع الصندوق بالخلف كتسوية مع تهديد بنشر البقية في الأمام",
+        "epistemic_type": "speaker_report",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0037",
+        "line_start": 115,
+        "line_end": 133,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0069",
+        "subject": "CHAR-MO-ELDER",
+        "predicate": "settlement",
+        "value": "قرر حبس مو يان7 أيام وتعويض الأكبر30 وأهل غاو وان50 مع إخراجهم",
+        "epistemic_type": "speaker_report",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0037",
+        "line_start": 149,
+        "line_end": 159,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0070",
+        "subject": "CHAR-FY",
+        "predicate": "political_risk",
+        "value": "يؤكد قصد التسوية والتهديد؛ يقر بأن عائلة مو تستطيع قمعه إن قبلت خسارة سمعتها",
+        "epistemic_type": "self_report",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0038",
+        "line_start": 251,
+        "line_end": 301,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0071",
+        "subject": "CHAR-FY",
+        "predicate": "settlement_received",
+        "value": "يشهد تفكيره بتنفيذ غرامة30 وتعويض30؛ رصيد مذكور98",
+        "epistemic_type": "self_report",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0039",
+        "line_start": 197,
+        "line_end": 205,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0072",
+        "subject": "CHAR-FY",
+        "predicate": "opportunity_cost",
+        "value": "يفوت شراء عشب موفر للغذاء كي لا يفوته ضفدع من فرصة زمنية يتذكرها",
+        "epistemic_type": "self_report",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0039",
+        "line_start": 217,
+        "line_end": 223,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0073",
+        "subject": "CHAR-FY",
+        "predicate": "past_business",
+        "value": "عمل بالقافلة وبمتجر قمار ثم أدار متجرًا متوسطًا؛ أخطأ التقدير أحيانًا",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0040",
+        "line_start": 103,
+        "line_end": 107,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0074",
+        "subject": "CHAR-FY",
+        "predicate": "risk_budget",
+        "value": "ذاكرة غامضة؛98 تكفي9 قطع اسميًا لكن احتياطي المعيشة يحصر الحد في7",
+        "epistemic_type": "self_report",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0040",
+        "line_start": 139,
+        "line_end": 175,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0075",
+        "subject": "CHAR-FY",
+        "predicate": "estimate",
+        "value": "استبعد بالشكل والحجم واختار6 قطع؛ ثقته الذاتية80% وليست احتمالًا مثبتًا",
+        "epistemic_type": "self_report",
+        "confidence": "high for attribution",
+        "chapter_id": "SRC-0040",
+        "line_start": 177,
+        "line_end": 225,
+        "status": "reviewed"
+      }
+    ],
+    "events": [
+      {
+        "id": "EV-MAIN-0038",
+        "timeline": "main",
+        "description": "اشترى احتياطي خمر بعد تحذير محدودية التوريد",
+        "chapter_id": "SRC-0023",
+        "line_start": 225,
+        "line_end": 259,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0039",
+        "timeline": "main",
+        "description": "اختبار نصل متعمد الخطأ ثم قطع رأس الدمية وصدمة الأصغر",
+        "chapter_id": "SRC-0025",
+        "line_start": 139,
+        "line_end": 205,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0040",
+        "timeline": "main",
+        "description": "تسلم مكافأة10 وبدل3",
+        "chapter_id": "SRC-0026",
+        "line_start": 15,
+        "line_end": 29,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0041",
+        "timeline": "main",
+        "description": "مواجهة بدنية مضبوطة لاستلاب الأحجار",
+        "chapter_id": "SRC-0027",
+        "line_start": 15,
+        "line_end": 113,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0042",
+        "timeline": "main",
+        "description": "استدعاء حظر الغو ثم أخذ حجر واحد رغم عرض المزيد",
+        "chapter_id": "SRC-0028",
+        "line_start": 135,
+        "line_end": 173,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0043",
+        "timeline": "main",
+        "description": "تكليف المجموعة الأخيرة بجمع56 حجرًا من بقية الطلاب",
+        "chapter_id": "SRC-0028",
+        "line_start": 239,
+        "line_end": 269,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0044",
+        "timeline": "main",
+        "description": "شراء20 جرة من موارد السلب",
+        "chapter_id": "SRC-0029",
+        "line_start": 11,
+        "line_end": 15,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0045",
+        "timeline": "main",
+        "description": "ظهور تدريب جماعي وعداء بعد عدم تدخل الشيوخ",
+        "chapter_id": "SRC-0030",
+        "line_start": 101,
+        "line_end": 143,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0046",
+        "timeline": "main",
+        "description": "تكرار السلب بعد بدل الأسبوع التالي",
+        "chapter_id": "SRC-0030",
+        "line_start": 147,
+        "line_end": 177,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0047",
+        "timeline": "main",
+        "description": "الجد يمنع مو يان من التدخل وهي تضمر مخالفة",
+        "chapter_id": "SRC-0031",
+        "line_start": 81,
+        "line_end": 127,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0048",
+        "timeline": "main",
+        "description": "استغلال اشتباه التوأمة لنقل المواجهة إلى المهجع",
+        "chapter_id": "SRC-0032",
+        "line_start": 115,
+        "line_end": 151,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0049",
+        "timeline": "main",
+        "description": "حماية المهجع وفتح الباب لإحباط الاقتحام",
+        "chapter_id": "SRC-0033",
+        "line_start": 19,
+        "line_end": 87,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0050",
+        "timeline": "main",
+        "description": "انسحاب مو يان وترك غاو وان للحراسة",
+        "chapter_id": "SRC-0033",
+        "line_start": 139,
+        "line_end": 149,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0051",
+        "timeline": "main",
+        "description": "اختبار ضربة على غاو وان وفشلها والتراجع",
+        "chapter_id": "SRC-0034",
+        "line_start": 97,
+        "line_end": 117,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0052",
+        "timeline": "main",
+        "description": "استعمال نصل أقوى من المتوقع وقتل غاو وان",
+        "chapter_id": "SRC-0035",
+        "line_start": 21,
+        "line_end": 103,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0053",
+        "timeline": "main",
+        "description": "استرداد الجثة والسيف مع خطر كشف الجوهر",
+        "chapter_id": "SRC-0035",
+        "line_start": 137,
+        "line_end": 165,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0054",
+        "timeline": "main",
+        "description": "مواجهة الشيخ وتقديم رواية دفاع وإقرار بالصندوق",
+        "chapter_id": "SRC-0036",
+        "line_start": 175,
+        "line_end": 229,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0055",
+        "timeline": "main",
+        "description": "قراءة الجد الرسالة وقرار تسوية مع عقوبات وتعويضات",
+        "chapter_id": "SRC-0037",
+        "line_start": 115,
+        "line_end": 159,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0056",
+        "timeline": "main",
+        "description": "تأكيد تنفيذ التعويض والغرامة",
+        "chapter_id": "SRC-0039",
+        "line_start": 197,
+        "line_end": 205,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0057",
+        "timeline": "main",
+        "description": "تجاوز العشب والذهاب إلى فرصة المقامرة",
+        "chapter_id": "SRC-0039",
+        "line_start": 217,
+        "line_end": 223,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0058",
+        "timeline": "main",
+        "description": "فرز20 حفرية وتحديد6 دون فتحها بعد",
+        "chapter_id": "SRC-0040",
+        "line_start": 139,
+        "line_end": 225,
+        "confidence": "high"
+      }
+    ],
+    "decisions": [
+      {
+        "id": "DEC-FY-0020",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0023",
+        "record": {
+          "situation": "خبر نفاد الخمر قبل القافلة",
+          "information": "تحذير النزل معقول وقابلية تخزين الخمر",
+          "unknown": "موعد الطلب وكميته الدقيقة",
+          "goal": "ضمان الغذاء وإخفاء شراء كميات خمر رديء",
+          "decision": "خمس جرار إضافية بعشرة",
+          "options": "انتظار أو شراء أقل أو خمر رديء",
+          "risks": "تجميد السيولة",
+          "resources": "20 حجرًا قبل الطلب",
+          "reason": "تخزين ممكن وغذاء أرخص بالكمية لا بالاسم",
+          "result": "شراء وتوصيل إلى المهجع",
+          "evaluation": "قرار مورد وسرية متسق لا ترف",
+          "impact": "قل الاحتياطي وزادت حاجة المكافأة",
+          "source_refs": "23.txt:225–259",
+          "confidence": "high for acts; inference explicitly marked"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0021",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0025",
+        "record": {
+          "situation": "حاجة10 أحجار وسط تقييم",
+          "information": "منافسة وموهبته القتالية وحاجة مال",
+          "unknown": "لا مصدر يثبت معرفة باطن الشيخ",
+          "goal": "نتيجة تفوق التوقع مع مظهر غير محسوم",
+          "decision": "تعمد خطأ ثم نصلان للرقبة",
+          "options": "أداء تقليدي أو إظهار كل الدقة؛ استنباط",
+          "risks": "إضاعة فرصة من3 وزيادة الانتباه",
+          "resources": "خبرة التحكم وجوهر",
+          "reason": "النية بتعمد الخطأ صريحة؛ السبب الكامل غير مصرح",
+          "result": "فصل الرأس وحصل على10 لاحقًا",
+          "evaluation": "لا نخترع أن الخطأ الأول ضرورة للفوز",
+          "impact": "تزايد انتباه الشيخ وشكوك الطلاب",
+          "source_refs": "25.txt:139–205؛26.txt:15–29",
+          "confidence": "high for acts; inference explicitly marked"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0022",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0028",
+        "record": {
+          "situation": "طلب حجر من كل طالب",
+          "information": "التفاوت البدني واللوائح؛29 يشرح توقعه للسماح",
+          "unknown": "لا إثبات لعلمه بحد الشيخ العددي الداخلي",
+          "goal": "مورد متكرر دون قمع مؤسسي",
+          "decision": "ضبط الضربات وحجر واحد حتى لو عرض المزيد",
+          "options": "سلب كل المال أو دخل أبطأ؛ استنباط",
+          "risks": "إصابات واستدعاء تدخل وعداوات",
+          "resources": "خبرة وبوابة واحدة",
+          "reason": "29:127–175 يشرح تمييز القتال المعتدل من القتل",
+          "result": "56 حجرًا دون تدخل",
+          "evaluation": "ليس ضمانًا لكل مؤسسة أو كل ظرف",
+          "impact": "يمول الخمر وينشأ تدريب مضاد",
+          "source_refs": "27.txt:105–113؛28.txt:157–203،265؛29.txt:119–175",
+          "confidence": "high for acts; inference explicitly marked"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0023",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0032",
+        "record": {
+          "situation": "مو يان الثانية تلاحقه",
+          "information": "التوأمة وقواعد المهجع ودافع خصوم",
+          "unknown": "هل ستتجاوز كلفة القاعدة",
+          "goal": "نقل الصدام لموقع يمنحه حماية",
+          "decision": "غموض هوية ثم اقتراح المهجع",
+          "options": "قتال أو فرار أو تفاوض مباشر؛ مستنبطة",
+          "risks": "التعرف عليه وضربه قبل الحماية",
+          "resources": "شبه التوأمين وموقع المهجع",
+          "reason": "الحوار لا يتضمن ادعاء صريحًا أنه الأصغر",
+          "result": "تابعته ثم عجزت عن القبض داخل الغرفة",
+          "evaluation": "التفسير قائم على قيودها السياسية لا تفوقه القتالي",
+          "impact": "تأخير ومغادرة مو يان",
+          "source_refs": "32.txt:115–197؛33.txt:19–47",
+          "confidence": "high for acts; inference explicitly marked"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0024",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0033",
+        "record": {
+          "situation": "تهديد باقتحام المهجع",
+          "information": "مو يان تخشى أثر خرق القواعد",
+          "unknown": "مدى ضبط غضبها؛ نسبة50 تقدير داخل النص",
+          "goal": "تفادي الاقتحام وعدم هدر التدريب",
+          "decision": "فتح الباب كاملًا ثم التدريب والصمت",
+          "options": "إغلاق الباب أو الاستجابة للاستفزاز",
+          "risks": "ضربة واحدة منها تكفي للقبض",
+          "resources": "حماية المكان وتحليل شخصيتها",
+          "reason": "يراهن على حذرها أمام استفزاز واضح",
+          "result": "غادرت وتركَت الخادم",
+          "evaluation": "تنجح هذه المرة؛ الاحتمالات ليست إحصاء موضوعيًا",
+          "impact": "فرصة انتظار الأقوى حتى تغادر",
+          "source_refs": "33.txt:59–143",
+          "confidence": "high for acts; inference explicitly marked"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0025",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0034",
+        "record": {
+          "situation": "بقاء غاو وان بعد خروج مو يان",
+          "information": "راقبه أثناء رفع الجوهر والبدن البالغ أقوى",
+          "unknown": "قدرة صد الضربة الدقيقة قبل تجربتها",
+          "goal": "إنهاء الحصار",
+          "decision": "اختبار هجوم ثم تراجع؛ لاحقًا غو",
+          "options": "البقاء أو القتال؛ مستنبطة",
+          "risks": "إصابة وعقوبة استعمال وكشف جوهر",
+          "resources": "جوهر مكرر وخبرة",
+          "reason": "الصد صحح تقدير القدرة الجسدية",
+          "result": "ألمه ساعد خصمه ولم تنجح ضربة الحسم",
+          "evaluation": "خبرة العقل لا تمحو حد الجسد",
+          "impact": "استخدام سلاح بعيد أقوى",
+          "source_refs": "34.txt:81–117؛35.txt:3–27",
+          "confidence": "high for acts; inference explicitly marked"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0026",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0035",
+        "record": {
+          "situation": "التحمل ينفد وخصم يتراجع",
+          "information": "الرتبة الاجتماعية والجوهر الأعلى الفعلي",
+          "unknown": "باقي سياسي بعد القتل",
+          "goal": "قتل الخصم وإخفاء أثر الدودة",
+          "decision": "استعمال الغو ومطاردة ثم استرداد الجثة",
+          "options": "تركه يفر أو تسوية أو قتال جسماني؛ تحليل",
+          "risks": "مخالفة القاعدة وانكشاف السر ونقص الجوهر",
+          "resources": "نصل أعلى توقع الخصم وأقل10% بعد القتال",
+          "reason": "سبب استرداد الجثة مصرح؛ كل غاية المطاردة ليست مفصلة",
+          "result": "قُتل؛ أخذ الجثة والسيف",
+          "evaluation": "لا يصور القانون حصانة مطلقة؛ غرامة وسياق تفاوت طبقي",
+          "impact": "رسالة وتسوية وتوتر الشيخ",
+          "source_refs": "35.txt:21–165",
+          "confidence": "high for acts; inference explicitly marked"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0027",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0036",
+        "record": {
+          "situation": "استدعاء الشيخ",
+          "information": "الموت حدث وخصمه خادم واللوائح",
+          "unknown": "قرار الشيخ ومو النهائي",
+          "goal": "تحديد مسؤولية محدودة وتحويل المخاطرة للخصم",
+          "decision": "ذكر الغرامة ودفاع وشبهة جاسوس",
+          "options": "صمت أو اعتذار أو تبرير آخر؛ تحليل",
+          "risks": "الادعاء قابل للاعتراض وغضب عائلة",
+          "resources": "فجوة معلومات وحاجة المؤسسة لتفسير",
+          "reason": "الجاسوس احتمال يدعيه لا حقيقة مصدرية",
+          "result": "الشيخ يؤجل العقوبة",
+          "evaluation": "حجة محاولة القتل لا تطابق نية غاو المقيدة المثبتة34:187–193",
+          "impact": "يتجه الملف للتسوية السياسية",
+          "source_refs": "36.txt:175–231",
+          "confidence": "high for acts; inference explicitly marked"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0028",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0038",
+        "record": {
+          "situation": "قتل خادم أسرة نافذة",
+          "information": "خطؤهم الأول وصراع مو/تشي/الزعيم",
+          "unknown": "قدرتهم على التضحية بالسمعة؛ يقر بها",
+          "goal": "تسوية تحفظ تهديدًا وستر أثر",
+          "decision": "الصندوق بالخلف لا بالأمام",
+          "options": "تصعيد علني أو اعتذار أو إخفاء كامل؛ مستنبط",
+          "risks": "قد يقبل الخصم الضرر ويقمعه",
+          "resources": "سمعة المنافس وحساسيته للسابقة",
+          "reason": "قصد التسوية والتهديد تؤيده38:293–295 بعد تفسير37",
+          "result": "قرار30 تعويض يثبت تنفيذه39:197–199",
+          "evaluation": "التوقع نجاح عقلاني لا انتصار مضمون",
+          "impact": "استقرار مؤقت وتصاعد رهبة",
+          "source_refs": "37.txt:115–157؛38.txt:251–301؛39.txt:197–199",
+          "confidence": "high for acts; inference explicitly marked"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0029",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0039",
+        "record": {
+          "situation": "عرض عشب موفر وطعم مقامرة نادر",
+          "information": "ذاكرة الليلة الأولى وقيمة الوقت",
+          "unknown": "الصخرة الدقيقة ومن سبقه",
+          "goal": "صفقة أكبر قبل زوالها",
+          "decision": "تجاوز شراء العشب والذهاب للخيمة",
+          "options": "الشراء أولًا أو ترك الرهان",
+          "risks": "فقد التوفير وربما خسارة مقامرة",
+          "resources": "98 حجرًا ومعرفة ناقصة",
+          "reason": "الأولوية للمكسب الكبير القابل للفوات",
+          "result": "وصل وفحص دون فتح حتى40",
+          "evaluation": "لا يسجل حصوله على الضفدع قبل وقوعه",
+          "impact": "وضع احتياطي وحد أقصى7 ثم اختيار6",
+          "source_refs": "39.txt:217–223؛40.txt:139–225",
+          "confidence": "high for acts; inference explicitly marked"
+        },
+        "status": "reviewed"
+      }
+    ],
+    "causal_edges": [
+      {
+        "id": "CE-0029",
+        "source_event": "EV-MAIN-0038",
+        "target_event": "EV-MAIN-0044",
+        "relation_type": "temporal_only",
+        "evidence": "23.txt:249–259؛29.txt:11–15؛ دفعتان مستقلتان",
+        "confidence": "high",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0030",
+        "source_event": "EV-MAIN-0039",
+        "target_event": "EV-MAIN-0040",
+        "relation_type": "direct_cause",
+        "evidence": "25.txt:183–193؛26.txt:15–29",
+        "confidence": "high",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0031",
+        "source_event": "EV-MAIN-0040",
+        "target_event": "EV-MAIN-0041",
+        "relation_type": "contributing_factor",
+        "evidence": "26.txt:7–23،173–189؛ توقيت توزيع مال قابل للاستخراج",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0032",
+        "source_event": "EV-MAIN-0041",
+        "target_event": "EV-MAIN-0043",
+        "relation_type": "contributing_factor",
+        "evidence": "27.txt:105–113؛28.txt:237–265",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0033",
+        "source_event": "EV-MAIN-0043",
+        "target_event": "EV-MAIN-0044",
+        "relation_type": "contributing_factor",
+        "evidence": "28.txt:265–269؛29.txt:11–15",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0034",
+        "source_event": "EV-MAIN-0041",
+        "target_event": "EV-MAIN-0045",
+        "relation_type": "direct_cause",
+        "evidence": "30.txt:103–113",
+        "confidence": "high",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0035",
+        "source_event": "EV-MAIN-0045",
+        "target_event": "EV-MAIN-0046",
+        "relation_type": "temporal_only",
+        "evidence": "30.txt:133–177؛ تدريب الزملاء لا يسبب اختيار السلب ذاته",
+        "confidence": "high",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0036",
+        "source_event": "EV-MAIN-0046",
+        "target_event": "EV-MAIN-0047",
+        "relation_type": "contributing_factor",
+        "evidence": "31.txt:3–27،81–127",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0037",
+        "source_event": "EV-MAIN-0047",
+        "target_event": "EV-MAIN-0048",
+        "relation_type": "contributing_factor",
+        "evidence": "31.txt:123–193؛32.txt:115–151",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0038",
+        "source_event": "EV-MAIN-0048",
+        "target_event": "EV-MAIN-0049",
+        "relation_type": "necessary_condition",
+        "evidence": "32.txt:159–197؛33.txt:19–41؛ شرط المواجهة عند هذه العتبة",
+        "confidence": "high",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0039",
+        "source_event": "EV-MAIN-0049",
+        "target_event": "EV-MAIN-0050",
+        "relation_type": "contributing_factor",
+        "evidence": "33.txt:123–149",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0040",
+        "source_event": "EV-MAIN-0050",
+        "target_event": "EV-MAIN-0051",
+        "relation_type": "contributing_factor",
+        "evidence": "34.txt:81–117",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0041",
+        "source_event": "EV-MAIN-0051",
+        "target_event": "EV-MAIN-0052",
+        "relation_type": "contributing_factor",
+        "evidence": "34.txt:113–115؛35.txt:3–27؛ الحاجة لوسيلة فعالة",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0042",
+        "source_event": "EV-MAIN-0052",
+        "target_event": "EV-MAIN-0053",
+        "relation_type": "direct_cause",
+        "evidence": "35.txt:137–151؛ الجروح تستدعي قرار إخفاء الأثر",
+        "confidence": "high",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0043",
+        "source_event": "EV-MAIN-0052",
+        "target_event": "EV-MAIN-0054",
+        "relation_type": "direct_cause",
+        "evidence": "36.txt:79–109،175–185",
+        "confidence": "high",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0044",
+        "source_event": "EV-MAIN-0053",
+        "target_event": "EV-MAIN-0055",
+        "relation_type": "contributing_factor",
+        "evidence": "36.txt:213؛37.txt:115–133؛ الصندوق وسيط رسالة وفق التفسير المؤيد38:293",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0045",
+        "source_event": "EV-MAIN-0055",
+        "target_event": "EV-MAIN-0056",
+        "relation_type": "direct_cause",
+        "evidence": "37.txt:157؛39.txt:197–199",
+        "confidence": "high",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0046",
+        "source_event": "EV-MAIN-0057",
+        "target_event": "EV-MAIN-0058",
+        "relation_type": "contributing_factor",
+        "evidence": "39.txt:217–223؛40.txt:139–145",
+        "confidence": "medium",
+        "status": "reviewed"
+      }
+    ],
+    "knowledge": [
+      {
+        "id": "K-FY-0014",
+        "character_id": "CHAR-FY",
+        "valid_from": "SRC-0023:L225",
+        "valid_until": null,
+        "epistemic_type": "known",
+        "proposition": "تحذير بقرب نفاد خمر جيد بفعل طلب القافلة",
+        "source_ref": "23.txt:225–249",
+        "confidence": "high for attribution"
+      },
+      {
+        "id": "K-FY-0015",
+        "character_id": "CHAR-FY",
+        "valid_from": "SRC-0034:L115",
+        "valid_until": null,
+        "epistemic_type": "known",
+        "proposition": "لا يكفي جسده للغلبة على غاو وان دون غو",
+        "source_ref": "34.txt:103–131",
+        "confidence": "high for attribution"
+      },
+      {
+        "id": "K-FY-0016",
+        "character_id": "CHAR-FY",
+        "valid_from": "SRC-0038:L257",
+        "valid_until": null,
+        "epistemic_type": "inference",
+        "proposition": "قد تعوضه مو؛ يستطيعون مع ذلك قمعه إن قبلوا كلفة السمعة",
+        "source_ref": "38.txt:251–301",
+        "confidence": "high for attribution"
+      },
+      {
+        "id": "K-FY-0017",
+        "character_id": "CHAR-FY",
+        "valid_from": "SRC-0039:L199",
+        "valid_until": null,
+        "epistemic_type": "known",
+        "proposition": "تمت غرامة30 وتعويض30",
+        "source_ref": "39.txt:197–199",
+        "confidence": "high for attribution"
+      },
+      {
+        "id": "K-FY-0018",
+        "character_id": "CHAR-FY",
+        "valid_from": "SRC-0040:L225",
+        "valid_until": null,
+        "epistemic_type": "belief",
+        "proposition": "ثقته80% بوجود ضفدع في إحدى الست المختارة",
+        "source_ref": "40.txt:139–225",
+        "confidence": "high for attribution"
+      },
+      {
+        "id": "K-FZ-0009",
+        "character_id": "CHAR-FZ",
+        "valid_from": "SRC-0028:L209",
+        "valid_until": null,
+        "epistemic_type": "belief",
+        "proposition": "يتوقع طرد أخيه أو لزوم اعترافه بالخطأ",
+        "source_ref": "28.txt:209–217؛30.txt:29–47",
+        "confidence": "high for attribution"
+      },
+      {
+        "id": "K-MO-0001",
+        "character_id": "CHAR-MO-YAN",
+        "valid_from": "SRC-0032:L143",
+        "valid_until": "SRC-0032:L197",
+        "epistemic_type": "belief",
+        "proposition": "قد يكون الذي تلاحقه فانغ تشينغ فتختبر بدل الهجوم",
+        "source_ref": "32.txt:115–147",
+        "confidence": "high for attribution"
+      },
+      {
+        "id": "K-MO-0002",
+        "character_id": "CHAR-MO-YAN",
+        "valid_from": "SRC-0032:L197",
+        "valid_until": null,
+        "epistemic_type": "known",
+        "proposition": "هو الأكبر كما يكشف الحوار",
+        "source_ref": "32.txt:193–197؛33.txt:3–17",
+        "confidence": "high for attribution"
+      },
+      {
+        "id": "K-MO-0003",
+        "character_id": "CHAR-MO-ELDER",
+        "valid_from": "SRC-0037:L119",
+        "valid_until": null,
+        "epistemic_type": "inference",
+        "proposition": "الصندوق رسالة تهديد وتسوية متعددة الجهات",
+        "source_ref": "37.txt:115–133",
+        "confidence": "high for attribution"
+      },
+      {
+        "id": "K-ELDER-0001",
+        "character_id": "CHAR-ACADEMY-ELDER",
+        "valid_from": "SRC-0028:L197",
+        "valid_until": null,
+        "epistemic_type": "concealed",
+        "proposition": "حده التدخل إذا أخذ حجرين لا حجرًا؛ لم يخبر الأكبر بذلك في المشهد",
+        "source_ref": "28.txt:189–203",
+        "confidence": "high for attribution"
+      }
+    ],
+    "entities": [
+      {
+        "id": "CHAR-MO-YAN",
+        "kind": "character",
+        "canonical_name": "غو يوي مو يان",
+        "aliases_json": "[]"
+      },
+      {
+        "id": "CHAR-MO-BEI",
+        "kind": "character",
+        "canonical_name": "غو يوي مو بي",
+        "aliases_json": "[]"
+      },
+      {
+        "id": "CHAR-MO-ELDER",
+        "kind": "character",
+        "canonical_name": "غو يوي مو تشينغ",
+        "aliases_json": "[\"مو تشين\"]"
+      },
+      {
+        "id": "CHAR-CHI-LIAN",
+        "kind": "character",
+        "canonical_name": "غو يوي تشي ليان",
+        "aliases_json": "[]"
+      },
+      {
+        "id": "CHAR-CHI-CHENG",
+        "kind": "character",
+        "canonical_name": "غو يوي تشي تشينغ",
+        "aliases_json": "[\"تشي تشين\"]"
+      },
+      {
+        "id": "CHAR-GAO-WAN",
+        "kind": "character",
+        "canonical_name": "غاو وان",
+        "aliases_json": "[]"
+      },
+      {
+        "id": "CHAR-ACADEMY-ELDER",
+        "kind": "character",
+        "canonical_name": "شيخ الأكاديمية",
+        "aliases_json": "[]"
+      },
+      {
+        "id": "CHAR-JIANG-YA",
+        "kind": "character",
+        "canonical_name": "جيانغ يا",
+        "aliases_json": "[]"
+      },
+      {
+        "id": "CHAR-JIA-FU",
+        "kind": "character",
+        "canonical_name": "جيا فو",
+        "aliases_json": "[]"
+      },
+      {
+        "id": "GU-MOONLIGHT",
+        "kind": "gu",
+        "canonical_name": "غو ضوء القمر",
+        "aliases_json": "[]"
+      },
+      {
+        "id": "GU-LIQUOR",
+        "kind": "gu",
+        "canonical_name": "دودة الخمور",
+        "aliases_json": "[]"
+      },
+      {
+        "id": "FAC-MO",
+        "kind": "faction",
+        "canonical_name": "فرع عائلة مو",
+        "aliases_json": "[]"
+      },
+      {
+        "id": "FAC-CHI",
+        "kind": "faction",
+        "canonical_name": "فرع عائلة تشي",
+        "aliases_json": "[]"
+      }
+    ],
+    "relationships": [
+      {
+        "id": "REL-0007",
+        "subject": "CHAR-MO-YAN",
+        "object": "CHAR-MO-BEI",
+        "relation": "أخت تحاول حمايته خلافًا لأمر الجد",
+        "valid_from": "SRC-0031:L17",
+        "valid_until": null,
+        "source_ref": "31.txt:17–19،117–127",
+        "confidence": "high"
+      },
+      {
+        "id": "REL-0008",
+        "subject": "CHAR-MO-YAN",
+        "object": "CHAR-FY",
+        "relation": "ملاحقة لتلقينه درسًا وإكراه عبر خادم",
+        "valid_from": "SRC-0031:L123",
+        "valid_until": "SRC-0037:L157",
+        "source_ref": "31.txt:123–193؛33.txt:143؛37.txt:157",
+        "confidence": "high"
+      },
+      {
+        "id": "REL-0009",
+        "subject": "FAC-MO",
+        "object": "CHAR-FY",
+        "relation": "قرار تسوية وتعويض وعدم تجديد المتاعب",
+        "valid_from": "SRC-0037:L157",
+        "valid_until": null,
+        "source_ref": "37.txt:157–159؛39.txt:197–199",
+        "confidence": "high"
+      },
+      {
+        "id": "REL-0010",
+        "subject": "FAC-GY-STUDENTS",
+        "object": "CHAR-FY",
+        "relation": "عداء وعزلة بعد السلب ثم خوف من القتل",
+        "valid_from": "SRC-0030:L135",
+        "valid_until": null,
+        "source_ref": "30.txt:135–143؛36.txt:55–69",
+        "confidence": "high"
+      }
+    ]
+  }
+}

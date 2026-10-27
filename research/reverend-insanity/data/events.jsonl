@@ -37,3 +37,24 @@
 {"id": "EV-MAIN-0035", "timeline": "main", "description": "خبر تسلم الأكبر الجائزة وقائمة أسبقيته ثم صدمة الأصغر", "chapter_id": "SRC-0021", "line_start": 55, "line_end": 123, "confidence": "high"}
 {"id": "EV-MAIN-0036", "timeline": "main", "description": "تفسيرات فرعي مو وتشي للحظ وإعلان الجد المساعدة", "chapter_id": "SRC-0021", "line_start": 135, "line_end": 207, "confidence": "high"}
 {"id": "EV-MAIN-0037", "timeline": "main", "description": "اختبار نصل مخفي ونسبته خطأ لطالب آخر", "chapter_id": "SRC-0022", "line_start": 199, "line_end": 239, "confidence": "high"}
+{"id": "EV-MAIN-0038", "timeline": "main", "description": "اشترى احتياطي خمر بعد تحذير محدودية التوريد", "chapter_id": "SRC-0023", "line_start": 225, "line_end": 259, "confidence": "high"}
+{"id": "EV-MAIN-0039", "timeline": "main", "description": "اختبار نصل متعمد الخطأ ثم قطع رأس الدمية وصدمة الأصغر", "chapter_id": "SRC-0025", "line_start": 139, "line_end": 205, "confidence": "high"}
+{"id": "EV-MAIN-0040", "timeline": "main", "description": "تسلم مكافأة10 وبدل3", "chapter_id": "SRC-0026", "line_start": 15, "line_end": 29, "confidence": "high"}
+{"id": "EV-MAIN-0041", "timeline": "main", "description": "مواجهة بدنية مضبوطة لاستلاب الأحجار", "chapter_id": "SRC-0027", "line_start": 15, "line_end": 113, "confidence": "high"}
+{"id": "EV-MAIN-0042", "timeline": "main", "description": "استدعاء حظر الغو ثم أخذ حجر واحد رغم عرض المزيد", "chapter_id": "SRC-0028", "line_start": 135, "line_end": 173, "confidence": "high"}
+{"id": "EV-MAIN-0043", "timeline": "main", "description": "تكليف المجموعة الأخيرة بجمع56 حجرًا من بقية الطلاب", "chapter_id": "SRC-0028", "line_start": 239, "line_end": 269, "confidence": "high"}
+{"id": "EV-MAIN-0044", "timeline": "main", "description": "شراء20 جرة من موارد السلب", "chapter_id": "SRC-0029", "line_start": 11, "line_end": 15, "confidence": "high"}
+{"id": "EV-MAIN-0045", "timeline": "main", "description": "ظهور تدريب جماعي وعداء بعد عدم تدخل الشيوخ", "chapter_id": "SRC-0030", "line_start": 101, "line_end": 143, "confidence": "high"}
+{"id": "EV-MAIN-0046", "timeline": "main", "description": "تكرار السلب بعد بدل الأسبوع التالي", "chapter_id": "SRC-0030", "line_start": 147, "line_end": 177, "confidence": "high"}
+{"id": "EV-MAIN-0047", "timeline": "main", "description": "الجد يمنع مو يان من التدخل وهي تضمر مخالفة", "chapter_id": "SRC-0031", "line_start": 81, "line_end": 127, "confidence": "high"}
+{"id": "EV-MAIN-0048", "timeline": "main", "description": "استغلال اشتباه التوأمة لنقل المواجهة إلى المهجع", "chapter_id": "SRC-0032", "line_start": 115, "line_end": 151, "confidence": "high"}
+{"id": "EV-MAIN-0049", "timeline": "main", "description": "حماية المهجع وفتح الباب لإحباط الاقتحام", "chapter_id": "SRC-0033", "line_start": 19, "line_end": 87, "confidence": "high"}
+{"id": "EV-MAIN-0050", "timeline": "main", "description": "انسحاب مو يان وترك غاو وان للحراسة", "chapter_id": "SRC-0033", "line_start": 139, "line_end": 149, "confidence": "high"}
+{"id": "EV-MAIN-0051", "timeline": "main", "description": "اختبار ضربة على غاو وان وفشلها والتراجع", "chapter_id": "SRC-0034", "line_start": 97, "line_end": 117, "confidence": "high"}
+{"id": "EV-MAIN-0052", "timeline": "main", "description": "استعمال نصل أقوى من المتوقع وقتل غاو وان", "chapter_id": "SRC-0035", "line_start": 21, "line_end": 103, "confidence": "high"}
+{"id": "EV-MAIN-0053", "timeline": "main", "description": "استرداد الجثة والسيف مع خطر كشف الجوهر", "chapter_id": "SRC-0035", "line_start": 137, "line_end": 165, "confidence": "high"}
+{"id": "EV-MAIN-0054", "timeline": "main", "description": "مواجهة الشيخ وتقديم رواية دفاع وإقرار بالصندوق", "chapter_id": "SRC-0036", "line_start": 175, "line_end": 229, "confidence": "high"}
+{"id": "EV-MAIN-0055", "timeline": "main", "description": "قراءة الجد الرسالة وقرار تسوية مع عقوبات وتعويضات", "chapter_id": "SRC-0037", "line_start": 115, "line_end": 159, "confidence": "high"}
+{"id": "EV-MAIN-0056", "timeline": "main", "description": "تأكيد تنفيذ التعويض والغرامة", "chapter_id": "SRC-0039", "line_start": 197, "line_end": 205, "confidence": "high"}
+{"id": "EV-MAIN-0057", "timeline": "main", "description": "تجاوز العشب والذهاب إلى فرصة المقامرة", "chapter_id": "SRC-0039", "line_start": 217, "line_end": 223, "confidence": "high"}
+{"id": "EV-MAIN-0058", "timeline": "main", "description": "فرز20 حفرية وتحديد6 دون فتحها بعد", "chapter_id": "SRC-0040", "line_start": 139, "line_end": 225, "confidence": "high"}

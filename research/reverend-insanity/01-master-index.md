@@ -1,6 +1,6 @@
 # فهرس البحث وحالة الاعتماد
 
-هذه نقطة بداية قابلة للاستئناف، وليست موسوعة مكتملة. جميع النصوص فُهرست آليًا؛ القراءة السياقية المسجلة حتى الآن تخص الملفات 1–22. اكتملت القراءة الأولية للدفعة1–20 مع بقاء مراجعة المقارنة.
+هذه نقطة بداية قابلة للاستئناف، وليست موسوعة مكتملة. جميع النصوص فُهرست آليًا؛ القراءة السياقية المسجلة حتى الآن تخص الملفات 1–40. اكتملت القراءة الأولية للدفعة1–20 مع بقاء مراجعة المقارنة.
 
 - [تدقيق المصدر](00-source-audit.md)
 - [دليل البيانات والتوثيق](data/README.md)
@@ -24,3 +24,5 @@
 تحديث الدفعة: [قراءة7–20](19-research-progress/batch-0007-0020.md)، [تحديث فانغ يوان](06-fang-yuan/model-update-0020.md)، [تطور الأصغر](07-fang-zheng/development-0007-0020.md)، [تعارضات المصدر](18-open-questions/contradictions-0020.md)، [سجل الغو](03-gu-system/gu-register-0020.md)، [انحرافات لاحقة](16-divergence-simulator/dependencies-0020.md).
 
 [بداية الدفعة التالية21–22](19-research-progress/batch-0021-0022.md).
+
+الدفعة23–40: [دفتر القراءة](19-research-progress/batch-0023-0040.md)، [نموذج الأكبر](06-fang-yuan/model-update-0040.md)، [تطور الأصغر](07-fang-zheng/development-0023-0040.md)، [المؤسسات](08-factions/institutions-0040.md)، [الموارد والغو](03-gu-system/resources-and-refinement-0040.md)، [الانحراف](16-divergence-simulator/dependencies-0040.md)، [معايرة الاتساق](17-consistency-audits/audit-calibration-0040.md).

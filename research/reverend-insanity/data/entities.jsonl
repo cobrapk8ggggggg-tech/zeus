@@ -4,3 +4,16 @@
 {"id": "GU-SAC", "kind": "gu", "canonical_name": "غو الربيع والخريف", "aliases_json": "[]"}
 {"id": "GU-HOPE", "kind": "gu", "canonical_name": "غو الأمل", "aliases_json": "[]"}
 {"id": "LOC-QM", "kind": "location", "canonical_name": "جبل تشينغ ماو", "aliases_json": "[]"}
+{"id": "CHAR-MO-YAN", "kind": "character", "canonical_name": "غو يوي مو يان", "aliases_json": "[]"}
+{"id": "CHAR-MO-BEI", "kind": "character", "canonical_name": "غو يوي مو بي", "aliases_json": "[]"}
+{"id": "CHAR-MO-ELDER", "kind": "character", "canonical_name": "غو يوي مو تشينغ", "aliases_json": "[\"مو تشين\"]"}
+{"id": "CHAR-CHI-LIAN", "kind": "character", "canonical_name": "غو يوي تشي ليان", "aliases_json": "[]"}
+{"id": "CHAR-CHI-CHENG", "kind": "character", "canonical_name": "غو يوي تشي تشينغ", "aliases_json": "[\"تشي تشين\"]"}
+{"id": "CHAR-GAO-WAN", "kind": "character", "canonical_name": "غاو وان", "aliases_json": "[]"}
+{"id": "CHAR-ACADEMY-ELDER", "kind": "character", "canonical_name": "شيخ الأكاديمية", "aliases_json": "[]"}
+{"id": "CHAR-JIANG-YA", "kind": "character", "canonical_name": "جيانغ يا", "aliases_json": "[]"}
+{"id": "CHAR-JIA-FU", "kind": "character", "canonical_name": "جيا فو", "aliases_json": "[]"}
+{"id": "GU-MOONLIGHT", "kind": "gu", "canonical_name": "غو ضوء القمر", "aliases_json": "[]"}
+{"id": "GU-LIQUOR", "kind": "gu", "canonical_name": "دودة الخمور", "aliases_json": "[]"}
+{"id": "FAC-MO", "kind": "faction", "canonical_name": "فرع عائلة مو", "aliases_json": "[]"}
+{"id": "FAC-CHI", "kind": "faction", "canonical_name": "فرع عائلة تشي", "aliases_json": "[]"}
