@@ -21,6 +21,19 @@ import UIKit
         XCTAssertEqual(ZeusCloudCache.signature(original), ZeusCloudCache.eventsSignature(events))
         XCTAssertNotEqual(ZeusCloudCache.signature(edited), ZeusCloudCache.eventsSignature(events))
     }
+    func testCloudWaitPlaceholderIsImmediateAndReusedWhenTheNetworkLoopStarts() {
+        let vm = AIChatViewModel()
+        vm.messages = [ChatMessage(role: .user, content: "hello")]
+        vm.isProcessing = true
+        let beforeNetwork = ZeusCloudPresentation.begin(vm)
+        XCTAssertTrue(beforeNetwork.isAwaitingModelResponse)
+        XCTAssertEqual(ZeusCloudPresentation.begin(vm).id, beforeNetwork.id)
+        let block = ZeusCloudPresentation.append("first partial", vm: vm, message: beforeNetwork, block: nil)
+        XCTAssertFalse(beforeNetwork.isAwaitingModelResponse)
+        XCTAssertEqual(block.content, "first partial")
+        XCTAssertEqual(vm.messages.count, 2)
+        vm.isProcessing = false
+    }
     private func proposal(remote: Bool = false, repository: String = "fixture-owner/project") throws -> [String: Any] {
         let raw = remote ? #"""
         {"title":"Audio app project","objective":"Implement and verify the approved audio product","platform":"ios",
