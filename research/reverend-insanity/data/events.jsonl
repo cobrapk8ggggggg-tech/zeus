@@ -1,0 +1,36 @@
+{"id": "EV-PREV-0001", "timeline": "previous-life", "description": "حصار قاتل واستخدام وسيلة العودة غير المضمونة", "chapter_id": "SRC-0001", "line_start": 19, "line_end": 77, "confidence": "high"}
+{"id": "EV-MAIN-0001", "timeline": "main", "description": "استعادة جسد الماضي والتعرف على القرية", "chapter_id": "SRC-0001", "line_start": 223, "line_end": 243, "confidence": "high"}
+{"id": "EV-MAIN-0002", "timeline": "main", "description": "تحديد تقوية الأساس والاستعانة المؤقتة بالعشيرة خطةً", "chapter_id": "SRC-0002", "line_start": 77, "line_end": 109, "confidence": "high"}
+{"id": "EV-MAIN-0003", "timeline": "main", "description": "زيارة النافذة وإنهاء فانغ يوان للحديث", "chapter_id": "SRC-0002", "line_start": 117, "line_end": 255, "confidence": "high"}
+{"id": "EV-MAIN-0004", "timeline": "main", "description": "رفض استغلال خبر الغش بالإبلاغ أو الابتزاز الفوري", "chapter_id": "SRC-0004", "line_start": 265, "line_end": 273, "confidence": "high"}
+{"id": "EV-MAIN-0005", "timeline": "main", "description": "إيقاظ فتحة فانغ يوان وتحقق تصنيف C", "chapter_id": "SRC-0005", "line_start": 123, "line_end": 181, "confidence": "high"}
+{"id": "EV-MAIN-0006", "timeline": "main", "description": "شرود فانغ تشينغ إثر صدمة نتيجة الأكبر", "chapter_id": "SRC-0006", "line_start": 53, "line_end": 61, "confidence": "high"}
+{"id": "EV-MAIN-0007", "timeline": "main", "description": "سقوط فانغ تشينغ في النهر", "chapter_id": "SRC-0006", "line_start": 125, "line_end": 143, "confidence": "high"}
+{"id": "EV-MAIN-0008", "timeline": "main", "description": "مساعدة فانغ يوان لأخيه في النهر", "chapter_id": "SRC-0006", "line_start": 145, "line_end": 171, "confidence": "high"}
+{"id": "EV-MAIN-0009", "timeline": "main", "description": "تحقق 43 خطوة وموهبة A للأصغر", "chapter_id": "SRC-0006", "line_start": 179, "line_end": 187, "confidence": "high"}
+{"id": "EV-MAIN-0010", "timeline": "main", "description": "تنافس المتنفذين على تربية الأصغر", "chapter_id": "SRC-0006", "line_start": 189, "line_end": 201, "confidence": "high"}
+{"id": "EV-MAIN-0011", "timeline": "main", "description": "بحث أسبوع لا يحقق العثور على إرث الراهب", "chapter_id": "SRC-0007", "line_start": 171, "line_end": 207, "confidence": "high"}
+{"id": "EV-MAIN-0012", "timeline": "main", "description": "اختيار غو ضوء القمر احتياطًا", "chapter_id": "SRC-0008", "line_start": 55, "line_end": 93, "confidence": "high"}
+{"id": "EV-MAIN-0013", "timeline": "main", "description": "قبول الأصغر التبني", "chapter_id": "SRC-0009", "line_start": 49, "line_end": 69, "confidence": "high"}
+{"id": "EV-MAIN-0014", "timeline": "main", "description": "رفض الأكبر التبني والاستقلال المبكر", "chapter_id": "SRC-0009", "line_start": 71, "line_end": 101, "confidence": "high"}
+{"id": "EV-MAIN-0015", "timeline": "main", "description": "المطر يعطل الجذب فيبدأ صقل ضوء القمر", "chapter_id": "SRC-0010", "line_start": 15, "line_end": 43, "confidence": "high"}
+{"id": "EV-MAIN-0016", "timeline": "main", "description": "إبطال فخ الخادمة ثم الانتقال إلى النزل", "chapter_id": "SRC-0011", "line_start": 77, "line_end": 155, "confidence": "high"}
+{"id": "EV-MAIN-0017", "timeline": "main", "description": "معرفة خمر الخيزران الأخضر بالملاحظة في النزل", "chapter_id": "SRC-0012", "line_start": 95, "line_end": 115, "confidence": "high"}
+{"id": "EV-MAIN-0018", "timeline": "main", "description": "شراء الخمر الأغلى رغم استهلاك قسم كبير من المتبقي", "chapter_id": "SRC-0012", "line_start": 283, "line_end": 317, "confidence": "high"}
+{"id": "EV-MAIN-0019", "timeline": "main", "description": "قرار وقف البحث بعد فشل المحاولة الأخيرة", "chapter_id": "SRC-0013", "line_start": 145, "line_end": 177, "confidence": "high"}
+{"id": "EV-MAIN-0020", "timeline": "main", "description": "رؤية دودة الخمور عند الاستدارة للمغادرة", "chapter_id": "SRC-0013", "line_start": 209, "line_end": 229, "confidence": "high"}
+{"id": "EV-MAIN-0021", "timeline": "main", "description": "تراجع وانتظار ثمالة الدودة ثم تتبعها بدل إمساكها فورًا", "chapter_id": "SRC-0014", "line_start": 15, "line_end": 97, "confidence": "high"}
+{"id": "EV-MAIN-0022", "timeline": "main", "description": "العثور على الكهف داخل الجبل وأخذ الدودة", "chapter_id": "SRC-0014", "line_start": 135, "line_end": 275, "confidence": "high"}
+{"id": "EV-MAIN-0023", "timeline": "main", "description": "خطأ أولي في تفسير صوت التسجيل كعدو حاضر وتصحيحه", "chapter_id": "SRC-0015", "line_start": 3, "line_end": 41, "confidence": "high"}
+{"id": "EV-MAIN-0024", "timeline": "main", "description": "فهم التسجيل وتفسير خطأ رواية العشيرة", "chapter_id": "SRC-0016", "line_start": 15, "line_end": 73, "confidence": "high"}
+{"id": "EV-MAIN-0025", "timeline": "main", "description": "أخذ15 حجرًا ومراجعة الربح المتوقع", "chapter_id": "SRC-0016", "line_start": 83, "line_end": 139, "confidence": "high"}
+{"id": "EV-MAIN-0026", "timeline": "main", "description": "مقاومة الدودة أقوى من المتوقع ورفع تقدير الكلفة", "chapter_id": "SRC-0017", "line_start": 151, "line_end": 257, "confidence": "high"}
+{"id": "EV-MAIN-0027", "timeline": "main", "description": "صفع الأصغر واستدعاء تاريخ الرعاية وعقد المقايضة", "chapter_id": "SRC-0018", "line_start": 37, "line_end": 155, "confidence": "high"}
+{"id": "EV-MAIN-0028", "timeline": "main", "description": "العم يعوض الأصغر بستة أحجار", "chapter_id": "SRC-0018", "line_start": 217, "line_end": 241, "confidence": "high"}
+{"id": "EV-MAIN-0029", "timeline": "main", "description": "هجوم إرادة الدودة واستعداد الأكبر للدفاع", "chapter_id": "SRC-0018", "line_start": 343, "line_end": 385, "confidence": "high"}
+{"id": "EV-MAIN-0030", "timeline": "main", "description": "ظهور غو الربيع والخريف واكتشاف وجودها", "chapter_id": "SRC-0018", "line_start": 389, "line_end": 401, "confidence": "high"}
+{"id": "EV-MAIN-0031", "timeline": "main", "description": "هالة الغو تقمع الإرادة الغازية والبحر", "chapter_id": "SRC-0019", "line_start": 39, "line_end": 67, "confidence": "high"}
+{"id": "EV-MAIN-0032", "timeline": "main", "description": "صقل الدودة وضوء القمر بالهالة", "chapter_id": "SRC-0020", "line_start": 23, "line_end": 83, "confidence": "high"}
+{"id": "EV-MAIN-0033", "timeline": "main", "description": "إخفاء الدودة والإسراع إلى الأكاديمية طلبًا للجائزة", "chapter_id": "SRC-0020", "line_start": 117, "line_end": 127, "confidence": "high"}
+{"id": "EV-MAIN-0034", "timeline": "main", "description": "تصحيح هوية الأخ أمام الشيخ دون توثيق تسليم الجائزة بعد", "chapter_id": "SRC-0020", "line_start": 175, "line_end": 243, "confidence": "high"}
+{"id": "EV-ANCIENT-0001", "timeline": "ancient", "description": "معركة الراهب والزعيم الرابع كما يعرضها التسجيل؛ مصدر تاريخي داخل العالم لا مشاهدة حاضرة", "chapter_id": "SRC-0015", "line_start": 39, "line_end": 189, "confidence": "high for recorded portrayal"}

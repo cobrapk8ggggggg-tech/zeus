@@ -1,0 +1,50 @@
+{
+  "archive_sha256": "3d018f708c151bc88316734791a1b6d248cfd97e0a48ff51a09e133522b6725f",
+  "crc_bad_entry": null,
+  "archive_entries": 2397,
+  "files": 2397,
+  "min_file_number": 1,
+  "max_file_number": 2398,
+  "missing_file_numbers": [
+    2346
+  ],
+  "duplicate_file_numbers": [],
+  "exact_duplicate_groups": [
+    [
+      "SRC-0163",
+      "SRC-0164",
+      "SRC-0165",
+      "SRC-0168",
+      "SRC-0169",
+      "SRC-0171"
+    ],
+    [
+      "SRC-1649",
+      "SRC-1650",
+      "SRC-1652"
+    ]
+  ],
+  "normalized_duplicate_groups": [
+    [
+      "SRC-0163",
+      "SRC-0164",
+      "SRC-0165",
+      "SRC-0168",
+      "SRC-0169",
+      "SRC-0171"
+    ],
+    [
+      "SRC-1649",
+      "SRC-1650",
+      "SRC-1652"
+    ]
+  ],
+  "flags": {
+    "no_explicit_header": 2397,
+    "editorial_material": 1887,
+    "cjk_residue": 239,
+    "ending_needs_review": 257
+  },
+  "candidate_count": 170413,
+  "decoding_errors": []
+}

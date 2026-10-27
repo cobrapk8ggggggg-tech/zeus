@@ -1,0 +1,6 @@
+{"id": "CHAR-FY", "kind": "character", "canonical_name": "غو يوي فانغ يوان", "aliases_json": "[\"فانغ يوان\"]"}
+{"id": "CHAR-FZ", "kind": "character", "canonical_name": "غو يوي فانغ تشينغ", "aliases_json": "[\"فانغ تشينغ\"]"}
+{"id": "FAC-GY", "kind": "faction", "canonical_name": "عشيرة غو يوي", "aliases_json": "[]"}
+{"id": "GU-SAC", "kind": "gu", "canonical_name": "غو الربيع والخريف", "aliases_json": "[]"}
+{"id": "GU-HOPE", "kind": "gu", "canonical_name": "غو الأمل", "aliases_json": "[]"}
+{"id": "LOC-QM", "kind": "location", "canonical_name": "جبل تشينغ ماو", "aliases_json": "[]"}

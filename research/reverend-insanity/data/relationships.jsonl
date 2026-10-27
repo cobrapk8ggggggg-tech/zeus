@@ -1,0 +1,6 @@
+{"id": "REL-0001", "subject": "CHAR-FZ", "object": "CHAR-FY", "relation": "مقارنة وشعور بالنقص مع زيارة مراعاة ظاهرية", "valid_from": "SRC-0002:L119", "valid_until": null, "source_ref": "2.txt:119–155", "confidence": "high"}
+{"id": "REL-0002", "subject": "CHAR-FY", "object": "CHAR-FZ", "relation": "تخلٍ عن جعل الضغينة غاية حالية", "valid_from": "SRC-0002:L221", "valid_until": null, "source_ref": "2.txt:221–247", "confidence": "high"}
+{"id": "REL-0003", "subject": "CHAR-FY", "object": "CHAR-FZ", "relation": "مساعدة موضعية في النهر", "valid_from": "SRC-0006:L145", "valid_until": "SRC-0006:L171", "source_ref": "6.txt:145–171", "confidence": "high"}
+{"id": "REL-0004", "subject": "FAC-GY", "object": "CHAR-FZ", "relation": "تنافس على رعايته بعد قياس A", "valid_from": "SRC-0006:L189", "valid_until": null, "source_ref": "6.txt:189–201", "confidence": "high"}
+{"id": "REL-0005", "subject": "CHAR-FZ", "object": "FAC-GY-HOUSEHOLD", "relation": "قبول تبني العم والعمة وشعور بالامتنان", "valid_from": "SRC-0009:L63", "valid_until": null, "source_ref": "9.txt:49–69،197–199", "confidence": "high"}
+{"id": "REL-0006", "subject": "CHAR-FY", "object": "CHAR-FZ", "relation": "إعلان قطع الأخوة اجتماعيًا؛ لا محو للقرابة الجسدية", "valid_from": "SRC-0018:L97", "valid_until": null, "source_ref": "18.txt:95–107", "confidence": "high"}
