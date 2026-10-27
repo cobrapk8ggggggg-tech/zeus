@@ -119,7 +119,7 @@ import ZEUSBrowser
         defer { if !duringTransition && includeLocalFiles { NativeCloudAccountAPI.isMigrating = false } }
         try await NativeCloudAccountAPI.prepareBrowserBackup?()
         progress("تجهيز نسخة مشفرة للمحادثات والإعدادات…")
-        try await ZeusCloudDeletion.shared.sync()
+        try await ZeusCloudDeletion.shared.sync(fetchRemote: true)
         let old = try await NativeCloudAccountAPI.archive()
         let oldSecrets = try await old.mapAsync { try await self.secretBundle($0) }
         let keyData = oldSecrets?.fileKey ?? keyBytes(), passphrase = keyBytes().base64EncodedString()
@@ -128,7 +128,22 @@ import ZEUSBrowser
         let before = try await inventory(includeSessions: includeLocalFiles)
         let package = try Self.inspect(summary.packageURL)
         var files = [try await upload(Item(scope: "native_database", path: "account.minisbak", url: summary.packageURL, bytes: package.0, digest: package.1, mode: 0o600), key: SymmetricKey(data: keyData), previous: [])]
-        if !includeLocalFiles { files += old?.files.filter { $0.scope != "native_database" } ?? [] }
+        if !includeLocalFiles {
+            let oldSkillPaths = Set((old?.files ?? []).filter { $0.scope == "agent_skills" }.map(\.path))
+            let bundledSkills = try ZeusDefaultSkills.shared.bundledCopies(including: oldSkillPaths)
+            let deletedNotes = Set(ZeusCloudDeletion.shared.deletedIDs.flatMap { id in
+                [id, id.uppercased()].map { self.hash(Data($0.utf8)) + ".json" }
+            })
+            files += old?.files.filter { file in
+                guard file.scope != "native_database" else { return false }
+                if file.scope == "agent_skills", let target = try? self.destination(file), let data = bundledSkills[target.path], self.hash(data) == file.sha256 { return false }
+                if file.scope == "agent_task_notes", deletedNotes.contains(URL(fileURLWithPath: file.path).lastPathComponent) { return false }
+                if file.scope == "agent_sessions", let session = file.path.split(separator: "/").first {
+                    return !ZeusCloudDeletion.shared.deletedIDs.contains(String(session).lowercased())
+                }
+                return true
+            } ?? []
+        }
         for (index, item) in before.enumerated() {
             progress("تشفير الملفات والتحقق منها \(index + 1)/\(before.count)…")
             let uploaded = try await upload(item, key: SymmetricKey(data: keyData), previous: old?.files ?? [])
@@ -143,8 +158,11 @@ import ZEUSBrowser
         let raw = try JSONEncoder().encode(secrets)
         let sealed = try await NativeCloudAccountAPI.sealSecrets(raw)
         guard try await NativeCloudAccountAPI.unsealSecrets(sealed) == raw else { throw error("فشل التحقق من مفاتيح الاستعادة.") }
-        let archive = NativeCloudArchive(files: files, secrets: try await NativeCloudAccountAPI.putObject(sealed))
+        let archive = NativeCloudArchive(files: files, secrets: try await NativeCloudAccountAPI.putObject(sealed), deletionEpoch: ZeusCloudDeletion.shared.deletedIDs.count)
         try await NativeCloudAccountAPI.publishArchive(archive)
+        // The new verified archive excludes deleted chats. Collection preserves
+        // every current/shared reference and releases only proven orphan bytes.
+        _ = try? await NativeCloudAccountAPI.runtime("v1/storage/collect", method: "POST", body: Data("{}".utf8))
         try markRestored()
         return archive
     }
@@ -318,6 +336,7 @@ import ZEUSBrowser
         try await download(metadata, to: package, key: key)
         var options = BackupImporter.Options(); options.passphrase = secrets.passphrase
         let report = try await BackupImporter().import(from: package, options: options)
+        try await ZeusCloudDeletion.shared.sync(fetchRemote: true)
         guard report.integrityFailed.isEmpty, report.categories.allSatisfy({ $0.failed == nil && $0.unreadable == 0 && $0.missingBlobs == 0 }) else { throw error("لم تكتمل استعادة بعض فئات الحساب؛ أعد المحاولة.") }
         let smallScopes = ["browser_accounts", "agent_skills", "agent_mcp_config", "agent_task_notes"]
         let skillPaths = Set(archive.files.filter { $0.scope == "agent_skills" }.map(\.path))

@@ -38,3 +38,9 @@ class PostgresGatewayStore:
 
     async def deletions(self, owner): return await self.call("deletions", owner=owner)
     async def delete_conversation(self, owner, conversation): return await self.call("delete_conversation", owner=owner, id=conversation)
+
+    async def gc_snapshot(self, owner): return await self.call("gc_snapshot", owner=owner)
+    async def gc_prepare(self, owner, revision, epoch, candidates, prune): return await self.call("gc_prepare", owner=owner, revision=revision, epoch=epoch, candidates=candidates, prune=prune)
+    async def gc_delete(self, owner, revision, digest): return await self.call("gc_delete", owner=owner, revision=revision, sha256=digest)
+
+    async def gc_end(self, owner): return await self.call("gc_end", owner=owner)

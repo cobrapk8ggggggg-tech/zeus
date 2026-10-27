@@ -38,6 +38,7 @@ struct CloudSnapshotManifest: Codable {
     var native: CloudObjectReference? = nil
     var executionTarget: String? = nil
     var executionChoiceVersion: Int? = nil
+    var deletionEpoch: Int? = nil
 }
 
 struct CloudSnapshotHead: Codable {
@@ -201,6 +202,7 @@ struct CloudSnapshotHead: Codable {
             var manifest = CloudSnapshotManifest(version: 1, deviceID: state.deviceID, created: Date(), browser: ref,
                                                  coverage: ["browser_profiles", "browser_settings", "browser_records"])
             manifest.native = remote?.manifest.native
+            manifest.deletionEpoch = remote?.manifest.deletionEpoch
             manifest.executionTarget = NativeCloudAccountAPI.usesCloud ? "cloud" : "local"
             manifest.executionChoiceVersion = 2
             manifest.coverage = Array(Set(manifest.coverage + (remote?.manifest.coverage.filter { !$0.hasPrefix("browser_") } ?? [])))

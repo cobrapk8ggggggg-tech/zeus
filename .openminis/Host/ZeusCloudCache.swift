@@ -15,7 +15,7 @@ enum ZeusCloudCache {
                 result.append(["type": "tool", "id": call.toolUseId, "name": call.name, "input": input])
             case .toolResult(let value):
                 // Media remains local until its own remote reference is verified.
-                guard value.mediaRef == nil else { return nil }
+                guard value.mediaRef == nil && value.snapshot == nil && value.pageURL == nil else { return nil }
                 result.append(["type": "result", "id": value.toolUseId, "output": value.output, "success": value.success])
             default: return nil
             }

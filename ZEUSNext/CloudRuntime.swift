@@ -33,7 +33,8 @@ public struct NativeCloudArchive: Codable, Sendable {
     public let files: [NativeCloudFile]
     public let secrets: NativeCloudBlob
     public let created: Date
-    public init(files: [NativeCloudFile], secrets: NativeCloudBlob) { version = 1; self.files = files; self.secrets = secrets; created = Date() }
+    public let deletionEpoch: Int?
+    public init(files: [NativeCloudFile], secrets: NativeCloudBlob, deletionEpoch: Int? = nil) { version = 1; self.files = files; self.secrets = secrets; self.deletionEpoch = deletionEpoch; created = Date() }
 }
 
 struct CloudExecutionPreference: Codable {
@@ -274,7 +275,7 @@ actor CloudCheckpointGate {
         await CloudCheckpointGate.shared.enter()
         do {
             guard let head = try await api.head() else { throw CloudAccountError.incomplete("احفظ نسخة المتصفح في الحساب قبل نقل الوكيل.") }
-            var manifest = head.manifest; manifest.native = ref
+            var manifest = head.manifest; manifest.native = ref; manifest.deletionEpoch = archive.deletionEpoch
             manifest.coverage = Array(Set(manifest.coverage + ["agent_archive", "encrypted_secrets"]))
             _ = try await api.commit(manifest, expected: head.revision, operation: UUID())
             await CloudCheckpointGate.shared.leave()

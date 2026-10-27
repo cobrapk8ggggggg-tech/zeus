@@ -209,6 +209,13 @@ import CryptoKit
             }
         }
     }
+    func removeDeletedSession(_ session: String) {
+        for job in jobs.values where job.owner == session && job.exitCode == nil { job.task?.cancel() }
+        states.removeValue(forKey: session)
+        results = results.filter { !$0.key.hasPrefix(session + ":") }
+        try? FileManager.default.removeItem(at: file(session))
+        try? FileManager.default.removeItem(at: AIChatViewModel.minisConfigRoot.appendingPathComponent("cloud-run-" + session + ".json"))
+    }
     func cancel(session: String?) {
         guard let session else { return }
         for job in jobs.values where job.owner == session && job.exitCode == nil { job.task?.cancel() }

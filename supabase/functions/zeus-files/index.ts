@@ -119,6 +119,26 @@ return async (request: Request): Promise<Response> => {
       if (!lookup.ok || !(await lookup.json())[0]) return json({ error: "unauthorized" }, 401);
       const input = JSON.parse(new TextDecoder().decode(await bounded(request, 2 * 1024 * 1024)));
       if (typeof input.command !== "string" || typeof input.args !== "object" || input.args === null) return json({ error: "invalid_command" }, 400);
+      if (input.command === "gc_delete") {
+        const args = input.args;
+        if (!uuid.test(args.owner ?? "") || !digestPattern.test(args.sha256 ?? "")) return json({ error: "invalid_collection" }, 400);
+        const check = await admin("/rest/v1/rpc/zeus_runtime_command", "POST", { command: "gc_check", args });
+        if (!check.ok) return json({ error: "collection_conflict" }, check.status);
+        if (!(await check.json()).allowed) return json({ deleted: false });
+        const path = args.owner + "/objects/" + args.sha256;
+        const removed = await admin("/storage/v1/object/zeus-private", "DELETE", { prefixes: [path] });
+        if (!removed.ok) throw new Error("storage");
+        const remaining = await admin("/storage/v1/object/zeus-private/" + path);
+        let missing = remaining.status === 404;
+        if (!missing && remaining.status === 400) {
+          const detail = await remaining.json().catch(() => ({}));
+          missing = Number(detail.statusCode) === 404 || detail.code === "NoSuchKey";
+        }
+        if (!missing) return json({ error: "gc_object_absence_unverified", status: remaining.status }, 503);
+        const released = await admin("/rest/v1/rpc/zeus_runtime_command", "POST", { command: "gc_forget", args });
+        if (!released.ok) throw new Error("storage");
+        return new Response(released.body, { headers: { ...headers, "Content-Type": "application/json" } });
+      }
       const result = await admin("/rest/v1/rpc/zeus_runtime_command", "POST", { command: input.command, args: input.args });
       if (!result.ok) return json({ error: "runtime_storage_failed" }, result.status);
       return new Response(result.body, { headers: { ...headers, "Content-Type": "application/json" } });

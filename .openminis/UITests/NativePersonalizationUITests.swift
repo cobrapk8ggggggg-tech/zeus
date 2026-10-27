@@ -53,10 +53,22 @@ final class NativePersonalizationUITests: XCTestCase {
         expectation(for: NSPredicate(format: "label == %@", "1:readable:ZEUS-Import-Test"), evaluatedWith: result)
         waitForExpectations(timeout: 15)
     }
+    @MainActor func testCloudPartialReplyAppearsInOriginalMessageListBeforeCompletion() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--zeus-cloud-partial-stream", "--zeus-native-fixture", "-AppleLanguages", "(ar)"]
+        app.launch()
+        let partial = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "الجزء الأول من الرد السحابي")).firstMatch
+        XCTAssertTrue(partial.waitForExistence(timeout: 30))
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "اكتمل الرد التجريبي")).firstMatch.exists)
+        let image = XCTAttachment(screenshot: app.screenshot()); image.name = "ZEUS-Cloud-Partial-Reply-Before-Completion"; image.lifetime = .keepAlways; add(image)
+        app.buttons["finishCloudReply"].tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "اكتمل الرد التجريبي")).firstMatch.waitForExistence(timeout: 10))
+    }
     @MainActor func testCloudToolsRenderWithTheOriginalNativeCards() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["--zeus-cloud-tool-cards", "-AppleLanguages", "(ar)", "-AppleLocale", "ar_SA"]
+        app.launchArguments = ["--zeus-cloud-tool-cards", "--zeus-native-fixture", "-AppleLanguages", "(ar)", "-AppleLocale", "ar_SA"]
         app.launch()
         XCTAssertTrue(app.staticTexts["فحص نظام Linux"].waitForExistence(timeout: 30))
         XCTAssertTrue(app.staticTexts["قراءة ملف المشروع"].exists)

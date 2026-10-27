@@ -16,7 +16,9 @@ struct ZEUSBrowserRootEntry: View {
     init() { _ = ZEUSNativeHostBootstrap.configured }
     var body: some View {
         #if DEBUG
-        if CommandLine.arguments.contains("--zeus-cloud-tool-cards") {
+        if CommandLine.arguments.contains("--zeus-cloud-partial-stream") {
+            ZeusCloudPartialStreamTestEntry()
+        } else if CommandLine.arguments.contains("--zeus-cloud-tool-cards") {
             ZeusCloudToolCardsTestEntry()
         } else if CommandLine.arguments.contains("--zeus-file-picker") {
             ZEUSFileImportDiagnostics()
@@ -60,6 +62,29 @@ private enum ZEUSNativeHostBootstrap {
 }
 
 #if DEBUG
+private struct ZeusCloudPartialStreamTestEntry: View {
+    @StateObject private var vm = AIChatViewModel()
+    @State private var message: ChatMessage?
+    @State private var block: AssistantBlock?
+    var body: some View {
+        VStack {
+            CollectionViewMessageListV3(vm: vm, inputFocused: false, onRetryMessage: nil, onRetryLast: nil, onEdit: nil, onWithdraw: nil, onResume: nil, onStop: nil, onCompact: nil, maxContentWidth: 0, floatingBarHeight: 0, inputBarHeight: 0)
+            Button("إكمال الرد التجريبي") {
+                guard let message else { return }
+                block = ZeusCloudPresentation.append("\n\nاكتمل الرد التجريبي", vm: vm, message: message, block: block)
+                vm.isProcessing = false
+            }.accessibilityIdentifier("finishCloudReply")
+        }.preferredColorScheme(.dark)
+        .task {
+            guard message == nil else { return }
+            vm.messages = [ChatMessage(role: .user, content: "اختبار وصول أجزاء الرد")]
+            vm.isProcessing = true
+            let current = ZeusCloudPresentation.begin(vm); message = current
+            try? await Task.sleep(for: .milliseconds(300))
+            block = ZeusCloudPresentation.append("الجزء الأول من الرد السحابي", vm: vm, message: current, block: nil)
+        }
+    }
+}
 /// Exercises the production remote-event mapping in the stock native renderer.
 private struct ZeusCloudToolCardsTestEntry: View {
     @State private var message: ChatMessage = {

@@ -121,9 +121,7 @@ import ZEUSBrowser
         guard let sid = vm.sessionId, UUID(uuidString: sid) != nil, let owner = NativeCloudAccountAPI.ownerID else { throw failure("المحادثة أو جلسة الحساب غير متاحة.") }
         guard !observers.contains(sid) else { return }
         observers.insert(sid); defer { observers.remove(sid) }
-        let display = ChatMessage(role: .assistant, content: "", blocks: [])
-        display.isAwaitingModelResponse = true
-        vm.messages.append(display); vm.publishUnlessTransitioning()
+        let display = ZeusCloudPresentation.begin(vm)
         await Task.yield()
         defer { display.isAwaitingModelResponse = false; vm.publishUnlessTransitioning() }
         var state = (try? Data(contentsOf: stateURL(sid))).flatMap { try? JSONDecoder().decode(State.self, from: $0) }
@@ -196,13 +194,8 @@ import ZEUSBrowser
                 switch event["kind"] as? String {
                 case "text":
                     let delta = data["delta"] as? String ?? ""
-                    if textBlock == nil { let block = AssistantBlock(kind: .text, content: ""); display.blocks.append(block); textBlock = block }
-                    display.isAwaitingModelResponse = false
                     text += delta
-                    if let block = textBlock, let msgIdx = vm.messages.firstIndex(where: { $0.id == display.id }), let blockIdx = display.blocks.firstIndex(where: { $0.id == block.id }) {
-                        vm.setStreamingTextBlockContent(msgIdx: msgIdx, blockIdx: blockIdx, text: block.content + delta, parsedMarkdown: nil, cacheAttributedString: true, requestScroll: true)
-                        vm.publishUnlessTransitioning()
-                    }
+                    textBlock = ZeusCloudPresentation.append(delta, vm: vm, message: display, block: textBlock)
                 case "thinking":
                     if thinkingBlock == nil { let block = AssistantBlock(kind: .thinking, content: ""); display.blocks.append(block); thinkingBlock = block }
                     thinkingBlock?.content += data["delta"] as? String ?? ""

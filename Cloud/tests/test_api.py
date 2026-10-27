@@ -399,6 +399,19 @@ class APITests(unittest.IsolatedAsyncioTestCase):
         response=await asyncio.wait_for(waiter,2);self.assertEqual(response.status_code,200)
         await self.wait_state(run,{"completed"})
 
+    async def test_new_user_turn_preempts_background_storage_collection(self):
+        started=asyncio.Event();released=[]
+        async def snapshot(owner): started.set();await asyncio.sleep(60)
+        async def release(owner): released.append(owner)
+        self.store.gc_snapshot=snapshot;self.store.gc_end=release
+        cleanup=asyncio.create_task(self.client.post("/v1/storage/collect",json={}))
+        await asyncio.wait_for(started.wait(),1)
+        run,_=await self.submit()
+        done=await self.wait_state(run,{"completed","failed"})
+        self.assertEqual(done["status"],"completed",done)
+        await asyncio.gather(cleanup,return_exceptions=True)
+        self.assertEqual(released,[self.owner])
+
     async def test_disabling_all_native_tools_does_not_restore_a_cloud_fallback_catalog(self):
         class NoTools:
             async def stream(self, provider, messages, tools, instructions):

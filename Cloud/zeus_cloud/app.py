@@ -146,6 +146,13 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
         return result
     store.event = publish_event
 
+    collection_task = None
+    async def stop_collection():
+        nonlocal collection_task
+        if collection_task and not collection_task.done():
+            collection_task.cancel(); await asyncio.gather(collection_task, return_exceptions=True)
+        collection_task = None
+
     terminal_grants = {}
     async def terminal_event(terminal, kind, value):
         # Terminal replay is bounded in memory. Agent output and command
@@ -173,6 +180,7 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
                 await store.close()
         try: yield
         finally:
+            await stop_collection()
             if engine: await engine.shutdown()
             if worker: worker.cancel(); await asyncio.gather(worker, return_exceptions=True)
             await store.close(); await gateway.close(); await models.close()
@@ -244,7 +252,7 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
 
     @app.post("/v1/runs")
     async def submit(value: RunInput, account=Depends(auth)):
-        ready()
+        ready(); await stop_collection()
         conversation, identifier = str(value.conversation), str(value.id)
         if value.native_session and (str(value.native_session.get("id", "")).lower() != conversation or len(json.dumps(value.native_session)) > 16_000):
             raise ValueError("بيانات المحادثة الأصلية غير صالحة.")
@@ -380,6 +388,23 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
             await store.update_run(account, run["id"], status="queued", resume_device=key)
             engine.wakeup.set(); return {"accepted": True}
 
+    @app.post("/v1/storage/collect")
+    async def collect_storage(authorization: str = Header(default=""), account=Depends(auth)):
+        nonlocal collection_task
+        ready()
+        if not hasattr(store, "gc_snapshot"): raise HTTPException(409, "Storage collection is not configured for this backend")
+        from .collection import Collection
+        async with engine.execution_gate:
+            if engine.running and not engine.running.done() or any(t.owner == account and terminals.active(account,t.id) for t in terminals.sessions.values()):
+                return {"deleted_objects": 0, "deferred": True}
+            if collection_task and not collection_task.done(): return {"deleted_objects": 0, "deferred": True}
+            async def collect():
+                try:
+                    async with asyncio.timeout(45): return await Collection(store, gateway).collect(account, authorization.removeprefix("Bearer "))
+                except asyncio.TimeoutError: return {"deleted_objects": 0, "deferred": True}
+            collection_task = asyncio.create_task(collect())
+        return await collection_task
+
     @app.get("/v1/deletions")
     async def deletions(account=Depends(auth)):
         ready(); return {"conversations": await store.deletions(account)}
@@ -455,7 +480,7 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
 
     @app.post("/v1/terminals")
     async def open_terminal(value: TerminalInput, account=Depends(auth)):
-        ready()
+        ready(); await stop_collection()
         conversation = str(value.conversation); grant = value.file_grant.get_secret_value()
         checked = await gateway.check(grant)
         if checked.get("user_id") != account or checked.get("conversation_id") != conversation: raise HTTPException(403, "تصريح الملفات لا يطابق المحادثة.")

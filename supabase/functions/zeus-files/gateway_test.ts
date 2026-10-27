@@ -118,3 +118,38 @@ Deno.test("account upload reserves actual bytes and verifies the stored object",
   const value = await response.json();
   assert(response.status === 200 && value.verified === true && value.bytes === bytes.length && value.sha256 === digest);
 });
+
+Deno.test("physical collection requires the private runtime capability", async () => {
+  let calls=0;
+  const app=createGateway("https://project.test","admin-secret",async()=>{calls++;throw new Error("unexpected")});
+  const response=await app(new Request("https://function.test?op=runtime",{method:"POST",headers:{Authorization:"Bearer "+jwt},body:JSON.stringify({command:"gc_delete",args:{owner,sha256:"a".repeat(64),revision:1}})}));
+  assert(response.status===401 && calls===0);
+});
+Deno.test("collection physically removes only an approved object and then releases its reservation", async () => {
+  const order:string[]=[];const root="zdb1_"+"b".repeat(64);
+  const app=createGateway("https://project.test","admin-secret",async(url,options)=>{
+    if(String(url).includes("zeus_runtime_access"))return Response.json([{label:"runtime"}]);
+    if(String(url).endsWith("/rpc/zeus_runtime_command")){
+      const value=JSON.parse(String(options?.body));order.push(value.command);
+      if(value.command==="gc_check")return Response.json({allowed:true});
+      if(value.command==="gc_forget")return Response.json({deleted:true,released_bytes:20});
+    }
+    if(options?.method==="DELETE"){
+      order.push("physical-delete");const value=JSON.parse(String(options.body));assert(value.prefixes[0]===owner+"/objects/"+"a".repeat(64));return Response.json([]);
+    }
+    order.push("verify-absent");return new Response("",{status:404});
+  });
+  const response=await app(new Request("https://function.test?op=runtime",{method:"POST",headers:{Authorization:"Bearer "+root},body:JSON.stringify({command:"gc_delete",args:{owner,sha256:"a".repeat(64),revision:1}})}));
+  assert(response.status===200 && (await response.json()).deleted);
+  assert(JSON.stringify(order)===JSON.stringify(["gc_check","physical-delete","verify-absent","gc_forget"]));
+});
+Deno.test("a reference-check denial never reaches physical Storage deletion", async () => {
+  const root="zdb1_"+"c".repeat(64);let deleted=false;
+  const app=createGateway("https://project.test","admin-secret",async(url,options)=>{
+    if(String(url).includes("zeus_runtime_access"))return Response.json([{label:"runtime"}]);
+    if(options?.method==="DELETE")deleted=true;
+    return Response.json({allowed:false});
+  });
+  const response=await app(new Request("https://function.test?op=runtime",{method:"POST",headers:{Authorization:"Bearer "+root},body:JSON.stringify({command:"gc_delete",args:{owner,sha256:"a".repeat(64),revision:1}})}));
+  assert(response.status===200 && !(await response.json()).deleted && !deleted);
+});
