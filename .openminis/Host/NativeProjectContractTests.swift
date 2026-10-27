@@ -22,6 +22,12 @@ import CryptoKit
         let pristine = try tree("pristine")
         XCTAssertTrue(try ZeusPristineRootfs.remove(at: pristine, baseline: baseline, allowed: { false }))
         XCTAssertFalse(fm.fileExists(atPath: pristine.path))
+        let overlay = try tree("overlay")
+        let overlayData = Data("bundled app overlay".utf8)
+        try overlayData.write(to: overlay.appendingPathComponent("data/bin/sh"))
+        let overlayHash = SHA256.hash(data: overlayData).map { String(format: "%02x", $0) }.joined()
+        let overlaidBaseline = baseline.merging(["@generated:data/bin/sh:" + overlayHash: overlayHash]) { old, _ in old }
+        XCTAssertTrue(try ZeusPristineRootfs.remove(at: overlay, baseline: overlaidBaseline, allowed: { false }))
         let edited = try tree("edited")
         try Data("my edited shell".utf8).write(to: edited.appendingPathComponent("data/bin/sh"))
         XCTAssertFalse(try ZeusPristineRootfs.remove(at: edited, baseline: baseline, allowed: { false }))

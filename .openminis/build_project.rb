@@ -80,7 +80,7 @@ app.resources_build_phase.add_file_reference(skills)
 
 rootfs_baseline = browser + '.openminis/build/zeus-rootfs-baseline.json'
 FileUtils.mkdir_p(rootfs_baseline.dirname)
-raise 'Rootfs baseline generation failed' unless system('python3', (browser + '.openminis/rootfs_manifest.py').to_s, (native + 'deps/resources/alpine-rootfs.zip').to_s, rootfs_baseline.to_s)
+raise 'Rootfs baseline generation failed' unless system('python3', (browser + '.openminis/rootfs_manifest.py').to_s, (native + 'deps/resources/alpine-rootfs.zip').to_s, rootfs_baseline.to_s, (native + 'src/ios/default_mount').to_s)
 app.resources_build_phase.add_file_reference(group.new_file(rootfs_baseline.to_s))
 
 # Browser resources are resolved by Bundle.main from inside the static module.
@@ -114,7 +114,7 @@ app.build_configurations.each do |config|
   config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'tools.rea.ZEUSBrowserAnalysis'
   config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '18.1'
   config.build_settings['MARKETING_VERSION'] = '4.0.0'
-  config.build_settings['CURRENT_PROJECT_VERSION'] = '46'
+  config.build_settings['CURRENT_PROJECT_VERSION'] = '47'
   config.build_settings['INFOPLIST_KEY_CFBundleDisplayName'] = 'ZEUS'
 end
 # A device `build` (unlike archive/install) did not strip the original app's

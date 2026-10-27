@@ -41,7 +41,8 @@ enum ZeusPristineRootfs {
                     return text.isEmpty || text.hasPrefix("#") || ["nameserver ", "search ", "domain ", "options "].contains(where: text.hasPrefix)
                 }) { continue }
             }
-            guard baseline[name] == SHA256.hash(data: data).map({ String(format: "%02x", $0) }).joined() else { return false }
+            let digest = SHA256.hash(data: data).map({ String(format: "%02x", $0) }).joined()
+            guard baseline[name] == digest || baseline["@generated:" + name + ":" + digest] == digest else { return false }
         }
         guard complete, !allowed() else { return false }
         try fm.removeItem(at: root)
