@@ -22,3 +22,22 @@
 {"id": "GU-MUDSKIN", "kind": "gu", "canonical_name": "ضفدع الجلد الطيني", "aliases_json": "[]"}
 {"id": "GU-GREEN-SILK", "kind": "gu", "canonical_name": "غو الحرير الأخضر", "aliases_json": "[]"}
 {"id": "FAC-JIA", "kind": "faction", "canonical_name": "عائلة جيا", "aliases_json": "[]"}
+{"id": "CHAR-GY-BO", "kind": "character", "canonical_name": "غو يوي بو", "aliases_json": "[]"}
+{"id": "CHAR-JIANG-HE", "kind": "character", "canonical_name": "جيانغ هي", "aliases_json": "[]"}
+{"id": "CHAR-WANG-ER", "kind": "character", "canonical_name": "وانغ إر", "aliases_json": "[]"}
+{"id": "CHAR-OLD-WANG", "kind": "character", "canonical_name": "العجوز وانغ", "aliases_json": "[]"}
+{"id": "CHAR-WANG-DAUGHTER", "kind": "character", "canonical_name": "ابنة وانغ", "aliases_json": "[]"}
+{"id": "GU-FOOTPRINT", "kind": "gu", "canonical_name": "غو تتبع الأقدام", "aliases_json": "[\"غو الأثر في57\"]"}
+{"id": "GU-BAMBOO-GENTLEMAN", "kind": "gu", "canonical_name": "نبيل الخيزران", "aliases_json": "[]"}
+{"id": "GU-WHITE-BOAR", "kind": "gu", "canonical_name": "غو الخنزير الأبيض", "aliases_json": "[]"}
+{"id": "GU-EARTH-TREASURY", "kind": "gu", "canonical_name": "غو زهرة كنز الأرض", "aliases_json": "[]"}
+{"id": "GU-LITTLE-LIGHT", "kind": "gu", "canonical_name": "غو الضوء الصغير", "aliases_json": "[]"}
+{"id": "CHAR-WANG-DA", "kind": "character", "canonical_name": "وانغ دا — ابن الصياد", "aliases_json": "[\"ليس حارس الأكاديمية الذي يحمل اسمًا مماثلًا في54\"]"}
+{"id": "CHAR-QING-SHU", "kind": "character", "canonical_name": "غو يوي تشينغ شو", "aliases_json": "[]"}
+{"id": "CHAR-YAO-HONG", "kind": "character", "canonical_name": "غو يوي ياو هونغ", "aliases_json": "[]"}
+{"id": "CHAR-JIAO-SAN", "kind": "character", "canonical_name": "غو يوي جياو سان", "aliases_json": "[\"الأفعى المريضة\"]"}
+{"id": "CHAR-KONG-JING", "kind": "character", "canonical_name": "غو يوي كونغ جينغ", "aliases_json": "[]"}
+{"id": "GU-BIG-BELLY-TOAD", "kind": "gu", "canonical_name": "ضفدع البطن الكبير", "aliases_json": "[]"}
+{"id": "GU-FLASH-BLINK", "kind": "gu", "canonical_name": "غو الوميض", "aliases_json": "[]"}
+{"id": "GU-SHADOW-FOLLOWER", "kind": "gu", "canonical_name": "غو تابع الظل", "aliases_json": "[]"}
+{"id": "GU-LOVE-LIFE-SEPARATION", "kind": "gu", "canonical_name": "غو انفصال الحب والحياة", "aliases_json": "[]"}
