@@ -20,15 +20,17 @@
     17,
     18,
     19,
-    20
+    20,
+    21,
+    22
   ],
-  "next_file": 21,
+  "next_file": 23,
   "target_batch_end": 40,
   "source_chapter_numbers_verified": false,
   "source_archive_sha256": "3d018f708c151bc88316734791a1b6d248cfd97e0a48ff51a09e133522b6725f",
   "branch": "research/reverend-insanity-continuation-20261027",
-  "resume_command": "python research/reverend-insanity/tools/query.py source 21",
-  "next_action": "Read 21–40 completely; update decisions, temporal knowledge, causal graph, evidence and contradictions. No claim of complete encyclopedia.",
+  "resume_command": "python research/reverend-insanity/tools/query.py source 23",
+  "next_action": "Read23–40 completely; preserve temporal knowledge, record chronological conflicts, extend entity/faction/Gu records.",
   "acceptance_complete": false,
-  "remote_push_status": "403 denied to syfslfk00-debug on both branch names"
+  "remote_push_status": "connected as cobrapk8ggggggg-tech; branch created and files1–20 saved in080d306"
 }

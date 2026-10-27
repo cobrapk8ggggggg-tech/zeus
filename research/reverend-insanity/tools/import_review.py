@@ -15,4 +15,9 @@ def main():
  state=json.loads((R/'19-research-progress/checkpoint.json').read_text())
  for n in state['reviewed_files']:db.execute("UPDATE chapters SET review_status='context_reviewed_initial' WHERE file_number=?",(n,))
  db.commit();db.close()
+ p=R/'data/chapters.jsonl'
+ rows=[json.loads(line) for line in p.read_text().splitlines()]
+ for row in rows:
+  row['review_status']='context_reviewed_initial' if row['file_number'] in state['reviewed_files'] else 'unreviewed'
+ p.write_text(''.join(json.dumps(row,ensure_ascii=False)+'\n' for row in rows))
 if __name__=='__main__':main()

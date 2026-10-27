@@ -25,3 +25,4 @@
 {"id": "CE-0025", "source_event": "EV-MAIN-0032", "target_event": "EV-MAIN-0033", "relation_type": "contributing_factor", "evidence": "20.txt:117–127", "confidence": "medium", "status": "reviewed"}
 {"id": "CE-0026", "source_event": "EV-MAIN-0033", "target_event": "EV-MAIN-0034", "relation_type": "direct_cause", "evidence": "20.txt:129–243", "confidence": "high", "status": "reviewed"}
 {"id": "CE-0027", "source_event": "EV-MAIN-0027", "target_event": "EV-MAIN-0028", "relation_type": "direct_cause", "evidence": "18.txt:213–235", "confidence": "high", "status": "reviewed"}
+{"id": "CE-0028", "source_event": "EV-MAIN-0034", "target_event": "EV-MAIN-0035", "relation_type": "contributing_factor", "evidence": "20.txt:175–243؛21.txt:55–123؛ الوصول جزء من تحقق الأسبقية لا توثيق لحظة تسليم المال", "confidence": "high", "status": "reviewed"}

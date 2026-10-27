@@ -34,3 +34,6 @@
 {"id": "EV-MAIN-0033", "timeline": "main", "description": "إخفاء الدودة والإسراع إلى الأكاديمية طلبًا للجائزة", "chapter_id": "SRC-0020", "line_start": 117, "line_end": 127, "confidence": "high"}
 {"id": "EV-MAIN-0034", "timeline": "main", "description": "تصحيح هوية الأخ أمام الشيخ دون توثيق تسليم الجائزة بعد", "chapter_id": "SRC-0020", "line_start": 175, "line_end": 243, "confidence": "high"}
 {"id": "EV-ANCIENT-0001", "timeline": "ancient", "description": "معركة الراهب والزعيم الرابع كما يعرضها التسجيل؛ مصدر تاريخي داخل العالم لا مشاهدة حاضرة", "chapter_id": "SRC-0015", "line_start": 39, "line_end": 189, "confidence": "high for recorded portrayal"}
+{"id": "EV-MAIN-0035", "timeline": "main", "description": "خبر تسلم الأكبر الجائزة وقائمة أسبقيته ثم صدمة الأصغر", "chapter_id": "SRC-0021", "line_start": 55, "line_end": 123, "confidence": "high"}
+{"id": "EV-MAIN-0036", "timeline": "main", "description": "تفسيرات فرعي مو وتشي للحظ وإعلان الجد المساعدة", "chapter_id": "SRC-0021", "line_start": 135, "line_end": 207, "confidence": "high"}
+{"id": "EV-MAIN-0037", "timeline": "main", "description": "اختبار نصل مخفي ونسبته خطأ لطالب آخر", "chapter_id": "SRC-0022", "line_start": 199, "line_end": 239, "confidence": "high"}
