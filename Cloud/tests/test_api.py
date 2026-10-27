@@ -412,6 +412,18 @@ class APITests(unittest.IsolatedAsyncioTestCase):
         await asyncio.gather(cleanup,return_exceptions=True)
         self.assertEqual(released,[self.owner])
 
+    async def test_native_command_substeps_use_the_cloud_terminal_and_propagate_exit_status(self):
+        response=await self.client.post("/v1/terminals",json={"conversation":self.conversation,"file_grant":"grant","command":"printf cloud-substep; printf saved > proof.txt; exit 7","timeout_seconds":10})
+        self.assertEqual(response.status_code,200,response.text);identifier=response.json()["id"]
+        for _ in range(100):
+            result=(await self.client.get("/v1/terminals/"+identifier)).json()
+            if result["exit_code"] is not None: break
+            await asyncio.sleep(.01)
+        self.assertEqual(result["exit_code"],7);self.assertIn("cloud-substep",result["output"])
+        self.assertEqual(await self.app.state.engine.spaces.read_cloud_file(self.owner,self.conversation,"proof.txt","grant"),b"saved")
+        limits=(await self.client.get("/v1/capabilities")).json()
+        self.assertTrue(limits["executables"]["sh"])
+
     async def test_disabling_all_native_tools_does_not_restore_a_cloud_fallback_catalog(self):
         class NoTools:
             async def stream(self, provider, messages, tools, instructions):

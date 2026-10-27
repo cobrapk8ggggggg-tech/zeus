@@ -1,5 +1,6 @@
 import SwiftUI
 import CryptoKit
+import ZEUSBrowser
 
 /// The executing agent remains the original AIChatViewModel and its selected
 /// provider. This runtime adds durable plans, tools and completion gates to it.
@@ -251,6 +252,7 @@ import CryptoKit
         return output
     }
     func prepareEnvironment(vm: AIChatViewModel) async throws {
+        if NativeCloudAccountAPI.usesCloud { return }
         if let session = vm.sessionId { try Self.prepareWorkspace(session: session) }
         vm.ensureKernelBooted()
         for _ in 0..<300 {

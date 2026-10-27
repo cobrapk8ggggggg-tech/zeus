@@ -238,6 +238,8 @@ def embed(native, browser, report):
     file_tools = source / "Agent/Chat/AIChatViewModel+FileTools.swift"
     replace(file_tools, 'ISHExecutionCoordinator.shared.hostURL(for: linuxPath)', 'ISHExecutionCoordinator.shared.hostURL(for: linuxPath, sessionId: self.sessionId)')
     replace(file_tools, 'ISHExecutionCoordinator.shared.hostURL(for: path)', 'ISHExecutionCoordinator.shared.hostURL(for: path, sessionId: self.sessionId)')
+    replace(source / "Agent/Chat/AIChatViewModel+ISHCommand.swift", "import Foundation", "import Foundation\nimport ZEUSBrowser")
+    replace(source / "Agent/Chat/AIChatViewModel+ISHCommand.swift", "        let effectiveTimeout = timeout ?? defaultCommandTimeout", "        let effectiveTimeout = timeout ?? defaultCommandTimeout\n        if NativeCloudAccountAPI.usesCloud { return try await ZeusCloudCommands.execute(command, session: fsSessionId, timeout: effectiveTimeout, line: lineCallback) }")
     replace(source / "Agent/Chat/AIChatViewModel+ISHCommand.swift", '        let bashism = BashismDetector.detect(command)', '        try ZeusAgentHarness.prepareWorkspace(session: sid)\n        ensureParentDirsInMetaDB(for: "/var/minis/workspace")\n        let bashism = BashismDetector.detect(command)')
     replace(source / "iSH/ISHShellExecutor.m", '    int exitCode = [notification.userInfo[@"code"] intValue];', '''    // The iSH exit hook reports Linux wait(2) status, not a shell exit code.
     int waitStatus = [notification.userInfo[@"code"] intValue];

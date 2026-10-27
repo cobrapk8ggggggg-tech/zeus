@@ -73,6 +73,8 @@ class ImportInput(Input):
 class TerminalInput(Input):
     conversation: uuid.UUID
     file_grant: SecretStr
+    command: str | None = Field(default=None, min_length=1, max_length=100000)
+    timeout_seconds: int = Field(default=900, ge=1, le=7200)
 
 
 class TerminalWrite(Input):
@@ -210,8 +212,10 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
     @app.get("/v1/capabilities")
     async def capabilities(account=Depends(auth)):
         from .resources import limits
+        import shutil
+        executables = {name:path for name in ["sh","bash","git","python3","node","npm","swift","xcodebuild"] if (path:=shutil.which(name))}
         return {"ready": app.state.ready, "reason": app.state.problem,
-            "container_limits": limits(),
+            "container_limits": limits(), "executables": executables,
             "cloud_agent": True, "terminal": True, "browser": False, "xcode": False,
             "max_parallel_runs": 1, "workspace_bytes": WORKSPACE_LIMIT,
             "provider_protocols": ["openai", "responses", "anthropic"], "canonical_tools": True, "device_tool_bridge": True, "owner_configured": bool(owner or owner_email),
@@ -492,7 +496,7 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
             for folder in ["shared", "skills", "memory"]: (global_root / folder).mkdir(exist_ok=True)
             engine.own(global_root)
             engine.aliases(account, root)
-            terminal = await terminals.start(account, conversation, root, uid=child_uid, seconds=900, global_root=global_root)
+            terminal = await terminals.start(account, conversation, root, command=value.command or "/bin/bash --noprofile --norc", uid=child_uid, seconds=value.timeout_seconds, global_root=global_root)
             terminal_grants[terminal.id] = grant
         return terminals.read(account, terminal.id)
 
