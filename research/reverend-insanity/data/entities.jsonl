@@ -41,3 +41,14 @@
 {"id": "GU-FLASH-BLINK", "kind": "gu", "canonical_name": "غو الوميض", "aliases_json": "[]"}
 {"id": "GU-SHADOW-FOLLOWER", "kind": "gu", "canonical_name": "غو تابع الظل", "aliases_json": "[]"}
 {"id": "GU-LOVE-LIFE-SEPARATION", "kind": "gu", "canonical_name": "غو انفصال الحب والحياة", "aliases_json": "[]"}
+{"id": "GU-WHITE-JADE", "kind": "gu", "canonical_name": "غو اليشم الأبيض", "aliases_json": "[]"}
+{"id": "GU-MOON-RAIMENT", "kind": "gu", "canonical_name": "غو رداء القمر", "aliases_json": "[]"}
+{"id": "CHAR-HUA-XING", "kind": "character", "canonical_name": "غو يوي هوا شينغ", "aliases_json": "[\"هوا شين في95؛ اسم مضطرب\"]"}
+{"id": "CHAR-CHI-SHAN", "kind": "character", "canonical_name": "غو يوي تشي شان", "aliases_json": "[]"}
+{"id": "GU-SCARECROW", "kind": "gu", "canonical_name": "غو الفزاعة", "aliases_json": "[]"}
+{"id": "FAC-GY-STUDENTS", "kind": "group", "canonical_name": "طلاب أكاديمية غو يوي", "aliases_json": "[]"}
+{"id": "GU-YELLOW-CAMEL", "kind": "gu", "canonical_name": "خنفساء الجمل الأصفر", "aliases_json": "[]"}
+{"id": "GU-JADE-SKIN", "kind": "gu", "canonical_name": "غو الجلد اليشمي", "aliases_json": "[]"}
+{"id": "CHAR-UNCLE", "kind": "character", "canonical_name": "غو يوي دونغ تو — خال الأخوين في الترجمة", "aliases_json": "[]"}
+{"id": "GU-SNAKE-TONGUE", "kind": "gu", "canonical_name": "غو لسان الأفعى", "aliases_json": "[]"}
+{"id": "FAC-GY-HOUSEHOLD", "kind": "household", "canonical_name": "بيت الخال والخالة", "aliases_json": "[]"}

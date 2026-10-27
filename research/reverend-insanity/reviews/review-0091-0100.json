@@ -1,0 +1,1379 @@
+{
+  "reviewed_files": [
+    91,
+    92,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    100
+  ],
+  "next_action": "Continue direct reading from101 without scheduling or arbitrary chapter stop; verify asset confrontation, honey-Gu mismatch, feeding units, and time-sensitive knowledge.",
+  "next_batch_end": 120,
+  "records": {
+    "facts": [
+      {
+        "id": "F-0205",
+        "subject": "CHAR-FY",
+        "predicate": "necessary_spending",
+        "value": "يشتري تجهيز تدفئة وفراشًا ومؤن سبعة أيام مع ضيق المال؛ يرى التقتير في الأساسيات غير مقبول لضرر الصحة",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0091",
+        "line_start": 1,
+        "line_end": 23,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0206",
+        "subject": "CHAR-FY",
+        "predicate": "seventh_gu",
+        "value": "اختار ضوءًا صغيرًا ثانيًا بجائزة الامتحان، فأصبح المجموع سبعًا مع عبء تغذية",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0091",
+        "line_start": 85,
+        "line_end": 99,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0207",
+        "subject": "CHAR-FY",
+        "predicate": "breakthrough_options",
+        "value": "يعرض رفع الموهبة ودعم غو ومساعدة أعلى رتبة؛ يرفض تعريض فتحته لسيطرة مساعد ويعرف موارد لا يمكنه الوصول إليها",
+        "epistemic_type": "self_report",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0091",
+        "line_start": 117,
+        "line_end": 157,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0208",
+        "subject": "CHAR-FY",
+        "predicate": "continuous_supply",
+        "value": "يستخدم امتصاص الأحجار مع هجوم أبطأ يحافظ على الشقوق؛ توقف فوق نحو15دقيقة يفقد التقدم في هذه الخطة",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0091",
+        "line_start": 159,
+        "line_end": 199,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0209",
+        "subject": "CHAR-JIAO-SAN",
+        "predicate": "search_and_breakin",
+        "value": "يعثر الفريق على السكن في اليوم الثاني ويحاول مقاطعة الصقل ويقتحم تحت ذريعة الإنقاذ",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0091",
+        "line_start": 217,
+        "line_end": 301,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0210",
+        "subject": "CHAR-JIAO-SAN",
+        "predicate": "misled_by_coal",
+        "value": "الغرفة فارغة؛ المالك يذكر الفحم والمشتريات؛ يظن القائد احتجاز الأكبر في التعدين أو إصابته ويؤجل الخروج",
+        "epistemic_type": "belief",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0092",
+        "line_start": 9,
+        "line_end": 107,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0211",
+        "subject": "CHAR-FY",
+        "predicate": "rank_two_achieved",
+        "value": "يتم الاختراق في اليوم الرابع بعد ثلاث ليالٍ؛ يغثى ويكاد جسده ينهار وينام ثم يستعيد بعض طاقته",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0092",
+        "line_start": 109,
+        "line_end": 161,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0212",
+        "subject": "CHAR-FY",
+        "predicate": "safe_site",
+        "value": "سأل عن الفحم عمدًا ثم أقام بقرية جيانغ هي؛ اختارها لتقابل المصالح وخشية كشف الإرث عند البحث عنه",
+        "epistemic_type": "self_report",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0092",
+        "line_start": 179,
+        "line_end": 223,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0213",
+        "subject": "CHAR-JIANG-HE",
+        "predicate": "peer_status",
+        "value": "تعامل أود مع الأكبر بعد بلوغ2 وأهلية الندية؛ يحذره من الوحوش والذئاب؛ لا يلزمه الأكبر بليلة إضافية",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0092",
+        "line_start": 233,
+        "line_end": 251,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0214",
+        "subject": "CHAR-FY",
+        "predicate": "memory_retrieval",
+        "value": "ذكريات خمسمائة عام كثيفة وضبابية في أجزاء؛ تذكير تشي تشينغ يساعده على استرجاع موجة الوحوش",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0093",
+        "line_start": 11,
+        "line_end": 51,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0215",
+        "subject": "CHAR-FY",
+        "predicate": "wolf_forecast",
+        "value": "يتذكر موجة ذئاب كبيرة في العام التالي ويفسر سلسلة هجرة الوحوش؛ توقعه لا يحدد كل حادثة صغيرة",
+        "epistemic_type": "self_report",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0093",
+        "line_start": 61,
+        "line_end": 79,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0216",
+        "subject": "CHAR-FY",
+        "predicate": "temporary_team",
+        "value": "تشي تشينغ بالمرتبة2 ويحسب الأكبر1؛ الأكبر يحتج بقاعدة الانضمام لأقرب فريق أثناء التعبئة؛ تشي شان يقبل",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0093",
+        "line_start": 97,
+        "line_end": 135,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0217",
+        "subject": "CHAR-CHI-SHAN",
+        "predicate": "protects_newcomers",
+        "value": "يضع الأصغر خبرة والأكبر وسط التشكيل الآمن رغم أنه ليس عضو فريقه المعتاد؛ الأكبر يقارنه إيجابًا بجياو سان",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0093",
+        "line_start": 183,
+        "line_end": 197,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0218",
+        "subject": "GU-SNAKE-TONGUE",
+        "predicate": "inferred_detection",
+        "value": "الأكبر يرجح غو لسان الأفعى2 للكشف الحراري؛ يعدد ضيق المجال والتشويش وعدم كشف ذوات الدم البارد",
+        "epistemic_type": "inference",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0093",
+        "line_start": 239,
+        "line_end": 251,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0219",
+        "subject": "CHAR-FY",
+        "predicate": "combat_gap",
+        "value": "يرى تكامل غو2 يقتل النمر في ثلاث ثوانٍ مقابل تقديره خمس دقائق لنفسه؛ امتلاك2 لا يكمل منظومة غوه تلقائيًا",
+        "epistemic_type": "self_report",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0093",
+        "line_start": 283,
+        "line_end": 301,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0220",
+        "subject": "CHAR-CHI-SHAN",
+        "predicate": "aid_without_share",
+        "value": "يساعد فريق جياو سان بالشبكة ويترك المكافأة لهم ثم يغادر؛ لا يتلقى شكرًا",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0094",
+        "line_start": 73,
+        "line_end": 135,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0221",
+        "subject": "CHAR-JIAO-SAN",
+        "predicate": "intention_boundary",
+        "value": "يريد إصابة الأكبر وتأخير2 لا قتله؛ التقييم والتحقيق والقيم العشائرية تحد نية القتل في حسابه",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0094",
+        "line_start": 149,
+        "line_end": 181,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0222",
+        "subject": "CHAR-FY",
+        "predicate": "sabotage",
+        "value": "يسحب قوة كبح ملك الخنازير عمدًا عند اقتراب هوا شينغ فتموت؛ رميه بعيدًا لا يثبت إصابته فعلًا",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0094",
+        "line_start": 203,
+        "line_end": 227,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0223",
+        "subject": "CHAR-FY",
+        "predicate": "performed_injury",
+        "value": "الجلد اليشمي يحميه من السقوط عدا ألم ظهر؛ يمثل العرج ويفحص وجود شهود ثم يستتر احترازيًا",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0095",
+        "line_start": 9,
+        "line_end": 25,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0224",
+        "subject": "CHAR-FY",
+        "predicate": "sabotage_limit",
+        "value": "يمزق الشبكة بأنصال بحجة المساعدة ثم يتراجع؛ يرفض تصفية صريحة لأن غيره قد يلاحظ والتكلفة لا تستحق المجموعة",
+        "epistemic_type": "self_report",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0095",
+        "line_start": 91,
+        "line_end": 165,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0225",
+        "subject": "CHAR-FY",
+        "predicate": "unexpected_wolves",
+        "value": "ذئاب البرق مفاجأة؛ يقدر عدم قدرته على الفرار فيختبئ في جثة الملك ويستعمل المعالجة درعًا ويستعيد الجوهر انتظارًا للتعزيز",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0095",
+        "line_start": 193,
+        "line_end": 263,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0226",
+        "subject": "CHAR-FY",
+        "predicate": "exit_hazard",
+        "value": "تصل تعزيزات بعد نحو10دقائق؛ يخرج من الجثة كي لا تصيبه هجمات الإنقاذ، لا ليستمر مختبئًا بعد تغير الخطر",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0096",
+        "line_start": 3,
+        "line_end": 25,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0227",
+        "subject": "CHAR-FY",
+        "predicate": "shield_aftermath",
+        "value": "المعالجة ماتت بتيار عضات الذئاب بحسب السرد؛ غضب معالج كان يحبها لا يردعه؛ يحتج بتفسير ضرورة النجاة",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0096",
+        "line_start": 69,
+        "line_end": 143,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0228",
+        "subject": "CHAR-FY",
+        "predicate": "legal_limit",
+        "value": "يعرف أن كشف ضربه لها حتى الإغماء قد يدينه بإيذاء فرد، بخلاف قصة التنافس التي يرويها؛ يقدر عدم رؤية الشهود",
+        "epistemic_type": "self_report",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0096",
+        "line_start": 157,
+        "line_end": 159,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0229",
+        "subject": "CHAR-FY",
+        "predicate": "finishes_survivor",
+        "value": "يفترض أولًا موت جياو سان ثم يرى حركة إصبعه؛ يتكيف مع قرب المعالجين ويمثل الحزن ويقتل الناجي؛ الفحص يثبت موته",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0096",
+        "line_start": 165,
+        "line_end": 257,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0230",
+        "subject": "CHAR-FY",
+        "predicate": "no_looting",
+        "value": "لا يستولي على غو الميت لمخاطر التسجيل وكشف السر وعبء التغذية رغم سهولة إخضاع غو أدنى بالسادسة",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0096",
+        "line_start": 263,
+        "line_end": 281,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0231",
+        "subject": "CHAR-FY",
+        "predicate": "interrogation",
+        "value": "يكشف اختراقه لأن الهالة لا تخفى بلا غو؛ يعيد غالب الوقائع ويخفي نواياه وتفاصيل رئيسية، وخمس إعادات لا تكشفه",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0097",
+        "line_start": 35,
+        "line_end": 87,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0232",
+        "subject": "CHAR-FY",
+        "predicate": "mission_after_team_loss",
+        "value": "موت الفريق يزيل لزوم استعمال حق التخلي السنوي؛ يرفض الانضمام أو تأسيس فريق الآن لأسراره؛ الطلب يؤجل ثلاثة أيام",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0097",
+        "line_start": 113,
+        "line_end": 163,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0233",
+        "subject": "CHAR-FZ",
+        "predicate": "shared_mourning",
+        "value": "يدعوه لجنازة زميلتهم جين تشو ثم يخجل من أخيه عند رفضه وانتقاد الجماعة؛ يظهر تفاعل جديد بعد الحلبة",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0097",
+        "line_start": 171,
+        "line_end": 225,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0234",
+        "subject": "CHAR-FY",
+        "predicate": "reputation_as_tool",
+        "value": "يقبل النبذ كوسيلة للعزلة لأن هدفه الموارد والاستقلال؛ يميز بنية القوة الفردية هنا عن الأرض في تأمله",
+        "epistemic_type": "self_report",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0097",
+        "line_start": 229,
+        "line_end": 265,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0235",
+        "subject": "CHAR-UNCLE",
+        "predicate": "bribed_mission",
+        "value": "الرشوة تفسر التأجيل ثم إعداد أصعب مهمة؛ الخال يعتمد علاقاته ويراقب طلب مساعدة خارجية",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0098",
+        "line_start": 1,
+        "line_end": 45,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0236",
+        "subject": "CHAR-FY",
+        "predicate": "defense_choice",
+        "value": "مهمة خمسة ليانغ نبيذ عسل تحتاج دفاعًا؛ يقدر الجلد1 غير كاف ويختار صقل اليشم الأبيض2 بدل الهجوم لضيق المال",
+        "epistemic_type": "self_report",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0098",
+        "line_start": 81,
+        "line_end": 151,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0237",
+        "subject": "CHAR-FY",
+        "predicate": "gu_inventory",
+        "value": "السبع: السادسة الحيوية وضوء القمر ودودة الخمور والأبيض والجلد وضوء صغير مرتان؛ وصفة هجومية وأخرى دفاعية متاحتان",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0098",
+        "line_start": 117,
+        "line_end": 129,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0238",
+        "subject": "WORLD",
+        "predicate": "refinement_recipes",
+        "value": "ليست كل غو قابلة للدمج؛ الوصفة تراث تجارب؛ العشيرة تحوز سلسلتي وصفات5 وفق شرح الزعيم للأصغر",
+        "epistemic_type": "speaker_report",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0098",
+        "line_start": 187,
+        "line_end": 221,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0239",
+        "subject": "CHAR-FZ",
+        "predicate": "fusion_failure",
+        "value": "ينجح في ضم الوعي بعد ثلاث ساعات ثم يفشل حين ينسى الحفاظ عليه عند إضافة الحجر؛ تتضرر الغو ويشعر بصعوبة الصقل",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0098",
+        "line_start": 235,
+        "line_end": 267,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0240",
+        "subject": "CHAR-FY",
+        "predicate": "cicada_limits",
+        "value": "يفسر تعافي السادسة بدورة الفصول ويواصل تعلمها؛ هالتها تعين الإخضاع الفردي ولا ترفع احتمال الدمج هنا",
+        "epistemic_type": "self_report",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0099",
+        "line_start": 21,
+        "line_end": 43,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0241",
+        "subject": "CHAR-FY",
+        "predicate": "resource_deadline",
+        "value": "حصل ناب ملك بحصة القتال؛ المال يكفي محاولة دمج واحدة وتغذية نحو12يومًا إن لم يدمج؛ ينتقل للخطر مع تضاؤل البدائل",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0099",
+        "line_start": 59,
+        "line_end": 107,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0242",
+        "subject": "CHAR-FY",
+        "predicate": "fusion_result",
+        "value": "يضيف الناب بناء على وصفة مستقبلية فتنجح غو اليشم الأبيض2؛ يذكر النص زيادة20% غير محددة المقام، وينفي ضمان النجاح حتى لخبير",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0099",
+        "line_start": 135,
+        "line_end": 217,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0243",
+        "subject": "GU-WHITE-JADE",
+        "predicate": "defense_cost",
+        "value": "دفاعه أقوى من الجلد ويستهلك جوهرًا مستمرًا يزداد بالهجوم؛ قوة الأبيض المتراكمة تبقى بعد استهلاكه في الدمج",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0100",
+        "line_start": 19,
+        "line_end": 51,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0244",
+        "subject": "CHAR-FY",
+        "predicate": "attrition_and_budget",
+        "value": "يتراجع من نحو100قرد إلى نحو30 ثم يقاتل؛ يتوقف عند نقص الجوهر لأن الأحجار شحيحة؛ موضع الدليل مازال تخمينًا",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0100",
+        "line_start": 89,
+        "line_end": 127,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0245",
+        "subject": "GU-WHITE-JADE",
+        "predicate": "feeding_change",
+        "value": "لا يحتاج لحم خنزير بعد استهلاك الأبيض؛ اليشم الأبيض يتغذى8ليانغ يشم كل20يومًا، والموقع يخفف النفقة العملية",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0100",
+        "line_start": 139,
+        "line_end": 165,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0246",
+        "subject": "CHAR-FY",
+        "predicate": "submission_plan",
+        "value": "معه نبيذ العسل ويقول النص إنه جمعه بالجلد اليشمي رغم استهلاكه99؛ بقي حجران ونصف؛ يقبل انخفاض التقييم ويفرق قبول المهمة عن إكمالها",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0100",
+        "line_start": 169,
+        "line_end": 227,
+        "status": "reviewed"
+      },
+      {
+        "id": "F-0247",
+        "subject": "CHAR-FY",
+        "predicate": "gentle_act",
+        "value": "يمنع أبًا من ضرب طفلته ويهدئها بلطف ثم يمضي؛ لا يصرح النص بدافع خفي لهذا الفعل ضمن الملف100",
+        "epistemic_type": "narrator",
+        "confidence": "high for attribution; interpretations remain attributed",
+        "chapter_id": "SRC-0100",
+        "line_start": 245,
+        "line_end": 279,
+        "status": "reviewed"
+      }
+    ],
+    "events": [
+      {
+        "id": "EV-MAIN-0137",
+        "timeline": "main",
+        "description": "شراء أساسيات ومؤن وترك آثار السكن",
+        "chapter_id": "SRC-0091",
+        "line_start": 1,
+        "line_end": 23,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0138",
+        "timeline": "main",
+        "description": "اختيار تعويض القدرة بالأحجار والصقل المتصل",
+        "chapter_id": "SRC-0091",
+        "line_start": 159,
+        "line_end": 199,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0139",
+        "timeline": "main",
+        "description": "العثور على مسكن الطعم واقتحامه",
+        "chapter_id": "SRC-0091",
+        "line_start": 217,
+        "line_end": 301,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0140",
+        "timeline": "main",
+        "description": "غياب الأكبر وتفسير القائد المضلل بقصة الفحم",
+        "chapter_id": "SRC-0092",
+        "line_start": 9,
+        "line_end": 107,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0141",
+        "timeline": "main",
+        "description": "الاختراق إلى2 والإرهاق والنوم",
+        "chapter_id": "SRC-0092",
+        "line_start": 109,
+        "line_end": 161,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0142",
+        "timeline": "main",
+        "description": "كشف مكان الصقل الآمن وشراكة جيانغ هي الجزئية",
+        "chapter_id": "SRC-0092",
+        "line_start": 179,
+        "line_end": 251,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0143",
+        "timeline": "main",
+        "description": "تذكير موجة الوحوش والانضمام المؤقت لفريق تشي شان",
+        "chapter_id": "SRC-0093",
+        "line_start": 11,
+        "line_end": 135,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0144",
+        "timeline": "main",
+        "description": "مساعدة بلا حصة وعودة الأكبر إلى فريقه",
+        "chapter_id": "SRC-0094",
+        "line_start": 73,
+        "line_end": 135,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0145",
+        "timeline": "main",
+        "description": "إفلات متعمد لملك الخنازير وموت هوا شينغ",
+        "chapter_id": "SRC-0094",
+        "line_start": 203,
+        "line_end": 227,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0146",
+        "timeline": "main",
+        "description": "تخريب شبكة ووقف التصعيد المباشر عند حد خطر الشهود",
+        "chapter_id": "SRC-0095",
+        "line_start": 91,
+        "line_end": 165,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0147",
+        "timeline": "main",
+        "description": "ذئاب مفاجئة واختباء في جثة مع استخدام زميلة درعًا",
+        "chapter_id": "SRC-0095",
+        "line_start": 193,
+        "line_end": 263,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0148",
+        "timeline": "main",
+        "description": "وصول التعزيز وخروج الأكبر من الجثة",
+        "chapter_id": "SRC-0096",
+        "line_start": 3,
+        "line_end": 25,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0149",
+        "timeline": "main",
+        "description": "موت الزميلة واعتراض المعالج واحتجاج الأكبر بالضرورة",
+        "chapter_id": "SRC-0096",
+        "line_start": 69,
+        "line_end": 143,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0150",
+        "timeline": "main",
+        "description": "كشف جياو سان حيًا ثم قتله تحت تمثيل الحزن",
+        "chapter_id": "SRC-0096",
+        "line_start": 165,
+        "line_end": 257,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0151",
+        "timeline": "main",
+        "description": "استجواب لا يدينه وتقديم طلب مهمة الأصول",
+        "chapter_id": "SRC-0097",
+        "line_start": 35,
+        "line_end": 163,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0152",
+        "timeline": "main",
+        "description": "دعوة تشي تشينغ ومو بي والأصغر للجنازة ورفض الأكبر",
+        "chapter_id": "SRC-0097",
+        "line_start": 171,
+        "line_end": 225,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0153",
+        "timeline": "main",
+        "description": "رشوة الخال لإطالة الطلب وتعسير المهمة",
+        "chapter_id": "SRC-0098",
+        "line_start": 1,
+        "line_end": 45,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0154",
+        "timeline": "main",
+        "description": "اختيار هدف الصقل الدفاعي لإنجاز مهمة النبيذ",
+        "chapter_id": "SRC-0098",
+        "line_start": 81,
+        "line_end": 151,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0155",
+        "timeline": "main",
+        "description": "فشل الأصغر في دمج رداء القمر وتضرر مكوناته",
+        "chapter_id": "SRC-0098",
+        "line_start": 235,
+        "line_end": 267,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0156",
+        "timeline": "main",
+        "description": "نجاح صقل اليشم الأبيض بإضافة ناب الملك",
+        "chapter_id": "SRC-0099",
+        "line_start": 135,
+        "line_end": 217,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0157",
+        "timeline": "main",
+        "description": "تقدم مرحلي ضد القرود ثم توقف للجوهر",
+        "chapter_id": "SRC-0100",
+        "line_start": 89,
+        "line_end": 127,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0158",
+        "timeline": "main",
+        "description": "العودة بنبيذ العسل بنية تسليم المهمة",
+        "chapter_id": "SRC-0100",
+        "line_start": 169,
+        "line_end": 227,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-MAIN-0159",
+        "timeline": "main",
+        "description": "تهدئة طفلة وملاقاة الخال عند السكن",
+        "chapter_id": "SRC-0100",
+        "line_start": 245,
+        "line_end": 279,
+        "confidence": "high"
+      },
+      {
+        "id": "EV-PREV-RECIPE-0150",
+        "timeline": "previous_life",
+        "description": "وصفة إضافة ناب الملك تظهر في الخط الذي يتذكره الأكبر بعد150عامًا؛ لا ضمان تكررها في الخط الجديد",
+        "chapter_id": "SRC-0099",
+        "line_start": 143,
+        "line_end": 149,
+        "confidence": "high for attributed relative date"
+      },
+      {
+        "id": "EV-PREV-REFINEMENT-0300",
+        "timeline": "previous_life",
+        "description": "معرفة أثر فهم الغو في نجاح الدمج تنتشر بعد300عام وفق السرد؛ تاريخ نسبي لخط الذكرى",
+        "chapter_id": "SRC-0099",
+        "line_start": 187,
+        "line_end": 193,
+        "confidence": "high for attributed relative date"
+      }
+    ],
+    "causal_edges": [
+      {
+        "id": "CE-0114",
+        "source_event": "EV-MAIN-0136",
+        "target_event": "EV-MAIN-0138",
+        "relation_type": "contributing_factor",
+        "evidence": "90:177–251؛91:159–199؛ نقص القدرة يدفع التعويض المستمر",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0115",
+        "source_event": "EV-MAIN-0137",
+        "target_event": "EV-MAIN-0140",
+        "relation_type": "contributing_factor",
+        "evidence": "92:179–185؛ مشتريات وقصة الفحم صممت للتضليل",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0116",
+        "source_event": "EV-MAIN-0139",
+        "target_event": "EV-MAIN-0140",
+        "relation_type": "direct_cause",
+        "evidence": "92:9–21؛ الاقتحام يكشف غيابه ويستدعي رواية المالك",
+        "confidence": "high",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0117",
+        "source_event": "EV-MAIN-0117",
+        "target_event": "EV-MAIN-0142",
+        "relation_type": "contributing_factor",
+        "evidence": "92:183–205؛ السر المشترك يعين قبول الحماية ولا يضمن كل تعاون",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0118",
+        "source_event": "EV-MAIN-0138",
+        "target_event": "EV-MAIN-0141",
+        "relation_type": "direct_cause",
+        "evidence": "92:109–149؛ أحجار وصقل متواصل يكسران العائق",
+        "confidence": "high",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0119",
+        "source_event": "EV-MAIN-0142",
+        "target_event": "EV-MAIN-0141",
+        "relation_type": "contributing_factor",
+        "evidence": "92:179–205؛ مأمن يمنع المقاطعة لا مصدر قدرة سحري",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0120",
+        "source_event": "EV-MAIN-0141",
+        "target_event": "EV-MAIN-0143",
+        "relation_type": "temporal_only",
+        "evidence": "92:251؛93:9؛ الرجوع يوافق التعبئة ولا يخلق موجة الوحوش",
+        "confidence": "high",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0121",
+        "source_event": "EV-MAIN-0143",
+        "target_event": "EV-MAIN-0144",
+        "relation_type": "necessary_condition",
+        "evidence": "93:301؛94:73–135؛ مسار الفريق أوصله للمواجهة",
+        "confidence": "high",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0122",
+        "source_event": "EV-MAIN-0144",
+        "target_event": "EV-MAIN-0145",
+        "relation_type": "contributing_factor",
+        "evidence": "94:91–123،203–227؛ دعم الشبكة وإسناد الكبح يتيحان التخريب",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0123",
+        "source_event": "EV-MAIN-0145",
+        "target_event": "EV-MAIN-0146",
+        "relation_type": "contributing_factor",
+        "evidence": "95:15–95؛ إلقاؤه وتمثيل الإصابة ثم تخريب إضافي",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0124",
+        "source_event": "EV-MAIN-0146",
+        "target_event": "EV-MAIN-0147",
+        "relation_type": "contributing_factor",
+        "evidence": "95:167–217؛ الاستنزاف يقلل قدرة الفرار؛ الذئاب مفاجأة مستقلة لا يصنعها التخريب",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0125",
+        "source_event": "EV-MAIN-0147",
+        "target_event": "EV-MAIN-0148",
+        "relation_type": "contributing_factor",
+        "evidence": "96:9–25؛ المخبأ يحفظ الوقت حتى التعزيز ويستدعي مغادرته عند تغير الخطر",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0126",
+        "source_event": "EV-MAIN-0147",
+        "target_event": "EV-MAIN-0149",
+        "relation_type": "direct_cause",
+        "evidence": "95:221–229؛96:77–87؛ التعرض للعضات سبب وفاة الدرع",
+        "confidence": "high",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0127",
+        "source_event": "EV-MAIN-0147",
+        "target_event": "EV-MAIN-0150",
+        "relation_type": "contributing_factor",
+        "evidence": "96:165–181؛ الذئاب أصابت القائد ولم تقتله بعد؛ لا تنسب قتلته الأخيرة إليها",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0128",
+        "source_event": "EV-MAIN-0150",
+        "target_event": "EV-MAIN-0151",
+        "relation_type": "contributing_factor",
+        "evidence": "97:21–47،117–119؛ زوال الفريق يزيل قيد المهمة ويزيد التحقيق",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0129",
+        "source_event": "EV-MAIN-0151",
+        "target_event": "EV-MAIN-0153",
+        "relation_type": "contributing_factor",
+        "evidence": "98:1–11؛ الخال يتلقى خبر الطلب ويزيد الرشوة",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0130",
+        "source_event": "EV-MAIN-0153",
+        "target_event": "EV-MAIN-0154",
+        "relation_type": "contributing_factor",
+        "evidence": "98:81–111؛ مهمة صعبة تكشف قيمة الدفاع المخفي",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0131",
+        "source_event": "EV-MAIN-0154",
+        "target_event": "EV-MAIN-0156",
+        "relation_type": "contributing_factor",
+        "evidence": "98:139–151؛99:107–167؛ اختيار دفاعي ومال مقيد",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0132",
+        "source_event": "EV-MAIN-0156",
+        "target_event": "EV-MAIN-0157",
+        "relation_type": "contributing_factor",
+        "evidence": "100:19–43،89–113؛ دفاع2 يغير حجم المجموعة الممكنة دون إلغاء الجوهر",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0133",
+        "source_event": "EV-MAIN-0156",
+        "target_event": "EV-MAIN-0158",
+        "relation_type": "uncertain",
+        "evidence": "98:107–111؛100:171 يسمي الجلد1 لا الأبيض2؛ الاعتماد مرجح والخطأ النصي يمنع الجزم",
+        "confidence": "medium",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0134",
+        "source_event": "EV-MAIN-0152",
+        "target_event": "EV-MAIN-0158",
+        "relation_type": "temporal_only",
+        "evidence": "97:171–225؛100:169–227؛ الجنازة ليست سبب جمع النبيذ",
+        "confidence": "high",
+        "status": "reviewed"
+      },
+      {
+        "id": "CE-0135",
+        "source_event": "EV-PREV-RECIPE-0150",
+        "target_event": "EV-MAIN-0156",
+        "relation_type": "contributing_factor",
+        "evidence": "99:143–149،197؛ معرفة وصفة من الخط السابق وليست نبوءة مضمونة في الخط الرئيسي",
+        "confidence": "high",
+        "status": "reviewed"
+      }
+    ],
+    "knowledge": [
+      {
+        "id": "K-JS-0001",
+        "character_id": "CHAR-JIAO-SAN",
+        "valid_from": "SRC-0092:L75",
+        "valid_until": "SRC-0094:L117",
+        "epistemic_type": "belief",
+        "proposition": "يظن الأكبر في التعدين أو تاه وأصابه وحش؛ الطعم يخفي الصقل عند جيانغ هي",
+        "source_ref": "92:55–107",
+        "confidence": "high for attribution"
+      },
+      {
+        "id": "K-CHI-0001",
+        "character_id": "CHAR-CHI-CHENG",
+        "valid_from": "SRC-0093:L97",
+        "valid_until": null,
+        "epistemic_type": "false_information",
+        "proposition": "يعامل الأكبر كرتبة1 بينما بلغ2؛ عدم كشف الرتبة له ليس امتلاك غو إخفاء",
+        "source_ref": "93:97–103؛97:41–43",
+        "confidence": "high for attribution"
+      },
+      {
+        "id": "K-FY-0041",
+        "character_id": "CHAR-FY",
+        "valid_from": "SRC-0093:L51",
+        "valid_until": null,
+        "epistemic_type": "memory",
+        "proposition": "التذكير يسترجع حادث موجة الوحوش؛ لا وصول فوري دقيق لكل خمسمائة عام",
+        "source_ref": "93:11–51",
+        "confidence": "high for attribution"
+      },
+      {
+        "id": "K-FY-0042",
+        "character_id": "CHAR-FY",
+        "valid_from": "SRC-0095:L233",
+        "valid_until": null,
+        "epistemic_type": "known",
+        "proposition": "وجود ذئاب البرق في هذه الموجة الأولى مفاجأة له",
+        "source_ref": "95:193–239",
+        "confidence": "high for attribution"
+      },
+      {
+        "id": "K-FY-0043",
+        "character_id": "CHAR-FY",
+        "valid_from": "SRC-0096:L175",
+        "valid_until": "SRC-0096:L179",
+        "epistemic_type": "belief",
+        "proposition": "يحسب جياو سان ميتًا أولًا ثم تصحح حركة إصبعه الاعتقاد",
+        "source_ref": "96:165–181",
+        "confidence": "high for attribution"
+      },
+      {
+        "id": "K-FY-0044",
+        "character_id": "CHAR-FY",
+        "valid_from": "SRC-0097:L119",
+        "valid_until": null,
+        "epistemic_type": "known",
+        "proposition": "زوال الفريق جعله لا يحتاج استعمال امتياز التخلي السنوي لتقديم الطلب",
+        "source_ref": "97:117–119",
+        "confidence": "high for attribution"
+      },
+      {
+        "id": "K-FZ-0016",
+        "character_id": "CHAR-FZ",
+        "valid_from": "SRC-0098:L257",
+        "valid_until": null,
+        "epistemic_type": "known",
+        "proposition": "تعلم عمليًا أن فقد استمرار ضم الوعي يفشل الدمج ويضر المكونات",
+        "source_ref": "98:251–267",
+        "confidence": "high for attribution"
+      },
+      {
+        "id": "K-FY-0045",
+        "character_id": "CHAR-FY",
+        "valid_from": "SRC-0099:L23",
+        "valid_until": null,
+        "epistemic_type": "inference",
+        "proposition": "تعافي السادسة مرتبط بدورة الربيع والخريف؛ فهمه لها يتطور",
+        "source_ref": "99:21–39",
+        "confidence": "high for attribution"
+      },
+      {
+        "id": "K-FY-0046",
+        "character_id": "CHAR-FY",
+        "valid_from": "SRC-0099:L149",
+        "valid_until": null,
+        "epistemic_type": "memory",
+        "proposition": "يعرف تحسين إضافة ناب إلى وصفة الأبيض والجلد قبل شيوعه التاريخي",
+        "source_ref": "99:135–149،197",
+        "confidence": "high for attribution"
+      },
+      {
+        "id": "K-FY-0047",
+        "character_id": "CHAR-FY",
+        "valid_from": "SRC-0100:L123",
+        "valid_until": null,
+        "epistemic_type": "inference",
+        "proposition": "يرجح موضع الدليل أسفل العمود المركزي؛ لم يبلغه ولم يثبت الدليل بعد",
+        "source_ref": "100:73–127",
+        "confidence": "high for attribution"
+      }
+    ],
+    "relationships": [
+      {
+        "id": "REL-0020",
+        "subject": "CHAR-JIANG-HE",
+        "object": "CHAR-FY",
+        "relation": "يوفر مكان صقل آمنًا بحافز السر والتقييم ثم يعترف بالندية عند2",
+        "valid_from": "SRC-0092:L179",
+        "valid_until": null,
+        "source_ref": "92:179–249",
+        "confidence": "high"
+      },
+      {
+        "id": "REL-0021",
+        "subject": "CHAR-CHI-SHAN",
+        "object": "CHAR-FY",
+        "relation": "قبول مؤقت وقت التعبئة وحماية موضعية ثم إعادته لفريقه دون مطالبة بمكافأة",
+        "valid_from": "SRC-0093:L123",
+        "valid_until": "SRC-0094:L131",
+        "source_ref": "93:123–197؛94:89–135",
+        "confidence": "high"
+      }
+    ],
+    "decisions": [
+      {
+        "id": "DEC-FY-0065",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0091",
+        "record": {
+          "situation": "عائق44% وحاجة للخروج من قيد المهام",
+          "information": "موارد رفع الموهبة بعيدة؛ مساعدة خارجي تهدد السيطرة على الفتحة",
+          "unknown": "وقت اكتشاف موقعه وسلامة مكانه",
+          "goal": "اختراق2 مع حفظ السر والبدن",
+          "decision": "شراء أساسيات وصقل مستمر بالأحجار في موقع جيانغ هي مع طعم سكن",
+          "options": "رفع الموهبة أو غو دعم أو مساعد أو أحجار؛ منصوص",
+          "risks": "توقف15دقيقة يبدد التقدم وإرهاق شديد وكلفة محدودة",
+          "resources": "أحجار وخبرة تعدد مهام وحليف ذو مصلحة",
+          "reason": "91:135–199؛92:179–205 يشرح استبعاد البدائل واختيار المأمن",
+          "result": "النجاح مع انهيار بدني جزئي ونوم عميق",
+          "evaluation": "التضليل لا يكسر القانون الفيزيائي؛ النجاح يتطلب تنفيذًا وصبرًا وموارد",
+          "impact": "يصبح ندًا نسبيًا ويستطيع طلب الأصول",
+          "source_refs": "91:1–23،135–199؛92:109–223",
+          "confidence": "high for text; reconstructed alternatives identified"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0066",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0093",
+        "record": {
+          "situation": "تعبئة مفاجئة في العودة",
+          "information": "تذكير يعيد ذاكرة الحدث وقاعدة الالتحاق بأقرب فريق",
+          "unknown": "كل تفاصيل الموجة الحالية وهوية الوحوش القادمة",
+          "goal": "الوصول للقتال مع حماية قانونية وتكامل فريق",
+          "decision": "يلتحق بتشي شان رغم سخرية تشي تشينغ",
+          "options": "وصول منفرد أو التحاق؛ تحليل",
+          "risks": "قتال ليل وإظهار مستوى أداء غير عادي",
+          "resources": "قاعدة عشيرة وخبرة مشي وقوة2",
+          "reason": "93:115–135 يفرض على الفريق قبولًا مشروعًا",
+          "result": "حماية بالتشكيل ورؤية منظومة غو2",
+          "evaluation": "ليس اعتمادًا أعمى؛ يراقب الفريق ويعرف فجوة غوه",
+          "impact": "يلتقي فريق جياو سان في موقف يمكن استغلاله",
+          "source_refs": "93:11–51،115–197،283–301",
+          "confidence": "high for text; reconstructed alternatives identified"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0067",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0094",
+        "record": {
+          "situation": "أمر بكبح ملك الخنازير لصالح فريق يقمعه",
+          "information": "الملك مقيد مؤقتًا وغو دفاعه مخفية وموجة المعارك تعقد الشهود",
+          "unknown": "ما قد يراه سادة غو بعيدون",
+          "goal": "إضعاف القيد مع صون إمكانية الإنكار",
+          "decision": "يتظاهر بالكبح ثم يفلت عند فرصة وينجو بدفاعه",
+          "options": "امتثال أو تخريب أو رفض؛ تحليل",
+          "risks": "كشف نية الإيذاء وعقاب العشيرة",
+          "resources": "قوة وأداة دفاع وخطأ تقدير الفريق له",
+          "reason": "94:203–209 يثبت تعمد السحب؛95:21–25 يثبت فحص الشهود",
+          "result": "موت هوا شينغ وتمثيل عرج ثم استمرار المعركة",
+          "evaluation": "لا نحول خطر الإصابة الذي يريده جياو سان إلى نية قتله؛94:151–181 ينفيها",
+          "impact": "يختبر حد التصعيد بدل غزو مباشر",
+          "source_refs": "94:119–181،203–227؛95:9–25",
+          "confidence": "high for text; reconstructed alternatives identified"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0068",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0095",
+        "record": {
+          "situation": "انكشاف فرصة لإزالة بقية الفريق",
+          "information": "فريق مستنزف لكنه ليس بلا شهود محتملين؛ تكرار التخريب يلفت",
+          "unknown": "وجود مراقب بعيد أو تفسير التفصيل الزائد",
+          "goal": "تخفيف القيود دون عقاب أكبر",
+          "decision": "يوقف القتل المباشر بعد قطع الشبكة",
+          "options": "استمرار التخريب أو قتل صريح أو توقف؛ النص يقارن",
+          "risks": "إعدام وتعذيب وكشف أسرار مقابل مكسب مجموعة صغيرة",
+          "resources": "أداء وافد يرتكب خطأ وخصم مستنزف",
+          "reason": "95:139–165 يقرر أن المخاطرة لا تستحق",
+          "result": "يموت الملك لكن القيد الجماعي لم يزل كله بعد",
+          "evaluation": "قدرة التوقف عند حد الاشتباه تمنع صورة مخطط لا يعرف التراجع",
+          "impact": "الذئاب تأتي مفاجأة تفرض مسار نجاة جديدًا",
+          "source_refs": "95:91–171",
+          "confidence": "high for text; reconstructed alternatives identified"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0069",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0095",
+        "record": {
+          "situation": "ذئاب أسرع ولا غو سرعة",
+          "information": "قلة جوهر القائدين وفرصة جثة كبيرة وتوقع تعزيز",
+          "unknown": "وقت وصول الإنقاذ وعدد من يبقى عند الجثة",
+          "goal": "تعظيم احتمال البقاء",
+          "decision": "يستتر بالجثة ويستعمل زميلته غطاءً ويستعيد الجوهر",
+          "options": "فرار مع الفريق أو قتال أو اختباء؛ منصوص جزئيًا",
+          "risks": "العض والصعق وكشف موضعه أو اتهام الضرب السابق",
+          "resources": "جثة ملك وخبرة رصد واستعادة أحجار",
+          "reason": "95:215–255 يقارن احتمال الفرار بالانتظار",
+          "result": "يعيش حتى التعزيز وتموت الزميلة",
+          "evaluation": "هذا تقدير احتمالي لا يقين أن5 وحدها ستحيط أو أن كل بديل مستحيل",
+          "impact": "يلزمه الخروج عند تحول الإنقاذ إلى خطر هجوم عارض",
+          "source_refs": "95:193–263؛96:9–25،77–87،157–159",
+          "confidence": "high for text; reconstructed alternatives identified"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0070",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0096",
+        "record": {
+          "situation": "الإنقاذ يقاتل قرب الجثة",
+          "information": "احتمال هجوم عارض على مخبئه",
+          "unknown": "مسار كل ضربة إنقاذ",
+          "goal": "تجنب موت بسبب تحول مأمنه إلى خطر",
+          "decision": "يخرج فور سماع المعركة",
+          "options": "بقاء مستتر أو خروج؛ النص يبين الدافع",
+          "risks": "ذئاب أو ضربة منقذ أو سوء تفسير",
+          "resources": "تعزيزات ورصيد تعافٍ",
+          "reason": "96:13–15 يفسر تغير الخطر",
+          "result": "خروج آمن والتعزيز يهزم خمسة ذئاب",
+          "evaluation": "المأمن ليس آمنًا لكل مرحلة؛ لا يبقى لأن خطته الأولى كانت الاختباء",
+          "impact": "مواجهة أخلاقية وقانونية مع المعالج",
+          "source_refs": "96:1–37،95–143",
+          "confidence": "high for text; reconstructed alternatives identified"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0071",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0096",
+        "record": {
+          "situation": "قائد معاد يظنه ميتًا يتحرك ومعالجون يقتربون",
+          "information": "فرصة زوال القيد ضيقة؛ آثار قتل صريح مرئية",
+          "unknown": "توقيت الفحص ودقة الشهود",
+          "goal": "منع نجاة القائد دون كشف نية القتل",
+          "decision": "يغير وسيلة التصفية ويمثل حزن زميل",
+          "options": "ترك العلاج أو قتل ظاهر أو تمويه؛ النص يعرض",
+          "risks": "آثار واتهام في حضور إنقاذ",
+          "resources": "حالة إصابة شديدة وصورة ناجٍ مكلوم",
+          "reason": "96:193–219 يبين تردد البدائل والابتكار",
+          "result": "فحص لاحق يجد جياو سان ميتًا دون كشفه",
+          "evaluation": "لا ننسب موت القائد كله للذئاب؛ القرار يستغل حدثًا طارئًا وليس إعداد الموجة",
+          "impact": "زال الفريق وظهر استجواب من علاقات الضحايا",
+          "source_refs": "96:165–259؛97:21–27",
+          "confidence": "high for text; reconstructed alternatives identified"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0072",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0096",
+        "record": {
+          "situation": "فرصة غو عند الميت",
+          "information": "غو مسجلة وتؤول لوارث؛ الأخذ يثير التحقيق والطعام غال",
+          "unknown": "حجم الغنيمة الفعلية أو سهولة إخفاء كل أثر",
+          "goal": "حماية الأسرار والسيولة",
+          "decision": "لا يأخذ الغو رغم أداة إخضاع6",
+          "options": "نهب أو ترك؛ النص يقارن",
+          "risks": "تحقيق وتغذية وانكشاف",
+          "resources": "حصة قانونية أخرى محتملة وقوة قمع",
+          "reason": "96:263–281 حساب نفع وكلفة",
+          "result": "لا يستولي على الغو؛ الطبيب ينبهه للتسجيل",
+          "evaluation": "القدرة على الاستيلاء لا توجب الاستيلاء؛ رفض المورد له سبب",
+          "impact": "يتجه لعائد نظامي كناب الملك99",
+          "source_refs": "96:263–281؛99:69",
+          "confidence": "high for text; reconstructed alternatives identified"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0073",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0097",
+        "record": {
+          "situation": "استجواب بعد نجاة منفردة",
+          "information": "لا يستطيع إخفاء هالة2 بلا أداة؛ غالب الوقائع يمكن التحقق منها",
+          "unknown": "كل علاقات المحققين وتفاصيل ما شاهدوه",
+          "goal": "البراءة الإجرائية وحفظ التفاصيل المجرمة",
+          "decision": "يعلن2 ويكرر غالب الحقيقة مع حذف وتغيير ما يدينه",
+          "options": "إنكار كل شيء أو كشف كامل أو رواية مختلطة؛ تحليل",
+          "risks": "تكرار5مرات قد يكشف خلافًا أو شاهدًا يناقض",
+          "resources": "ذاكرة حدث قريب وأثر ضرورة يراه قانونيًا",
+          "reason": "97:41–57 و96:157–159 تبين ما يخفيه ولماذا",
+          "result": "لا يجدون أساسًا للإدانة ويطلب المهمة",
+          "evaluation": "قول النص97:83 إنه ذكر الحقيقة ليس ترخيصًا لتجاهل إغماء الزميلة المتعمد95:221",
+          "impact": "طلب أصول وتأجيل برشوة يعرف القارئ سببها98",
+          "source_refs": "97:13–87،161–163؛98:1–35",
+          "confidence": "high for text; reconstructed alternatives identified"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0074",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0097",
+        "record": {
+          "situation": "دعوة للفرق ولجنازة ثم نبذ",
+          "information": "أسراره تحتاج حرية ولديه مكانة2 ومورد مخفي",
+          "unknown": "نوع المهمة المقبلة وتكاليف العزلة",
+          "goal": "المال والاستقلال بدل قبول اجتماعي",
+          "decision": "لا ينشئ فريقًا أو ينضم الآن ويرفض الجنازة ويقبل النبذ",
+          "options": "اندماج أو تأسيس أو عزلة؛ منصوص",
+          "risks": "غياب دعم قتالي وصعوبة مهام شهرية وكراهية",
+          "resources": "قدرة فردية وتخطيط مخفي",
+          "reason": "97:151–157،245–265 يوضح الأهداف والبنية",
+          "result": "عزلة بميزة سرية وكلفة دعم100:199–209",
+          "evaluation": "لا تعمم أنه لا يريد أي تحالف؛ كان قد استخدم جيانغ هي92",
+          "impact": "يحاول استغلال انخفاض التقييم بدل شراء رضا المجتمع",
+          "source_refs": "97:113–163،171–265؛100:199–227",
+          "confidence": "high for text; reconstructed alternatives identified"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0075",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0099",
+        "record": {
+          "situation": "مال لمحاولة دمج واحدة ومهمة تحتاج دفاعًا",
+          "information": "الجلد1 غير كاف وفق تقديره؛ وصفة محسنة بالناب تقلل الفشل؛ السادسة لا تضمن الدمج",
+          "unknown": "النتيجة الاحتمالية الدقيقة وبديل دخل يصل في الوقت",
+          "goal": "تأمين دفاع يفتح المال والإرث",
+          "decision": "يختار اليشم الأبيض الآن ويضيف الناب ويضبط تعدد الوعي",
+          "options": "ترقية الهجوم أو انتظار أو دفاع؛ منصوص",
+          "risks": "فشل ينهار معه الاقتصاد وإعادة بناء بوقت أطول",
+          "resources": "ناب بحصة شرعية وخبرة ومكونات وأحجار",
+          "reason": "98:139–151؛99:73–105،135–149 مقارنة بديل يستهلك أموال الانتظار",
+          "result": "نجاح2 مع بقاء المال شحيحًا",
+          "evaluation": "20% ليست ضمانًا ولا معدل نجاح نهائي معلوم؛ لا يصنع الذكاء الموارد من عدم",
+          "impact": "يواجه قرودًا أكثر ويبقى مقيدًا بالجوهر ويملك النبيذ لاحقًا",
+          "source_refs": "98:107–151؛99:21–43،59–217؛100:89–175",
+          "confidence": "high for text; reconstructed alternatives identified"
+        },
+        "status": "reviewed"
+      },
+      {
+        "id": "DEC-FY-0076",
+        "character_id": "CHAR-FY",
+        "chapter_id": "SRC-0100",
+        "record": {
+          "situation": "نحو100قرد وحاجة لدليل مجهول",
+          "information": "دفاع2 يسمح بنحو30مع جوهر متاح؛ الأحجار محدودة",
+          "unknown": "موضع الدليل في المركز مازال ترجيحًا",
+          "goal": "التقدم دون استنزاف ينهي النجاة",
+          "decision": "يتراجع ليجزئ المطاردة ثم يقاتل ويوقف عند نقص الجوهر",
+          "options": "صمود أمام المائة أو انسحاب كامل أو تجزئة؛ النص يعرض",
+          "risks": "مطاردة وجوهر لا يعوض فورًا",
+          "resources": "دفاع2 وقوة باقية وخبرة حدود مطاردة القرود",
+          "reason": "100:93–119 يوضح الحد الحقيقي للترقية",
+          "result": "أكثر من100قتيل بعد جولات لكن الدليل لم يحصل عليه",
+          "evaluation": "لا تخلط مجموع قتلى الجولات بقدرة مواجهة100معًا",
+          "impact": "يحفظ الغذاء ويعود لتسليم المهمة مع2.5حجر",
+          "source_refs": "100:19–51،89–127،169–175",
+          "confidence": "high for text; reconstructed alternatives identified"
+        },
+        "status": "reviewed"
+      }
+    ],
+    "entities": [
+      {
+        "id": "GU-WHITE-JADE",
+        "kind": "gu",
+        "canonical_name": "غو اليشم الأبيض",
+        "aliases_json": "[]"
+      },
+      {
+        "id": "GU-MOON-RAIMENT",
+        "kind": "gu",
+        "canonical_name": "غو رداء القمر",
+        "aliases_json": "[]"
+      },
+      {
+        "id": "CHAR-HUA-XING",
+        "kind": "character",
+        "canonical_name": "غو يوي هوا شينغ",
+        "aliases_json": "[\"هوا شين في95؛ اسم مضطرب\"]"
+      },
+      {
+        "id": "CHAR-CHI-SHAN",
+        "kind": "character",
+        "canonical_name": "غو يوي تشي شان",
+        "aliases_json": "[]"
+      }
+    ]
+  }
+}

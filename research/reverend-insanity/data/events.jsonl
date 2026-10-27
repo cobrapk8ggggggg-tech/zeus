@@ -136,3 +136,28 @@
 {"id": "EV-MAIN-0134", "timeline": "main", "description": "رفض بيت الخالين واختيار حل قانوني بدل اغتيال", "chapter_id": "SRC-0090", "line_start": 73, "line_end": 145, "confidence": "high"}
 {"id": "EV-MAIN-0135", "timeline": "main", "description": "استئجار السكن المعروف من الحياة السابقة", "chapter_id": "SRC-0090", "line_start": 151, "line_end": 175, "confidence": "high"}
 {"id": "EV-MAIN-0136", "timeline": "main", "description": "فشل محاولة اختراق المرتبة الثانية وقياس العائق", "chapter_id": "SRC-0090", "line_start": 177, "line_end": 251, "confidence": "high"}
+{"id": "EV-MAIN-0137", "timeline": "main", "description": "شراء أساسيات ومؤن وترك آثار السكن", "chapter_id": "SRC-0091", "line_start": 1, "line_end": 23, "confidence": "high"}
+{"id": "EV-MAIN-0138", "timeline": "main", "description": "اختيار تعويض القدرة بالأحجار والصقل المتصل", "chapter_id": "SRC-0091", "line_start": 159, "line_end": 199, "confidence": "high"}
+{"id": "EV-MAIN-0139", "timeline": "main", "description": "العثور على مسكن الطعم واقتحامه", "chapter_id": "SRC-0091", "line_start": 217, "line_end": 301, "confidence": "high"}
+{"id": "EV-MAIN-0140", "timeline": "main", "description": "غياب الأكبر وتفسير القائد المضلل بقصة الفحم", "chapter_id": "SRC-0092", "line_start": 9, "line_end": 107, "confidence": "high"}
+{"id": "EV-MAIN-0141", "timeline": "main", "description": "الاختراق إلى2 والإرهاق والنوم", "chapter_id": "SRC-0092", "line_start": 109, "line_end": 161, "confidence": "high"}
+{"id": "EV-MAIN-0142", "timeline": "main", "description": "كشف مكان الصقل الآمن وشراكة جيانغ هي الجزئية", "chapter_id": "SRC-0092", "line_start": 179, "line_end": 251, "confidence": "high"}
+{"id": "EV-MAIN-0143", "timeline": "main", "description": "تذكير موجة الوحوش والانضمام المؤقت لفريق تشي شان", "chapter_id": "SRC-0093", "line_start": 11, "line_end": 135, "confidence": "high"}
+{"id": "EV-MAIN-0144", "timeline": "main", "description": "مساعدة بلا حصة وعودة الأكبر إلى فريقه", "chapter_id": "SRC-0094", "line_start": 73, "line_end": 135, "confidence": "high"}
+{"id": "EV-MAIN-0145", "timeline": "main", "description": "إفلات متعمد لملك الخنازير وموت هوا شينغ", "chapter_id": "SRC-0094", "line_start": 203, "line_end": 227, "confidence": "high"}
+{"id": "EV-MAIN-0146", "timeline": "main", "description": "تخريب شبكة ووقف التصعيد المباشر عند حد خطر الشهود", "chapter_id": "SRC-0095", "line_start": 91, "line_end": 165, "confidence": "high"}
+{"id": "EV-MAIN-0147", "timeline": "main", "description": "ذئاب مفاجئة واختباء في جثة مع استخدام زميلة درعًا", "chapter_id": "SRC-0095", "line_start": 193, "line_end": 263, "confidence": "high"}
+{"id": "EV-MAIN-0148", "timeline": "main", "description": "وصول التعزيز وخروج الأكبر من الجثة", "chapter_id": "SRC-0096", "line_start": 3, "line_end": 25, "confidence": "high"}
+{"id": "EV-MAIN-0149", "timeline": "main", "description": "موت الزميلة واعتراض المعالج واحتجاج الأكبر بالضرورة", "chapter_id": "SRC-0096", "line_start": 69, "line_end": 143, "confidence": "high"}
+{"id": "EV-MAIN-0150", "timeline": "main", "description": "كشف جياو سان حيًا ثم قتله تحت تمثيل الحزن", "chapter_id": "SRC-0096", "line_start": 165, "line_end": 257, "confidence": "high"}
+{"id": "EV-MAIN-0151", "timeline": "main", "description": "استجواب لا يدينه وتقديم طلب مهمة الأصول", "chapter_id": "SRC-0097", "line_start": 35, "line_end": 163, "confidence": "high"}
+{"id": "EV-MAIN-0152", "timeline": "main", "description": "دعوة تشي تشينغ ومو بي والأصغر للجنازة ورفض الأكبر", "chapter_id": "SRC-0097", "line_start": 171, "line_end": 225, "confidence": "high"}
+{"id": "EV-MAIN-0153", "timeline": "main", "description": "رشوة الخال لإطالة الطلب وتعسير المهمة", "chapter_id": "SRC-0098", "line_start": 1, "line_end": 45, "confidence": "high"}
+{"id": "EV-MAIN-0154", "timeline": "main", "description": "اختيار هدف الصقل الدفاعي لإنجاز مهمة النبيذ", "chapter_id": "SRC-0098", "line_start": 81, "line_end": 151, "confidence": "high"}
+{"id": "EV-MAIN-0155", "timeline": "main", "description": "فشل الأصغر في دمج رداء القمر وتضرر مكوناته", "chapter_id": "SRC-0098", "line_start": 235, "line_end": 267, "confidence": "high"}
+{"id": "EV-MAIN-0156", "timeline": "main", "description": "نجاح صقل اليشم الأبيض بإضافة ناب الملك", "chapter_id": "SRC-0099", "line_start": 135, "line_end": 217, "confidence": "high"}
+{"id": "EV-MAIN-0157", "timeline": "main", "description": "تقدم مرحلي ضد القرود ثم توقف للجوهر", "chapter_id": "SRC-0100", "line_start": 89, "line_end": 127, "confidence": "high"}
+{"id": "EV-MAIN-0158", "timeline": "main", "description": "العودة بنبيذ العسل بنية تسليم المهمة", "chapter_id": "SRC-0100", "line_start": 169, "line_end": 227, "confidence": "high"}
+{"id": "EV-MAIN-0159", "timeline": "main", "description": "تهدئة طفلة وملاقاة الخال عند السكن", "chapter_id": "SRC-0100", "line_start": 245, "line_end": 279, "confidence": "high"}
+{"id": "EV-PREV-RECIPE-0150", "timeline": "previous_life", "description": "وصفة إضافة ناب الملك تظهر في الخط الذي يتذكره الأكبر بعد150عامًا؛ لا ضمان تكررها في الخط الجديد", "chapter_id": "SRC-0099", "line_start": 143, "line_end": 149, "confidence": "high for attributed relative date"}
+{"id": "EV-PREV-REFINEMENT-0300", "timeline": "previous_life", "description": "معرفة أثر فهم الغو في نجاح الدمج تنتشر بعد300عام وفق السرد؛ تاريخ نسبي لخط الذكرى", "chapter_id": "SRC-0099", "line_start": 187, "line_end": 193, "confidence": "high for attributed relative date"}

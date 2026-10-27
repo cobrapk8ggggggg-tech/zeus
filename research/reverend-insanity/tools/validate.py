@@ -16,11 +16,17 @@ for table in ['facts','events']:
   assert chapter and 1<=row['line_start']<=row['line_end']<=chapter[0],(table,dict(row))
 for row in db.execute('SELECT * FROM causal_edges'):
  for key in ['source_event','target_event']:assert db.execute('SELECT 1 FROM events WHERE id=?',(row[key],)).fetchone()
+for table,keys in [('facts',['subject']),('knowledge',['character_id']),('decisions',['character_id']),('relationships',['subject','object'])]:
+ for row in db.execute(f'SELECT * FROM {table}'):
+  for key in keys:
+   entity=row[key]
+   if entity.startswith(('CHAR-','GU-','FAC-')):
+    assert db.execute('SELECT 1 FROM entities WHERE id=?',(entity,)).fetchone(),('missing entity',table,row['id'],entity)
 for f in r.glob('data/*.jsonl'):
  for line in f.read_text().splitlines():json.loads(line)
 import re
 for f in r.rglob('*.md'):
  for link in re.findall(r'\]\(([^)]+)\)',f.read_text()):
   if not re.match(r'\w+://',link):assert (f.parent/link.split('#')[0]).exists(),(f,link)
-print('PASS: SQLite integrity, archive hash, 2397 source records, review checkpoint, fact/event source ranges, causal endpoints, JSONL syntax, Markdown links.')
+print('PASS: SQLite integrity, archive hash, 2397 source records, review checkpoint, fact/event source ranges, causal endpoints, entity references, JSONL syntax, Markdown links.')
 print('This validates infrastructure and references, not completion or literary correctness.')
