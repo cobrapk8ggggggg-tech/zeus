@@ -60,6 +60,13 @@
   "resume_command": "python research/reverend-insanity/tools/query.py source 51",
   "next_action": "Read51–70 in full, prioritize investigation after killing Jia Jin Sheng and Fang Yuan knowledge boundaries; continue toward500.",
   "acceptance_complete": false,
-  "remote_push_status": "connected as cobrapk8ggggggg-tech; branch created and files1–20 saved in080d306",
-  "research_target": 500
+  "remote_push_status": "saved through source50 in191b72b using cobrapk8ggggggg-tech connector",
+  "research_target": 500,
+  "scheduled_continuation": {
+    "enabled_confirmed": true,
+    "cadence": "hourly",
+    "execution_confirmed": false,
+    "immediate_run_error": "404 Action not found",
+    "details": "19-research-progress/scheduled-continuation.md"
+  }
 }
