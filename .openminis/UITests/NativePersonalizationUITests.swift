@@ -56,19 +56,31 @@ final class NativePersonalizationUITests: XCTestCase {
     @MainActor func testCloudPartialReplyAppearsInOriginalMessageListBeforeCompletion() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["--zeus-cloud-partial-stream", "--zeus-native-fixture", "-AppleLanguages", "(ar)"]
+        app.launchArguments = ["--zeus-cloud-partial-stream", "--zeus-native-fixture", "-AppleLanguages", "(ar)", "-appearanceMode", "2"]
         app.launch()
-        let partial = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "الجزء الأول من الرد السحابي")).firstMatch
+        let partial = app.textViews.matching(NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@", "الجزء الأول من الرد السحابي", "الجزء الأول من الرد السحابي")).firstMatch
         XCTAssertTrue(partial.waitForExistence(timeout: 30))
-        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "اكتمل الرد التجريبي")).firstMatch.exists)
+        XCTAssertGreaterThan(partial.frame.height, 0)
+        XCTAssertFalse(app.textViews.matching(NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@", "اكتمل الرد التجريبي", "اكتمل الرد التجريبي")).firstMatch.exists)
         let image = XCTAttachment(screenshot: app.screenshot()); image.name = "ZEUS-Cloud-Partial-Reply-Before-Completion"; image.lifetime = .keepAlways; add(image)
         app.buttons["finishCloudReply"].tap()
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "اكتمل الرد التجريبي")).firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.textViews.matching(NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@", "اكتمل الرد التجريبي", "اكتمل الرد التجريبي")).firstMatch.waitForExistence(timeout: 10))
+    }
+    @MainActor func testCloudFreshChatNeverInstallsLocalLinuxOrPrewarmsAMathWebView() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--zeus-cloud-footprint", "--zeus-native-fixture", "-appearanceMode", "2"]
+        app.launch()
+        let result = app.staticTexts["cloudLinuxFootprint"]
+        expectation(for: NSPredicate(format: "label == %@", "0:idle"), evaluatedWith: result)
+        waitForExpectations(timeout: 30)
+        XCTAssertEqual(app.webViews.count, 0)
+        let screen = XCTAttachment(screenshot: app.screenshot()); screen.name = "ZEUS-Cloud-Zero-Local-Linux"; screen.lifetime = .keepAlways; add(screen)
     }
     @MainActor func testCloudToolsRenderWithTheOriginalNativeCards() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["--zeus-cloud-tool-cards", "--zeus-native-fixture", "-AppleLanguages", "(ar)", "-AppleLocale", "ar_SA"]
+        app.launchArguments = ["--zeus-cloud-tool-cards", "--zeus-native-fixture", "-AppleLanguages", "(ar)", "-AppleLocale", "ar_SA", "-appearanceMode", "2"]
         app.launch()
         XCTAssertTrue(app.staticTexts["فحص نظام Linux"].waitForExistence(timeout: 30))
         XCTAssertTrue(app.staticTexts["قراءة ملف المشروع"].exists)

@@ -8,12 +8,35 @@ import unittest
 import uuid
 import base64
 import os
+import socket
+import uvicorn
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.fernet import Fernet
 from fastapi import Header, HTTPException
 import httpx
 from zeus_cloud.app import create_app
 from test_runtime import MemoryStore
+
+
+@asynccontextmanager
+async def network_server(app):
+    socket_ = socket.socket(); socket_.bind(("127.0.0.1", 0))
+    address = "http://127.0.0.1:" + str(socket_.getsockname()[1])
+    server = uvicorn.Server(uvicorn.Config(app, lifespan="off", log_level="critical", access_log=False))
+    serving = asyncio.create_task(server.serve(sockets=[socket_]))
+    try:
+        for _ in range(200):
+            if server.started: break
+            if serving.done(): await serving
+            await asyncio.sleep(.01)
+        if not server.started: raise AssertionError("Test HTTP listener did not start")
+        yield address
+    finally:
+        server.should_exit = True
+        try: await asyncio.wait_for(serving, 3)
+        except asyncio.TimeoutError:
+            serving.cancel(); await asyncio.gather(serving, return_exceptions=True)
+        socket_.close()
 
 
 class GatewayFixture:
@@ -437,6 +460,56 @@ class APITests(unittest.IsolatedAsyncioTestCase):
             if not waiter.done(): waiter.cancel()
             await asyncio.gather(waiter, return_exceptions=True)
         await self.wait_state(run, {"completed"})
+
+    async def test_real_http_sse_delivers_json_reply_before_model_completion_and_replays(self):
+        ready, first, finish = (asyncio.Event() for _ in range(3))
+        class GatedModel:
+            async def stream(self, provider, messages, tools, instructions):
+                ready.set(); await first.wait()
+                yield {"kind": "text", "text": '{"answer":"الجزء الأول'}
+                await finish.wait()
+                yield {"kind": "text", "text": ' والنهاية"}'}
+        self.app.state.engine.models = GatedModel()
+        run, _ = await self.submit(); await asyncio.wait_for(ready.wait(), 2)
+        async with network_server(self.app) as address, httpx.AsyncClient(base_url=address, timeout=3, headers={"Authorization": "Bearer fixture-owner"}) as client:
+            first_cursor = None
+            try:
+                async with client.stream("GET", f"/v1/runs/{run}/feed") as response:
+                    self.assertEqual(response.status_code, 200)
+                    self.assertIn("text/event-stream", response.headers["content-type"])
+                    self.assertEqual(response.headers["x-accel-buffering"], "no")
+                    first.set()
+                    async for line in response.aiter_lines():
+                        if not line.startswith("data:"): continue
+                        page = json.loads(line[5:])
+                        text = "".join(e["data"].get("delta", "") for e in page["events"] if e["kind"] == "text")
+                        if not text: continue
+                        self.assertEqual(text, '{"answer":"الجزء الأول')
+                        self.assertEqual(page["run"]["status"], "running")
+                        self.assertFalse(finish.is_set())
+                        first_cursor = page["cursor"]
+                        break
+            finally: first.set(); finish.set()
+            self.assertIsNotNone(first_cursor)
+            await self.wait_state(run, {"completed"})
+            async with client.stream("GET", f"/v1/runs/{run}/feed?after={first_cursor}") as replay:
+                pages = [json.loads(line[5:]) async for line in replay.aiter_lines() if line.startswith("data:")]
+            self.assertTrue(pages)
+            events = [e for p in pages for e in p["events"]]
+            self.assertTrue(all(e["seq"] > first_cursor for e in events))
+            self.assertEqual("".join(e["data"].get("delta", "") for e in events if e["kind"] == "text"), ' والنهاية"}')
+            self.assertEqual(pages[-1]["run"]["status"], "completed")
+            self.assertEqual(pages[-1]["cursor"], pages[-1]["run"]["seq"])
+
+    async def test_sse_closes_at_persisted_approval_without_repeating_a_stale_pending_page(self):
+        run, _ = await self.submit(permission="ask_all")
+        await self.wait_state(run, {"waiting_user"})
+        async with network_server(self.app) as address, httpx.AsyncClient(base_url=address, timeout=3, headers={"Authorization": "Bearer fixture-owner"}) as client:
+            async with client.stream("GET", f"/v1/runs/{run}/feed") as response:
+                pages = [json.loads(line[5:]) async for line in response.aiter_lines() if line.startswith("data:")]
+            self.assertEqual(len(pages), 1)
+            self.assertEqual(pages[0]["run"]["status"], "waiting_user")
+            self.assertTrue(pages[0]["run"]["pending_approval"])
 
     async def test_new_user_turn_preempts_background_storage_collection(self):
         started=asyncio.Event();released=[]

@@ -76,7 +76,9 @@ struct CloudLocalOwner {
 @MainActor final class CloudAccount: ObservableObject {
     static let shared = CloudAccount()
     enum Phase: Equatable { case loading, signedOut, claim, ready, blocked }
-    @Published private(set) var phase: Phase = .loading
+    @Published private(set) var phase: Phase = .loading {
+        didSet { if phase != .ready { NativeLocalExecutionBoundary.shared.setAllowed(false) } }
+    }
     @Published private(set) var identity: CloudIdentity?
     @Published var busy = false
     @Published var issue: String?

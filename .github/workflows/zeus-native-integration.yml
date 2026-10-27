@@ -165,6 +165,25 @@ jobs:
       timeout-minutes: 10
       run: |
         bash browser/.openminis/run_native_stage.sh boot IPAD "${IPAD_SIMULATOR}"
+    - name: 'IPAD: Verify cloud streaming, cards and zero local Linux before Files tests'
+      if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
+      timeout-minutes: 6
+      run: bash browser/.openminis/run_native_stage.sh cloud IPAD "${IPAD_SIMULATOR}"
+    - name: 'IPAD: Export cloud UI evidence'
+      if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
+      timeout-minutes: 2
+      run: xcrun xcresulttool export attachments --path results/embedded-IPAD-cloud-ui.xcresult --output-path results/cloud-ui-attachments-IPAD || true
+    - name: 'IPAD: Upload cloud UI evidence immediately'
+      if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: zeus-ipad-cloud-ui-diagnostics
+        path: |
+          results/embedded-IPAD-cloud-ui.log
+          results/embedded-IPAD-cloud-ui.xcresult
+          results/cloud-ui-attachments-IPAD
+        retention-days: 14
+        if-no-files-found: warn
     - name: 'IPAD: Verify system Files imports and saved layouts'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
       timeout-minutes: 22

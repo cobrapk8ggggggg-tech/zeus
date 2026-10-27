@@ -3,6 +3,18 @@ import SwiftUI
 import Security
 import WebKit
 
+/// Local Linux must be explicitly enabled by an authenticated execution choice.
+/// Rootfs installation also checks this from background queues, so the default
+/// is deny and the snapshot is protected independently of MainActor UI state.
+public final class NativeLocalExecutionBoundary: @unchecked Sendable {
+    public static let shared = NativeLocalExecutionBoundary()
+    private let lock = NSLock()
+    private var allowed = false
+    private init() {}
+    public var isAllowed: Bool { lock.lock(); defer { lock.unlock() }; return allowed }
+    func setAllowed(_ value: Bool) { lock.lock(); allowed = value; lock.unlock() }
+}
+
 public struct NativeCloudBlob: Codable, Sendable {
     public let sha256: String
     public let bytes: Int
@@ -107,13 +119,23 @@ actor CloudCheckpointGate {
     public static var browserFilesDidChange: (() -> Void)?
     public static var prepareBrowserBackup: (() async throws -> Void)?
     public static var isMigrating = false
+    public static func trimDeviceCaches() { WebsiteCacheBudget.schedule() }
     public static var ownerID: String? { CloudAccount.shared.phase == .ready ? CloudAccount.shared.identity?.id.uuidString.lowercased() : nil }
     private static var preferencesURL: URL { BrowserDisk.applicationRoot.appendingPathComponent("cloud-execution.json") }
     private typealias Preference = CloudExecutionPreference
     public static var usesCloud: Bool {
-        guard let id = CloudAccount.shared.identity?.id, CloudAccount.shared.phase == .ready else { return false }
+        guard let id = CloudAccount.shared.identity?.id, CloudAccount.shared.phase == .ready else {
+            #if DEBUG
+            if CommandLine.arguments.contains("--zeus-native-fixture"), !CommandLine.arguments.contains(where: { $0.hasPrefix("--zeus-cloud-") }) {
+                NativeLocalExecutionBoundary.shared.setAllowed(true); return false
+            }
+            #endif
+            NativeLocalExecutionBoundary.shared.setAllowed(false); return false
+        }
         let secure = (try? CloudSessionStorage().retrieve(key: "zeus-execution:" + id.uuidString)).flatMap { try? JSONDecoder().decode(Preference.self, from: $0) }
-        return Preference.resolved(owner: id, secure: secure, disk: BrowserDisk.read(Preference.self, from: preferencesURL))
+        let enabled = Preference.resolved(owner: id, secure: secure, disk: BrowserDisk.read(Preference.self, from: preferencesURL))
+        NativeLocalExecutionBoundary.shared.setAllowed(!enabled)
+        return enabled
     }
     public static func setEnabled(_ value: Bool) async throws {
         guard let id = CloudAccount.shared.identity?.id, CloudAccount.shared.phase == .ready else { throw CloudAccountError.wrongOwner }
@@ -122,6 +144,7 @@ actor CloudCheckpointGate {
         let preference = Preference(owner: id, enabled: value, choiceVersion: 2, pendingCommit: true)
         try CloudSessionStorage().store(key: "zeus-execution:" + id.uuidString, value: JSONEncoder().encode(preference))
         try? BrowserDisk.write(preference, to: preferencesURL)
+        NativeLocalExecutionBoundary.shared.setAllowed(!value)
         try await prepareBrowserBackup?()
         await CloudCheckpointGate.shared.enter()
         do {
@@ -141,6 +164,7 @@ actor CloudCheckpointGate {
         let preference = Preference(owner: id, enabled: value == "cloud", choiceVersion: 2)
         try CloudSessionStorage().store(key: "zeus-execution:" + id.uuidString, value: JSONEncoder().encode(preference))
         try? BrowserDisk.write(preference, to: preferencesURL)
+        NativeLocalExecutionBoundary.shared.setAllowed(value == "local")
     }
     static func markPreferenceCommitted(_ enabled: Bool) throws {
         guard let id = CloudAccount.shared.identity?.id, usesCloud == enabled else { return }
@@ -176,7 +200,9 @@ actor CloudCheckpointGate {
             return BrowserSecret(service: service, account: account, data: data)
         }
         let store = ProfileStore(); var cookies: [CookieRecord] = []
+        let existing = await WebsiteCacheBudget.existingIdentifiers()
         for profile in store.profiles where !profile.isPrivate {
+            guard (profile.legacyWebsiteStore == true ? WebsiteCacheBudget.hasLegacyStore : existing.contains(profile.id)) else { continue }
             let entries: [HTTPCookie] = await withCheckedContinuation { continuation in
                 store.websiteDataStore(for: profile).httpCookieStore.getAllCookies { continuation.resume(returning: $0) }
             }
@@ -260,7 +286,7 @@ actor CloudCheckpointGate {
         request.setValue("Bearer " + (try await CloudAccount.shared.authorization(for: id)), forHTTPHeaderField: "Authorization")
         request.setValue(ZeusCloudConfiguration.publishableKey, forHTTPHeaderField: "apikey")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await CloudAccountNetwork.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             let detail = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["detail"] as? String
             throw NativeCloudHTTPError(statusCode: (response as? HTTPURLResponse)?.statusCode ?? 0,

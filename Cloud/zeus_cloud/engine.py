@@ -131,7 +131,7 @@ class Engine:
                             raise ValueError("Approval cannot be applied to this saved tool call")
                         await self.perform_calls(run, pending, root, grant, command_ids, messages, approval["status"] == "allowed")
                         await self.store.update_run(owner, identifier, resume_approval=None, pending_calls=[])
-                    from .tool_protocol import candidate, repair
+                    from .tool_protocol import candidate, repair, pending_call_prefix
                     repair_count = run.get("tool_text_repairs", 0)
                     for _ in range(100):
                         text, calls, buffered = "", [], ""
@@ -143,7 +143,7 @@ class Engine:
                             if event["kind"] == "text":
                                 text += event["text"]; buffered += event["text"]
                                 if len(text) > 512_000: raise ValueError("Reply exceeds the configured limit")
-                                possible_protocol = text.lstrip().startswith(("{", "<tool_call>")) and len(text) <= 12000
+                                possible_protocol = pending_call_prefix(text) and len(text) <= 12000
                                 throttle = .2 if len(text) < 500 else .3 if len(text) < 2000 else .5 if len(text) < 32000 else 1 if len(text) < 64000 else 1.5 if len(text) < 128000 else 2
                                 if not possible_protocol and (not flushed or time.monotonic() - last_flush >= throttle):
                                     await self.store.event(owner, identifier, "text", {"delta": buffered}); buffered = ""; last_flush = time.monotonic(); flushed = True

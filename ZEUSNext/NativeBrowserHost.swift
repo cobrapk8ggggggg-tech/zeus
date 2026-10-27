@@ -34,7 +34,10 @@ extension EnvironmentValues {
                     .preferredColorScheme(holder.model.data.settings.theme?.light == true ? .light : .dark)
                     .environment(\.layoutDirection, .rightToLeft)
                     .onChange(of: scenePhase) { _, phase in
-                        if phase == .background { CloudBackgroundSave.shared.start(holder.model) }
+                        if phase == .background {
+                            WebsiteCacheBudget.schedule(force: true)
+                            CloudBackgroundSave.shared.start(holder.model)
+                        }
                     }
                     .task {
                         NativeCloudAccountAPI.prepareBrowserBackup = { [weak model = holder.model] in

@@ -173,12 +173,28 @@ import ZEUSBrowser
         var toolNames: [String: String] = [:]
         var thinkingBlock: AssistantBlock?
         var textBlock: AssistantBlock?
+        var feed: NativeCloudEventFeed?
+        var pages: AsyncThrowingStream<Data, Error>.Iterator?
+        defer { feed?.cancel() }
         while true {
             try Task.checkCancellation()
             guard NativeCloudAccountAPI.ownerID == owner else { throw failure("تغير حساب التطبيق.") }
-            if UIApplication.shared.applicationState != .active { try await Task.sleep(for: .seconds(2)); continue }
+            if UIApplication.shared.applicationState != .active {
+                feed?.cancel(); feed = nil; pages = nil
+                try await Task.sleep(for: .seconds(2)); continue
+            }
             let page: [String: Any]
-            do { page = try json(await NativeCloudAccountAPI.runtime("v1/runs/\(state.run)/events?after=\(cursor)&wait=20")) }
+            do {
+                if pages == nil {
+                    feed = try NativeCloudAccountAPI.eventFeed("v1/runs/\(state.run)/feed?after=\(cursor)")
+                    pages = feed!.pages.makeAsyncIterator()
+                }
+                guard let bytes = try await pages!.next() else {
+                    feed?.cancel(); feed = nil; pages = nil
+                    continue
+                }
+                page = try json(bytes)
+            }
             catch {
                 display.error = "انقطع الاتصال بالمراقبة. المهمة مستقلة على الخادم؛ أعد فتح المحادثة للمتابعة."
                 throw error
@@ -189,7 +205,8 @@ import ZEUSBrowser
                 state.userID = state.userID ?? metadata?["native_user_id"] as? String
                 try JSONEncoder().encode(state).write(to: stateURL(sid), options: .atomic)
             }
-            for event in page["events"] as? [[String: Any]] ?? [] {
+            let events = page["events"] as? [[String: Any]] ?? []
+            for event in events {
                 let data = event["data"] as? [String: Any] ?? [:]
                 switch event["kind"] as? String {
                 case "text":
@@ -251,7 +268,11 @@ import ZEUSBrowser
             if let metadata = page["run"] as? [String: Any], metadata["status"] as? String == "waiting_user", let device = metadata["pending_device"] as? String {
                 try await ZeusCloudToolBridge.perform(id: device, vm: vm, run: state.run)
             }
-            display.error = nil; vm.publishUnlessTransitioning(); vm.scrollToBottomSignal.send()
+            display.error = nil
+            if !events.allSatisfy({ $0["kind"] as? String == "text" }) {
+                vm.publishUnlessTransitioning()
+                if vm.isNearBottom { vm.scrollToBottomSignal.send() }
+            }
             let run = page["run"] as? [String: Any] ?? [:], status = run["status"] as? String ?? ""
             if ["completed", "failed", "cancelled", "interrupted"].contains(status), cursor >= (run["seq"] as? Int ?? 0) {
                 if let block = textBlock { _ = await ZeusCloudPresentation.append("", vm: vm, message: display, block: block, snapshot: text, final: true) }

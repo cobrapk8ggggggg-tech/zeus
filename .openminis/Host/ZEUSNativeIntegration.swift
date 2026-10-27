@@ -16,7 +16,9 @@ struct ZEUSBrowserRootEntry: View {
     init() { _ = ZEUSNativeHostBootstrap.configured }
     var body: some View {
         #if DEBUG
-        if CommandLine.arguments.contains("--zeus-cloud-partial-stream") {
+        if CommandLine.arguments.contains("--zeus-cloud-footprint") {
+            ZeusCloudFootprintTestEntry()
+        } else if CommandLine.arguments.contains("--zeus-cloud-partial-stream") {
             ZeusCloudPartialStreamTestEntry()
         } else if CommandLine.arguments.contains("--zeus-cloud-tool-cards") {
             ZeusCloudToolCardsTestEntry()
@@ -54,6 +56,7 @@ private enum ZEUSNativeHostBootstrap {
         if defaults.bool(forKey: "voice.output.readRepliesAloud") { defaults.set(false, forKey: "voice.output.readRepliesAloud") }
         Bundle.setLanguage("ar")
         ZeusCloudArchive.shared.monitorSettings()
+        Task { await ZeusDeviceStorageBudget.prepare() }
         Task { await ZeusDefaultSkills.shared.install() }
         #if DEBUG
         _ = ZEUSNativeFixtureBootstrap.configured
@@ -62,6 +65,28 @@ private enum ZEUSNativeHostBootstrap {
 }
 
 #if DEBUG
+private struct ZeusCloudFootprintTestEntry: View {
+    @StateObject private var vm = AIChatViewModel()
+    @State private var result = "checking"
+    @State private var breakdown = ""
+    var body: some View {
+        VStack {
+            Text(result).accessibilityIdentifier("cloudLinuxFootprint")
+            Text(breakdown).accessibilityIdentifier("cloudDeviceFootprintBreakdown")
+        }.task {
+            await ZeusDeviceStorageBudget.prepare()
+            vm.ensureKernelBooted()
+            vm.mountMinis(for: UUID().uuidString)
+            try? await Task.sleep(for: .milliseconds(300))
+            let bytes = (try? ZeusStorageFiles.size(RootfsManager.shared.rootfsPath)) ?? 0
+            result = "\(bytes):\(ISHKernel.shared.isBooted ? "booted" : "idle")"
+            breakdown = [ZeusStorageScope.documents, ZeusStorageScope.library].map { root in
+                let size = (try? ZeusStorageFiles.size(root)) ?? 0
+                return root.lastPathComponent + ": " + String(size) + " bytes"
+            }.joined(separator: "\n")
+        }
+    }
+}
 private struct ZeusCloudPartialStreamTestEntry: View {
     @StateObject private var vm = AIChatViewModel()
     @State private var message: ChatMessage?
@@ -89,6 +114,7 @@ private struct ZeusCloudPartialStreamTestEntry: View {
 }
 /// Exercises the production remote-event mapping in the stock native renderer.
 private struct ZeusCloudToolCardsTestEntry: View {
+    @StateObject private var vm = AIChatViewModel()
     @State private var message: ChatMessage = {
         let samples: [(String, [String: Any], String)] = [
             ("shell_execute", ["command": "uname -a", "tool_title": "فحص نظام Linux"], #"{"id":"sample","output":"Linux · UID 10001\nexit 0","exit_code":0}"#),
@@ -112,7 +138,7 @@ private struct ZeusCloudToolCardsTestEntry: View {
                     AssistantBlockView(block: block, message: message, isActiveMessage: false, highlightedBlockId: .constant(nil), detailBlock: .constant(nil))
                 }
             }.padding(24).frame(maxWidth: 840)
-        }.frame(maxWidth: .infinity, maxHeight: .infinity).preferredColorScheme(.dark)
+        }.frame(maxWidth: .infinity, maxHeight: .infinity).preferredColorScheme(.dark).environmentObject(vm)
     }
 }
 /// Use the real settings view inside a sheet, as in browser preferences.

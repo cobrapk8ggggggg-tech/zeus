@@ -164,6 +164,7 @@ import ZEUSBrowser
         // every current/shared reference and releases only proven orphan bytes.
         _ = try? await NativeCloudAccountAPI.runtime("v1/storage/collect", method: "POST", body: Data("{}".utf8))
         try markRestored()
+        await ChatStore.shared.zeusTrimJournal()
         return archive
     }
     func restoreBrowserFile(at url: URL) async throws -> URL? {
@@ -257,7 +258,7 @@ import ZEUSBrowser
         try Data(owner.utf8).write(to: marker, options: .atomic)
     }
     func restoreAccountIfNeeded(progress: @escaping (String) -> Void) async throws {
-        defer { scheduleBackup() }
+        defer { scheduleBackup(); Task { await ZeusDeviceStorageBudget.prepare() } }
         guard let owner = NativeCloudAccountAPI.ownerID else { return }
         if (try? String(contentsOf: marker, encoding: .utf8)) == owner {
             return

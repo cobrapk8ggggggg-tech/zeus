@@ -79,6 +79,7 @@ import UIKit
         tab.loading = false; tab.error = nil
         if model.current?.id == tab.id { model.address = tab.url }
         model.addVisit(tab: tab); model.persist(); model.changed()
+        WebsiteCacheBudget.schedule()
     }
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { fail(error) }
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { fail(error) }

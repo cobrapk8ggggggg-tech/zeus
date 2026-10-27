@@ -351,6 +351,52 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
                 await asyncio.sleep(1)
         return StreamingResponse(lines(), media_type="text/event-stream", headers={"Cache-Control": "private, no-store"})
 
+    @app.get("/v1/runs/{identifier}/feed")
+    async def feed(identifier: uuid.UUID, request: Request, after: int = 0, authorization: str = Header(default=""), account=Depends(auth)):
+        ready(); name = str(identifier)
+        initial = public_run(await store.run(account, name))
+        async def frames():
+            cursor, current, replay = max(after, 0), initial, True
+            key, signal = (account, name), asyncio.Event()
+            buffered = {"events": [], "bytes": 0, "complete": True}
+            observers.setdefault(key, {})[signal] = buffered
+            try:
+                while not await request.is_disconnected():
+                    live = sorted((e for e in buffered["events"] if e["seq"] > cursor), key=lambda e: e["seq"])
+                    contiguous = buffered["complete"] and live and [e["seq"] for e in live] == list(range(cursor + 1, cursor + len(live) + 1))
+                    if replay or (live and not contiguous) or not buffered["complete"]:
+                        current = public_run(await store.run(account, name))
+                        items = await engine.history.events(account, name, cursor, authorization.removeprefix("Bearer "))
+                        replay = False
+                    elif live:
+                        items = live
+                        if any(e["kind"] not in {"text", "thinking", "tool_output"} for e in items):
+                            current = public_run(await store.run(account, name))
+                        else: current = {**current, "status": "running", "seq": max(current.get("seq", 0), items[-1]["seq"])}
+                    else: items = []
+                    if items:
+                        cursor = items[-1]["seq"]
+                        page = {"run": current, "events": items, "cursor": cursor}
+                        yield "id: " + str(cursor) + "\ndata: " + json.dumps(page, ensure_ascii=False, separators=(",", ":")) + "\n\n"
+                        buffered["events"][:] = [e for e in buffered["events"] if e["seq"] > cursor]
+                        buffered["bytes"] = sum(len(json.dumps(e, ensure_ascii=False).encode()) for e in buffered["events"])
+                        # An overflow forces authoritative replay through its
+                        # latest sequence before trusting the hand-off again.
+                        if cursor >= current.get("seq", 0): buffered["complete"] = True
+                        if current["status"] in TERMINAL | {"waiting_user"} and cursor >= current.get("seq", 0): break
+                        if cursor < current.get("seq", 0): replay = True
+                        continue
+                    if current["status"] in TERMINAL | {"waiting_user"} and cursor >= current.get("seq", 0):
+                        yield "data: " + json.dumps({"run": current, "events": [], "cursor": cursor}, separators=(",", ":")) + "\n\n"
+                        break
+                    signal.clear()
+                    try: await asyncio.wait_for(signal.wait(), 15)
+                    except asyncio.TimeoutError: yield ": keepalive\n\n"
+            finally:
+                observers[key].pop(signal, None)
+                if not observers[key]: observers.pop(key, None)
+        return StreamingResponse(frames(), media_type="text/event-stream", headers={"Cache-Control": "private, no-store, no-transform", "X-Accel-Buffering": "no"})
+
     @app.post("/v1/runs/{identifier}/cancel")
     async def cancel(identifier: uuid.UUID, account=Depends(auth)):
         ready(); current = await store.run(account, str(identifier)); public_run(current)

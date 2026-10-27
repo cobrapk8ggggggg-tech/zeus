@@ -4,6 +4,13 @@ import re
 MARKER = "ZEUS_TOOL_REPAIR_REQUIRED:"
 
 
+def pending_call_prefix(text):
+    # Hold only a still-ambiguous tool envelope. Ordinary JSON replies must
+    # stream as soon as their first key distinguishes them from tool_calls.
+    prefix = re.sub(r"\s+", "", text[:80])
+    return bool(prefix) and any(marker.startswith(prefix) or prefix.startswith(marker) for marker in ('{"tool_calls":', '<tool_call>'))
+
+
 def candidate(text, tools):
     value = text[:12000].strip()
     if not value.startswith(("{", "<tool_call>")): return None

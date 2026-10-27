@@ -1,8 +1,47 @@
 import XCTest
 import UIKit
+import CryptoKit
 @testable import Minis
 
 @MainActor final class NativeProjectContractTests: XCTestCase {
+    func testPristineLocalOSCanBeRemovedButEditsUnknownFilesAndSymlinksArePreserved() throws {
+        let fm = FileManager.default
+        let parent = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fm.createDirectory(at: parent, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: parent) }
+        let bytes = Data("bundled operating system".utf8)
+        let digest = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+        let baseline = ["data/": "", "data/bin/": "", "data/bin/sh": digest]
+        func tree(_ name: String) throws -> URL {
+            let root = parent.appendingPathComponent(name)
+            try fm.createDirectory(at: root.appendingPathComponent("data/bin"), withIntermediateDirectories: true)
+            try bytes.write(to: root.appendingPathComponent("data/bin/sh"))
+            try Data("aarch64".utf8).write(to: root.appendingPathComponent(".arch"))
+            return root
+        }
+        let pristine = try tree("pristine")
+        XCTAssertTrue(try ZeusPristineRootfs.remove(at: pristine, baseline: baseline, allowed: { false }))
+        XCTAssertFalse(fm.fileExists(atPath: pristine.path))
+        let edited = try tree("edited")
+        try Data("my edited shell".utf8).write(to: edited.appendingPathComponent("data/bin/sh"))
+        XCTAssertFalse(try ZeusPristineRootfs.remove(at: edited, baseline: baseline, allowed: { false }))
+        XCTAssertEqual(try Data(contentsOf: edited.appendingPathComponent("data/bin/sh")), Data("my edited shell".utf8))
+        let unknown = try tree("unknown")
+        try Data("my project".utf8).write(to: unknown.appendingPathComponent("data/project.txt"))
+        XCTAssertFalse(try ZeusPristineRootfs.remove(at: unknown, baseline: baseline, allowed: { false }))
+        let linked = try tree("linked")
+        try fm.createSymbolicLink(at: linked.appendingPathComponent("data/outside"), withDestinationURL: unknown)
+        XCTAssertFalse(try ZeusPristineRootfs.remove(at: linked, baseline: baseline, allowed: { false }))
+        XCTAssertTrue(fm.fileExists(atPath: unknown.appendingPathComponent("data/project.txt").path))
+        let managed = try tree("managed")
+        try fm.createDirectory(at: managed.appendingPathComponent("data/var/minis"), withIntermediateDirectories: true)
+        try fm.createSymbolicLink(at: managed.appendingPathComponent("data/var/minis/shared"), withDestinationURL: unknown)
+        let mountedBaseline = baseline.merging(["data/var/": ""]) { old, _ in old }
+        XCTAssertTrue(try ZeusPristineRootfs.remove(at: managed, baseline: mountedBaseline, allowed: { false }))
+        XCTAssertTrue(fm.fileExists(atPath: unknown.appendingPathComponent("data/project.txt").path))
+        let local = try tree("local")
+        XCTAssertFalse(try ZeusPristineRootfs.remove(at: local, baseline: baseline, allowed: { true }))
+    }
     func testCloudToolEventsUseTheOriginalNativeCardKindsAndReadableTerminalOutput() {
         XCTAssertEqual(ZeusToolPresentation.kind("shell_execute", input: ["command": "uname -a"]), .shellTool(command: "uname -a"))
         XCTAssertEqual(ZeusToolPresentation.kind("file_edit", input: ["path": "main.py"]), .fileEditTool(path: "main.py"))

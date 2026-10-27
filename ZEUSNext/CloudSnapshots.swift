@@ -54,7 +54,7 @@ struct CloudSnapshotHead: Codable {
     let account: CloudAccount
     let owner: UUID
     private let network: URLSession
-    init(account: CloudAccount, owner: UUID, network: URLSession = .shared) { self.account = account; self.owner = owner; self.network = network }
+    init(account: CloudAccount, owner: UUID, network: URLSession = CloudAccountNetwork.shared) { self.account = account; self.owner = owner; self.network = network }
     static func fingerprint(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
     func head() async throws -> CloudSnapshotHead? {
         let bytes = try await request("rest/v1/zeus_cloud_heads", query: [

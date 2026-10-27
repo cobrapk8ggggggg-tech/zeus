@@ -89,6 +89,7 @@ def embed(native, browser, report):
     # Only its file-private visibility changes; its body is untouched.
     replace(source / "Views/ContentView.swift", "private struct SettingsSheet: View", "struct SettingsSheet: View")
     replace(source / "Views/ContentView.swift", "import SwiftUI", "import SwiftUI\nimport ZEUSBrowser")
+    replace(source / "Views/Chat/AIChatView.swift", "import SwiftUI", "import SwiftUI\nimport ZEUSBrowser")
     replace(source / "Views/Chat/AIChatView.swift", '''        .sheet(isPresented: $showFileBrowser) {
             NavigationStack {
                 let base = RootfsManager.shared.dataPath
@@ -104,8 +105,49 @@ def embed(native, browser, report):
             }
         }''')
     replace(source / "Agent/Chat/ChatStore.swift", "    func deleteSession(_ id: String) {", "    func deleteSession(_ id: String) {\n        Task { @MainActor in await ZeusCloudDeletion.shared.enqueue(id) }")
+    replace(source / "Agent/Chat/ChatStore.swift", "    func deleteSession(_ id: String) {", '''    func zeusTrimJournal() {
+        // Return verified WAL pages to the database and release the retained
+        // journal, rather than keeping several MB allocated after a few chats.
+        sqlite3_exec(db, "PRAGMA journal_size_limit=0", nil, nil, nil)
+        sqlite3_exec(db, "PRAGMA wal_autocheckpoint=64", nil, nil, nil)
+        sqlite3_exec(db, "PRAGMA wal_checkpoint(TRUNCATE)", nil, nil, nil)
+    }
+    func deleteSession(_ id: String) {''')
     replace(source / "Agent/Chat/ChatStore.swift", "    func deleteSession(_ id: String) {", '    func zeusCachedMessageBytes(_ session: String) -> Int {\n        var statement: OpaquePointer?\n        defer { sqlite3_finalize(statement) }\n        guard sqlite3_prepare_v2(db, "SELECT COALESCE(SUM(length(parts_json)),0) FROM messages WHERE session_id=?", -1, &statement, nil) == SQLITE_OK else { return 0 }\n        sqlite3_bind_text(statement, 1, (session as NSString).utf8String, -1, nil)\n        return sqlite3_step(statement) == SQLITE_ROW ? Int(sqlite3_column_int64(statement, 0)) : 0\n    }\n    func zeusEvictVerifiedCloudMessages(_ session: String, expected: [String: String]) -> Bool {\n        let rows = loadMessages(sessionId: session)\n        guard !rows.isEmpty, rows.allSatisfy({ ZeusCloudCache.signature($0.parts) == expected[$0.id.uppercased()] && expected[$0.id.uppercased()] != nil }) else { return false }\n        var statement: OpaquePointer?\n        defer { sqlite3_finalize(statement) }\n        guard sqlite3_prepare_v2(db, "DELETE FROM messages WHERE session_id=?", -1, &statement, nil) == SQLITE_OK else { return false }\n        sqlite3_bind_text(statement, 1, (session as NSString).utf8String, -1, nil)\n        return sqlite3_step(statement) == SQLITE_DONE\n    }\n    func deleteSession(_ id: String) {')
     cloud_vm = source / "Agent/Chat/AIChatViewModel.swift"
+    misc = source / "Agent/Chat/AIChatViewModel+Misc.swift"
+    replace(misc, "import Foundation", "import Foundation\nimport ZEUSBrowser")
+    replace(misc, "    func ensureKernelBooted() {", "    func ensureKernelBooted() {\n        _ = NativeCloudAccountAPI.usesCloud\n        guard NativeLocalExecutionBoundary.shared.isAllowed else { return }")
+    offloading = source / "Agent/Chat/AIChatViewModel+Offloading.swift"
+    replace(offloading, "import Foundation", "import Foundation\nimport ZEUSBrowser")
+    replace(offloading, "    func mountMinis(for sid: String) {", "    func mountMinis(for sid: String) {\n        _ = NativeCloudAccountAPI.usesCloud\n        guard NativeLocalExecutionBoundary.shared.isAllowed else { return }")
+    replace(source / "Views/Chat/AIChatView.swift", "                ISHTerminalView(sessionId: vm.sessionId, showCloseButton: true, initCommand: terminalInitCommand)", "                if NativeCloudAccountAPI.usesCloud {\n                    ZeusCloudTerminalView(session: vm.sessionId, initialCommand: terminalInitCommand)\n                } else {\n                ISHTerminalView(sessionId: vm.sessionId, showCloseButton: true, initCommand: terminalInitCommand)")
+    # Close only the added local branch inside this exact terminal cover.
+    replace(source / "Views/Chat/AIChatView.swift", "        }\n        .fullScreenCover(isPresented: $showCamera, onDismiss: {", "            }\n        }\n        .fullScreenCover(isPresented: $showCamera, onDismiss: {")
+    replace(source / "Views/Chat/ToolLiveSheet.swift", "                ISHTerminalView(\n                    sessionId: sessionId,\n                    showCloseButton: true,\n                    initCommand: terminalPrefillCommand\n                )", "                if NativeCloudAccountAPI.usesCloud { ZeusCloudTerminalView(session: sessionId, initialCommand: terminalPrefillCommand) }\n                else {\n                    ISHTerminalView(sessionId: sessionId, showCloseButton: true, initCommand: terminalPrefillCommand)\n                }")
+    rootfs = source / "iSH/RootfsManager.swift"
+    replace(rootfs, "import Foundation", "import Foundation\nimport ZEUSBrowser")
+    replace(rootfs, "    static let shared = RootfsManager()", "    static let shared = RootfsManager()\n    static let zeusLifecycleLock = NSRecursiveLock()")
+    replace(rootfs, "    func installIfNeeded() throws {", "    func installIfNeeded() throws {\n        guard NativeLocalExecutionBoundary.shared.isAllowed else {\n            throw NSError(domain: \"ZeusExecution\", code: 1, userInfo: [NSLocalizedDescriptionKey: \"البيئة المحلية متوقفة. اختر التنفيذ المحلي صراحةً من إعدادات الوكيل لتثبيتها.\"])\n        }")
+    replace(rootfs, "    func installIfNeeded() throws {", "    func installIfNeeded() throws {\n        Self.zeusLifecycleLock.lock(); defer { Self.zeusLifecycleLock.unlock() }")
+    replace(rootfs, "    func reset(keepUserData: Bool = false) throws -> URL? {", "    func reset(keepUserData: Bool = false) throws -> URL? {\n        Self.zeusLifecycleLock.lock(); defer { Self.zeusLifecycleLock.unlock() }")
+    # Math rendering is on demand and never needs a persistent website store.
+    replace(app, "        KaTeXRenderer.shared.warmUp()", "        // ZEUS: create the math renderer only when a formula needs it.")
+    replace(source / "Agent/Markdown/KaTeXRenderer.swift", "        let config = WKWebViewConfiguration()", "        let config = WKWebViewConfiguration()\n        config.websiteDataStore = .nonPersistent()")
+    logging = source / "Shared/LoggingManager.swift"
+    replace(logging, '            UserDefaults.standard.set(isEnabled, forKey: "loggingEnabled")', '            UserDefaults.standard.set(isEnabled, forKey: "loggingEnabled")\n            UserDefaults.standard.set(isEnabled, forKey: "zeus.logging.userOptIn")')
+    replace(logging, "private let maxLogFileSize: UInt64 = 100 * 1024 * 1024", "private let maxLogFileSize: UInt64 = 256 * 1024")
+    replace(logging, "private static let logRetentionDays = 15", "private static let logRetentionDays = 2")
+    replace(logging, "private static let maxPendingBytes = 8 * 1024 * 1024", "private static let maxPendingBytes = 256 * 1024")
+    replace(logging, "if writeCount % 1000 == 0", "if writeCount % 16 == 0")
+    replace(logging, "            _ = self.safeWrite(Data(line.utf8))", "            _ = self.safeWrite(Data(line.utf8))\n            self.truncateIfNeeded()")
+    # The bundled catalog is the durable fallback; downloaded catalogs stay in
+    # memory instead of writing another complete multi-megabyte JSON copy.
+    models_dev = source / "Providers/ModelsDevAPI.swift"
+    registry_code = models_dev.read_text()
+    cache_start = registry_code.index("    private static func saveDiskCache(_ data: Data) {")
+    cache_end = registry_code.index("\n    }", cache_start) + len("\n    }")
+    replace(models_dev, registry_code[cache_start:cache_end], "    private static func saveDiskCache(_ data: Data) {\n        // ZEUS: retain refreshed catalogs in memory; Bundle is the disk fallback.\n    }")
     replace(cloud_vm, "import Foundation", "import Foundation\nimport ZEUSBrowser")
     replace(cloud_vm, "    func send(overrideText: String? = nil) {", "    func send(overrideText: String? = nil) {\n        guard !NativeCloudAccountAPI.isMigrating else { errorMessage = \"انتظر اكتمال نقل الحساب.\"; return }")
     replace(cloud_vm, "    private func runAgentLoop(resumingAt existingMsgIdx: Int? = nil, committedBlocks: Int? = nil) async throws {", "    private func runAgentLoop(resumingAt existingMsgIdx: Int? = nil, committedBlocks: Int? = nil) async throws {\n        if NativeCloudAccountAPI.usesCloud { try await ZeusCloudRuntime.shared.run(self); return }")
@@ -395,6 +437,7 @@ def embed(native, browser, report):
     stream.write_text(text)
 
     detail = source / "Views/Chat/ToolLiveSheet.swift"
+    replace(detail, "import SwiftUI", "import SwiftUI\nimport ZEUSBrowser")
     replace(detail, 'if isLive, onBrowserTakeover != nil, case .browserTool = block.kind {',
         'if isLive, onBrowserTakeover != nil, case .browserTool = block.kind, !block.zeusIsUserBrowser {')
     replace(detail, '} else if case .browserTool = block.kind, browserPool != nil {',

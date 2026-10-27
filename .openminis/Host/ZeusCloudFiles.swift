@@ -218,6 +218,8 @@ private struct ZeusCloudDirectory: View {
 /// A real remote PTY with bounded replay and a fifteen-minute maximum lease.
 /// Closing the screen stops it and checkpoints its files, allowing idle sleep.
 struct ZeusCloudTerminalView: View {
+    let session: String?
+    let initialCommand: String?
     @Environment(\.dismiss) private var dismiss
     @State private var terminal: String?
     @State private var output = ""
@@ -225,6 +227,10 @@ struct ZeusCloudTerminalView: View {
     @State private var issue: String?
     @State private var offset = 0
     @State private var conversation = UUID().uuidString.lowercased()
+    init(session: String? = nil, initialCommand: String? = nil) {
+        self.session = session; self.initialCommand = initialCommand
+        _input = State(initialValue: initialCommand ?? "")
+    }
     var body: some View {
         NavigationStack {
             VStack {
@@ -248,7 +254,7 @@ struct ZeusCloudTerminalView: View {
     @MainActor private func start() async {
         do {
             // One stable account-owned terminal workspace, reusable on reinstall.
-            conversation = "00000000-0000-4000-8000-000000000002"
+            conversation = session?.lowercased() ?? "00000000-0000-4000-8000-000000000002"
             let grant = try await NativeCloudAccountAPI.fileGrant(conversation: conversation)
             let body = try JSONSerialization.data(withJSONObject: ["conversation": conversation, "file_grant": grant])
             let data = try await NativeCloudAccountAPI.runtime("v1/terminals", method: "POST", body: body)

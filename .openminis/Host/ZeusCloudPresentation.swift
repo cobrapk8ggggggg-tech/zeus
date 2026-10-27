@@ -17,7 +17,9 @@ import Foundation
         if !final { current.cachedAttributedString = nil }
         if let msgIdx = vm.messages.firstIndex(where: { $0.id == message.id }), let blockIdx = message.blocks.firstIndex(where: { $0.id == current.id }) {
             vm.setStreamingTextBlockContent(msgIdx: msgIdx, blockIdx: blockIdx, text: text, parsedMarkdown: parsed, cacheAttributedString: final, requestScroll: true)
-            vm.publishUnlessTransitioning()
+            // Native streaming mutates the existing observed block. Rebuilding
+            // the entire list for every text part restarts layout/fade work.
+            if block == nil || final { vm.publishUnlessTransitioning() }
         }
         return current
     }
