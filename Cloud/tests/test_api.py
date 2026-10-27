@@ -511,6 +511,31 @@ class APITests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(pages[0]["run"]["status"], "waiting_user")
             self.assertTrue(pages[0]["run"]["pending_approval"])
 
+    async def test_first_reasoning_part_streams_without_waiting_for_a_second_chunk(self):
+        ready, finish = asyncio.Event(), asyncio.Event()
+        class ThinkingModel:
+            async def stream(self, provider, messages, tools, instructions):
+                yield {"kind": "thinking", "text": "first reasoning part"}
+                ready.set(); await finish.wait()
+                yield {"kind": "text", "text": "verified answer"}
+        self.app.state.engine.models = ThinkingModel()
+        run, _ = await self.submit(); await asyncio.wait_for(ready.wait(), 2)
+        try:
+            async with network_server(self.app) as address, httpx.AsyncClient(base_url=address, timeout=3, headers={"Authorization": "Bearer fixture-owner"}) as client:
+                async with client.stream("GET", f"/v1/runs/{run}/feed") as response:
+                    async for line in response.aiter_lines():
+                        if not line.startswith("data:"): continue
+                        page = json.loads(line[5:])
+                        thinking = [e for e in page["events"] if e["kind"] == "thinking"]
+                        if thinking:
+                            self.assertEqual(thinking[0]["data"]["delta"], "first reasoning part")
+                            self.assertEqual(page["run"]["status"], "running")
+                            self.assertFalse(finish.is_set())
+                            break
+                    else: self.fail("No first reasoning part was streamed")
+        finally: finish.set()
+        await self.wait_state(run, {"completed"})
+
     async def test_new_user_turn_preempts_background_storage_collection(self):
         started=asyncio.Event();released=[]
         async def snapshot(owner): started.set();await asyncio.sleep(60)

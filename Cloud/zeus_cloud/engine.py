@@ -136,6 +136,7 @@ class Engine:
                     for _ in range(100):
                         text, calls, buffered = "", [], ""
                         thinking, thinking_count = "", 0
+                        thinking_flushed = False
                         thinking_flush = time.monotonic()
                         last_flush = time.monotonic()
                         flushed = False
@@ -152,9 +153,9 @@ class Engine:
                                 thinking += event["text"]
                                 thinking_count += len(event["text"])
                                 if thinking_count > 512_000: raise ValueError("Reasoning exceeds the configured limit")
-                                if len(thinking) >= 2048 or time.monotonic() - thinking_flush >= 0.5:
+                                if not thinking_flushed or len(thinking) >= 2048 or time.monotonic() - thinking_flush >= 0.5:
                                     await self.store.event(owner, identifier, "thinking", {"delta": thinking})
-                                    thinking = ""; thinking_flush = time.monotonic()
+                                    thinking = ""; thinking_flush = time.monotonic(); thinking_flushed = True
                         malformed = candidate(text, self.catalog(run)) if not calls else None
                         if buffered and not malformed: await self.store.event(owner, identifier, "text", {"delta": buffered})
                         if thinking: await self.store.event(owner, identifier, "thinking", {"delta": thinking})
