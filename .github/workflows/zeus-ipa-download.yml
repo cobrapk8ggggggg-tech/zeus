@@ -15,7 +15,7 @@ permissions:
   contents: read
 jobs:
   ipa:
-    runs-on: macos-latest
+    runs-on: macos-15
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4

@@ -29,7 +29,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   integration:
-    runs-on: macos-latest
+    runs-on: macos-15
     timeout-minutes: 120
     steps:
     - uses: actions/checkout@v4
@@ -113,8 +113,8 @@ jobs:
       with:
         path: |
           ${{ runner.temp }}/OpenMinisOriginal/SourcePackages
-        key: zeus-native-packages-263-v3-${{ github.run_id }}
-        restore-keys: zeus-native-packages-263-v3-
+        key: zeus-native-packages-263-macos15-v1-${{ github.run_id }}
+        restore-keys: zeus-native-packages-263-macos15-v1-
     - name: Discard SDK module caches tied to the previous runner image
       run: |
         python3 - <<'PYCODE'
@@ -167,7 +167,7 @@ jobs:
       with:
         path: |
           ${{ runner.temp }}/OpenMinisOriginal/SourcePackages
-        key: zeus-native-packages-263-v3-${{ github.run_id }}
+        key: zeus-native-packages-263-macos15-v1-${{ github.run_id }}
     - name: 'IPAD: Boot for Files and layout UI tests'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
       timeout-minutes: 10
