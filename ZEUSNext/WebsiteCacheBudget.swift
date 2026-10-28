@@ -7,7 +7,8 @@ import WebKit
     private static var cleanup: Task<Void, Never>?
     private static var lastCleanup = Date.distantPast
     static func existingIdentifiers() async -> Set<UUID> {
-        await withCheckedContinuation { continuation in
+        guard hasLegacyStore else { return [] }
+        return await withCheckedContinuation { continuation in
             WKWebsiteDataStore.fetchAllDataStoreIdentifiers { continuation.resume(returning: Set($0)) }
         }
     }

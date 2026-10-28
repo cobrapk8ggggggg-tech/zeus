@@ -125,6 +125,21 @@ def embed(native, browser, report):
     # Close only the added local branch inside this exact terminal cover.
     replace(source / "Views/Chat/AIChatView.swift", "        }\n        .fullScreenCover(isPresented: $showCamera, onDismiss: {", "            }\n        }\n        .fullScreenCover(isPresented: $showCamera, onDismiss: {")
     replace(source / "Views/Chat/ToolLiveSheet.swift", "                ISHTerminalView(\n                    sessionId: sessionId,\n                    showCloseButton: true,\n                    initCommand: terminalPrefillCommand\n                )", "                if NativeCloudAccountAPI.usesCloud { ZeusCloudTerminalView(session: sessionId, initialCommand: terminalPrefillCommand) }\n                else {\n                    ISHTerminalView(sessionId: sessionId, showCloseButton: true, initCommand: terminalPrefillCommand)\n                }")
+    # Skill indexing and mount refresh can run before the kernel boots.
+    # They must not materialize a guest filesystem in cloud mode.
+    skill_store = source / "Agent/Session/SkillStore.swift"
+    replace(skill_store, "import Foundation", "import Foundation\nimport ZEUSBrowser")
+    replace(skill_store, "    private func syncToRootfs(skill: Skill, content: String) {", "    private func syncToRootfs(skill: Skill, content: String) {\n        guard NativeLocalExecutionBoundary.shared.isAllowed else { return }")
+    replace(offloading, "        let mountsDir = dataPath.appendingPathComponent(\"var/minis/mounts\", isDirectory: true)", "        guard NativeLocalExecutionBoundary.shared.isAllowed else { return }\n        let mountsDir = dataPath.appendingPathComponent(\"var/minis/mounts\", isDirectory: true)")
+    skill_code = skill_store.read_text()
+    skill_lines = skill_code.splitlines(keepends=True)
+    for index, line in enumerate(skill_lines):
+        stripped = line.strip()
+        if stripped.startswith("try? ") and any(token in stripped for token in ("at: rootfs", "to: rootfs")):
+            indentation = line[:len(line) - len(line.lstrip())]
+            skill_lines[index] = indentation + "if NativeLocalExecutionBoundary.shared.isAllowed { " + stripped + " }\n"
+    skill_store.write_text("".join(skill_lines))
+    replace(skill_store, "    private func ensureFakefsMetadata(for linuxPath: String, isDirectory: Bool) {", "    private func ensureFakefsMetadata(for linuxPath: String, isDirectory: Bool) {\n        guard NativeLocalExecutionBoundary.shared.isAllowed else { return }")
     rootfs = source / "iSH/RootfsManager.swift"
     replace(rootfs, "import Foundation", "import Foundation\nimport ZEUSBrowser")
     replace(rootfs, "    static let shared = RootfsManager()", "    static let shared = RootfsManager()\n    static let zeusLifecycleLock = NSRecursiveLock()")
