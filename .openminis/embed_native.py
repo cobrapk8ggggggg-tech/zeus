@@ -206,6 +206,27 @@ def embed(native, browser, report):
     replace(persistence, signature, signature + "\n        if NativeCloudAccountAPI.usesCloud { return msg.dbMessageId ?? UUID().uuidString }")
     replace(persistence, "            rawMessages = await ChatStore.shared.loadMessages(sessionId: sessionId)", "            if NativeCloudAccountAPI.usesCloud {\n                do { rawMessages = try await ZeusCloudRuntime.shared.cloudTranscript(session: sessionId) }\n                catch { self.errorMessage = error.localizedDescription; return }\n            } else { rawMessages = await ChatStore.shared.loadMessages(sessionId: sessionId) }")
     replace(persistence, "    func reloadMessagesFromDB(reason: String = \"unspecified\") async {", "    func reloadMessagesFromDB(reason: String = \"unspecified\") async {\n        guard !NativeCloudAccountAPI.usesCloud else { return }")
+    send_code = cloud_vm.read_text()
+    send_code = send_code.replace("            try? fm.createDirectory(at: uploadsDir, withIntermediateDirectories: true)", "            if !pendingAttachments.isEmpty { try? fm.createDirectory(at: uploadsDir, withIntermediateDirectories: true) }", 1)
+    cloud_vm.write_text(send_code)
+    replace(cloud_vm, '        let displayText = text.isEmpty && pendingAttachments.isEmpty ? "" : text', '        let displayText = NativeCloudAccountAPI.usesCloud ? PastePlaceholder.expand(text) { id in self.pastedTexts.first(where: { $0.id == id })?.text } : (text.isEmpty && pendingAttachments.isEmpty ? "" : text)')
+    attachments_source = source / "Agent/Chat/AIChatViewModel+Attachments.swift"
+    replace(attachments_source, "import Foundation", "import Foundation\nimport ZEUSBrowser")
+    replace(attachments_source, "        if text.count > PastePlaceholder.fileAttachmentThreshold {", "        if !NativeCloudAccountAPI.usesCloud && text.count > PastePlaceholder.fileAttachmentThreshold {")
+    consume_start = attachments_source.read_text().index("    func consumePastedDraft(")
+    consume_anchor = "        guard !matches.isEmpty else { return nil }"
+    attachment_code = attachments_source.read_text()
+    consume_pos = attachment_code.index(consume_anchor, consume_start) + len(consume_anchor)
+    cloud_paste = '''
+        if NativeCloudAccountAPI.usesCloud {
+            let expanded = PastePlaceholder.expand(draft) { id in self.pastedTexts.first(where: { $0.id == id })?.text }
+            let ids = Set(matches.compactMap { Int(ns.substring(with: $0.range(at: 1))) })
+            pastedTexts.removeAll { ids.contains($0.id) }
+            return (expanded, [.text(expanded)], [])
+        }'''
+    attachments_source.write_text(attachment_code[:consume_pos] + cloud_paste + attachment_code[consume_pos:])
+    replace(attachments_source, "    func planPastedCards(for draft: String) -> (plan: [Int: String], metas: [AttachmentMeta]) {", "    func planPastedCards(for draft: String) -> (plan: [Int: String], metas: [AttachmentMeta]) {\n        guard !NativeCloudAccountAPI.usesCloud else { return ([:], []) }")
+    replace(offloading, "    func migrateOffloadsIfNeeded(for sid: String) {", "    func migrateOffloadsIfNeeded(for sid: String) {\n        guard !NativeCloudAccountAPI.usesCloud else { return }")
     replace(cloud_vm, "    func cancel() {", "    func cancel() {\n        ZeusCloudRuntime.shared.cancel(session: sessionId)")
     replace(source / "Agent/Chat/AIChatViewModel+Persistence.swift", "    func loadSession() async {\n        guard let sessionId else { return }", "    func loadSession() async {\n        guard let sessionId else { return }\n        defer { Task { await ZeusCloudRuntime.shared.reconnect(self) } }")
     replace(source / "Agent/Chat/AIChatViewModel+Persistence.swift", "            id: UUID().uuidString, sessionId: sessionId,", "            id: NativeCloudAccountAPI.usesCloud ? (msg.dbMessageId ?? UUID().uuidString) : UUID().uuidString, sessionId: sessionId,")

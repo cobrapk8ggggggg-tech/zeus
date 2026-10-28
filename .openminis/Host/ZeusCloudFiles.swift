@@ -106,9 +106,9 @@ import ZEUSBrowser
     }
     static func discardAbandonedPreviews() {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("ZEUSCloudPreviews")
-        let active = Set(activePreviews.map { $0.deletingLastPathComponent().standardizedFileURL })
+        let active = Set(activePreviews.map { $0.deletingLastPathComponent().standardizedFileURL.path })
         for dir in (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? [] {
-            if !active.contains(dir.standardizedFileURL) { try? FileManager.default.removeItem(at: dir) }
+            if !active.contains(dir.standardizedFileURL.path) { try? FileManager.default.removeItem(at: dir) }
         }
     }
     static func downloadAll(session: String) async throws {

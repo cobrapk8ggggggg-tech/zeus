@@ -464,7 +464,8 @@ import ZEUSBrowser
             if persist { await ChatStore.shared.appendMessage(raw) }
             restored.append(raw); known.insert(assistantID); changed = true
         }
-        if persist, let latest = runs.first, let id = latest["id"] as? String, let assistantID = latest["native_assistant_id"] as? String,
+        if let latest = runs.first, ["completed", "failed", "interrupted", "cancelled"].contains(latest["status"] as? String ?? ""),
+           let id = latest["id"] as? String, let assistantID = latest["native_assistant_id"] as? String,
            known.contains(assistantID), let owner = NativeCloudAccountAPI.ownerID {
             let state = State(owner: owner, conversation: session, run: id, complete: true, assistantID: assistantID)
             try JSONEncoder().encode(state).write(to: stateURL(session), options: .atomic)

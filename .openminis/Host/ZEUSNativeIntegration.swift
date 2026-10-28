@@ -85,6 +85,9 @@ private struct ZeusCloudStorageUseTestEntry: View {
                 let before = await ChatStore.shared.zeusCachedMessageBytes(session)
                 let payload = String(repeating: "نص سحابي ", count: 10000)
                 for turn in 0..<20 {
+                    vm.send(overrideText: "رسالة \(turn): " + payload)
+                    await vm.currentTask?.value
+                    guard !vm.isProcessing else { throw NSError(domain: "CloudStorageFixture", code: 2) }
                     _ = await vm.persistAgentMessage(AgentMessage(role: .user, parts: [.text("طلب \(turn): " + payload)]))
                     _ = await vm.persistAgentMessage(AgentMessage(role: .assistant, parts: [
                         .toolUse(id: "tool-\(turn)", name: "file_write", input: ["path": "output-\(turn).txt", "content": payload]),
@@ -106,6 +109,10 @@ private struct ZeusCloudStorageUseTestEntry: View {
                     ]
                     return try JSONSerialization.data(withJSONObject: ["events": events])
                 }
+                if let literal = vm.stashPastedText(payload) {
+                    let pasted = await vm.consumePastedDraft(literal, sessionId: session)
+                    guard pasted?.modelText == payload else { throw NSError(domain: "CloudStorageFixture", code: 3) }
+                } else { throw NSError(domain: "CloudStorageFixture", code: 4) }
                 let first = try await ZeusCloudRuntime(transcriptRead: read).cloudTranscript(session: session)
                 let reopened = try await ZeusCloudRuntime(transcriptRead: read).cloudTranscript(session: session)
                 let after = await ChatStore.shared.zeusCachedMessageBytes(session)
@@ -113,7 +120,10 @@ private struct ZeusCloudStorageUseTestEntry: View {
                 let linux = FileManager.default.fileExists(atPath: root.path) ? try ZeusStorageFiles.size(root) : 0
                 let filesRoot = AIChatViewModel.minisPersistentBase.appendingPathComponent(session)
                 let localFiles = FileManager.default.fileExists(atPath: filesRoot.path) ? try ZeusStorageFiles.size(filesRoot) : 0
-                guard first.count == 40, reopened.count == 40,
+                let taskName = SHA256.hash(data: Data(session.utf8)).map { String(format: "%02x", $0) }.joined() + ".json"
+                let savedTask = ZeusAgentHarness.shared.taskStorageDirectory.appendingPathComponent(taskName)
+                guard vm.messages.filter({ $0.role == .user }).count == 20,
+                      !FileManager.default.fileExists(atPath: savedTask.path), first.count == 40, reopened.count == 40,
                       first.map(\.id) == reopened.map(\.id), before == 0, after == 0,
                       reopened.last?.parts.count == 3, linux == 0, !FileManager.default.fileExists(atPath: root.path), localFiles == 0, !ISHKernel.shared.isBooted else {
                     throw NSError(domain: "CloudStorageFixture", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unexpected local payload or incomplete remote replay"])
