@@ -25,7 +25,8 @@ import CryptoKit
         XCTAssertEqual(try Data(contentsOf: original), bytes)
     }
     func testIncompleteCloudReplayFailsWithoutWritingPartialMessages() async throws {
-        let session = UUID().uuidString
+        let registered = await ChatStore.shared.createSession(modelId: "cloud-storage-fixture")
+        let session = registered.id
         let before = await ChatStore.shared.loadMessages(sessionId: session)
         let runtime = ZeusCloudRuntime(transcriptRead: { path in
             if path.contains("/runs?") {

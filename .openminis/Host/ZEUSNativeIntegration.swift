@@ -80,12 +80,18 @@ private struct ZeusCloudStorageUseTestEntry: View {
         }.task {
             do {
                 await ZeusDeviceStorageBudget.prepare()
-                let session = UUID().uuidString
+                let registered = await ChatStore.shared.createSession(modelId: "cloud-storage-fixture")
+                let session = registered.id
                 vm.sessionId = session
                 let before = await ChatStore.shared.zeusCachedMessageBytes(session)
                 let payload = String(repeating: "نص سحابي ", count: 10000)
                 for turn in 0..<20 {
-                    vm.send(overrideText: "رسالة \(turn): " + payload)
+                    let input: String
+                    if turn == 19 {
+                        guard let literal = vm.stashPastedText(payload) else { throw NSError(domain: "CloudStorageFixture", code: 5) }
+                        input = literal
+                    } else { input = "رسالة اختبار سحابي \(turn)" }
+                    vm.send(overrideText: input)
                     await vm.currentTask?.value
                     guard !vm.isProcessing else { throw NSError(domain: "CloudStorageFixture", code: 2) }
                     _ = await vm.persistAgentMessage(AgentMessage(role: .user, parts: [.text("طلب \(turn): " + payload)]))
