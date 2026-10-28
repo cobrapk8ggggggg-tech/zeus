@@ -173,6 +173,10 @@ jobs:
       timeout-minutes: 10
       run: |
         bash browser/.openminis/run_native_stage.sh boot IPAD "${IPAD_SIMULATOR}"
+    - name: 'IPAD: Verify cloud storage replay and safe upload cleanup'
+      if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
+      timeout-minutes: 8
+      run: bash browser/.openminis/run_native_stage.sh storage-tests IPAD "${IPAD_SIMULATOR}"
     - name: 'IPAD: Verify cloud streaming, cards and zero local Linux before Files tests'
       if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
       timeout-minutes: 12
@@ -189,6 +193,7 @@ jobs:
       with:
         name: zeus-ipad-cloud-ui-diagnostics
         path: |
+          results/embedded-IPAD-storage-tests*
           results/embedded-IPAD-cloud-ui.log
           results/embedded-IPAD-cloud-ui.xcresult
           results/cloud-ui-attachments-IPAD

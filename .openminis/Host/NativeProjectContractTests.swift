@@ -4,6 +4,40 @@ import CryptoKit
 @testable import Minis
 
 @MainActor final class NativeProjectContractTests: XCTestCase {
+    func testUploadedCopyIsRemovedOnlyAfterMatchingRemoteDigestAndOriginalIsPreserved() throws {
+        let fm = FileManager.default, root = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+        let staged = root.appendingPathComponent("attachments")
+        try fm.createDirectory(at: staged, withIntermediateDirectories: true)
+        let original = root.appendingPathComponent("original.txt"), copy = staged.appendingPathComponent("copy.txt")
+        let bytes = Data("my cloud attachment".utf8)
+        try bytes.write(to: original); try bytes.write(to: copy)
+        let digest = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+        XCTAssertFalse(try ZeusCloudFiles.discardVerifiedUpload(original, within: staged, bytes: Int64(bytes.count), digest: digest))
+        XCTAssertFalse(try ZeusCloudFiles.discardVerifiedUpload(copy, within: staged, bytes: Int64(bytes.count), digest: String(repeating: "0", count: 64)))
+        XCTAssertTrue(fm.fileExists(atPath: copy.path))
+        XCTAssertTrue(try ZeusCloudFiles.discardVerifiedUpload(copy, within: staged, bytes: Int64(bytes.count), digest: digest))
+        XCTAssertEqual(try Data(contentsOf: original), bytes)
+        let link = staged.appendingPathComponent("link.txt")
+        try fm.createSymbolicLink(at: link, withDestinationURL: original)
+        XCTAssertFalse(try ZeusCloudFiles.discardVerifiedUpload(link, within: staged, bytes: Int64(bytes.count), digest: digest))
+        XCTAssertEqual(try Data(contentsOf: original), bytes)
+    }
+    func testIncompleteCloudReplayFailsWithoutWritingPartialMessages() async throws {
+        let session = UUID().uuidString
+        let before = await ChatStore.shared.loadMessages(sessionId: session)
+        let runtime = ZeusCloudRuntime(transcriptRead: { path in
+            if path.contains("/runs?") {
+                return try JSONSerialization.data(withJSONObject: ["runs": [["id": "run", "native_user_id": "user", "native_assistant_id": "assistant", "status": "completed", "prompt": "must stay in memory", "seq": 2]]])
+            }
+            return Data("{\"events\":[]}".utf8)
+        })
+        do { _ = try await runtime.cloudTranscript(session: session); XCTFail("Incomplete replay must throw") }
+        catch { }
+        let after = await ChatStore.shared.loadMessages(sessionId: session)
+        XCTAssertEqual(before.map(\.id), after.map(\.id))
+    }
     func testCrashDiagnosticsRemainStableWhenRequestedConcurrently() async {
         let initial = CrashReporter.detectInjectedDylibs()
         let results = await withTaskGroup(of: [String].self, returning: [[String]].self) { group in

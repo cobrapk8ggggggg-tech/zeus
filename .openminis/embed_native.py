@@ -199,6 +199,13 @@ def embed(native, browser, report):
     cloud_text = cloud_text.replace("if case .failed(let msg) = self.kernelStatus {", "if !NativeCloudAccountAPI.usesCloud, case .failed(let msg) = self.kernelStatus {")
     cloud_vm.write_text(cloud_text)
     replace(cloud_vm, "            } else if !isProcessing && oldValue {", "            } else if !isProcessing && oldValue {\n                if NativeCloudAccountAPI.usesCloud { messages.last(where: { $0.role == .assistant })?.isAwaitingModelResponse = false }\n                ZeusCloudArchive.shared.scheduleBackup()")
+    persistence = source / "Agent/Chat/AIChatViewModel+Persistence.swift"
+    replace(persistence, "import Foundation", "import Foundation\nimport ZEUSBrowser")
+    persistence_code = persistence.read_text()
+    signature = next(line for line in persistence_code.splitlines() if line.strip().startswith("func persistAgentMessage("))
+    replace(persistence, signature, signature + "\n        if NativeCloudAccountAPI.usesCloud { return msg.dbMessageId ?? UUID().uuidString }")
+    replace(persistence, "            rawMessages = await ChatStore.shared.loadMessages(sessionId: sessionId)", "            if NativeCloudAccountAPI.usesCloud {\n                do { rawMessages = try await ZeusCloudRuntime.shared.cloudTranscript(session: sessionId) }\n                catch { self.errorMessage = error.localizedDescription; return }\n            } else { rawMessages = await ChatStore.shared.loadMessages(sessionId: sessionId) }")
+    replace(persistence, "    func reloadMessagesFromDB(reason: String = \"unspecified\") async {", "    func reloadMessagesFromDB(reason: String = \"unspecified\") async {\n        guard !NativeCloudAccountAPI.usesCloud else { return }")
     replace(cloud_vm, "    func cancel() {", "    func cancel() {\n        ZeusCloudRuntime.shared.cancel(session: sessionId)")
     replace(source / "Agent/Chat/AIChatViewModel+Persistence.swift", "    func loadSession() async {\n        guard let sessionId else { return }", "    func loadSession() async {\n        guard let sessionId else { return }\n        defer { Task { await ZeusCloudRuntime.shared.reconnect(self) } }")
     replace(source / "Agent/Chat/AIChatViewModel+Persistence.swift", "            id: UUID().uuidString, sessionId: sessionId,", "            id: NativeCloudAccountAPI.usesCloud ? (msg.dbMessageId ?? UUID().uuidString) : UUID().uuidString, sessionId: sessionId,")

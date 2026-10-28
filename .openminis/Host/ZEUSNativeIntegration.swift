@@ -16,7 +16,9 @@ struct ZEUSBrowserRootEntry: View {
     init() { _ = ZEUSNativeHostBootstrap.configured }
     var body: some View {
         #if DEBUG
-        if CommandLine.arguments.contains("--zeus-cloud-footprint") {
+        if CommandLine.arguments.contains("--zeus-cloud-storage-fixture") {
+            ZeusCloudStorageUseTestEntry()
+        } else if CommandLine.arguments.contains("--zeus-cloud-footprint") {
             ZeusCloudFootprintTestEntry()
         } else if CommandLine.arguments.contains("--zeus-cloud-partial-stream") {
             ZeusCloudPartialStreamTestEntry()
@@ -65,6 +67,63 @@ private enum ZEUSNativeHostBootstrap {
 }
 
 #if DEBUG
+/// Exercises the actual native persistence entry and production transcript
+/// decoder with repeated remote tool events, then reopens from a fresh reader.
+private struct ZeusCloudStorageUseTestEntry: View {
+    @StateObject private var vm = AIChatViewModel()
+    @State private var result = "running"
+    @State private var detail = ""
+    var body: some View {
+        VStack(spacing: 14) {
+            Text(result).accessibilityIdentifier("cloudStorageAfterUse")
+            Text(detail).accessibilityIdentifier("cloudStorageAfterUseBytes")
+        }.task {
+            do {
+                await ZeusDeviceStorageBudget.prepare()
+                let session = UUID().uuidString
+                vm.sessionId = session
+                let before = await ChatStore.shared.zeusCachedMessageBytes(session)
+                let payload = String(repeating: "نص سحابي ", count: 10000)
+                for turn in 0..<20 {
+                    _ = await vm.persistAgentMessage(AgentMessage(role: .user, parts: [.text("طلب \(turn): " + payload)]))
+                    _ = await vm.persistAgentMessage(AgentMessage(role: .assistant, parts: [
+                        .toolUse(id: "tool-\(turn)", name: "file_write", input: ["path": "output-\(turn).txt", "content": payload]),
+                        .toolResult(id: "tool-\(turn)", name: "file_write", content: "saved on server", isError: false),
+                        .text(payload)
+                    ]))
+                    vm.ensureKernelBooted(); vm.mountMinis(for: session)
+                }
+                let runs: [[String: Any]] = (0..<20).reversed().map { turn in
+                    ["id": "run-\(turn)", "native_user_id": "user-\(turn)", "native_assistant_id": "assistant-\(turn)",
+                     "status": "completed", "prompt": "طلب \(turn): " + payload, "created": Double(turn), "seq": 3]
+                }
+                let read: (String) async throws -> Data = { path in
+                    if path.contains("/runs?") { return try JSONSerialization.data(withJSONObject: ["runs": runs]) }
+                    let events: [[String: Any]] = [
+                        ["seq": 1, "kind": "tool_start", "data": ["id": "write-1", "name": "file_write", "input": ["path": "output.txt", "content": payload]]],
+                        ["seq": 2, "kind": "tool_result", "data": ["id": "write-1", "output": "saved on server", "success": true]],
+                        ["seq": 3, "kind": "text", "data": ["delta": payload]]
+                    ]
+                    return try JSONSerialization.data(withJSONObject: ["events": events])
+                }
+                let first = try await ZeusCloudRuntime(transcriptRead: read).cloudTranscript(session: session)
+                let reopened = try await ZeusCloudRuntime(transcriptRead: read).cloudTranscript(session: session)
+                let after = await ChatStore.shared.zeusCachedMessageBytes(session)
+                let root = RootfsManager.shared.rootfsPath
+                let linux = FileManager.default.fileExists(atPath: root.path) ? try ZeusStorageFiles.size(root) : 0
+                let filesRoot = AIChatViewModel.minisPersistentBase.appendingPathComponent(session)
+                let localFiles = FileManager.default.fileExists(atPath: filesRoot.path) ? try ZeusStorageFiles.size(filesRoot) : 0
+                guard first.count == 40, reopened.count == 40,
+                      first.map(\.id) == reopened.map(\.id), before == 0, after == 0,
+                      reopened.last?.parts.count == 3, linux == 0, !FileManager.default.fileExists(atPath: root.path), localFiles == 0, !ISHKernel.shared.isBooted else {
+                    throw NSError(domain: "CloudStorageFixture", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unexpected local payload or incomplete remote replay"])
+                }
+                detail = "20 turns; 40 messages reopened; messages=\(after) bytes; files=\(localFiles) bytes; Linux=\(linux) bytes"
+                result = "20:40:0:0:idle"
+            } catch { detail = error.localizedDescription; result = "failed" }
+        }
+    }
+}
 private struct ZeusCloudFootprintTestEntry: View {
     @StateObject private var vm = AIChatViewModel()
     @State private var result = "checking"

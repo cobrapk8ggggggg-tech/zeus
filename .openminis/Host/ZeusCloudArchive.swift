@@ -336,10 +336,14 @@ import ZEUSBrowser
         defer { try? fm.removeItem(at: package) }
         try await download(metadata, to: package, key: key)
         var options = BackupImporter.Options(); options.passphrase = secrets.passphrase
+        if !includeFiles, try await NativeCloudAccountAPI.hasCloudHistory() {
+            options.categories = Set(BackupCategory.allCases).subtracting([.chats, .sharedFiles, .skills, .memory])
+        }
         let report = try await BackupImporter().import(from: package, options: options)
         try await ZeusCloudDeletion.shared.sync(fetchRemote: true)
         guard report.integrityFailed.isEmpty, report.categories.allSatisfy({ $0.failed == nil && $0.unreadable == 0 && $0.missingBlobs == 0 }) else { throw error("لم تكتمل استعادة بعض فئات الحساب؛ أعد المحاولة.") }
-        let smallScopes = ["browser_accounts", "agent_skills", "agent_mcp_config", "agent_task_notes"]
+        if !includeFiles { try await ZeusCloudRuntime.shared.restoreSessionIndex() }
+        let smallScopes = ["browser_accounts", "agent_mcp_config"]
         let skillPaths = Set(archive.files.filter { $0.scope == "agent_skills" }.map(\.path))
         let reproducible = try ZeusDefaultSkills.shared.bundledCopies(including: skillPaths)
         if includeFiles || archive.files.contains(where: { smallScopes.contains($0.scope) }) {

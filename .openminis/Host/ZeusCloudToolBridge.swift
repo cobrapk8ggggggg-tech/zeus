@@ -47,6 +47,12 @@ import ZEUSBrowser
             guard let call = value["call"] as? [String: Any], let name = call["name"] as? String,
                   let callID = call["id"] as? String, let originalArgs = call["arguments"] as? [String: Any],
                   let msgIdx = vm.messages.indices.last else { throw issue("طلب أداة غير صالح.") }
+            // Cloud execution must never fall back to the device filesystem or
+            // shell, even if a stale server dispatches a server-owned tool here.
+            let serverTools: Set<String> = ["exec_command", "write_stdin", "shell_execute", "file_read", "file_write", "file_edit", "memory_get", "memory_write", "apply_patch", "file_list", "task_checkpoint", "history_read"]
+            guard !serverTools.contains(name) else {
+                throw issue("هذه الأداة تنفذ على الخادم فقط؛ رُفض تحويلها إلى الجهاز.")
+            }
             var args = originalArgs
             var staged: URL?
             defer { if let staged { try? FileManager.default.removeItem(at: staged) } }

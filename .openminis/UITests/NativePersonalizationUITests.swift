@@ -53,6 +53,17 @@ final class NativePersonalizationUITests: XCTestCase {
         expectation(for: NSPredicate(format: "label == %@", "1:readable:ZEUS-Import-Test"), evaluatedWith: result)
         waitForExpectations(timeout: 15)
     }
+    @MainActor func testCloudAfterRepeatedMessagesToolResultsAndReopenKeepDevicePayloadAtZero() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--zeus-cloud-storage-fixture", "--zeus-native-fixture", "-appearanceMode", "2"]
+        app.launch()
+        let result = app.staticTexts["cloudStorageAfterUse"]
+        expectation(for: NSPredicate(format: "label == %@", "20:40:0:0:idle"), evaluatedWith: result)
+        waitForExpectations(timeout: 45)
+        let proof = XCTAttachment(screenshot: app.screenshot())
+        proof.name = "ZEUS-Cloud-Zero-Payload-After-20-Turns-And-Reopen"; proof.lifetime = .keepAlways; add(proof)
+    }
     @MainActor func testCloudPartialReplyAppearsInOriginalMessageListBeforeCompletion() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

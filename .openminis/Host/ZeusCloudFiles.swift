@@ -13,6 +13,7 @@ import ZEUSBrowser
         var id: String { path }
     }
     struct Snapshot { let files: [Entry]; let hash: String }
+    private static var activePreviews: Set<URL> = []
     private static func fail() -> NSError { NSError(domain: "ZEUSCloud", code: 3, userInfo: [NSLocalizedDescriptionKey: "ملف سحابي غير صالح أو تغير أثناء التنزيل. أعد المحاولة."]) }
     static func list(session: String) async throws -> [Entry] {
         try await snapshot(session: session).files
@@ -37,8 +38,10 @@ import ZEUSBrowser
     }
     static func download(_ entry: Entry, session: String, to destination: URL? = nil) async throws -> URL {
         let fm = FileManager.default
-        let cache = fm.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("ZEUSCloudFiles/\(session)/\(entry.digest)")
+        let cache = fm.temporaryDirectory.appendingPathComponent("ZEUSCloudPreviews/" + UUID().uuidString, isDirectory: true)
         try fm.createDirectory(at: cache, withIntermediateDirectories: true)
+        var previewReturned = false
+        defer { if !previewReturned { try? fm.removeItem(at: cache) } }
         let result = cache.appendingPathComponent(URL(fileURLWithPath: entry.path).lastPathComponent)
         if !fm.fileExists(atPath: result.path) {
             let stage = cache.appendingPathComponent(UUID().uuidString)
@@ -58,6 +61,7 @@ import ZEUSBrowser
             try fm.moveItem(at: stage, to: result)
         }
         if let destination {
+            defer { try? fm.removeItem(at: cache) }
             var parent = destination.deletingLastPathComponent()
             while parent.path != "/" {
                 if fm.fileExists(atPath: parent.path), try parent.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink == true { throw fail() }
@@ -69,23 +73,43 @@ import ZEUSBrowser
             try fm.setAttributes([.posixPermissions: entry.mode], ofItemAtPath: destination.path)
             return destination
         }
-        // One byte budget across conversations, with an exception for the
-        // file the user is currently opening. Remote originals are untouched.
-        try? fm.setAttributes([.modificationDate: Date()], ofItemAtPath: result.path)
-        let cacheRoot = fm.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("ZEUSCloudFiles")
-        let keys: Set<URLResourceKey> = [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey]
-        var files: [(URL, Int64, Date)] = []
-        if let scan = fm.enumerator(at: cacheRoot, includingPropertiesForKeys: Array(keys), options: [.skipsHiddenFiles]) {
-            for case let url as URL in scan {
-                guard let value = try? url.resourceValues(forKeys: keys), value.isRegularFile == true, value.isSymbolicLink != true else { continue }
-                files.append((url, Int64(value.fileSize ?? 0), value.contentModificationDate ?? .distantPast))
-            }
-        }
-        var used = files.reduce(Int64(0)) { $0 + $1.1 }
-        for file in files.sorted(by: { $0.2 < $1.2 }) where used > 64 * 1024 * 1024 && file.0 != result {
-            do { try fm.removeItem(at: file.0); used -= file.1 } catch { }
-        }
+        previewReturned = true
+        activePreviews.insert(result)
         return result
+    }
+    @discardableResult static func discardVerifiedUpload(_ url: URL, within root: URL, bytes: Int64, digest: String) throws -> Bool {
+        let fm = FileManager.default
+        guard try root.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else { return false }
+        let canonicalRoot = root.resolvingSymlinksInPath().standardizedFileURL.path + "/"
+        let path = url.deletingLastPathComponent().resolvingSymlinksInPath().appendingPathComponent(url.lastPathComponent)
+        guard path.path.hasPrefix(canonicalRoot) else { return false }
+        let keys: Set<URLResourceKey> = [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey, .fileResourceIdentifierKey]
+        let before = try path.resourceValues(forKeys: keys)
+        guard before.isRegularFile == true, before.isSymbolicLink != true, Int64(before.fileSize ?? -1) == bytes else { return false }
+        let handle = try FileHandle(forReadingFrom: path); defer { try? handle.close() }
+        var hash = SHA256()
+        while let data = try handle.read(upToCount: 1024 * 1024), !data.isEmpty { hash.update(data: data) }
+        guard hash.finalize().map({ String(format: "%02x", $0) }).joined() == digest else { return false }
+        let after = try URL(fileURLWithPath: path.path).resourceValues(forKeys: keys)
+        guard after.isSymbolicLink != true, after.fileSize == before.fileSize,
+              after.contentModificationDate == before.contentModificationDate,
+              (after.fileResourceIdentifier as? NSObject) == (before.fileResourceIdentifier as? NSObject) else { return false }
+        try fm.removeItem(at: path)
+        return true
+    }
+    static func discardPreview(_ url: URL?) {
+        guard let url else { return }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("ZEUSCloudPreviews").standardizedFileURL.path + "/"
+        guard url.standardizedFileURL.path.hasPrefix(root) else { return }
+        activePreviews.remove(url)
+        try? FileManager.default.removeItem(at: url.deletingLastPathComponent())
+    }
+    static func discardAbandonedPreviews() {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("ZEUSCloudPreviews")
+        let active = Set(activePreviews.map { $0.deletingLastPathComponent().standardizedFileURL })
+        for dir in (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? [] {
+            if !active.contains(dir.standardizedFileURL) { try? FileManager.default.removeItem(at: dir) }
+        }
     }
     static func downloadAll(session: String) async throws {
         let manifest = try await snapshot(session: session)
@@ -106,6 +130,7 @@ struct ZeusCloudFilesView: View {
     @State private var issue: String?
     @State private var busy: String?
     @State private var preview: FileItem?
+    @State private var previewURL: URL?
     @State private var showInputs = false
     @State private var folders: Bool
     @State private var kind: ZeusOutputKind?
@@ -160,7 +185,7 @@ struct ZeusCloudFilesView: View {
                     } label: { Image(systemName: folders ? "folder" : "square.grid.2x2") }
                 }
             }
-            .sheet(item: $preview) { FilePreviewSheet(item: $0) }
+            .sheet(item: $preview, onDismiss: { ZeusCloudFiles.discardPreview(previewURL); previewURL = nil }) { FilePreviewSheet(item: $0) }
             .task { await refresh() }.refreshable { await refresh() }
         }
     }
@@ -174,7 +199,7 @@ struct ZeusCloudFilesView: View {
         guard let session, busy == nil else { return }; busy = entry.id
         Task {
             defer { busy = nil }
-            do { preview = FileItem(url: try await ZeusCloudFiles.download(entry, session: session)) }
+            do { let url = try await ZeusCloudFiles.download(entry, session: session); previewURL = url; preview = FileItem(url: url) }
             catch { issue = error.localizedDescription }
         }
     }

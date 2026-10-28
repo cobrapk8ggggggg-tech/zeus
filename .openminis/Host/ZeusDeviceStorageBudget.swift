@@ -66,8 +66,12 @@ enum ZeusPristineRootfs {
             }
         }
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        // Preview copies are reproducible downloads, never project originals.
+        let oldPreviews = caches.appendingPathComponent("ZEUSCloudFiles")
+        _ = await Task.detached(priority: .utility) { try? FileManager.default.removeItem(at: oldPreviews) }.value
         let catalog = caches.appendingPathComponent("com.openminis.app.models-dev-cache")
         _ = await Task.detached(priority: .utility) { try? FileManager.default.removeItem(at: catalog) }.value
+        ZeusCloudFiles.discardAbandonedPreviews()
         NativeCloudAccountAPI.trimDeviceCaches()
         if SessionActivityTracker.shared.activeSessions.isEmpty { await ChatStore.shared.zeusTrimJournal() }
         await reclaimUnusedLocalEnvironment()

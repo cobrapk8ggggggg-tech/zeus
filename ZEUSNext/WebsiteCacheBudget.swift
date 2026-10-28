@@ -4,10 +4,13 @@ import WebKit
 /// Disk caches are expendable; cookies, local storage and IndexedDB are not.
 /// Enumerating existing stores avoids creating WebKit profiles during backup.
 @MainActor enum WebsiteCacheBudget {
+    private static let processPool = WKProcessPool()
     private static var cleanup: Task<Void, Never>?
     private static var lastCleanup = Date.distantPast
     static func existingIdentifiers() async -> Set<UUID> {
         guard hasLegacyStore else { return [] }
+        // Initialize WebKit on MainActor before its asynchronous store lookup.
+        _ = processPool
         return await withCheckedContinuation { continuation in
             WKWebsiteDataStore.fetchAllDataStoreIdentifiers { continuation.resume(returning: Set($0)) }
         }

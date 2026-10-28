@@ -124,6 +124,13 @@ actor CloudCheckpointGate {
     private static var preferencesURL: URL { BrowserDisk.applicationRoot.appendingPathComponent("cloud-execution.json") }
     private typealias Preference = CloudExecutionPreference
     public static var usesCloud: Bool {
+        #if DEBUG
+        // A storage-only fixture exercises the cloud write policy without
+        // granting an identity or permitting authenticated network requests.
+        if CommandLine.arguments.contains("--zeus-cloud-storage-fixture") {
+            NativeLocalExecutionBoundary.shared.setAllowed(false); return true
+        }
+        #endif
         guard let id = CloudAccount.shared.identity?.id, CloudAccount.shared.phase == .ready else {
             #if DEBUG
             if CommandLine.arguments.contains("--zeus-native-fixture"), !CommandLine.arguments.contains(where: { $0.hasPrefix("--zeus-cloud-") }) {

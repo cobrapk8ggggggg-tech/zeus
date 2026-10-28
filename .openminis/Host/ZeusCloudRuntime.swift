@@ -7,6 +7,10 @@ import ZEUSBrowser
 /// loop to Railway. A dropped observer never cancels the server's job.
 @MainActor final class ZeusCloudRuntime {
     static let shared = ZeusCloudRuntime()
+    private let transcriptRead: (String) async throws -> Data
+    init(transcriptRead: @escaping (String) async throws -> Data = { try await NativeCloudAccountAPI.runtime($0) }) {
+        self.transcriptRead = transcriptRead
+    }
     static let globalWorkspace = "00000000-0000-4000-8000-000000000001"
     private(set) var transitionID: String?
     private var transitionOwner: String?
@@ -333,14 +337,12 @@ import ZEUSBrowser
     }
     func trimTranscriptCache(keeping session: String) async throws {
         guard NativeCloudAccountAPI.usesCloud else { return }
-        var retained = 1, bytes = await ChatStore.shared.zeusCachedMessageBytes(session)
         let rows = try await allConversations().sorted { ($0["updated"] as? Double ?? 0) > ($1["updated"] as? Double ?? 0) }
         for row in rows {
             guard let raw = row["native_session"] as? [String: Any], let sid = raw["id"] as? String,
-                  sid.lowercased() != session.lowercased(), !observers.contains(sid) else { continue }
+                  (!observers.contains(sid) || sid.lowercased() == session.lowercased()) else { continue }
             let size = await ChatStore.shared.zeusCachedMessageBytes(sid)
             guard size > 0 else { continue }
-            if retained < 3 && bytes + size <= 16 * 1024 * 1024 { retained += 1; bytes += size; continue }
             var expected: [String: String] = [:], before = 4102444800.0
             while true {
                 let page = try json(await NativeCloudAccountAPI.runtime("v1/conversations/\(sid)/runs?before=\(before)"))
@@ -384,6 +386,7 @@ import ZEUSBrowser
         }
     }
     private func restoreTranscript(_ vm: AIChatViewModel, session: String) async throws {
+        guard !NativeCloudAccountAPI.usesCloud else { return }
         if try await restoreTranscript(session: session) { await vm.loadSession() }
     }
     func restoreAllTranscripts(progress: @escaping (String) -> Void) async throws {
@@ -401,11 +404,18 @@ import ZEUSBrowser
         }
         return sessions
     }
+    func cloudTranscript(session: String) async throws -> [RawMessage] {
+        try await readTranscript(session: session, persist: false).messages
+    }
     private func restoreTranscript(session: String) async throws -> Bool {
-        let existing = await ChatStore.shared.loadMessages(sessionId: session)
+        try await readTranscript(session: session, persist: true).changed
+    }
+    private func readTranscript(session: String, persist: Bool) async throws -> (changed: Bool, messages: [RawMessage]) {
+        let existing = persist ? await ChatStore.shared.loadMessages(sessionId: session) : []
+        var restored = existing
         var known = Set(existing.map(\.id)), runs: [[String: Any]] = [], before = 4102444800.0
         while true {
-            let page = try json(await NativeCloudAccountAPI.runtime("v1/conversations/\(session)/runs?before=\(before)"))
+            let page = try json(await transcriptRead("v1/conversations/\(session)/runs?before=\(before)"))
             let rows = page["runs"] as? [[String: Any]] ?? []; runs += rows
             guard rows.count == 25, let next = page["before"] as? Double, next < before else { break }; before = next
         }
@@ -414,13 +424,14 @@ import ZEUSBrowser
             guard let runID = run["id"] as? String else { continue }
             if let userID = run["native_user_id"] as? String, !known.contains(userID), let prompt = run["prompt"] as? String {
                 let raw = RawMessage(id: userID, sessionId: session, role: .user, parts: [.text(prompt)], createdAt: Date(timeIntervalSince1970: run["created"] as? Double ?? 0))
-                await ChatStore.shared.appendMessage(raw); known.insert(userID); changed = true
+                if persist { await ChatStore.shared.appendMessage(raw) }
+                restored.append(raw); known.insert(userID); changed = true
             }
             guard let assistantID = run["native_assistant_id"] as? String, !known.contains(assistantID),
                   ["completed", "failed", "interrupted", "cancelled"].contains(run["status"] as? String ?? "") else { continue }
             var cursor = 0, parts: [AgentContentPart] = [], text = ""
             while cursor < (run["seq"] as? Int ?? 0) {
-                let page = try json(await NativeCloudAccountAPI.runtime("v1/runs/\(runID)/events?after=\(cursor)"))
+                let page = try json(await transcriptRead("v1/runs/\(runID)/events?after=\(cursor)"))
                 let events = page["events"] as? [[String: Any]] ?? []
                 guard !events.isEmpty else { throw failure("سجل المهمة غير مكتمل بعد؛ لم تُحفظ نسخة ناقصة.") }
                 for event in events {
@@ -450,14 +461,15 @@ import ZEUSBrowser
             }
             let raw = RawMessage(id: assistantID, sessionId: session, role: .assistant, parts: content,
                 createdAt: Date(timeIntervalSince1970: (run["created"] as? Double ?? 0) + 0.001), errorInfo: run["error"] as? String)
-            await ChatStore.shared.appendMessage(raw); known.insert(assistantID); changed = true
+            if persist { await ChatStore.shared.appendMessage(raw) }
+            restored.append(raw); known.insert(assistantID); changed = true
         }
-        if let latest = runs.first, let id = latest["id"] as? String, let assistantID = latest["native_assistant_id"] as? String,
+        if persist, let latest = runs.first, let id = latest["id"] as? String, let assistantID = latest["native_assistant_id"] as? String,
            known.contains(assistantID), let owner = NativeCloudAccountAPI.ownerID {
             let state = State(owner: owner, conversation: session, run: id, complete: true, assistantID: assistantID)
             try JSONEncoder().encode(state).write(to: stateURL(session), options: .atomic)
         }
-        return changed
+        return (changed, restored)
     }
     @discardableResult func importArchive(_ archive: NativeCloudArchive, fileKey: Data, progress: @escaping (String) -> Void) async throws -> Set<String> {
         guard !archive.files.contains(where: { $0.scope == "agent_sessions" && ($0.path.contains("/workspace/__zeus_inputs__/") || $0.path.hasSuffix("/workspace/__zeus_inputs__")) }) else {
@@ -510,6 +522,14 @@ import ZEUSBrowser
             files.append(["path": "__zeus_inputs__/attachments/" + item.relativePath, "bytes": item.bytes, "sha256": sha, "parts": parts])
         }
         _ = try await request("v1/conversations/\(sid)/import", ["files": files, "file_key": bytes.base64EncodedString(), "file_grant": grant], method: "PUT")
+        let remote = try await ZeusCloudFiles.list(session: sid)
+        for item in snapshot.entries {
+            guard let confirmed = remote.first(where: { $0.path == "__zeus_inputs__/attachments/" + item.relativePath }),
+                  confirmed.bytes == item.bytes else { continue }
+            // Delete only our unchanged staged copy after the server confirms
+            // the same content. The Files-provider original is never touched.
+            _ = try? ZeusCloudFiles.discardVerifiedUpload(item.url, within: root, bytes: confirmed.bytes, digest: confirmed.digest)
+        }
     }
     func restoreWorkspaces(progress: @escaping (String) -> Void) async throws {
         for record in try await allConversations() {
