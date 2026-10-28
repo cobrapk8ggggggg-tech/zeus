@@ -130,6 +130,14 @@ jobs:
         import json, os, subprocess
         devices = json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','-j']))['devices']
         types = json.loads(subprocess.check_output(['xcrun','simctl','list','devicetypes','-j']))['devicetypes']
+        sdk_version = subprocess.check_output(['xcrun', '--sdk', 'iphonesimulator', '--show-sdk-version'], text=True).strip()
+        sdk_pair = '.'.join(sdk_version.split('.')[:2])
+        runtime_suffix = 'iOS-' + sdk_pair.replace('.', '-')
+        devices = {runtime: group for runtime, group in devices.items() if runtime.endswith(runtime_suffix)}
+        if not devices:
+            raise SystemExit('No installed simulator matching selected Xcode SDK ' + sdk_pair)
+        print('Testing selected Xcode SDK/runtime:', sdk_pair)
+
         with open(os.environ['GITHUB_ENV'], 'a') as output:
             for kind in ['iPhone', 'iPad']:
                 runtime, match = next((runtime, device) for runtime, group in devices.items() for device in group if kind in device['name'])
