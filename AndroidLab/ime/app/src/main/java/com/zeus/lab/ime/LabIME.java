@@ -8,10 +8,19 @@ import android.content.IntentFilter;
 import android.os.Build;
 import android.util.Base64;
 import android.view.inputmethod.InputConnection;
+import android.view.View;
+import android.widget.TextView;
+import android.graphics.Color;
 import java.nio.charset.StandardCharsets;
 
 /** Only installed on the disposable cloud Android device. No networking/storage. */
 public final class LabIME extends InputMethodService {
+    @Override public View onCreateInputView() {
+        TextView view=new TextView(this);
+        view.setText("ZEUS · اكتب من شريط المختبر");view.setTextColor(Color.WHITE);view.setBackgroundColor(0xff171b20);
+        view.setPadding(20,16,20,16);return view;
+    }
+    @Override public boolean onEvaluateFullscreenMode() { return false; }
     private final BroadcastReceiver receiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
             if ("com.zeus.lab.READY".equals(intent.getAction())) {

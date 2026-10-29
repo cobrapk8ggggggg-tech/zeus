@@ -46,11 +46,13 @@ async def main():
                     if result['status']!='running':assert result['status']=='completed',result;return result
                     await asyncio.sleep(2)
                 raise AssertionError('APK job did not finish')
-            await call('android_device',{'operation':'start'})
             for _ in range(100):
                 if (ca_directory/'mitmproxy-ca-cert.pem').is_file(): break
                 await asyncio.sleep(.1)
             await install_interception_ca(device,ca_directory/'mitmproxy-ca-cert.pem',proof/'android-ca-setup.log')
+            # Base-image provisioning precedes session startup; the actual
+            # startup then installs/selects the keyboard after the reboot.
+            await call('android_device',{'operation':'start'})
             await call('android_ui',{'operation':'launch','package':'com.android.settings'})
             tree=await call('android_ui',{'operation':'tree'});assert tree['nodes']
             screenshot=await call('android_screenshot',{});data=base64.b64decode(screenshot['image']['data']);assert data[:2]==b'\xff\xd8'
@@ -74,6 +76,11 @@ async def main():
                 left,top,right,bottom=map(int,re.findall(r'\d+',node['bounds']))
                 return {'x':(left+right)/2/width,'y':(top+bottom)/2/height}
             await call('android_ui',{'operation':'tap',**point('probeInput')})
+            (proof/'before-type-ui.json').write_text(json.dumps(await call('android_ui',{'operation':'tree'}),ensure_ascii=False))
+            (proof/'before-type.jpg').write_bytes(await device.screenshot())
+            (proof/'before-type-ime.txt').write_bytes(await device.command('shell','dumpsys','input_method'))
+            (proof/'before-type-ime-ready.txt').write_bytes(await device.command('shell','am','broadcast','-a','com.zeus.lab.READY','-p','com.zeus.lab.ime'))
+            (proof/'before-type-ime-ready-unscoped.txt').write_bytes(await device.command('shell','am','broadcast','-a','com.zeus.lab.READY'))
             await call('android_ui',{'operation':'type','text':'مرحبا ZEUS probe'})
             # Keyboard appearance can move the button; reread actual bounds.
             tree=await call('android_ui',{'operation':'tree'})

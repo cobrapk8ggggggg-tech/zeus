@@ -56,6 +56,7 @@ class Device:
             await self.command("install", "-r", keyboard, timeout=60)
             await self.command("shell", "ime", "enable", "com.zeus.lab.ime/.LabIME")
             await self.command("shell", "ime", "set", "com.zeus.lab.ime/.LabIME")
+            await self.command("shell", "settings", "put", "secure", "show_ime_with_hard_keyboard", "1")
 
     async def size(self):
         text = (await self.command("shell", "wm", "size")).decode()
@@ -70,7 +71,7 @@ class Device:
             tree = ET.fromstring(raw)
             nodes = []
             for node in tree.iter("node"):
-                value = {k: v for k, v in node.attrib.items() if k in {"text", "resource-id", "class", "content-desc", "bounds", "clickable", "enabled", "password"}}
+                value = {k: v for k, v in node.attrib.items() if k in {"text", "resource-id", "class", "content-desc", "bounds", "clickable", "enabled", "password", "focused", "focusable"}}
                 if value.get("password") == "true": value["text"] = "[password]"
                 nodes.append(value)
                 if len(nodes) >= 500: break
