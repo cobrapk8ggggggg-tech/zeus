@@ -50,7 +50,7 @@ async def main():
             for _ in range(100):
                 if (ca_directory/'mitmproxy-ca-cert.pem').is_file(): break
                 await asyncio.sleep(.1)
-            await install_interception_ca(device,ca_directory/'mitmproxy-ca-cert.pem')
+            await install_interception_ca(device,ca_directory/'mitmproxy-ca-cert.pem',proof/'android-ca-setup.log')
             await call('android_ui',{'operation':'launch','package':'com.android.settings'})
             tree=await call('android_ui',{'operation':'tree'});assert tree['nodes']
             screenshot=await call('android_screenshot',{});data=base64.b64decode(screenshot['image']['data']);assert data[:2]==b'\xff\xd8'

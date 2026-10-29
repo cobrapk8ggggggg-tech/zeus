@@ -1,5 +1,6 @@
 """Controlled HTTPS origin and system-CA provisioning for a disposable AVD only."""
 import datetime
+import asyncio
 import ipaddress
 import json
 from pathlib import Path
@@ -35,13 +36,30 @@ def start_origin(directory):
     return server,public
 
 
-async def install_interception_ca(device,certificate):
+async def install_interception_ca(device,certificate,log_path=None):
     # This helper is never copied into the production Android image. API29
     # userdebug+writable-system is chosen explicitly for this acceptance test.
     digest=subprocess.check_output(['openssl','x509','-in',str(certificate),'-subject_hash_old','-noout'],text=True).strip()
     assert len(digest)==8 and all(c in '0123456789abcdef' for c in digest)
-    await device.command('root');await device.command('wait-for-device',timeout=30)
-    await device.command('remount',timeout=30)
-    destination='/system/etc/security/cacerts/'+digest+'.0'
-    await device.command('push',str(certificate),destination,timeout=30)
-    await device.command('shell','chmod','644',destination)
+    log=[]
+    async def step(*args,**kwargs):
+        output=await device.command(*args,**kwargs);log.append(' '.join(args)+'\n'+output.decode(errors='replace'));return output
+    try:
+        await step('root');await step('wait-for-device',timeout=30)
+        try:await step('shell','avbctl','disable-verification')
+        except ValueError as error:
+            if 'not found' not in str(error):raise
+        await step('disable-verity')
+        await step('reboot');await step('wait-for-device',timeout=60)
+        for attempt in range(90):
+            try:
+                if (await device.command('shell','getprop','sys.boot_completed',timeout=3)).strip()==b'1':break
+            except (ValueError,asyncio.TimeoutError):pass
+            if attempt==89:raise AssertionError('Disposable AVD did not reboot for CA provisioning')
+            await asyncio.sleep(1)
+        await step('root');await step('wait-for-device',timeout=30);await step('remount',timeout=30)
+        destination='/system/etc/security/cacerts/'+digest+'.0'
+        await step('push',str(certificate),destination,timeout=30);await step('shell','chmod','644',destination)
+        await step('shell','input','keyevent','224')
+    finally:
+        if log_path:Path(log_path).write_text('\n'.join(log))
