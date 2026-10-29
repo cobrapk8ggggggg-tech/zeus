@@ -19,6 +19,7 @@ from .state import State
 from .projects import Projects
 from .video import Video
 from .lifecycle import Lifecycle
+from .ice import servers as ice_servers
 
 
 class Call(BaseModel):
@@ -64,6 +65,10 @@ def create_app(root=None, key=None, owner=None, device=None, clock=time.time):
 
     @asynccontextmanager
     async def lifespan(app):
+        interrupted=state.load()
+        if interrupted and interrupted["status"]=="interrupted":
+            try: await stop(interrupted,"worker_restart")
+            except ValueError: pass  # stop_failed is retried by the independent sweep.
         worker = asyncio.create_task(sweep())
         try: yield
         finally:
@@ -213,7 +218,11 @@ def create_app(root=None, key=None, owner=None, device=None, clock=time.time):
     async def offer(request: Request, value=Depends(claims)):
         state.owned(value)
         body = await request.json()
-        return await video.offer(body.get("sdp", ""), body.get("type", ""))
+        return await video.offer(body.get("sdp", ""), body.get("type", ""), state.scope(value))
+
+    @app.get("/v1/ice")
+    async def ice(value=Depends(claims)):
+        return {"iceServers":ice_servers(state.scope(value))}
 
     @app.post("/v1/heartbeat")
     async def heartbeat(value=Depends(claims)):

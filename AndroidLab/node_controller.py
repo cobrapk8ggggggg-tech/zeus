@@ -7,10 +7,29 @@ import json
 import os
 import subprocess
 import threading
+import datetime
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
 gate=threading.Lock()
+
+def enforce_deadline():
+    # The worker is not responsible for its own crash recovery. This fixed
+    # host watchdog also caps Android container uptime when the API is down.
+    with gate:
+        result=subprocess.run(["docker","inspect","--format","{{json .State}}","zeus-lab-android"],capture_output=True,timeout=5)
+        if result.returncode: return
+        value=json.loads(result.stdout)
+        if not value.get("Running"): return
+        started=datetime.datetime.fromisoformat(value["StartedAt"].replace("Z","+00:00")).timestamp()
+        if time.time()-started>=1800: subprocess.run(["docker","stop","--time","5","zeus-lab-android"],capture_output=True,timeout=15)
+
+def watchdog():
+    while True:
+        try: enforce_deadline()
+        except (OSError,ValueError,KeyError,subprocess.TimeoutExpired): pass
+        time.sleep(15)
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args): pass
@@ -33,4 +52,5 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__=="__main__":
+    threading.Thread(target=watchdog,daemon=True).start()
     ThreadingHTTPServer((os.environ.get("ZEUS_ANDROID_NODE_BIND","172.31.80.1"),9090),Handler).serve_forever()

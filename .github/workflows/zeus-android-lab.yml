@@ -89,7 +89,7 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -writable-system
           script: python AndroidLab/tests/real_device.py
       - uses: actions/upload-artifact@v4
         if: always()

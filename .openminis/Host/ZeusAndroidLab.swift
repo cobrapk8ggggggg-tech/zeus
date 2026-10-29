@@ -140,6 +140,7 @@ private struct ZeusAndroidWebView: UIViewRepresentable {
         }
     }
     static func dismantleUIView(_ view:WKWebView,coordinator:Coordinator) {
+        view.navigationDelegate=nil
         view.stopLoading(); view.loadHTMLString("",baseURL:nil)
         view.configuration.userContentController.removeScriptMessageHandler(forName:"labRenew")
         view.configuration.userContentController.removeScriptMessageHandler(forName:"labFullscreen")

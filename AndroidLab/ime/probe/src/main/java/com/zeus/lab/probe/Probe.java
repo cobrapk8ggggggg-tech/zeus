@@ -15,7 +15,7 @@ public final class Probe extends Activity {
         TextView result=new TextView(this);result.setContentDescription("probeResult");column.addView(result);
         send.setOnClickListener(v->{String text=input.getText().toString();new Thread(()->{
             try {
-                HttpURLConnection connection=(HttpURLConnection)new URL("http://zeus-probe.invalid:8090/probe").openConnection();
+                HttpURLConnection connection=(HttpURLConnection)new URL("https://zeus-probe.invalid:8091/probe").openConnection();
                 connection.setRequestMethod("POST");connection.setDoOutput(true);connection.setConnectTimeout(5000);connection.setReadTimeout(5000);
                 connection.setRequestProperty("Content-Type","text/plain; charset=utf-8");connection.getOutputStream().write(text.getBytes(StandardCharsets.UTF_8));
                 int code=connection.getResponseCode();connection.disconnect();runOnUiThread(()->result.setText("HTTP "+code));

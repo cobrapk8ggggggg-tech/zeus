@@ -14,6 +14,9 @@ import java.nio.charset.StandardCharsets;
 public final class LabIME extends InputMethodService {
     private final BroadcastReceiver receiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
+            if ("com.zeus.lab.READY".equals(intent.getAction())) {
+                setResultCode(getCurrentInputConnection() == null ? 0 : 1); return;
+            }
             if (!"com.zeus.lab.INPUT".equals(intent.getAction())) return;
             String encoded = intent.getStringExtra("payload");
             InputConnection connection = getCurrentInputConnection();
@@ -27,6 +30,7 @@ public final class LabIME extends InputMethodService {
     @Override public void onCreate() {
         super.onCreate();
         IntentFilter filter = new IntentFilter("com.zeus.lab.INPUT");
+        filter.addAction("com.zeus.lab.READY");
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED);
         else registerReceiver(receiver, filter);
     }

@@ -127,6 +127,19 @@ class LabTests(unittest.IsolatedAsyncioTestCase):
 
 
 class DeviceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_waits_for_ime_readiness_before_a_single_text_mutation(self):
+        device=Device('emulator-5554');calls=[];ready=0
+        async def command(*args,**kw):
+            nonlocal ready
+            calls.append(args)
+            if 'com.zeus.lab.READY' in args:
+                ready+=1;return b'Broadcast completed: result='+ (b'1' if ready>=3 else b'0')
+            return b'Broadcast completed: result=1'
+        device.command=command
+        await device.action('type',{'text':'one message'})
+        self.assertEqual(ready,3)
+        self.assertEqual(sum('com.zeus.lab.INPUT' in c for c in calls),1)
+
     async def test_arbitrary_package_and_non_normalized_coordinates_never_reach_adb(self):
         device=Device('emulator-5554')
         for args in [{'package':'good.app; id'}, {'package':'$(id)'}, {'package':'../app'}]:
@@ -138,7 +151,8 @@ class DeviceTests(unittest.IsolatedAsyncioTestCase):
         device.command=command
         text='مرحبا $(id); "hello"'
         await device.action('type',{'text':text})
-        self.assertNotIn(text,calls[0]);self.assertEqual(base64.b64decode(calls[0][-1]).decode(),text)
+        mutation=next(c for c in calls if 'payload' in c)
+        self.assertNotIn(text,mutation);self.assertEqual(base64.b64decode(mutation[-1]).decode(),text)
 
 
 if __name__=='__main__':unittest.main()

@@ -14,6 +14,15 @@ node=importlib.util.module_from_spec(spec);spec.loader.exec_module(node)
 
 
 class NodeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_host_stops_an_overdue_device_without_a_working_worker(self):
+        commands=[]
+        def run(command,**kwargs):
+            commands.append(command)
+            return SimpleNamespace(returncode=0,stdout=b'{"Running":true,"StartedAt":"2026-01-01T00:00:00Z"}')
+        with patch.object(node.subprocess,'run',side_effect=run),patch.object(node.time,'time',return_value=1767227500):
+            node.enforce_deadline()
+        self.assertEqual(commands[-1],['docker','stop','--time','5','zeus-lab-android'])
+
     async def test_only_fixed_container_operations_are_authenticated_and_reset_can_retry(self):
         commands=[]
         def run(command,**kwargs):

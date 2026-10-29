@@ -6,13 +6,9 @@ import os
 import hashlib
 import re
 import secrets
-import socket
 import subprocess
-import threading
-from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from pathlib import Path
 import tempfile
-import unittest
 import uuid
 import httpx
 import uvicorn
@@ -20,6 +16,7 @@ from aiortc import RTCPeerConnection,RTCConfiguration,RTCSessionDescription
 from zeus_android.device import Device
 from zeus_android.app import create_app
 from zeus_android.tokens import encode
+from tls_origin import start_origin,install_interception_ca
 
 
 async def main():
@@ -31,15 +28,11 @@ async def main():
         proof=Path(os.environ.get('LAB_PROOF_DIR','android-results'));proof.mkdir(exist_ok=True)
         server=uvicorn.Server(uvicorn.Config(app,lifespan='off',host='127.0.0.1',port=8088,log_level='warning',access_log=False))
         serving=asyncio.create_task(server.serve())
-        class Origin(BaseHTTPRequestHandler):
-            def log_message(self,*args):pass
-            def do_POST(self):
-                data=self.rfile.read(min(8000,int(self.headers.get('Content-Length','0'))))
-                self.send_response(200);self.send_header('Content-Type','application/json');self.end_headers();self.wfile.write(json.dumps({'received':data.decode()}).encode())
-        origin=ThreadingHTTPServer(('127.0.0.1',8090),Origin);threading.Thread(target=origin.serve_forever,daemon=True).start()
+        origin,origin_ca=start_origin(directory)
         capture_token=secrets.token_urlsafe(40);os.environ['ZEUS_ANDROID_CAPTURE_TOKEN']=capture_token
         capture_log=(proof/'capture.log').open('w')
-        capture=subprocess.Popen([os.environ['LAB_CAPTURE_EXE'],'--listen-host','0.0.0.0','--listen-port','8089','-q','-s','AndroidLab/tests/route_probe.py','-s','AndroidLab/zeus_android/capture.py'],
+        ca_directory=Path(directory)/'capture-ca'
+        capture=subprocess.Popen([os.environ['LAB_CAPTURE_EXE'],'--listen-host','0.0.0.0','--listen-port','8089','-q','--set','confdir='+str(ca_directory),'--set','ssl_verify_upstream_trusted_ca='+str(origin_ca),'-s','AndroidLab/tests/route_probe.py','-s','AndroidLab/zeus_android/capture.py'],
             env={**os.environ,'ZEUS_ANDROID_CAPTURE_ENDPOINT':'http://127.0.0.1:8088/internal/capture'},stdout=capture_log,stderr=capture_log)
         async with app.router.lifespan_context(app),httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='https://lab.test',headers={'Authorization':'Bearer '+encode(key,owner,conversation)}) as client:
             async def call(name,args):
@@ -54,6 +47,10 @@ async def main():
                     await asyncio.sleep(2)
                 raise AssertionError('APK job did not finish')
             await call('android_device',{'operation':'start'})
+            for _ in range(100):
+                if (ca_directory/'mitmproxy-ca-cert.pem').is_file(): break
+                await asyncio.sleep(.1)
+            await install_interception_ca(device,ca_directory/'mitmproxy-ca-cert.pem')
             await call('android_ui',{'operation':'launch','package':'com.android.settings'})
             tree=await call('android_ui',{'operation':'tree'});assert tree['nodes']
             screenshot=await call('android_screenshot',{});data=base64.b64decode(screenshot['image']['data']);assert data[:2]==b'\xff\xd8'
@@ -90,6 +87,7 @@ async def main():
             assert found is not None,'Actual Android request did not reach capture addon'
             assert base64.b64decode(found['request_body']['base64']).decode()=='مرحبا ZEUS probe',found
             assert found['status']==200,found
+            assert found['url'].startswith('https://'),found
             (proof/'actual-android-captured-request.json').write_text(json.dumps(found,ensure_ascii=False,indent=2))
             peer=RTCPeerConnection(RTCConfiguration(iceServers=[]));frame_ready=asyncio.Future()
             @peer.on('track')
@@ -129,7 +127,7 @@ async def main():
             await call('android_network',{'operation':'stop'})
             await call('android_device',{'operation':'stop'})
             server.should_exit=True;await serving;origin.shutdown();origin.server_close();capture.terminate();capture.wait(timeout=5);capture_log.close()
-            print('PASS: actual Android launch/UI/screenshot/Unicode input, controlled HTTP capture, H264-WebRTC frame, JADX analysis, APK decode/edit/build/re-sign/install; original digest preserved. HTTPS interception and cellular WebRTC are not inferred.')
+            print('PASS: actual Android launch/UI/screenshot/Unicode input, controlled HTTPS capture with trusted CA, H264-WebRTC frame, JADX analysis, APK decode/edit/build/re-sign/install; original digest preserved. Third-party pinning and cellular WebRTC are not inferred.')
 
 
 if __name__=='__main__':asyncio.run(main())

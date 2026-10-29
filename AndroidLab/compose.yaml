@@ -28,8 +28,7 @@ services:
       ZEUS_ANDROID_NODE_TOKEN: ${ZEUS_ANDROID_NODE_TOKEN:?set a separate container controller key}
       ZEUS_ANDROID_STUN_URL: ${ZEUS_ANDROID_STUN_URL:-}
       ZEUS_ANDROID_TURN_URL: ${ZEUS_ANDROID_TURN_URL:-}
-      ZEUS_ANDROID_TURN_USER: ${ZEUS_ANDROID_TURN_USER:-}
-      ZEUS_ANDROID_TURN_PASSWORD: ${ZEUS_ANDROID_TURN_PASSWORD:-}
+      ZEUS_ANDROID_TURN_SECRET: ${ZEUS_ANDROID_TURN_SECRET:-}
     volumes: ["lab-data:/data"]
     networks: [lab]
     # An authenticated TURN relay is required when ICE cannot reach this node.

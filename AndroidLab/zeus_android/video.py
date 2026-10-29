@@ -2,12 +2,13 @@
 import asyncio
 import fractions
 import time
+from .ice import servers
 
 
 class Video:
     def __init__(self, device): self.device, self.peers, self.processes = device, set(), set()
 
-    async def offer(self, sdp, kind):
+    async def offer(self, sdp, kind, identity="android"):
         from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack, RTCConfiguration, RTCIceServer, RTCRtpSender
         import av
         import os
@@ -41,10 +42,7 @@ class Video:
             def stop(self):
                 super().stop()
                 if asyncio.current_task() is not self.task: self.task.cancel()
-        ice = []
-        if os.environ.get("ZEUS_ANDROID_STUN_URL"): ice.append(RTCIceServer(urls=os.environ["ZEUS_ANDROID_STUN_URL"]))
-        if os.environ.get("ZEUS_ANDROID_TURN_URL"):
-            ice.append(RTCIceServer(urls=os.environ["ZEUS_ANDROID_TURN_URL"], username=os.environ.get("ZEUS_ANDROID_TURN_USER"), credential=os.environ.get("ZEUS_ANDROID_TURN_PASSWORD")))
+        ice = [RTCIceServer(**entry) for entry in servers(identity)]
         peer = RTCPeerConnection(RTCConfiguration(iceServers=ice)); self.peers.add(peer); track = Screen()
         @peer.on("connectionstatechange")
         async def changed():

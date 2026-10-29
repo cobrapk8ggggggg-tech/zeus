@@ -90,9 +90,14 @@ class Device:
             import base64
             value = args.get("text", "")
             if not isinstance(value, str) or not 0 < len(value) <= 4000: raise ValueError("Text is empty or too long")
+            for attempt in range(25):
+                ready=await self.command("shell","am","broadcast","-a","com.zeus.lab.READY","-p","com.zeus.lab.ime")
+                if b"result=1" in ready: break
+                if attempt==24: raise ValueError("اضغط حقل الكتابة وانتظر اتصال لوحة ZEUS بالمختبر قبل إرسال النص.")
+                await asyncio.sleep(.15)
             encoded = base64.b64encode(value.encode()).decode()
-            result = await self.command("shell", "am", "broadcast", "-a", "com.zeus.lab.INPUT", "--es", "payload", encoded)
-            if b"result=1" not in result: raise ValueError("Install and select the ZEUS laboratory keyboard before entering text")
+            result = await self.command("shell", "am", "broadcast", "-a", "com.zeus.lab.INPUT", "-p", "com.zeus.lab.ime", "--es", "payload", encoded)
+            if b"result=1" not in result: raise ValueError("تعذر تأكيد إدخال النص؛ افحص الحقل قبل إعادة الإرسال.")
         elif operation == "key":
             codes = {"back": "4", "home": "3", "recent": "187", "enter": "66", "delete": "67"}
             if args.get("key") not in codes: raise ValueError("Unsupported Android key")
