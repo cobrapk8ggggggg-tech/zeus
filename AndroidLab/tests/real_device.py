@@ -16,6 +16,7 @@ import unittest
 import uuid
 import httpx
 import uvicorn
+from aiortc import RTCPeerConnection,RTCConfiguration,RTCSessionDescription
 from zeus_android.device import Device
 from zeus_android.app import create_app
 from zeus_android.tokens import encode
@@ -90,20 +91,45 @@ async def main():
             assert base64.b64decode(found['request_body']['base64']).decode()=='مرحبا ZEUS probe',found
             assert found['status']==200,found
             (proof/'actual-android-captured-request.json').write_text(json.dumps(found,ensure_ascii=False,indent=2))
+            peer=RTCPeerConnection(RTCConfiguration(iceServers=[]));frame_ready=asyncio.Future()
+            @peer.on('track')
+            def on_track(track):
+                async def receive():
+                    try:
+                        frame=await track.recv()
+                        if not frame_ready.done():frame_ready.set_result(frame)
+                    except Exception as e:
+                        if not frame_ready.done():frame_ready.set_exception(e)
+                asyncio.create_task(receive())
+            try:
+                peer.addTransceiver('video',direction='recvonly');await peer.setLocalDescription(await peer.createOffer())
+                offered=await client.post('/v1/video',json={'sdp':peer.localDescription.sdp,'type':peer.localDescription.type})
+                assert offered.status_code==200,offered.text
+                await peer.setRemoteDescription(RTCSessionDescription(**offered.json()))
+                frame=await asyncio.wait_for(frame_ready,25);assert frame.width>0 and frame.height>0
+                frame.to_image().save(proof/'actual-android-video-frame.jpg')
+            finally:await peer.close()
+            await job(project,'analyze')
+            sources=await call('android_project',{'operation':'files','project':project,'tree':'sources'})
+            assert any(p.endswith('/Probe.java') for p in sources['files']),sources
             await job(project,'decode')
             manifest=await call('android_project',{'operation':'read','project':project,'path':'AndroidManifest.xml'})
+            assert 'ZEUS CI Probe' in manifest['content'],manifest['content']
             await call('android_project',{'operation':'write','project':project,'path':'AndroidManifest.xml','content':manifest['content'].replace('ZEUS CI Probe','ZEUS CI Edited'),'expected_sha256':manifest['sha256']})
             keyfile=Path(directory)/'lab.keystore'
             subprocess.run(['keytool','-genkeypair','-alias','zeus-lab','-keyalg','RSA','-keystore',str(keyfile),'-storepass','android','-keypass','android','-dname','CN=ZEUS CI','-validity','3'],check=True,capture_output=True)
             os.environ['ZEUS_ANDROID_KEYSTORE']=str(keyfile)
             built=await job(project,'build');(proof/'actual-apk-build.json').write_text(json.dumps(built,indent=2))
+            scope=app.state.lab.load()['scope'];project_root=Path(directory)/'projects'/scope/project
+            assert hashlib.sha256((project_root/'original.apk').read_bytes()).hexdigest()==uploaded.json()['sha256']
+            assert hashlib.sha256((project_root/'rebuilt.apk').read_bytes()).hexdigest()!=uploaded.json()['sha256']
             await device.command('uninstall','com.zeus.lab.probe')  # Only the controlled CI fixture.
             await call('android_project',{'operation':'install','project':project,'variant':'rebuilt'})
             await call('android_ui',{'operation':'launch','package':'com.zeus.lab.probe'})
             await call('android_network',{'operation':'stop'})
             await call('android_device',{'operation':'stop'})
             server.should_exit=True;await serving;origin.shutdown();origin.server_close();capture.terminate();capture.wait(timeout=5);capture_log.close()
-            print('PASS: actual Android launch/UI/screenshot/Unicode input, controlled HTTP capture, APK decode/edit/build/re-sign/install. HTTPS interception and cellular WebRTC are not inferred.')
+            print('PASS: actual Android launch/UI/screenshot/Unicode input, controlled HTTP capture, H264-WebRTC frame, JADX analysis, APK decode/edit/build/re-sign/install; original digest preserved. HTTPS interception and cellular WebRTC are not inferred.')
 
 
 if __name__=='__main__':asyncio.run(main())

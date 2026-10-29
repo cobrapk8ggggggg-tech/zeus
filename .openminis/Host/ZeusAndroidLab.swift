@@ -119,6 +119,7 @@ private struct ZeusAndroidWebView: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(renew:renew) }
     func makeUIView(context:Context) -> WKWebView {
         let configuration = WKWebViewConfiguration(); configuration.websiteDataStore = .nonPersistent(); configuration.allowsInlineMediaPlayback=true
+        configuration.mediaTypesRequiringUserActionForPlayback = []
         configuration.userContentController.add(context.coordinator,name:"labRenew")
         configuration.userContentController.add(context.coordinator,name:"labFullscreen")
         let view = WKWebView(frame:.zero,configuration:configuration)

@@ -16,7 +16,8 @@ class Capture:
             return {k:("[redacted]" if k.lower() in {"authorization", "proxy-authorization", "cookie", "set-cookie", "x-api-key"} else v[:2000]) for k,v in value.items()}
         def body(value):
             raw = value.raw_content or b""
-            return {"base64":base64.b64encode(raw[:32768]).decode(), "bytes":len(raw), "truncated":len(raw)>32768}
+            available=value.raw_content is not None
+            return {"base64":base64.b64encode(raw[:32768]).decode(), "bytes":len(raw) if available else None, "truncated":not available or len(raw)>32768, "available":available}
         event = {"started":flow.request.timestamp_start, "finished":time.time(), "method":flow.request.method,
             "url":flow.request.pretty_url[:4000], "status":flow.response.status_code,
             "request_headers":headers(flow.request.headers), "response_headers":headers(flow.response.headers),

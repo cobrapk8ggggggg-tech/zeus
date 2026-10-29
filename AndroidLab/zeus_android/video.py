@@ -8,13 +8,13 @@ class Video:
     def __init__(self, device): self.device, self.peers, self.processes = device, set(), set()
 
     async def offer(self, sdp, kind):
-        from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack, RTCConfiguration, RTCIceServer
+        from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack, RTCConfiguration, RTCIceServer, RTCRtpSender
         import av
         import os
         if kind != "offer" or len(sdp) > 100000 or len(self.peers) >= 2: raise ValueError("Video session limit reached")
         server = self
         class Screen(VideoStreamTrack):
-            def __init__(self): super().__init__(); self.queue = asyncio.Queue(maxsize=1); self.task = asyncio.create_task(self.read()); self.origin = time.monotonic()
+            def __init__(self): super().__init__(); self.queue = asyncio.Queue(maxsize=1); self.task = asyncio.create_task(self.read()); self.origin = time.monotonic(); self.last_frame = 0
             async def read(self):
                 try:
                     while self.readyState == "live":
@@ -34,7 +34,9 @@ class Video:
                 except asyncio.CancelledError: pass
                 except Exception: self.stop()
             async def recv(self):
-                try: return await asyncio.wait_for(self.queue.get(), 15)
+                try:
+                    await asyncio.sleep(max(0,1/15-(time.monotonic()-self.last_frame)))
+                    frame=await asyncio.wait_for(self.queue.get(),15);self.last_frame=time.monotonic();return frame
                 except asyncio.TimeoutError: self.stop(); raise
             def stop(self):
                 super().stop()
@@ -49,6 +51,10 @@ class Video:
             if peer.connectionState in {"failed", "closed", "disconnected"}: track.stop(); await peer.close(); self.peers.discard(peer)
         try:
             await peer.setRemoteDescription(RTCSessionDescription(sdp=sdp, type=kind)); peer.addTrack(track)
+            codecs=RTCRtpSender.getCapabilities("video").codecs
+            preferred=[c for c in codecs if c.mimeType.lower()=="video/h264"]
+            for transceiver in peer.getTransceivers():
+                if transceiver.kind=="video": transceiver.setCodecPreferences(preferred+[c for c in codecs if c not in preferred])
             answer = await peer.createAnswer(); await peer.setLocalDescription(answer)
             return {"sdp": peer.localDescription.sdp, "type": peer.localDescription.type}
         except BaseException:
