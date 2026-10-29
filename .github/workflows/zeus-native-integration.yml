@@ -10,6 +10,7 @@ name: ZEUS native browser integration tests
     - feature/zeus-project-contract-20261024
     - feature/zeus-ipad-layout-studio-20261025
     - feature/zeus-cloud-account-20261026
+    - feature/zeus-android-lab-20261030
     paths:
     - ZEUSNext/**
     - .openminis/**

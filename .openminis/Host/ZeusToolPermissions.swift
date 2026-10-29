@@ -79,6 +79,9 @@ enum ZeusPermissionMode: String, CaseIterable {
     }
 
     static func isConsequential(tool: String, args: [String: Any]) -> Bool {
+        if ZeusAndroidTools.names.contains(tool) {
+            return tool != "android_screenshot" && !["status", "tree", "list", "read", "job", "files"].contains(args["operation"] as? String ?? "")
+        }
         switch tool {
         case "update_plan", "task_checkpoint", "task_complete", "task_verify_mcp", "task_verify_github", "integration_accounts", "integration_tools", "project_environment", "propose_project_plan", "github_read_file", "github_project_inspect": return false
         case "github_request": return !["GET", "HEAD"].contains(args["method"] as? String ?? "GET")

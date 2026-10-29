@@ -4,6 +4,14 @@ import CryptoKit
 @testable import Minis
 
 @MainActor final class NativeProjectContractTests: XCTestCase {
+    func testAndroidSchemasKeepCoordinatesTypedAndRejectLocalExecutionArguments() throws {
+        let schema = try XCTUnwrap(ZeusAndroidTools.schema("android_ui"))
+        XCTAssertNoThrow(try ZeusAgentSchemas.validate(["operation":"tap", "x":0.3, "y":0.4], schema:schema))
+        XCTAssertThrowsError(try ZeusAgentSchemas.validate(["operation":"tap", "x":2, "y":0.4], schema:schema))
+        XCTAssertThrowsError(try ZeusAgentSchemas.validate(["operation":"tap", "x":0.3, "y":0.4, "command":"uname"], schema:schema))
+        XCTAssertTrue(ZeusToolPermissions.isConsequential(tool:"android_ui",args:["operation":"tap"]))
+        XCTAssertFalse(ZeusToolPermissions.isConsequential(tool:"android_ui",args:["operation":"tree"]))
+    }
     func testStorageBudgetDisablesDiskForPreviouslyCapturedSessionCache() async {
         let retained = URLCache.shared
         let configuration = URLSessionConfiguration.default

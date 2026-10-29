@@ -1,0 +1,109 @@
+"""Opt-in CI smoke against a real booted Android AVD; never runs in unit tests."""
+import asyncio
+import base64
+import json
+import os
+import hashlib
+import re
+import secrets
+import socket
+import subprocess
+import threading
+from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
+from pathlib import Path
+import tempfile
+import unittest
+import uuid
+import httpx
+import uvicorn
+from zeus_android.device import Device
+from zeus_android.app import create_app
+from zeus_android.tokens import encode
+
+
+async def main():
+    os.environ['ZEUS_ANDROID_EXTERNAL_AVD']='1'
+    device=Device(os.environ.get('ZEUS_ANDROID_ADB','emulator-5554'))
+    with tempfile.TemporaryDirectory() as directory:
+        key='ci-only-not-a-production-signing-key-0000000';owner='ci-test';conversation=str(uuid.uuid4())
+        app=create_app(root=directory,key=key,owner=owner,device=device)
+        proof=Path(os.environ.get('LAB_PROOF_DIR','android-results'));proof.mkdir(exist_ok=True)
+        server=uvicorn.Server(uvicorn.Config(app,lifespan='off',host='127.0.0.1',port=8088,log_level='warning',access_log=False))
+        serving=asyncio.create_task(server.serve())
+        class Origin(BaseHTTPRequestHandler):
+            def log_message(self,*args):pass
+            def do_POST(self):
+                data=self.rfile.read(min(8000,int(self.headers.get('Content-Length','0'))))
+                self.send_response(200);self.send_header('Content-Type','application/json');self.end_headers();self.wfile.write(json.dumps({'received':data.decode()}).encode())
+        origin=ThreadingHTTPServer(('127.0.0.1',8090),Origin);threading.Thread(target=origin.serve_forever,daemon=True).start()
+        capture_token=secrets.token_urlsafe(40);os.environ['ZEUS_ANDROID_CAPTURE_TOKEN']=capture_token
+        capture_log=(proof/'capture.log').open('w')
+        capture=subprocess.Popen([os.environ['LAB_CAPTURE_EXE'],'--listen-host','0.0.0.0','--listen-port','8089','-q','-s','AndroidLab/tests/route_probe.py','-s','AndroidLab/zeus_android/capture.py'],
+            env={**os.environ,'ZEUS_ANDROID_CAPTURE_ENDPOINT':'http://127.0.0.1:8088/internal/capture'},stdout=capture_log,stderr=capture_log)
+        async with app.router.lifespan_context(app),httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='https://lab.test',headers={'Authorization':'Bearer '+encode(key,owner,conversation)}) as client:
+            async def call(name,args):
+                response=await client.post('/v1/tool',json={'name':name,'arguments':args,'request_id':str(uuid.uuid4())})
+                assert response.status_code==200,response.text
+                return response.json()
+            async def job(project,operation):
+                value=await call('android_project',{'operation':operation,'project':project})
+                for _ in range(310):
+                    result=await call('android_project',{'operation':'job','project':project,'job':value['id']})
+                    if result['status']!='running':assert result['status']=='completed',result;return result
+                    await asyncio.sleep(2)
+                raise AssertionError('APK job did not finish')
+            await call('android_device',{'operation':'start'})
+            await call('android_ui',{'operation':'launch','package':'com.android.settings'})
+            tree=await call('android_ui',{'operation':'tree'});assert tree['nodes']
+            screenshot=await call('android_screenshot',{});data=base64.b64decode(screenshot['image']['data']);assert data[:2]==b'\xff\xd8'
+            (proof/'actual-android-settings.jpg').write_bytes(data)
+            (proof/'actual-android-ui-tree.json').write_text(json.dumps(tree,ensure_ascii=False))
+            await call('android_ui',{'operation':'key','key':'home'})
+            await call('android_network',{'operation':'start'})
+            configured=(await device.command('shell','settings','get','global','http_proxy')).decode().strip()
+            assert configured==os.environ.get('ZEUS_ANDROID_PROXY','capture:8080'),configured
+            apk=Path(os.environ['LAB_PROBE_APK']).read_bytes()
+            uploaded=await client.post('/v1/upload',content=apk,headers={'X-Filename':'zeus-probe.apk'})
+            assert uploaded.status_code==200,uploaded.text
+            project=uploaded.json()['id'];assert uploaded.json()['sha256']==hashlib.sha256(apk).hexdigest()
+            await call('android_project',{'operation':'install','project':project})
+            await call('android_ui',{'operation':'launch','package':'com.zeus.lab.probe'})
+            await asyncio.sleep(1)
+            tree=await call('android_ui',{'operation':'tree'})
+            width,height=await device.size()
+            def point(description):
+                node=next(n for n in tree['nodes'] if n.get('content-desc')==description)
+                left,top,right,bottom=map(int,re.findall(r'\d+',node['bounds']))
+                return {'x':(left+right)/2/width,'y':(top+bottom)/2/height}
+            await call('android_ui',{'operation':'tap',**point('probeInput')})
+            await call('android_ui',{'operation':'type','text':'مرحبا ZEUS probe'})
+            # Keyboard appearance can move the button; reread actual bounds.
+            tree=await call('android_ui',{'operation':'tree'})
+            await call('android_ui',{'operation':'tap',**point('probeSend')})
+            found=None
+            for _ in range(50):
+                events=(await call('android_network',{'operation':'read','after':0}))['events']
+                found=next((e for e in events if e['url'].endswith('/probe')),None)
+                if found:break
+                await asyncio.sleep(.2)
+            assert found is not None,'Actual Android request did not reach capture addon'
+            assert base64.b64decode(found['request_body']['base64']).decode()=='مرحبا ZEUS probe',found
+            assert found['status']==200,found
+            (proof/'actual-android-captured-request.json').write_text(json.dumps(found,ensure_ascii=False,indent=2))
+            await job(project,'decode')
+            manifest=await call('android_project',{'operation':'read','project':project,'path':'AndroidManifest.xml'})
+            await call('android_project',{'operation':'write','project':project,'path':'AndroidManifest.xml','content':manifest['content'].replace('ZEUS CI Probe','ZEUS CI Edited'),'expected_sha256':manifest['sha256']})
+            keyfile=Path(directory)/'lab.keystore'
+            subprocess.run(['keytool','-genkeypair','-alias','zeus-lab','-keyalg','RSA','-keystore',str(keyfile),'-storepass','android','-keypass','android','-dname','CN=ZEUS CI','-validity','3'],check=True,capture_output=True)
+            os.environ['ZEUS_ANDROID_KEYSTORE']=str(keyfile)
+            built=await job(project,'build');(proof/'actual-apk-build.json').write_text(json.dumps(built,indent=2))
+            await device.command('uninstall','com.zeus.lab.probe')  # Only the controlled CI fixture.
+            await call('android_project',{'operation':'install','project':project,'variant':'rebuilt'})
+            await call('android_ui',{'operation':'launch','package':'com.zeus.lab.probe'})
+            await call('android_network',{'operation':'stop'})
+            await call('android_device',{'operation':'stop'})
+            server.should_exit=True;await serving;origin.shutdown();origin.server_close();capture.terminate();capture.wait(timeout=5);capture_log.close()
+            print('PASS: actual Android launch/UI/screenshot/Unicode input, controlled HTTP capture, APK decode/edit/build/re-sign/install. HTTPS interception and cellular WebRTC are not inferred.')
+
+
+if __name__=='__main__':asyncio.run(main())

@@ -50,7 +50,7 @@ import ZEUSBrowser
             // Cloud execution must never fall back to the device filesystem or
             // shell, even if a stale server dispatches a server-owned tool here.
             let serverTools: Set<String> = ["exec_command", "write_stdin", "shell_execute", "file_read", "file_write", "file_edit", "memory_get", "memory_write", "apply_patch", "file_list", "task_checkpoint", "history_read"]
-            guard !serverTools.contains(name) else {
+            guard !serverTools.contains(name), !name.hasPrefix("android_") else {
                 throw issue("هذه الأداة تنفذ على الخادم فقط؛ رُفض تحويلها إلى الجهاز.")
             }
             var args = originalArgs

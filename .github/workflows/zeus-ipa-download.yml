@@ -2,7 +2,7 @@ name: ZEUS integrated IPA - build and publish (no tests)
 run-name: IPA from ${{ github.ref_name }} (${{ github.sha }})
 on:
   push:
-    branches: [build/zeus-unsigned-ipa-repair-20261023, feature/zeus-project-agent-20261023, feature/zeus-direct-integrations-20261023, feature/zeus-ipad-layout-studio-20261025, feature/zeus-cloud-account-20261026]
+    branches: [build/zeus-unsigned-ipa-repair-20261023, feature/zeus-project-agent-20261023, feature/zeus-direct-integrations-20261023, feature/zeus-ipad-layout-studio-20261025, feature/zeus-cloud-account-20261026, feature/zeus-android-lab-20261030]
     paths: [.github/workflows/zeus-ipa-download.yml, .openminis/**, ZEUSNext/**]
   workflow_dispatch:
     inputs:

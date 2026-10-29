@@ -13,6 +13,7 @@ from .terminal import protocol_result
 from .tools import SERVER_TOOLS, TOOLS, INSTRUCTIONS, builtin_instructions
 from .history import History
 from .resources import instructions as resource_instructions
+from .android import ANDROID_NAMES
 
 TERMINAL = {"completed", "failed", "cancelled", "interrupted"}
 
@@ -29,9 +30,10 @@ class Vault:
 
 
 class Engine:
-    def __init__(self, store, spaces, models, terminals, vault, child_uid=10001):
+    def __init__(self, store, spaces, models, terminals, vault, child_uid=10001, android=None):
         self.store, self.spaces, self.models, self.terminals, self.vault = store, spaces, models, terminals, vault
         self.child_uid = child_uid
+        self.android = android
         self.running = None
         self.wakeup = asyncio.Event()
         self.approvals = {}
@@ -236,7 +238,7 @@ class Engine:
             if run.get("tools") is not None and call["name"] not in {t["name"] for t in self.catalog(run)}: raise ValueError("The tool is disabled or absent from this conversation registry")
             approved = first_approval if index == 0 else None
             device_path = str(call["arguments"].get("path", "")).startswith(("/var/minis/mounts/", "minis://mounts/"))
-            if call["name"] not in SERVER_TOOLS or device_path:
+            if call["name"] not in SERVER_TOOLS | ANDROID_NAMES or device_path:
                 if call["name"] not in {t["name"] for t in self.catalog(run)}: raise ValueError("The model requested an unregistered tool")
                 if any(self.terminals.active(owner, key) for key in command_ids): raise ValueError("Finish the active command before waiting for the device")
                 await self.checkpoint(owner, conversation, grant)
@@ -247,7 +249,8 @@ class Engine:
                 await self.store.event(owner, identifier, "device_required", {"id": key, "call": call, "notice": "هذه الأداة تستخدم الجهاز الأصلي. المهمة محفوظة وتنتظر اتصاله؛ لا يعمل متصفح على Railway."})
                 raise WaitingForUser()
 
-            if approved is None and (run.get("permission_mode") == "ask_all" or call["name"] in {"exec_command", "shell_execute", "file_write", "file_edit", "apply_patch", "memory_write"} and run.get("permission_mode") != "unrestricted"):
+            android_mutation = call["name"] in ANDROID_NAMES and call["name"] != "android_screenshot" and call["arguments"].get("operation") not in {"status", "tree", "list", "read", "job", "files"}
+            if approved is None and (run.get("permission_mode") == "ask_all" or (android_mutation or call["name"] in {"exec_command", "shell_execute", "file_write", "file_edit", "apply_patch", "memory_write"}) and run.get("permission_mode") != "unrestricted"):
                 # A live command cannot be suspended into a portable approval.
                 for key in command_ids:
                     if self.terminals.active(owner, key):
@@ -266,7 +269,10 @@ class Engine:
                 output = "Tool error: " + str(error)[:2000]
             if successful and (call["name"] in {"file_write", "file_edit", "apply_patch", "memory_write"} or call["name"] in {"exec_command", "shell_execute", "write_stdin"} and not any(self.terminals.active(owner, key) for key in command_ids)):
                 await self.checkpoint(owner, conversation, grant)
-            messages.append({"role": "tool", "tool_call_id": call["id"], "content": output[:32_000]})
+            image = None
+            if successful and call["name"] == "android_screenshot":
+                payload = json.loads(output); image = payload.get("image"); output = str(payload.get("output", "Android screenshot"))
+            messages.append({"role": "tool", "tool_call_id": call["id"], "content": output[:32_000], **({"image":image} if image else {})})
             await self.store.event(owner, identifier, "tool_result", {"id": call["id"], "output": output[:32_000], "success": successful})
             await self.save_conversation(run, messages, run["prompt"][:120])
 
@@ -306,6 +312,10 @@ class Engine:
     async def tool(self, run, call, root, command_ids):
         owner, conversation = run["owner"], run["conversation"]
         name, args = call["name"], call["arguments"]
+        if name in ANDROID_NAMES:
+            if self.android is None: raise ValueError("Android laboratory is not configured")
+            result = await self.android.tool(owner, conversation, name, args, run["id"] + ":" + call["id"])
+            return json.dumps(result, ensure_ascii=False)
         def scoped_path(value):
             if value.startswith("/var/minis/workspace/"): value = value[len("/var/minis/workspace/"):]
             if value.startswith("@builtin-skills/"):

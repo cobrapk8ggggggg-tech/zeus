@@ -87,22 +87,26 @@ private enum SkillFilePickResult {''')
                     vm.addFileAttachment(from: url)
                 }''', '''                vm.zeusAddPickedFiles(urls)''')
     replace(chat, '    @State private var showFileBrowser = false',
-            '    @State private var showFileBrowser = false\n    @State private var zeusShowArtifacts = false')
-    replace(chat, '        .sheet(isPresented: $showBrowserSheet) {', '''        .sheet(isPresented: $zeusShowArtifacts) {
+            '    @State private var showFileBrowser = false\n    @State private var zeusShowArtifacts = false\n    @State private var zeusShowAndroid = false')
+    replace(chat, '        .sheet(isPresented: $showBrowserSheet) {', '''        .fullScreenCover(isPresented: $zeusShowAndroid) {
+            ZeusAndroidLabView(session: vm.sessionId)
+        }
+        .sheet(isPresented: $zeusShowArtifacts) {
             ZeusConversationFiles(sessionID: vm.sessionId)
         }
         .sheet(isPresented: $showBrowserSheet) {''')
     replace(chat, 'showFileBrowser || showBrowserSheet || showTerminal || showCamera',
-            'showFileBrowser || showBrowserSheet || zeusShowArtifacts || showTerminal || showCamera')
+            'showFileBrowser || showBrowserSheet || zeusShowArtifacts || zeusShowAndroid || showTerminal || showCamera')
     replace(chat, '    private func dismissAllOwnedImmersiveCovers() {', '''    private func dismissAllOwnedImmersiveCovers() {
         if showBrowserSheet { showBrowserSheet = false }''')
     for file in [chat, source / 'Views/ContentView.swift', source / 'Views/Chat/ToolLiveSheet.swift']:
         replace(file, 'BrowserSheetView(pool:', 'ZeusAgentBrowserWindow(pool:')
     replace(chat, '            onBrowseFiles: { showFileBrowser = true },',
-            '            onBrowseFiles: { showFileBrowser = true },\n            onArtifacts: { zeusShowArtifacts = true },')
-    replace(chat, '    let onBrowseFiles: () -> Void', '    let onBrowseFiles: () -> Void\n    let onArtifacts: () -> Void', count=2)
+            '            onBrowseFiles: { showFileBrowser = true },\n            onArtifacts: { zeusShowArtifacts = true },\n            onAndroid: { zeusShowAndroid = true },')
+    replace(chat, '    let onBrowseFiles: () -> Void', '    let onBrowseFiles: () -> Void\n    let onArtifacts: () -> Void\n    let onAndroid: () -> Void', count=2)
     replace(chat, '''            UIAction(title: AppLocalized("Browse Chat Files"),
-                     image: UIImage(systemName: "folder")) { _ in coordinator.parent.onBrowseFiles() },''', '''            UIAction(title: "ملفات هذه المحادثة", image: UIImage(systemName: "square.grid.2x2")) { _ in coordinator.parent.onArtifacts() },
+                     image: UIImage(systemName: "folder")) { _ in coordinator.parent.onBrowseFiles() },''', '''            UIAction(title: "مختبر Android", image: UIImage(systemName: "apps.iphone")) { _ in coordinator.parent.onAndroid() },
+            UIAction(title: "ملفات هذه المحادثة", image: UIImage(systemName: "square.grid.2x2")) { _ in coordinator.parent.onArtifacts() },
             UIAction(title: AppLocalized("Browse Chat Files"),
                      image: UIImage(systemName: "folder")) { _ in coordinator.parent.onBrowseFiles() },''')
     # The old button only hid chrome inside the form sheet. Move the same pool

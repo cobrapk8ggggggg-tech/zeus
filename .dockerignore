@@ -15,3 +15,9 @@
 !Cloud/requirements.lock
 !Cloud/zeus_cloud/
 !Cloud/zeus_cloud/*.py
+!AndroidLab/
+!AndroidLab/**
+AndroidLab/**/__pycache__/
+AndroidLab/**/build/
+AndroidLab/**/.gradle/
+AndroidLab/.env
