@@ -27,6 +27,19 @@ jobs:
       - run: PYTHONPATH=Cloud python -m unittest discover -v -s Cloud/tests
       - run: PYTHONPATH=AndroidLab python -m unittest discover -v -s AndroidLab/tests
       - run: node --check AndroidLab/zeus_android/web/lab.js
+      - name: Verify iPhone and iPad layout, fullscreen and direct APK upload
+        env:
+          CHROMIUM_PATH: /usr/bin/google-chrome
+          LAB_PROOF_DIR: android-results
+        run: |
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install --prefix "$RUNNER_TEMP/zeus-browser" --no-save playwright@1.56.1
+          NODE_PATH="$RUNNER_TEMP/zeus-browser/node_modules" PYTHONPATH=AndroidLab python AndroidLab/tests/run_browser.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-ui-evidence
+          path: android-results/
+          retention-days: 7
   android:
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -39,6 +52,9 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with: {gradle-version: '8.11.1'}
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
       - name: Build the Unicode laboratory keyboard
         working-directory: AndroidLab/ime
         run: gradle --no-daemon :app:assembleDebug :probe:assembleDebug

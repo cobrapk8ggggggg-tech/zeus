@@ -48,7 +48,13 @@ class AndroidGateway:
                     if len(content) > 1_400_000: raise ValueError("Android worker response exceeds limit")
                 if response.status_code != 200:
                     raise ValueError("تعذّر إجراء Android؛ الجهاز مشغول أو متوقف، أو انتهت صلاحية الوصول. راجع المختبر.")
-                return json.loads(content)
+                result=json.loads(content)
+                if name=="android_screenshot":
+                    try:
+                        image=result["image"];raw=base64.b64decode(image["data"],validate=True)
+                        if image["mime"]!="image/jpeg" or len(raw)>900000 or not raw.startswith(b"\xff\xd8"): raise ValueError()
+                    except (KeyError,TypeError,ValueError): raise ValueError("Invalid Android screenshot response") from None
+                return result
         except httpx.HTTPError:
             raise ValueError("خادم Android غير متاح؛ لم يُحوّل التنفيذ إلى الجهاز المحلي ولم تُكرر العملية.") from None
 

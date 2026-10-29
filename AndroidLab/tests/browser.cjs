@@ -17,6 +17,9 @@ const path=require('node:path');
    await page.getByText('fixture.apk',{exact:true}).waitFor();assert.equal(errors.length,0,errors.join('\n'));
    await page.screenshot({path:path.join(process.env.LAB_PROOF_DIR,name+'-project.png'),fullPage:true});
    await page.getByRole('button',{name:'الجهاز',exact:true}).click();await page.screenshot({path:path.join(process.env.LAB_PROOF_DIR,name+'-device.png'),fullPage:true});
+   await page.locator('#fullscreen').click();assert(await page.locator('body').evaluate(x=>x.classList.contains('device-fullscreen')));
+   assert((await page.locator('#screen').boundingBox()).height>height*.75);
+   await page.screenshot({path:path.join(process.env.LAB_PROOF_DIR,name+'-fullscreen.png')});await page.locator('#fullscreen').click();
    await context.close();console.log(name+': layout, navigation, token removal and direct APK upload passed');
   }
  }finally{await browser.close();}

@@ -14,6 +14,7 @@ services:
     pids_limit: 1024
     restart: unless-stopped
   worker:
+    security_opt: [no-new-privileges:true]
     build:
       context: ..
       dockerfile: AndroidLab/Dockerfile

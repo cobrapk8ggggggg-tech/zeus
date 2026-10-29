@@ -33,3 +33,13 @@ class AndroidAPITests(unittest.IsolatedAsyncioTestCase):
         tool={'name':'android_ui','description':'inspect','parameters':{'type':'object','properties':{}}}
         run={'owner':self.owner,'id':str(uuid.uuid4()),'conversation':self.conversation}
         with self.assertRaises(ValueError):await self.app.state.engine.tool(run,{'name':'android_ui','arguments':{'operation':'tree'},'id':'call'},None,set())
+
+    async def test_conversation_delete_waits_for_confirmed_android_deletion(self):
+        await self.store.put(self.owner,'conversation',self.conversation,{'title':'keep until lab deleted'})
+        gateway=self.app.state.engine.android
+        gateway.url=gateway.public_url='https://worker.test';gateway.key='k'*40
+        await gateway.client.aclose()
+        gateway.client=httpx.AsyncClient(transport=httpx.MockTransport(lambda request:httpx.Response(503)))
+        result=await self.client.delete('/v1/conversations/'+self.conversation)
+        self.assertEqual(result.status_code,400,result.text)
+        self.assertIsNotNone(await self.store.get(self.owner,'conversation',self.conversation))

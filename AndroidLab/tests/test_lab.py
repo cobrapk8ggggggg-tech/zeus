@@ -105,6 +105,26 @@ class LabTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('playsinline',r.text)
         self.assertEqual((await self.client.get('/lab/../../tokens.py')).status_code,404)
 
+    async def test_delete_removes_only_this_conversations_projects_and_capture(self):
+        await self.start();scope=self.app.state.lab.load()['scope']
+        root=self.app.state.lab.root/'projects'/scope;root.mkdir(parents=True);(root/'private-apk.bin').write_bytes(b'mine')
+        other=self.app.state.lab.root/'projects'/'other';other.mkdir();(other/'keep').write_bytes(b'other')
+        self.app.state.lab.capture(scope,{'url':'private'})
+        response=await self.client.delete('/v1/session',headers=self.auth())
+        self.assertEqual(response.status_code,200,response.text);self.assertFalse(root.exists())
+        self.assertEqual((other/'keep').read_bytes(),b'other');self.assertEqual(self.app.state.lab.events(scope),[])
+        self.assertIsNone(self.app.state.lab.load())
+
+    async def test_capture_requires_private_key_and_rejects_pre_session_flows(self):
+        environment=patch.dict('os.environ',{'ZEUS_ANDROID_CAPTURE_TOKEN':'c'*40});environment.start();self.addCleanup(environment.stop)
+        await self.start();await self.call('android_network',{'operation':'start'})
+        self.assertEqual((await self.client.post('/internal/capture',json={'started':self.now})).status_code,403)
+        headers={'X-Capture-Token':'c'*40}
+        response=await self.client.post('/internal/capture',headers=headers,json={'started':self.now-1,'url':'old'})
+        self.assertFalse(response.json()['accepted'])
+        response=await self.client.post('/internal/capture',headers=headers,json={'started':self.now,'url':'new'})
+        self.assertTrue(response.json()['accepted'])
+
 
 class DeviceTests(unittest.IsolatedAsyncioTestCase):
     async def test_arbitrary_package_and_non_normalized_coordinates_never_reach_adb(self):
