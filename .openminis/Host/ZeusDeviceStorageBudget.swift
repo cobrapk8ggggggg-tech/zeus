@@ -53,7 +53,10 @@ enum ZeusPristineRootfs {
 @MainActor enum ZeusDeviceStorageBudget {
     static func prepare() async {
         URLCache.shared.removeAllCachedResponses()
-        URLCache.shared = URLCache(memoryCapacity: 2 * 1024 * 1024, diskCapacity: 0, diskPath: nil)
+        // Existing URLSessions may retain this cache object. Mutate it so
+        // connections created before the budget cannot refill a disk cache.
+        URLCache.shared.diskCapacity = 0
+        URLCache.shared.memoryCapacity = 2 * 1024 * 1024
         if !CommandLine.arguments.contains("-loggingEnabled") {
             let optedIn = UserDefaults.standard.bool(forKey: "zeus.logging.userOptIn")
             if !optedIn { LoggingManager.shared.isEnabled = false }

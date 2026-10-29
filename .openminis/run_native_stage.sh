@@ -71,6 +71,7 @@ case "$stage" in
         -resultBundlePath "results/embedded-$kind-storage-tests.xcresult" \
         -only-testing:ZEUSBrowserIntegrationTests/NativeProjectContractTests/testUploadedCopyIsRemovedOnlyAfterMatchingRemoteDigestAndOriginalIsPreserved \
         -only-testing:ZEUSBrowserIntegrationTests/NativeProjectContractTests/testIncompleteCloudReplayFailsWithoutWritingPartialMessages \
+        -only-testing:ZEUSBrowserIntegrationTests/NativeProjectContractTests/testStorageBudgetDisablesDiskForPreviouslyCapturedSessionCache \
         -parallel-testing-enabled NO -test-timeouts-enabled YES \
         -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 120 \
         test-without-building CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=-

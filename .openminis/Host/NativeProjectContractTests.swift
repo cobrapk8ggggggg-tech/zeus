@@ -4,6 +4,16 @@ import CryptoKit
 @testable import Minis
 
 @MainActor final class NativeProjectContractTests: XCTestCase {
+    func testStorageBudgetDisablesDiskForPreviouslyCapturedSessionCache() async {
+        let retained = URLCache.shared
+        let configuration = URLSessionConfiguration.default
+        configuration.urlCache = retained
+        retained.diskCapacity = 20 * 1024 * 1024
+        await ZeusDeviceStorageBudget.prepare()
+        XCTAssertTrue(URLCache.shared === retained)
+        XCTAssertEqual(configuration.urlCache?.diskCapacity, 0)
+        XCTAssertEqual(configuration.urlCache?.memoryCapacity, 2 * 1024 * 1024)
+    }
     func testUploadedCopyIsRemovedOnlyAfterMatchingRemoteDigestAndOriginalIsPreserved() throws {
         let fm = FileManager.default, root = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try fm.createDirectory(at: root, withIntermediateDirectories: true)
