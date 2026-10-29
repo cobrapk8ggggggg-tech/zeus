@@ -226,8 +226,25 @@ final class NativeBrowserIntegrationTests: XCTestCase {
         _ = try await other.executeCommand("rm -rf -- " + ZeusAgentHarness.quote(dir), timeout: 30) { _ in }
         _ = try await vm.executeCommand("rm -rf -- " + ZeusAgentHarness.quote(dir), timeout: 30) { _ in }
     }
-    func testOfficialSkillsInstallOfflineWithTheirOriginalAssets() async throws {
+    func testCloudCatalogDoesNotCopyFilesBeforeExplicitLocalSelection() async throws {
+        _ = SkillStore.shared.skills
+        func snapshot() -> Set<String> {
+            let root = AIChatViewModel.minisSkillsPersistentDir
+            let scan = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey])
+            var result: Set<String> = []
+            while let url = scan?.nextObject() as? URL {
+                let value = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+                result.insert(url.path + ":" + String(value?.fileSize ?? 0) + ":" + String(value?.contentModificationDate?.timeIntervalSince1970 ?? 0))
+            }
+            return result
+        }
+        let before = snapshot()
         await ZeusDefaultSkills.shared.install()
+        XCTAssertEqual(ZeusDefaultSkills.shared.entries.count, 59)
+        XCTAssertEqual(snapshot(), before, "Loading the cloud catalog must not copy, overwrite or delete skill files")
+    }
+    func testOfficialSkillsInstallOfflineWithTheirOriginalAssets() async throws {
+        await ZeusDefaultSkills.shared.install(forceLocal: true)
         XCTAssertNil(ZeusDefaultSkills.shared.error)
         XCTAssertEqual(ZeusDefaultSkills.shared.entries.count, 59)
         for entry in ZeusDefaultSkills.shared.entries {

@@ -1,0 +1,31 @@
+name: ZEUS cloud runtime
+on:
+  push:
+    branches: [feature/zeus-cloud-account-20261026]
+    paths: [Cloud/**, supabase/functions/**, .dockerignore, .github/workflows/zeus-cloud-runtime.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r Cloud/requirements.lock
+      - name: Verify execution, encrypted migration, approvals and ownership
+        run: PYTHONPATH=Cloud python -m unittest discover -v -s Cloud/tests
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.6
+      - name: Verify authenticated storage gateway
+        run: deno test --allow-env supabase/functions/zeus-files/gateway_test.ts
+      - name: Build the actual lightweight server image
+        run: docker build -f Cloud/Dockerfile -t zeus-cloud:test .
+      - name: Verify no browser or model runner is bundled
+        run: docker run --rm --entrypoint sh zeus-cloud:test -c 'test ! -d /opt/zeus/Runtime && ! command -v chromium && ! command -v codex && python -c "from zeus_cloud.app import create_app; print(create_app().title)"'
+      - name: Verify real Linux execution as the production tool user
+        run: docker run --rm --pids-limit 128 --memory 500m --cpus 0.25 -v "$PWD/Cloud/tests/container_smoke.py:/opt/zeus/container_smoke.py:ro" --entrypoint python zeus-cloud:test /opt/zeus/container_smoke.py

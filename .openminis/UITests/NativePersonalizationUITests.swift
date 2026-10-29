@@ -53,6 +53,65 @@ final class NativePersonalizationUITests: XCTestCase {
         expectation(for: NSPredicate(format: "label == %@", "1:readable:ZEUS-Import-Test"), evaluatedWith: result)
         waitForExpectations(timeout: 15)
     }
+    @MainActor func testCloudAfterRepeatedMessagesToolResultsAndReopenKeepDevicePayloadAtZero() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--zeus-cloud-storage-fixture", "--zeus-native-fixture", "-appearanceMode", "2"]
+        app.launch()
+        let result = app.staticTexts["cloudStorageAfterUse"]
+        expectation(for: NSPredicate(format: "label == %@", "20:40:0:0:idle"), evaluatedWith: result)
+        waitForExpectations(timeout: 45)
+        let proof = XCTAttachment(screenshot: app.screenshot())
+        proof.name = "ZEUS-Cloud-Zero-Payload-After-20-Turns-And-Reopen"; proof.lifetime = .keepAlways; add(proof)
+    }
+    @MainActor func testCloudPartialReplyAppearsInOriginalMessageListBeforeCompletion() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--zeus-cloud-partial-stream", "--zeus-native-fixture", "-AppleLanguages", "(ar)", "-appearanceMode", "2"]
+        app.launch()
+        let partial = app.textViews.matching(NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@", "الجزء الأول من الرد السحابي", "الجزء الأول من الرد السحابي")).firstMatch
+        XCTAssertTrue(partial.waitForExistence(timeout: 30))
+        XCTAssertGreaterThan(partial.frame.height, 0)
+        XCTAssertFalse(app.textViews.matching(NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@", "اكتمل الرد التجريبي", "اكتمل الرد التجريبي")).firstMatch.exists)
+        let image = XCTAttachment(screenshot: app.screenshot()); image.name = "ZEUS-Cloud-Partial-Reply-Before-Completion"; image.lifetime = .keepAlways; add(image)
+        app.buttons["finishCloudReply"].tap()
+        XCTAssertTrue(app.textViews.matching(NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@", "اكتمل الرد التجريبي", "اكتمل الرد التجريبي")).firstMatch.waitForExistence(timeout: 10))
+    }
+    @MainActor func testCloudFreshChatNeverInstallsLocalLinuxOrPrewarmsAMathWebView() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--zeus-cloud-footprint", "--zeus-native-fixture", "-appearanceMode", "2"]
+        app.launch()
+        let result = app.staticTexts["cloudLinuxFootprint"]
+        expectation(for: NSPredicate(format: "label == %@", "0:idle"), evaluatedWith: result)
+        waitForExpectations(timeout: 30)
+        XCTAssertEqual(app.webViews.count, 0)
+        let screen = XCTAttachment(screenshot: app.screenshot()); screen.name = "ZEUS-Cloud-Zero-Local-Linux"; screen.lifetime = .keepAlways; add(screen)
+    }
+    @MainActor func testCloudToolsRenderWithTheOriginalNativeCards() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--zeus-cloud-tool-cards", "--zeus-native-fixture", "-AppleLanguages", "(ar)", "-AppleLocale", "ar_SA", "-appearanceMode", "2"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["فحص نظام Linux"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.staticTexts["قراءة ملف المشروع"].exists)
+        XCTAssertTrue(app.staticTexts["تعديل ملف المشروع"].exists)
+        XCTAssertFalse(app.staticTexts["أُرسلت الموافقة إلى الخادم."].exists)
+        let image = XCTAttachment(screenshot: app.screenshot())
+        image.name = "ZEUS-Cloud-Original-Tool-Cards-iPad"; image.lifetime = .keepAlways; add(image)
+    }
+    @MainActor func testCloudLoginScreenRendersArabicAndRequiresCredentials() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--zeus-cloud-login", "-AppleLanguages", "(ar)", "-AppleLocale", "ar_SA"]
+        app.launch()
+        XCTAssertTrue(app.textFields["cloudEmail"].waitForExistence(timeout: 40))
+        XCTAssertTrue(app.secureTextFields["cloudPassword"].exists)
+        XCTAssertTrue(app.buttons["cloudSubmit"].exists)
+        XCTAssertFalse(app.buttons["cloudSubmit"].isEnabled)
+        let image = XCTAttachment(screenshot: app.screenshot())
+        image.name = "ZEUS-Cloud-Login-Arabic-iPad"; image.lifetime = .keepAlways; add(image)
+    }
     @MainActor func testExternalFolderSettingsCancellationLeavesSettingsUsable() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

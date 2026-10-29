@@ -1,3 +1,4 @@
+import ZEUSBrowser
 import SwiftUI
 import CryptoKit
 
@@ -382,11 +383,17 @@ struct ZeusProjectProgressCard: View {
         guard let session = vm.sessionId else { throw ZeusPatch.failure("No active conversation.") }
         var paths: [String: String] = [:], probeError: String?
         do {
+            if NativeCloudAccountAPI.usesCloud {
+                let data = try await NativeCloudAccountAPI.runtime("v1/capabilities")
+                let value = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                paths = value?["executables"] as? [String: String] ?? [:]
+            } else {
             try await prepareEnvironment(vm: vm)
             let result = try await vm.executeCommand("for x in sh git python3 node npm swift xcodebuild; do p=$(command -v \"$x\" 2>/dev/null || true); printf '%s=%s\\n' \"$x\" \"$p\"; done", timeout: 30) { _ in }
             for line in result.output.split(separator: "\n") {
                 let fields = line.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
                 if fields.count == 2, !fields[1].isEmpty { paths[String(fields[0])] = String(fields[1]) }
+            }
             }
         } catch { probeError = error.localizedDescription }
         let accounts = ZeusConnections.shared.linked("github").map(\.id)
@@ -403,8 +410,8 @@ struct ZeusProjectProgressCard: View {
         if !utility { value.project = project }
         try save(session, value)
         var output: [String: Any] = [:]
-        output["host"] = "ZEUS Browser on iOS/iPadOS"
-        output["local_execution"] = "Linux guest; not macOS"
+        output["host"] = NativeCloudAccountAPI.usesCloud ? "ZEUS cloud Linux service" : "ZEUS Browser on iOS/iPadOS"
+        output["local_execution"] = NativeCloudAccountAPI.usesCloud ? "Commands execute on the cloud conversation workspace; the iPad kernel is not started" : "Linux guest; not macOS"
         output["has_ios_sdk"] = false
         output["project_plan_required"] = !utility
         output["image_tool"] = ["name": "read_image", "native_vision": vm.activeModelHasNativeVision, "vision_group_configured": VisionGroupResolver.isConfigured, "uses_ffmpeg": false]

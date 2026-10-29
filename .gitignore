@@ -9,3 +9,5 @@ ZEUSNext/Resources/FILTER-NOTICES.txt
 
 # Private Cloudflare device connection files never belong in source control.
 ZEUS-Cloudflare-connection*.json
+supabase/.temp/
+Cloud/**/__pycache__/

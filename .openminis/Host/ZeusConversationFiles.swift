@@ -1,6 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 import ImageIO
+import ZEUSBrowser
 
 extension AIChatViewModel {
     /// Files providers may download or coordinate a large selection. Keep that
@@ -136,6 +137,12 @@ struct ZeusConversationFiles: View {
             .sorted { newest ? $0.date > $1.date : $0.relativePath.localizedStandardCompare($1.relativePath) == .orderedAscending }
     }
     var body: some View {
+        Group {
+            if NativeCloudAccountAPI.usesCloud { ZeusCloudFilesView(session: sessionID) }
+            else { localBody }
+        }
+    }
+    private var localBody: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 filters

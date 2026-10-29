@@ -49,8 +49,11 @@ class NativeEmbeddingTests(unittest.TestCase):
                     continue
                 expected = file.read_text().replace("group.com.openminis.app", "group.tools.zeus.openminis").replace("iCloud.com.openminis.app", "iCloud.tools.zeus.openminis")
                 if str(relative) == "Views/ContentView.swift":
+                    expected = expected.replace("import SwiftUI", "import SwiftUI\nimport ZEUSBrowser")
+                    expected = expected.replace("                ISHTerminalView(showCloseButton: true)", "                if NativeCloudAccountAPI.usesCloud { ZeusCloudTerminalView() }\n                else { ISHTerminalView(showCloseButton: true) }")
                     expected = expected.replace('BrowserSheetView(pool:', 'ZeusAgentBrowserWindow(pool:')
                     expected = expected.replace('                Section("Agent Runtime") {', '''                Section("وكيل ZEUS") {
+                    NavigationLink { NativeCloudExecutionSettings() } label: { Label("التشغيل والتخزين — محلي أو سحابي", systemImage: "icloud") }
                     NavigationLink { ZeusAgentRuntimeSettings() } label: { Label("أدوات الوكيل وتنفيذه", systemImage: "terminal") }
                     NavigationLink { ZeusPluginsSettingsView() } label: { Label("الإضافات", systemImage: "puzzlepiece.extension") }
                 }
@@ -91,6 +94,27 @@ class NativeEmbeddingTests(unittest.TestCase):
                 return text[start:text.index('    /// Trivial', start)]
             self.assertEqual(detail_context(adapted_mounts), detail_context(original_mounts))
             expected_mounts = original_mounts.replace('"Minis"', '"Zeus"')
+            expected_mounts = 'import ZEUSBrowser\n' + expected_mounts
+            expected_mounts = expected_mounts.replace('private struct PendingMount: Identifiable {', '''private final class ZeusMountFolderLease {
+    let url: URL
+    let active: Bool
+    init(_ url: URL) { self.url = url; active = url.startAccessingSecurityScopedResource() }
+    deinit { if active { url.stopAccessingSecurityScopedResource() } }
+}
+
+private struct PendingMount: Identifiable {''')
+            expected_mounts = expected_mounts.replace('    var allowWrite: Bool\n}', '    var allowWrite: Bool\n    var access: ZeusMountFolderLease? = nil\n}')
+            start = expected_mounts.index('        .sheet(isPresented: $showingPicker) {')
+            end = expected_mounts.index('        .sheet(item: $pendingMount)', start)
+            expected_mounts = expected_mounts[:start] + '''        .zeusFileImporter(isPresented: $showingPicker, allowedContentTypes: [.folder]) { result in
+            switch result {
+            case .success(let url):
+                pendingMount = PendingMount(url: url, name: Self.defaultMountName(for: url), allowWrite: true, access: ZeusMountFolderLease(url))
+            case .failure(let error):
+                if (error as NSError).code != NSUserCancelledError { errorText = error.localizedDescription }
+            }
+        }
+''' + expected_mounts[end:]
             expected_mounts = expected_mounts.replace('.disabled(model.isAtCapacity)', '.accessibilityIdentifier("mountExternalFolder")\n                .disabled(model.isAtCapacity)')
             expected_mounts = expected_mounts.replace('Button(AppLocalized("Mount"), action: onConfirm)', 'Button(AppLocalized("Mount"), action: onConfirm)\n                        .accessibilityIdentifier("confirmExternalMount")')
             expected_mounts = expected_mounts.replace('TextField("name", text: $name)', 'TextField("name", text: $name).accessibilityIdentifier("externalMountName")')

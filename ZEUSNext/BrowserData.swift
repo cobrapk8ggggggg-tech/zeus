@@ -145,7 +145,8 @@ enum BrowserDisk {
     }
     static func write<T: Encodable>(_ value: T, to url: URL) throws {
         try ensure(url.deletingLastPathComponent())
-        try JSONEncoder().encode(value).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+        try encoder.encode(value).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
     }
     static func read<T: Decodable>(_ type: T.Type, from url: URL) -> T? {
         guard let data = try? Data(contentsOf: url) else { return nil }
@@ -175,12 +176,14 @@ enum BrowserDisk {
     @Published var errorMessage: String?
     let root: URL
     let downloadsRoot: URL
+    let loadedExistingIndex: Bool
     private var stores: [UUID: WKWebsiteDataStore] = [:]
     private var pendingStoreRemovals: Set<UUID> = []
     private struct Index: Codable { var profiles: [BrowserProfile]; var activeID: UUID }
 
     init(root: URL = BrowserDisk.applicationRoot, downloadsRoot: URL = BrowserDisk.downloadsRoot) {
         self.root = root; self.downloadsRoot = downloadsRoot
+        loadedExistingIndex = FileManager.default.fileExists(atPath: root.appendingPathComponent("profiles.json").path)
         pendingStoreRemovals = Set(BrowserDisk.read([UUID].self, from: root.appendingPathComponent("removed-web-stores.json")) ?? [])
         if let index = BrowserDisk.read(Index.self, from: root.appendingPathComponent("profiles.json")), !index.profiles.isEmpty {
             profiles = index.profiles
@@ -237,7 +240,15 @@ enum BrowserDisk {
     }
     func save(_ data: ProfileData, for profile: BrowserProfile) {
         guard !profile.isPrivate else { return }
-        do { try BrowserDisk.write(data, to: folder(for: profile).appendingPathComponent("browser.json")) }
+        do {
+            let file = folder(for: profile).appendingPathComponent("browser.json")
+            let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+            let bytes = try encoder.encode(data)
+            guard (try? Data(contentsOf: file)) != bytes else { return }
+            try BrowserDisk.ensure(file.deletingLastPathComponent())
+            try bytes.write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            NotificationCenter.default.post(name: .zeusBrowserDataChanged, object: root)
+        }
         catch { errorMessage = "تعذر حفظ بيانات المساحة: \(error.localizedDescription)" }
     }
     @discardableResult func add(name: String, accent: String, isPrivate: Bool) -> BrowserProfile {
@@ -307,8 +318,30 @@ enum BrowserDisk {
             catch { /* The durable queue remains for the next launch. */ }
         }
     }
+    /// Fresh-install restore commits the index last. An interrupted write never
+    /// replaces an existing profile or changes the previous visible index.
+    func installCloudBrowser(_ payload: CloudBrowserPayload) throws {
+        let payload = try payload.validated()
+        guard !loadedExistingIndex else { throw CloudAccountError.conflict }
+        let oldIDs = Set(profiles.map(\.id))
+        guard payload.profiles.allSatisfy({ !oldIDs.contains($0.profile.id) }) else { throw CloudAccountError.conflict }
+        for entry in payload.profiles {
+            try BrowserDisk.write(entry.data, to: folder(for: entry.profile).appendingPathComponent("browser.json"))
+            if let avatar = entry.avatar {
+                let folder = configurationFolder(entry.profile); try BrowserDisk.ensure(folder)
+                try avatar.write(to: folder.appendingPathComponent("avatar.jpg"), options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            }
+        }
+        try BrowserDisk.write(Index(profiles: payload.profiles.map(\.profile), activeID: payload.activeID), to: root.appendingPathComponent("profiles.json"))
+        profiles = payload.profiles.map(\.profile); activeID = payload.activeID
+        ensureSpecialAccounts()
+    }
+
     private func persistIndex() {
-        do { try BrowserDisk.write(Index(profiles: profiles, activeID: activeID), to: root.appendingPathComponent("profiles.json")) }
+        do {
+            try BrowserDisk.write(Index(profiles: profiles, activeID: activeID), to: root.appendingPathComponent("profiles.json"))
+            NotificationCenter.default.post(name: .zeusBrowserDataChanged, object: root)
+        }
         catch { errorMessage = "تعذر حفظ البروفايلات: \(error.localizedDescription)" }
     }
     private func migrateLegacy(into profile: BrowserProfile) {

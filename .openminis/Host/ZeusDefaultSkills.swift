@@ -1,4 +1,5 @@
 import SwiftUI
+import ZEUSBrowser
 
 @MainActor final class ZeusDefaultSkills: ObservableObject {
     static let shared = ZeusDefaultSkills()
@@ -18,8 +19,9 @@ import SwiftUI
     @Published var entries: [Entry] = []
     @Published var error: String?
     @Published var busy = false
+    private var catalogFileCache: [String: Data] = [:]
     private let revisionKey = "zeus.defaultSkills.revision"
-    func install() async {
+    func install(forceLocal: Bool = false) async {
         guard !busy else { return }
         busy = true; defer { busy = false }
         do {
@@ -28,7 +30,11 @@ import SwiftUI
             }
             let catalog = try JSONDecoder().decode(Catalog.self, from: Data(contentsOf: root.appendingPathComponent("manifest.json")))
             entries = catalog.skills
-            guard UserDefaults.standard.string(forKey: revisionKey) != catalog.revision else { return }
+            guard forceLocal || (NativeCloudAccountAPI.ownerID != nil && !NativeCloudAccountAPI.usesCloud) else { return }
+            guard UserDefaults.standard.string(forKey: revisionKey) != catalog.revision || (forceLocal && entries.contains(where: { entry in
+                guard let skill = SkillStore.shared.skills.first(where: { $0.name == entry.installedName }) else { return false }
+                return !FileManager.default.fileExists(atPath: SkillStore.shared.skillDirectoryURL(for: skill.id).appendingPathComponent("SKILL.md").path)
+            })) else { return }
             for entry in entries {
                 let source = root.appendingPathComponent(entry.directory)
                 let original = try String(contentsOf: source.appendingPathComponent("SKILL.md"), encoding: .utf8)
@@ -39,8 +45,14 @@ import SwiftUI
                 // Preserve user edits/deletions after initial installation. The
                 // original SkillStore controls enablement, sync and discovery.
                 let parsedName = SkillStore.parse(skillMD: content).name
-                if SkillStore.shared.skills.contains(where: { $0.name == parsedName }) { continue }
-                let skill = try SkillStore.shared.importSkill(content: content, source: .bundled)
+                let skill: Skill
+                if let existing = SkillStore.shared.skills.first(where: { $0.name == parsedName }) {
+                    if FileManager.default.fileExists(atPath: SkillStore.shared.skillDirectoryURL(for: existing.id).appendingPathComponent("SKILL.md").path) { continue }
+                    skill = existing
+                    let directory = SkillStore.shared.skillDirectoryURL(for: skill.id)
+                    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                    try Data(content.utf8).write(to: directory.appendingPathComponent("SKILL.md"), options: .atomic)
+                } else { skill = try SkillStore.shared.importSkill(content: content, source: .bundled) }
                 let destination = SkillStore.shared.skillDirectoryURL(for: skill.id)
                 for file in try FileManager.default.contentsOfDirectory(at: source, includingPropertiesForKeys: nil) where file.lastPathComponent != "SKILL.md" {
                     let target = destination.appendingPathComponent(file.lastPathComponent)
@@ -51,6 +63,51 @@ import SwiftUI
             error = nil
         } catch { self.error = error.localizedDescription }
     }
+    /// Only byte-identical catalog files are reproducible. Custom edits remain
+    /// user data even if the skill was originally shipped with the application.
+    func bundledCopies(including paths: Set<String>? = nil) throws -> [String: Data] {
+        guard let root = Bundle.main.url(forResource: "ZEUSDefaultSkills", withExtension: nil) else { return [:] }
+        var copies: [String: Data] = [:]
+        for entry in entries {
+            let id = SkillStore.slugify(entry.installedName)
+            if let paths, !paths.contains(where: { $0.hasPrefix(id + "/") }) { continue }
+            let source = root.appendingPathComponent(entry.directory)
+            let destination = SkillStore.shared.skillDirectoryURL(for: id)
+            if paths == nil && !FileManager.default.fileExists(atPath: destination.path) { continue }
+            guard let files = FileManager.default.enumerator(at: source, includingPropertiesForKeys: [.isRegularFileKey]) else { continue }
+            for case let file as URL in files {
+                guard try file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true else { continue }
+                let relative = String(file.path.dropFirst(source.path.count + 1))
+                if let paths, !paths.contains(id + "/" + relative) { continue }
+                let target = destination.appendingPathComponent(relative)
+                if paths == nil && !FileManager.default.fileExists(atPath: target.path) { continue }
+                if let cached = catalogFileCache[file.path] { copies[target.path] = cached; continue }
+                var data = try Data(contentsOf: file)
+                if relative == "SKILL.md", let text = String(data: data, encoding: .utf8) {
+                    let regex = try NSRegularExpression(pattern: "(?m)^name:.*$")
+                    data = Data(regex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "name: " + entry.installedName).utf8)
+                }
+                catalogFileCache[file.path] = data
+                copies[target.path] = data
+            }
+        }
+        return copies
+    }
+
+    func cloudInstructions(_ text: String) throws -> String {
+        let paths = Set(entries.map { SkillStore.slugify($0.installedName) + "/SKILL.md" })
+        let originals = try bundledCopies(including: paths)
+        var result = text
+        for entry in entries {
+            let id = SkillStore.slugify(entry.installedName)
+            let path = SkillStore.shared.skillDirectoryURL(for: id).appendingPathComponent("SKILL.md")
+            guard let expected = originals[path.path] else { continue }
+            if let current = try? Data(contentsOf: path), current != expected { continue }
+            result = result.replacingOccurrences(of: "/var/minis/skills/" + id + "/", with: "@builtin-skills/" + entry.directory + "/")
+        }
+        return result
+    }
+
 }
 
 struct ZeusDefaultSkillsView: View {

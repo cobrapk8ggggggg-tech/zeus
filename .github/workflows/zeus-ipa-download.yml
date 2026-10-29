@@ -2,7 +2,7 @@ name: ZEUS integrated IPA - build and publish (no tests)
 run-name: IPA from ${{ github.ref_name }} (${{ github.sha }})
 on:
   push:
-    branches: [build/zeus-unsigned-ipa-repair-20261023, feature/zeus-project-agent-20261023, feature/zeus-direct-integrations-20261023, feature/zeus-ipad-layout-studio-20261025]
+    branches: [build/zeus-unsigned-ipa-repair-20261023, feature/zeus-project-agent-20261023, feature/zeus-direct-integrations-20261023, feature/zeus-ipad-layout-studio-20261025, feature/zeus-cloud-account-20261026]
     paths: [.github/workflows/zeus-ipa-download.yml, .openminis/**, ZEUSNext/**]
   workflow_dispatch:
     inputs:
@@ -15,7 +15,7 @@ permissions:
   contents: read
 jobs:
   ipa:
-    runs-on: macos-latest
+    runs-on: macos-15-intel
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
@@ -41,7 +41,7 @@ jobs:
       - name: Prepare device build and record exact source revisions
         run: |
           set -euo pipefail
-          test "$(uname -m)" = arm64
+          test "$(uname -m)" = x86_64
           mkdir -p results
           git -C browser rev-parse HEAD > results/browser-commit.txt
           git -C upstream rev-parse HEAD > results/openminis-commit.txt
@@ -100,8 +100,9 @@ jobs:
           xcodebuild -project upstream/src/ios/Minis.xcodeproj -scheme Minis \
             -configuration Release -destination 'generic/platform=iOS' -sdk iphoneos \
             -derivedDataPath "$RUNNER_TEMP/ZEUSNativeDevice" \
-            build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ARCHS=arm64 \
+            -onlyUsePackageVersionsFromResolvedFile build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ARCHS=arm64 \
             2>&1 | tee results/device-build.log
+          cp upstream/src/ios/Minis.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved results/Package.resolved
       - name: Package unsigned IPA and verify its contents
         run: |
           set -euo pipefail
@@ -134,6 +135,7 @@ jobs:
             results/native-adapters.json
             results/ipa-zip-check.txt
             results/ipa-size-audit.json
+            results/Package.resolved
           retention-days: 14
           compression-level: 0
           if-no-files-found: error

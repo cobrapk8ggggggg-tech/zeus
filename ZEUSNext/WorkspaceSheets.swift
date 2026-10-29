@@ -33,6 +33,7 @@ struct DownloadsSheet: View {
     @State private var adding = false
     @State private var link = ""
     @State private var importing = false
+    @State private var restoring: UUID?
     @State private var preview: ShareItem?
     @State private var sharing: ShareItem?
     @State private var exporting: ShareItem?
@@ -107,8 +108,22 @@ struct DownloadsSheet: View {
                 if item.isBusy { Button { service.pause(item) } label: { Image(systemName: "pause.fill").frame(width: 36, height: 30) } }
                 else if item.state == .failed || item.state == .paused { Button { Task { await service.resume(item, webView: model.webView) } } label: { Label("متابعة", systemImage: "play.fill").font(.caption.bold()) } }
                 else if let file = service.fileURL(item) { Button("فتح") { preview = ShareItem(url: file) }.font(.caption.bold()) }
+                else if item.state == .completed {
+                    if restoring == item.id { ProgressView().controlSize(.small) }
+                    else { Button("استعادة من الحساب") { restoreFromAccount(item) }.font(.caption.bold()).disabled(restoring != nil) }
+                }
             }.buttonStyle(.plain)
         }.padding(17).glassSurface(25)
+    }
+    private func restoreFromAccount(_ item: BrowserDownload) {
+        restoring = item.id
+        Task { @MainActor in
+            defer { restoring = nil }
+            do {
+                if let file = try await service.restoreFile(item) { preview = ShareItem(url: file) }
+                else { model.notify("لا توجد نسخة مكتملة لهذا الملف في الحساب.") }
+            } catch { model.notify(error.localizedDescription) }
+        }
     }
     private func status(_ item: BrowserDownload) -> String {
         switch item.state {

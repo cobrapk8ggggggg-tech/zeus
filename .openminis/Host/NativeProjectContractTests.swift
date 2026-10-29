@@ -1,8 +1,143 @@
 import XCTest
 import UIKit
+import CryptoKit
 @testable import Minis
 
 @MainActor final class NativeProjectContractTests: XCTestCase {
+    func testStorageBudgetDisablesDiskForPreviouslyCapturedSessionCache() async {
+        let retained = URLCache.shared
+        let configuration = URLSessionConfiguration.default
+        configuration.urlCache = retained
+        retained.diskCapacity = 20 * 1024 * 1024
+        await ZeusDeviceStorageBudget.prepare()
+        XCTAssertTrue(URLCache.shared === retained)
+        XCTAssertEqual(configuration.urlCache?.diskCapacity, 0)
+        XCTAssertEqual(configuration.urlCache?.memoryCapacity, 2 * 1024 * 1024)
+    }
+    func testUploadedCopyIsRemovedOnlyAfterMatchingRemoteDigestAndOriginalIsPreserved() throws {
+        let fm = FileManager.default, root = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+        let staged = root.appendingPathComponent("attachments")
+        try fm.createDirectory(at: staged, withIntermediateDirectories: true)
+        let original = root.appendingPathComponent("original.txt"), copy = staged.appendingPathComponent("copy.txt")
+        let bytes = Data("my cloud attachment".utf8)
+        try bytes.write(to: original); try bytes.write(to: copy)
+        let digest = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+        XCTAssertFalse(try ZeusCloudFiles.discardVerifiedUpload(original, within: staged, bytes: Int64(bytes.count), digest: digest))
+        XCTAssertFalse(try ZeusCloudFiles.discardVerifiedUpload(copy, within: staged, bytes: Int64(bytes.count), digest: String(repeating: "0", count: 64)))
+        XCTAssertTrue(fm.fileExists(atPath: copy.path))
+        XCTAssertTrue(try ZeusCloudFiles.discardVerifiedUpload(copy, within: staged, bytes: Int64(bytes.count), digest: digest))
+        XCTAssertEqual(try Data(contentsOf: original), bytes)
+        let link = staged.appendingPathComponent("link.txt")
+        try fm.createSymbolicLink(at: link, withDestinationURL: original)
+        XCTAssertFalse(try ZeusCloudFiles.discardVerifiedUpload(link, within: staged, bytes: Int64(bytes.count), digest: digest))
+        XCTAssertEqual(try Data(contentsOf: original), bytes)
+    }
+    func testIncompleteCloudReplayFailsWithoutWritingPartialMessages() async throws {
+        let registered = await ChatStore.shared.createSession(modelId: "cloud-storage-fixture")
+        let session = registered.id
+        let before = await ChatStore.shared.loadMessages(sessionId: session)
+        let runtime = ZeusCloudRuntime(transcriptRead: { path in
+            if path.contains("/runs?") {
+                return try JSONSerialization.data(withJSONObject: ["runs": [["id": "run", "native_user_id": "user", "native_assistant_id": "assistant", "status": "completed", "prompt": "must stay in memory", "seq": 2]]])
+            }
+            return Data("{\"events\":[]}".utf8)
+        })
+        do { _ = try await runtime.cloudTranscript(session: session); XCTFail("Incomplete replay must throw") }
+        catch { }
+        let after = await ChatStore.shared.loadMessages(sessionId: session)
+        XCTAssertEqual(before.map(\.id), after.map(\.id))
+    }
+    func testCrashDiagnosticsRemainStableWhenRequestedConcurrently() async {
+        let initial = CrashReporter.detectInjectedDylibs()
+        let results = await withTaskGroup(of: [String].self, returning: [[String]].self) { group in
+            for _ in 0..<16 { group.addTask { CrashReporter.detectInjectedDylibs() } }
+            var values: [[String]] = []
+            for await value in group { values.append(value) }
+            return values
+        }
+        XCTAssertEqual(results.count, 16)
+        XCTAssertTrue(results.allSatisfy { $0 == initial })
+    }
+    func testPristineLocalOSCanBeRemovedButEditsUnknownFilesAndSymlinksArePreserved() throws {
+        let fm = FileManager.default
+        let parent = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fm.createDirectory(at: parent, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: parent) }
+        let bytes = Data("bundled operating system".utf8)
+        let digest = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+        let baseline = ["data/": "", "data/bin/": "", "data/bin/sh": digest]
+        func tree(_ name: String) throws -> URL {
+            let root = parent.appendingPathComponent(name)
+            try fm.createDirectory(at: root.appendingPathComponent("data/bin"), withIntermediateDirectories: true)
+            try bytes.write(to: root.appendingPathComponent("data/bin/sh"))
+            try Data("aarch64".utf8).write(to: root.appendingPathComponent(".arch"))
+            return root
+        }
+        let pristine = try tree("pristine")
+        XCTAssertTrue(try ZeusPristineRootfs.remove(at: pristine, baseline: baseline, allowed: { false }))
+        XCTAssertFalse(fm.fileExists(atPath: pristine.path))
+        let overlay = try tree("overlay")
+        let overlayData = Data("bundled app overlay".utf8)
+        try overlayData.write(to: overlay.appendingPathComponent("data/bin/sh"))
+        let overlayHash = SHA256.hash(data: overlayData).map { String(format: "%02x", $0) }.joined()
+        let overlaidBaseline = baseline.merging(["@generated:data/bin/sh:" + overlayHash: overlayHash]) { old, _ in old }
+        XCTAssertTrue(try ZeusPristineRootfs.remove(at: overlay, baseline: overlaidBaseline, allowed: { false }))
+        let edited = try tree("edited")
+        try Data("my edited shell".utf8).write(to: edited.appendingPathComponent("data/bin/sh"))
+        XCTAssertFalse(try ZeusPristineRootfs.remove(at: edited, baseline: baseline, allowed: { false }))
+        XCTAssertEqual(try Data(contentsOf: edited.appendingPathComponent("data/bin/sh")), Data("my edited shell".utf8))
+        let unknown = try tree("unknown")
+        try Data("my project".utf8).write(to: unknown.appendingPathComponent("data/project.txt"))
+        XCTAssertFalse(try ZeusPristineRootfs.remove(at: unknown, baseline: baseline, allowed: { false }))
+        let linked = try tree("linked")
+        try fm.createSymbolicLink(at: linked.appendingPathComponent("data/outside"), withDestinationURL: unknown)
+        XCTAssertFalse(try ZeusPristineRootfs.remove(at: linked, baseline: baseline, allowed: { false }))
+        XCTAssertTrue(fm.fileExists(atPath: unknown.appendingPathComponent("data/project.txt").path))
+        let managed = try tree("managed")
+        try fm.createDirectory(at: managed.appendingPathComponent("data/var/minis"), withIntermediateDirectories: true)
+        try fm.createSymbolicLink(at: managed.appendingPathComponent("data/var/minis/shared"), withDestinationURL: unknown)
+        let mountedBaseline = baseline.merging(["data/var/": ""]) { old, _ in old }
+        XCTAssertTrue(try ZeusPristineRootfs.remove(at: managed, baseline: mountedBaseline, allowed: { false }))
+        XCTAssertTrue(fm.fileExists(atPath: unknown.appendingPathComponent("data/project.txt").path))
+        let local = try tree("local")
+        XCTAssertFalse(try ZeusPristineRootfs.remove(at: local, baseline: baseline, allowed: { true }))
+    }
+    func testCloudToolEventsUseTheOriginalNativeCardKindsAndReadableTerminalOutput() {
+        XCTAssertEqual(ZeusToolPresentation.kind("shell_execute", input: ["command": "uname -a"]), .shellTool(command: "uname -a"))
+        XCTAssertEqual(ZeusToolPresentation.kind("file_edit", input: ["path": "main.py"]), .fileEditTool(path: "main.py"))
+        XCTAssertEqual(ZeusToolPresentation.kind("memory_get"), .memoryTool(action: "memory_get"))
+        XCTAssertEqual(ZeusToolPresentation.kind("browser_use", input: ["action": "get_state"]), .browserTool(action: "get_state"))
+        XCTAssertEqual(ZeusToolPresentation.kind("read_image", input: ["path": "screen.png"]), .readImageTool(path: "screen.png"))
+        XCTAssertEqual(ZeusToolPresentation.kind("integration_call"), .shellTool(command: "integration_call"))
+        let result = #"{"id":"pty-1","output":"Linux\nfile.txt\n","exit_code":0,"next_offset":20}"#
+        XCTAssertEqual(ZeusToolPresentation.output(result, name: "shell_execute"), "Linux\nfile.txt\n")
+        XCTAssertEqual(ZeusToolPresentation.output(result, name: "file_read"), result, "Actual file JSON must remain unchanged")
+    }
+    func testCloudCacheRequiresMatchingContentAndRefusesEditedMessages() {
+        let original: [ContentPart] = [.text("original cloud reply")]
+        let edited: [ContentPart] = [.text("user edited reply")]
+        let events: [[String: Any]] = [["kind": "text", "data": ["delta": "original cloud reply"]]]
+        XCTAssertEqual(ZeusCloudCache.signature(original), ZeusCloudCache.eventsSignature(events))
+        XCTAssertNotEqual(ZeusCloudCache.signature(edited), ZeusCloudCache.eventsSignature(events))
+    }
+    func testCloudWaitPlaceholderIsImmediateAndReusedWhenTheNetworkLoopStarts() async {
+        let vm = AIChatViewModel()
+        vm.messages = [ChatMessage(role: .user, content: "hello")]
+        vm.isProcessing = true
+        let beforeNetwork = ZeusCloudPresentation.begin(vm)
+        XCTAssertTrue(beforeNetwork.isAwaitingModelResponse)
+        XCTAssertEqual(ZeusCloudPresentation.begin(vm).id, beforeNetwork.id)
+        let block = await ZeusCloudPresentation.append("first partial", vm: vm, message: beforeNetwork, block: nil)
+        XCTAssertFalse(beforeNetwork.isAwaitingModelResponse)
+        XCTAssertEqual(block.content, "first partial")
+        XCTAssertEqual(vm.messages.count, 2)
+        _ = await ZeusCloudPresentation.append(" then final", vm: vm, message: beforeNetwork, block: block, final: true)
+        XCTAssertEqual(block.cachedMarkdown, MarkdownContent(prepareMarkdownForRender("first partial then final")))
+        XCTAssertNotNil(block.cachedAttributedString)
+        vm.isProcessing = false
+    }
     private func proposal(remote: Bool = false, repository: String = "fixture-owner/project") throws -> [String: Any] {
         let raw = remote ? #"""
         {"title":"Audio app project","objective":"Implement and verify the approved audio product","platform":"ios",
@@ -301,6 +436,8 @@ import UIKit
         do { _ = try await runtime.execute("propose_project_plan", args: ["proposal": changed], callID: "forged-approval", vm: vm); XCTFail("Different plan hash requires new approval") } catch {}
     }
     func testActualGitHubRESTChecksRouteCommitJobsArtifactsAndReadsDownloadedUIScreenshot() async throws {
+        // This contract exercises local project discovery and its local skill assets.
+        await ZeusDefaultSkills.shared.install(forceLocal: true)
         let key = "zeus.contract.fixture." + UUID().uuidString
         defer { UserDefaults.standard.removeObject(forKey: key) }
         let connections = ZeusConnections(storageKey: key)

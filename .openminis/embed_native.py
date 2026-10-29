@@ -73,8 +73,9 @@ def embed(native, browser, report):
     # The application remains OpenMinis' original @main/AppDelegate/root setup;
     # its root content now embeds the browser with the original AI UI alongside.
     replace(source / "MinisApp.swift", "                ContentView()", "                ZEUSBrowserRootEntry()")
-    for name in ("ZEUSNativeIntegration.swift", "ZeusToolPermissions.swift", "ZeusDefaultSkills.swift", "ZeusAgentSchemas.swift", "ZeusPatch.swift", "ZeusAgentHarness.swift", "ZeusConnections.swift", "ZeusGitHubAuthorization.swift", "ZeusProjectContract.swift", "ZeusGitHubTools.swift", "ZeusStorageExplorer.swift", "ZeusTaskDashboard.swift", "ZeusAgentControls.swift", "ZeusConversationFiles.swift", "ZeusAgentBrowserWindow.swift"):
-        shutil.copyfile(browser / ".openminis/Host" / name, source / name)
+    for host in sorted((browser / ".openminis/Host").glob("*.swift")):
+        if host.name.endswith("Tests.swift"): continue
+        shutil.copyfile(host, source / host.name)
     # Turn the original informational storage rows into drill-down links.
     storage = source / "Views/Settings/StorageManagementView.swift"
     replace(storage, '        HStack {\n            Image(systemName: icon)', '        NavigationLink { ZeusStorageCategoryView(category: label) } label: {\n        HStack {\n            Image(systemName: icon)')
@@ -87,6 +88,153 @@ def embed(native, browser, report):
     # Reuse the exact native settings sheet from the browser's AI settings row.
     # Only its file-private visibility changes; its body is untouched.
     replace(source / "Views/ContentView.swift", "private struct SettingsSheet: View", "struct SettingsSheet: View")
+    replace(source / "Views/ContentView.swift", "import SwiftUI", "import SwiftUI\nimport ZEUSBrowser")
+    replace(source / "Views/Chat/AIChatView.swift", "import SwiftUI", "import SwiftUI\nimport ZEUSBrowser")
+    replace(source / "Views/Chat/AIChatView.swift", '''        .sheet(isPresented: $showFileBrowser) {
+            NavigationStack {
+                let base = RootfsManager.shared.dataPath
+                FileBrowserView(rootPath: base, initialPath: base.appendingPathComponent("var/minis"), rootLabel: "/")
+            }
+        }''', '''        .sheet(isPresented: $showFileBrowser) {
+            if NativeCloudAccountAPI.usesCloud { ZeusCloudFilesView(session: vm.sessionId, folders: true) }
+            else {
+                NavigationStack {
+                    let base = RootfsManager.shared.dataPath
+                    FileBrowserView(rootPath: base, initialPath: base.appendingPathComponent("var/minis"), rootLabel: "/")
+                }
+            }
+        }''')
+    replace(source / "Agent/Chat/ChatStore.swift", "    func deleteSession(_ id: String) {", "    func deleteSession(_ id: String) {\n        Task { @MainActor in await ZeusCloudDeletion.shared.enqueue(id) }")
+    replace(source / "Agent/Chat/ChatStore.swift", "    func deleteSession(_ id: String) {", '''    func zeusTrimJournal() {
+        // Return verified WAL pages to the database and release the retained
+        // journal, rather than keeping several MB allocated after a few chats.
+        sqlite3_exec(db, "PRAGMA journal_size_limit=0", nil, nil, nil)
+        sqlite3_exec(db, "PRAGMA wal_autocheckpoint=64", nil, nil, nil)
+        sqlite3_exec(db, "PRAGMA wal_checkpoint(TRUNCATE)", nil, nil, nil)
+    }
+    func deleteSession(_ id: String) {''')
+    replace(source / "Agent/Chat/ChatStore.swift", "    func deleteSession(_ id: String) {", '    func zeusCachedMessageBytes(_ session: String) -> Int {\n        var statement: OpaquePointer?\n        defer { sqlite3_finalize(statement) }\n        guard sqlite3_prepare_v2(db, "SELECT COALESCE(SUM(length(parts_json)),0) FROM messages WHERE session_id=?", -1, &statement, nil) == SQLITE_OK else { return 0 }\n        sqlite3_bind_text(statement, 1, (session as NSString).utf8String, -1, nil)\n        return sqlite3_step(statement) == SQLITE_ROW ? Int(sqlite3_column_int64(statement, 0)) : 0\n    }\n    func zeusEvictVerifiedCloudMessages(_ session: String, expected: [String: String]) -> Bool {\n        let rows = loadMessages(sessionId: session)\n        guard !rows.isEmpty, rows.allSatisfy({ ZeusCloudCache.signature($0.parts) == expected[$0.id.uppercased()] && expected[$0.id.uppercased()] != nil }) else { return false }\n        var statement: OpaquePointer?\n        defer { sqlite3_finalize(statement) }\n        guard sqlite3_prepare_v2(db, "DELETE FROM messages WHERE session_id=?", -1, &statement, nil) == SQLITE_OK else { return false }\n        sqlite3_bind_text(statement, 1, (session as NSString).utf8String, -1, nil)\n        return sqlite3_step(statement) == SQLITE_DONE\n    }\n    func deleteSession(_ id: String) {')
+    cloud_vm = source / "Agent/Chat/AIChatViewModel.swift"
+    misc = source / "Agent/Chat/AIChatViewModel+Misc.swift"
+    replace(misc, "import Foundation", "import Foundation\nimport ZEUSBrowser")
+    replace(misc, "    func ensureKernelBooted() {", "    func ensureKernelBooted() {\n        _ = NativeCloudAccountAPI.usesCloud\n        guard NativeLocalExecutionBoundary.shared.isAllowed else { return }")
+    offloading = source / "Agent/Chat/AIChatViewModel+Offloading.swift"
+    replace(offloading, "import Foundation", "import Foundation\nimport ZEUSBrowser")
+    replace(offloading, "    func mountMinis(for sid: String) {", "    func mountMinis(for sid: String) {\n        _ = NativeCloudAccountAPI.usesCloud\n        guard NativeLocalExecutionBoundary.shared.isAllowed else { return }")
+    replace(source / "Views/Chat/AIChatView.swift", "                ISHTerminalView(sessionId: vm.sessionId, showCloseButton: true, initCommand: terminalInitCommand)", "                if NativeCloudAccountAPI.usesCloud {\n                    ZeusCloudTerminalView(session: vm.sessionId, initialCommand: terminalInitCommand)\n                } else {\n                ISHTerminalView(sessionId: vm.sessionId, showCloseButton: true, initCommand: terminalInitCommand)")
+    # Close only the added local branch inside this exact terminal cover.
+    replace(source / "Views/Chat/AIChatView.swift", "        }\n        .fullScreenCover(isPresented: $showCamera, onDismiss: {", "            }\n        }\n        .fullScreenCover(isPresented: $showCamera, onDismiss: {")
+    replace(source / "Views/Chat/ToolLiveSheet.swift", "                ISHTerminalView(\n                    sessionId: sessionId,\n                    showCloseButton: true,\n                    initCommand: terminalPrefillCommand\n                )", "                if NativeCloudAccountAPI.usesCloud { ZeusCloudTerminalView(session: sessionId, initialCommand: terminalPrefillCommand) }\n                else {\n                    ISHTerminalView(sessionId: sessionId, showCloseButton: true, initCommand: terminalPrefillCommand)\n                }")
+    # Skill indexing and mount refresh can run before the kernel boots.
+    # They must not materialize a guest filesystem in cloud mode.
+    skill_store = source / "Agent/Session/SkillStore.swift"
+    replace(skill_store, "import Foundation", "import Foundation\nimport ZEUSBrowser")
+    replace(skill_store, "    private func syncToRootfs(skill: Skill, content: String) {", "    private func syncToRootfs(skill: Skill, content: String) {\n        guard NativeLocalExecutionBoundary.shared.isAllowed else { return }")
+    replace(offloading, "        let mountsDir = dataPath.appendingPathComponent(\"var/minis/mounts\", isDirectory: true)", "        guard NativeLocalExecutionBoundary.shared.isAllowed else { return }\n        let mountsDir = dataPath.appendingPathComponent(\"var/minis/mounts\", isDirectory: true)")
+    skill_code = skill_store.read_text()
+    skill_lines = skill_code.splitlines(keepends=True)
+    for index, line in enumerate(skill_lines):
+        stripped = line.strip()
+        if stripped.startswith("try? ") and any(token in stripped for token in ("at: rootfs", "to: rootfs")):
+            indentation = line[:len(line) - len(line.lstrip())]
+            skill_lines[index] = indentation + "if NativeLocalExecutionBoundary.shared.isAllowed { " + stripped + " }\n"
+    skill_store.write_text("".join(skill_lines))
+    replace(skill_store, "    private func ensureFakefsMetadata(for linuxPath: String, isDirectory: Bool) {", "    private func ensureFakefsMetadata(for linuxPath: String, isDirectory: Bool) {\n        guard NativeLocalExecutionBoundary.shared.isAllowed else { return }")
+    rootfs = source / "iSH/RootfsManager.swift"
+    replace(rootfs, "import Foundation", "import Foundation\nimport ZEUSBrowser")
+    replace(rootfs, "    static let shared = RootfsManager()", "    static let shared = RootfsManager()\n    static let zeusLifecycleLock = NSRecursiveLock()")
+    replace(rootfs, "    func installIfNeeded() throws {", "    func installIfNeeded() throws {\n        guard NativeLocalExecutionBoundary.shared.isAllowed else {\n            throw NSError(domain: \"ZeusExecution\", code: 1, userInfo: [NSLocalizedDescriptionKey: \"البيئة المحلية متوقفة. اختر التنفيذ المحلي صراحةً من إعدادات الوكيل لتثبيتها.\"])\n        }")
+    replace(rootfs, "    func installIfNeeded() throws {", "    func installIfNeeded() throws {\n        Self.zeusLifecycleLock.lock(); defer { Self.zeusLifecycleLock.unlock() }")
+    replace(rootfs, "    func reset(keepUserData: Bool = false) throws -> URL? {", "    func reset(keepUserData: Bool = false) throws -> URL? {\n        Self.zeusLifecycleLock.lock(); defer { Self.zeusLifecycleLock.unlock() }")
+    # Math rendering is on demand and never needs a persistent website store.
+    crash = source / "Diagnostics/CrashReporter.swift"
+    replace(crash, "import Foundation", "import Foundation\nimport Darwin")
+    crash_code = crash.read_text()
+    scan_start = crash_code.index("    /// [T-crash-injected-dylib-tag] Names of loaded images")
+    scan_end = crash_code.index("\n    }", crash_code.index("    static func detectInjectedDylibs()", scan_start)) + len("\n    }")
+    replace(crash, crash_code[scan_start:scan_end], '''    /// Optional diagnostic markers only, never enforcement. dyld image-name
+    /// enumeration can race image loading/unloading; startup SIGSEGV reports
+    /// pointed into the former String.contains scan. Resolve a bounded set of
+    /// known exports through the loader's supported synchronized API instead.
+    private static let injectedMarkersLock = NSLock()
+    private static var cachedInjectedDylibs: [String]?
+    static func detectInjectedDylibs() -> [String] {
+        injectedMarkersLock.lock(); defer { injectedMarkersLock.unlock() }
+        if let cached = cachedInjectedDylibs { return cached }
+        let handle = UnsafeMutableRawPointer(bitPattern: -2) // Darwin RTLD_DEFAULT
+        let exports = ["MSHookFunction", "MSHookMessageEx", "substitute_hook_functions", "substitute_hook_objc_message", "LHHookFunctions", "LBHookMessage"]
+        var found: [String] = []
+        for name in exports {
+            if dlsym(handle, name) != nil { found.append(name) }
+        }
+        cachedInjectedDylibs = found
+        return found
+    }''')
+    replace(crash, "Injected tweak/hook dylibs detected in-process:", "Runtime hook exports detected:")
+    replace(crash, 'report += "\\n⚠️ Injected:', 'report += "\\nRuntime hook exports:')
+    replace(app, "        KaTeXRenderer.shared.warmUp()", "        // ZEUS: create the math renderer only when a formula needs it.")
+    replace(source / "Agent/Markdown/KaTeXRenderer.swift", "        let config = WKWebViewConfiguration()", "        let config = WKWebViewConfiguration()\n        config.websiteDataStore = .nonPersistent()")
+    logging = source / "Shared/LoggingManager.swift"
+    replace(logging, '            UserDefaults.standard.set(isEnabled, forKey: "loggingEnabled")', '            UserDefaults.standard.set(isEnabled, forKey: "loggingEnabled")\n            UserDefaults.standard.set(isEnabled, forKey: "zeus.logging.userOptIn")')
+    replace(logging, "private let maxLogFileSize: UInt64 = 100 * 1024 * 1024", "private let maxLogFileSize: UInt64 = 256 * 1024")
+    replace(logging, "private static let logRetentionDays = 15", "private static let logRetentionDays = 2")
+    replace(logging, "private static let maxPendingBytes = 8 * 1024 * 1024", "private static let maxPendingBytes = 256 * 1024")
+    replace(logging, "if writeCount % 1000 == 0", "if writeCount % 16 == 0")
+    replace(logging, "            _ = self.safeWrite(Data(line.utf8))", "            _ = self.safeWrite(Data(line.utf8))\n            self.truncateIfNeeded()")
+    # The bundled catalog is the durable fallback; downloaded catalogs stay in
+    # memory instead of writing another complete multi-megabyte JSON copy.
+    models_dev = source / "Providers/ModelsDevAPI.swift"
+    registry_code = models_dev.read_text()
+    cache_start = registry_code.index("    private static func saveDiskCache(_ data: Data) {")
+    cache_end = registry_code.index("\n    }", cache_start) + len("\n    }")
+    replace(models_dev, registry_code[cache_start:cache_end], "    private static func saveDiskCache(_ data: Data) {\n        // ZEUS: retain refreshed catalogs in memory; Bundle is the disk fallback.\n    }")
+    replace(cloud_vm, "import Foundation", "import Foundation\nimport ZEUSBrowser")
+    replace(cloud_vm, "    func send(overrideText: String? = nil) {", "    func send(overrideText: String? = nil) {\n        guard !NativeCloudAccountAPI.isMigrating else { errorMessage = \"انتظر اكتمال نقل الحساب.\"; return }")
+    replace(cloud_vm, "    private func runAgentLoop(resumingAt existingMsgIdx: Int? = nil, committedBlocks: Int? = nil) async throws {", "    private func runAgentLoop(resumingAt existingMsgIdx: Int? = nil, committedBlocks: Int? = nil) async throws {\n        if NativeCloudAccountAPI.usesCloud { try await ZeusCloudRuntime.shared.run(self); return }")
+    replace(cloud_vm, '        isProcessing = true\n        errorMessage = nil\n        logger.info("🔄SESSION', '        isProcessing = true\n        errorMessage = nil\n        if NativeCloudAccountAPI.usesCloud { _ = ZeusCloudPresentation.begin(self) }\n        logger.info("🔄SESSION')
+    cloud_text = cloud_vm.read_text()
+    cloud_text = cloud_text.replace("    private var baseSystemPrompt: String {", "    var baseSystemPrompt: String {")
+    cloud_text = cloud_text.replace("        ensureKernelBooted()", "        if !NativeCloudAccountAPI.usesCloud { ensureKernelBooted() }")
+    cloud_text = cloud_text.replace("while self.kernelStatus == .booting {", "while !NativeCloudAccountAPI.usesCloud && self.kernelStatus == .booting {")
+    cloud_text = cloud_text.replace("if case .failed(let msg) = self.kernelStatus {", "if !NativeCloudAccountAPI.usesCloud, case .failed(let msg) = self.kernelStatus {")
+    cloud_vm.write_text(cloud_text)
+    replace(cloud_vm, "            } else if !isProcessing && oldValue {", "            } else if !isProcessing && oldValue {\n                if NativeCloudAccountAPI.usesCloud { messages.last(where: { $0.role == .assistant })?.isAwaitingModelResponse = false }\n                ZeusCloudArchive.shared.scheduleBackup()")
+    persistence = source / "Agent/Chat/AIChatViewModel+Persistence.swift"
+    replace(persistence, "import Foundation", "import Foundation\nimport ZEUSBrowser")
+    persistence_code = persistence.read_text()
+    signature = next(line for line in persistence_code.splitlines() if line.strip().startswith("func persistAgentMessage("))
+    replace(persistence, signature, signature + "\n        if NativeCloudAccountAPI.usesCloud { return msg.dbMessageId ?? UUID().uuidString }")
+    replace(persistence, "            rawMessages = await ChatStore.shared.loadMessages(sessionId: sessionId)", "            if NativeCloudAccountAPI.usesCloud {\n                do { rawMessages = try await ZeusCloudRuntime.shared.cloudTranscript(session: sessionId) }\n                catch { self.errorMessage = error.localizedDescription; return }\n            } else { rawMessages = await ChatStore.shared.loadMessages(sessionId: sessionId) }")
+    replace(persistence, "    func reloadMessagesFromDB(reason: String = \"unspecified\") async {", "    func reloadMessagesFromDB(reason: String = \"unspecified\") async {\n        guard !NativeCloudAccountAPI.usesCloud else { return }")
+    replace(cloud_vm, "            try? FileManager.default.createDirectory(at: uploadsDir, withIntermediateDirectories: true)", "            if queued.contains(where: { !$0.attachments.isEmpty }) { try? FileManager.default.createDirectory(at: uploadsDir, withIntermediateDirectories: true) }")
+    replace(cloud_vm, "        try? FileManager.default.createDirectory(at: qUploadsDir, withIntermediateDirectories: true)", "        if queued.contains(where: { !$0.attachments.isEmpty }) { try? FileManager.default.createDirectory(at: qUploadsDir, withIntermediateDirectories: true) }")
+    replace(misc, '        let chatMsg = ChatMessage(role: .user, content: text, isQueued: true)', '        let shownText = NativeCloudAccountAPI.usesCloud ? PastePlaceholder.expand(text) { id in self.pastedTexts.first(where: { $0.id == id })?.text } : text\n        let chatMsg = ChatMessage(role: .user, content: shownText, isQueued: true)')
+    send_code = cloud_vm.read_text()
+    send_code = send_code.replace("            try? fm.createDirectory(at: uploadsDir, withIntermediateDirectories: true)", "            if !pendingAttachments.isEmpty { try? fm.createDirectory(at: uploadsDir, withIntermediateDirectories: true) }", 1)
+    cloud_vm.write_text(send_code)
+    replace(cloud_vm, '        let displayText = text.isEmpty && pendingAttachments.isEmpty ? "" : text', '        let displayText = NativeCloudAccountAPI.usesCloud ? PastePlaceholder.expand(text) { id in self.pastedTexts.first(where: { $0.id == id })?.text } : (text.isEmpty && pendingAttachments.isEmpty ? "" : text)')
+    attachments_source = source / "Agent/Chat/AIChatViewModel+Attachments.swift"
+    replace(attachments_source, "import Foundation", "import Foundation\nimport ZEUSBrowser")
+    replace(attachments_source, "        if text.count > PastePlaceholder.fileAttachmentThreshold {", "        if !NativeCloudAccountAPI.usesCloud && text.count > PastePlaceholder.fileAttachmentThreshold {")
+    consume_start = attachments_source.read_text().index("    func consumePastedDraft(")
+    consume_anchor = "        guard !matches.isEmpty else { return nil }"
+    attachment_code = attachments_source.read_text()
+    consume_pos = attachment_code.index(consume_anchor, consume_start) + len(consume_anchor)
+    cloud_paste = '''
+        if NativeCloudAccountAPI.usesCloud {
+            let expanded = PastePlaceholder.expand(draft) { id in self.pastedTexts.first(where: { $0.id == id })?.text }
+            let ids = Set(matches.compactMap { Int(ns.substring(with: $0.range(at: 1))) })
+            pastedTexts.removeAll { ids.contains($0.id) }
+            return (expanded, [.text(expanded)], [])
+        }'''
+    attachments_source.write_text(attachment_code[:consume_pos] + cloud_paste + attachment_code[consume_pos:])
+    replace(attachments_source, "    func planPastedCards(for draft: String) -> (plan: [Int: String], metas: [AttachmentMeta]) {", "    func planPastedCards(for draft: String) -> (plan: [Int: String], metas: [AttachmentMeta]) {\n        guard !NativeCloudAccountAPI.usesCloud else { return ([:], []) }")
+    replace(offloading, "    func migrateOffloadsIfNeeded(for sid: String) {", "    func migrateOffloadsIfNeeded(for sid: String) {\n        guard !NativeCloudAccountAPI.usesCloud else { return }")
+    replace(cloud_vm, "    func cancel() {", "    func cancel() {\n        ZeusCloudRuntime.shared.cancel(session: sessionId)")
+    replace(source / "Agent/Chat/AIChatViewModel+Persistence.swift", "    func loadSession() async {\n        guard let sessionId else { return }", "    func loadSession() async {\n        guard let sessionId else { return }\n        defer { Task { await ZeusCloudRuntime.shared.reconnect(self) } }")
+    replace(source / "Agent/Chat/AIChatViewModel+Persistence.swift", "            id: UUID().uuidString, sessionId: sessionId,", "            id: NativeCloudAccountAPI.usesCloud ? (msg.dbMessageId ?? UUID().uuidString) : UUID().uuidString, sessionId: sessionId,")
+    replace(source / "Agent/Chat/AIChatViewModel+Persistence.swift", "import Foundation", "import Foundation\nimport ZEUSBrowser")
+    replace(source / "Views/ContentView.swift", "                ISHTerminalView(showCloseButton: true)", "                if NativeCloudAccountAPI.usesCloud { ZeusCloudTerminalView() }\n                else { ISHTerminalView(showCloseButton: true) }")
     # A compiler boundary around the unchanged native geometry expression.
     # The original giant modifier chain hit the type-checker limit in the
     # embedded target. No view, modifier or state is replaced or reordered.
@@ -203,6 +351,8 @@ def embed(native, browser, report):
     file_tools = source / "Agent/Chat/AIChatViewModel+FileTools.swift"
     replace(file_tools, 'ISHExecutionCoordinator.shared.hostURL(for: linuxPath)', 'ISHExecutionCoordinator.shared.hostURL(for: linuxPath, sessionId: self.sessionId)')
     replace(file_tools, 'ISHExecutionCoordinator.shared.hostURL(for: path)', 'ISHExecutionCoordinator.shared.hostURL(for: path, sessionId: self.sessionId)')
+    replace(source / "Agent/Chat/AIChatViewModel+ISHCommand.swift", "import Foundation", "import Foundation\nimport ZEUSBrowser")
+    replace(source / "Agent/Chat/AIChatViewModel+ISHCommand.swift", "        let effectiveTimeout = timeout ?? defaultCommandTimeout", "        let effectiveTimeout = timeout ?? defaultCommandTimeout\n        if NativeCloudAccountAPI.usesCloud { return try await ZeusCloudCommands.execute(command, session: fsSessionId, timeout: effectiveTimeout, line: lineCallback) }")
     replace(source / "Agent/Chat/AIChatViewModel+ISHCommand.swift", '        let bashism = BashismDetector.detect(command)', '        try ZeusAgentHarness.prepareWorkspace(session: sid)\n        ensureParentDirsInMetaDB(for: "/var/minis/workspace")\n        let bashism = BashismDetector.detect(command)')
     replace(source / "iSH/ISHShellExecutor.m", '    int exitCode = [notification.userInfo[@"code"] intValue];', '''    // The iSH exit hook reports Linux wait(2) status, not a shell exit code.
     int waitStatus = [notification.userInfo[@"code"] intValue];
@@ -338,6 +488,10 @@ def embed(native, browser, report):
 
     stream = source / "Agent/Chat/AIChatViewModel+SSEStream.swift"
     text = stream.read_text()
+    # Both execution locations use the stock tool cards and their input metadata.
+    first = text.index('                    let blockKind: AssistantBlockKind = switch name {')
+    last = text.index('\n                    if name == "file_write"', first)
+    text = text[:first] + '                    let blockKind = ZeusToolPresentation.kind(name)' + text[last:]
     if 'case "browser_use":' not in text:
         raise RuntimeError("Original browser card mapping was not found")
     text = text.replace('case "browser_use":', 'case let browserName where browserName == "browser_use" || browserName == "zeus_browser" || zeusBrowserOperation(browserName) != nil:')
@@ -354,6 +508,7 @@ def embed(native, browser, report):
     stream.write_text(text)
 
     detail = source / "Views/Chat/ToolLiveSheet.swift"
+    replace(detail, "import SwiftUI", "import SwiftUI\nimport ZEUSBrowser")
     replace(detail, 'if isLive, onBrowserTakeover != nil, case .browserTool = block.kind {',
         'if isLive, onBrowserTakeover != nil, case .browserTool = block.kind, !block.zeusIsUserBrowser {')
     replace(detail, '} else if case .browserTool = block.kind, browserPool != nil {',
@@ -485,6 +640,7 @@ def embed(native, browser, report):
     apply_text_only(source, browser)
     apply_native_ui(source, replace)
     replace(source / "Views/ContentView.swift", '                Section("Agent Runtime") {', '''                Section("وكيل ZEUS") {
+                    NavigationLink { NativeCloudExecutionSettings() } label: { Label("التشغيل والتخزين — محلي أو سحابي", systemImage: "icloud") }
                     NavigationLink { ZeusAgentRuntimeSettings() } label: { Label("أدوات الوكيل وتنفيذه", systemImage: "terminal") }
                     NavigationLink { ZeusPluginsSettingsView() } label: { Label("الإضافات", systemImage: "puzzlepiece.extension") }
                 }

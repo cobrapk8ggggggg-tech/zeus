@@ -16,7 +16,15 @@ struct ZEUSBrowserRootEntry: View {
     init() { _ = ZEUSNativeHostBootstrap.configured }
     var body: some View {
         #if DEBUG
-        if CommandLine.arguments.contains("--zeus-file-picker") {
+        if CommandLine.arguments.contains("--zeus-cloud-storage-fixture") {
+            ZeusCloudStorageUseTestEntry()
+        } else if CommandLine.arguments.contains("--zeus-cloud-footprint") {
+            ZeusCloudFootprintTestEntry()
+        } else if CommandLine.arguments.contains("--zeus-cloud-partial-stream") {
+            ZeusCloudPartialStreamTestEntry()
+        } else if CommandLine.arguments.contains("--zeus-cloud-tool-cards") {
+            ZeusCloudToolCardsTestEntry()
+        } else if CommandLine.arguments.contains("--zeus-file-picker") {
             ZEUSFileImportDiagnostics()
         } else if CommandLine.arguments.contains("--zeus-mounted-folders") {
             ZeusMountedFoldersTestEntry()
@@ -41,11 +49,16 @@ struct ZEUSBrowserRootEntry: View {
 @MainActor
 private enum ZEUSNativeHostBootstrap {
     static let configured: Void = {
+        NativeCloudAccountAPI.dataDelegate = ZeusCloudArchive.shared
+        NativeCloudAccountAPI.browserFilesDidChange = { ZeusCloudArchive.shared.scheduleBackup() }
+        NativeCloudAccountAPI.sharedFilesView = { AnyView(ZeusCloudFilesView(session: ZeusCloudRuntime.globalWorkspace)) }
         let defaults = UserDefaults.standard
         if defaults.string(forKey: "appLanguage") != "ar" { defaults.set("ar", forKey: "appLanguage") }
         if defaults.string(forKey: "composerInputModePreference") != "text" { defaults.set("text", forKey: "composerInputModePreference") }
         if defaults.bool(forKey: "voice.output.readRepliesAloud") { defaults.set(false, forKey: "voice.output.readRepliesAloud") }
         Bundle.setLanguage("ar")
+        ZeusCloudArchive.shared.monitorSettings()
+        Task { await ZeusDeviceStorageBudget.prepare() }
         Task { await ZeusDefaultSkills.shared.install() }
         #if DEBUG
         _ = ZEUSNativeFixtureBootstrap.configured
@@ -54,6 +67,155 @@ private enum ZEUSNativeHostBootstrap {
 }
 
 #if DEBUG
+/// Exercises the actual native persistence entry and production transcript
+/// decoder with repeated remote tool events, then reopens from a fresh reader.
+private struct ZeusCloudStorageUseTestEntry: View {
+    @StateObject private var vm = AIChatViewModel()
+    @State private var result = "running"
+    @State private var detail = ""
+    var body: some View {
+        VStack(spacing: 14) {
+            Text(result).accessibilityIdentifier("cloudStorageAfterUse")
+            Text(detail).accessibilityIdentifier("cloudStorageAfterUseBytes")
+        }.task {
+            do {
+                await ZeusDeviceStorageBudget.prepare()
+                let registered = await ChatStore.shared.createSession(modelId: "cloud-storage-fixture")
+                let session = registered.id
+                vm.sessionId = session
+                let before = await ChatStore.shared.zeusCachedMessageBytes(session)
+                let payload = String(repeating: "نص سحابي ", count: 10000)
+                for turn in 0..<20 {
+                    let input: String
+                    if turn == 19 {
+                        guard let literal = vm.stashPastedText(payload) else { throw NSError(domain: "CloudStorageFixture", code: 5) }
+                        input = literal
+                    } else { input = "رسالة اختبار سحابي \(turn)" }
+                    vm.send(overrideText: input)
+                    await vm.currentTask?.value
+                    guard !vm.isProcessing else { throw NSError(domain: "CloudStorageFixture", code: 2) }
+                    _ = await vm.persistAgentMessage(AgentMessage(role: .user, parts: [.text("طلب \(turn): " + payload)]))
+                    _ = await vm.persistAgentMessage(AgentMessage(role: .assistant, parts: [
+                        .toolUse(id: "tool-\(turn)", name: "file_write", input: ["path": "output-\(turn).txt", "content": payload]),
+                        .toolResult(id: "tool-\(turn)", name: "file_write", content: "saved on server", isError: false),
+                        .text(payload)
+                    ]))
+                    vm.ensureKernelBooted(); vm.mountMinis(for: session)
+                }
+                let runs: [[String: Any]] = (0..<20).reversed().map { turn in
+                    ["id": "run-\(turn)", "native_user_id": "user-\(turn)", "native_assistant_id": "assistant-\(turn)",
+                     "status": "completed", "prompt": "طلب \(turn): " + payload, "created": Double(turn), "seq": 3]
+                }
+                let read: (String) async throws -> Data = { path in
+                    if path.contains("/runs?") { return try JSONSerialization.data(withJSONObject: ["runs": runs]) }
+                    let events: [[String: Any]] = [
+                        ["seq": 1, "kind": "tool_start", "data": ["id": "write-1", "name": "file_write", "input": ["path": "output.txt", "content": payload]]],
+                        ["seq": 2, "kind": "tool_result", "data": ["id": "write-1", "output": "saved on server", "success": true]],
+                        ["seq": 3, "kind": "text", "data": ["delta": payload]]
+                    ]
+                    return try JSONSerialization.data(withJSONObject: ["events": events])
+                }
+                if let literal = vm.stashPastedText(payload) {
+                    let pasted = await vm.consumePastedDraft(literal, sessionId: session)
+                    guard pasted?.modelText == payload else { throw NSError(domain: "CloudStorageFixture", code: 3) }
+                } else { throw NSError(domain: "CloudStorageFixture", code: 4) }
+                let first = try await ZeusCloudRuntime(transcriptRead: read).cloudTranscript(session: session)
+                let reopened = try await ZeusCloudRuntime(transcriptRead: read).cloudTranscript(session: session)
+                let after = await ChatStore.shared.zeusCachedMessageBytes(session)
+                let root = RootfsManager.shared.rootfsPath
+                let linux = FileManager.default.fileExists(atPath: root.path) ? try ZeusStorageFiles.size(root) : 0
+                let filesRoot = AIChatViewModel.minisPersistentBase.appendingPathComponent(session)
+                let localFiles = FileManager.default.fileExists(atPath: filesRoot.path) ? try ZeusStorageFiles.size(filesRoot) : 0
+                let taskName = SHA256.hash(data: Data(session.utf8)).map { String(format: "%02x", $0) }.joined() + ".json"
+                let savedTask = ZeusAgentHarness.shared.taskStorageDirectory.appendingPathComponent(taskName)
+                guard vm.messages.filter({ $0.role == .user }).count == 20,
+                      !FileManager.default.fileExists(atPath: savedTask.path), first.count == 40, reopened.count == 40,
+                      first.map(\.id) == reopened.map(\.id), before == 0, after == 0,
+                      reopened.last?.parts.count == 3, linux == 0, !FileManager.default.fileExists(atPath: root.path), localFiles == 0, !ISHKernel.shared.isBooted else {
+                    throw NSError(domain: "CloudStorageFixture", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unexpected local payload or incomplete remote replay"])
+                }
+                detail = "20 turns; 40 messages reopened; messages=\(after) bytes; files=\(localFiles) bytes; Linux=\(linux) bytes"
+                result = "20:40:0:0:idle"
+            } catch { detail = error.localizedDescription; result = "failed" }
+        }
+    }
+}
+private struct ZeusCloudFootprintTestEntry: View {
+    @StateObject private var vm = AIChatViewModel()
+    @State private var result = "checking"
+    @State private var breakdown = ""
+    var body: some View {
+        VStack {
+            Text(result).accessibilityIdentifier("cloudLinuxFootprint")
+            Text(breakdown).accessibilityIdentifier("cloudDeviceFootprintBreakdown")
+        }.task {
+            await ZeusDeviceStorageBudget.prepare()
+            vm.ensureKernelBooted()
+            vm.mountMinis(for: UUID().uuidString)
+            try? await Task.sleep(for: .milliseconds(300))
+            let bytes = (try? ZeusStorageFiles.size(RootfsManager.shared.rootfsPath)) ?? 0
+            result = "\(bytes):\(ISHKernel.shared.isBooted ? "booted" : "idle")"
+            breakdown = [ZeusStorageScope.documents, ZeusStorageScope.library].map { root in
+                let size = (try? ZeusStorageFiles.size(root)) ?? 0
+                return root.lastPathComponent + ": " + String(size) + " bytes"
+            }.joined(separator: "\n")
+        }
+    }
+}
+private struct ZeusCloudPartialStreamTestEntry: View {
+    @StateObject private var vm = AIChatViewModel()
+    @State private var message: ChatMessage?
+    @State private var block: AssistantBlock?
+    var body: some View {
+        VStack {
+            CollectionViewMessageListV3(vm: vm, inputFocused: false, onRetryMessage: nil, onRetryLast: nil, onEdit: nil, onWithdraw: nil, onResume: nil, onStop: nil, onCompact: nil, maxContentWidth: 0, floatingBarHeight: 0, inputBarHeight: 0)
+            Button("إكمال الرد التجريبي") {
+                guard let message else { return }
+                Task { @MainActor in
+                    block = await ZeusCloudPresentation.append("\n\nاكتمل الرد التجريبي", vm: vm, message: message, block: block, final: true)
+                    vm.isProcessing = false
+                }
+            }.accessibilityIdentifier("finishCloudReply")
+        }.preferredColorScheme(.dark)
+        .task {
+            guard message == nil else { return }
+            vm.messages = [ChatMessage(role: .user, content: "اختبار وصول أجزاء الرد")]
+            vm.isProcessing = true
+            let current = ZeusCloudPresentation.begin(vm); message = current
+            try? await Task.sleep(for: .milliseconds(300))
+            block = await ZeusCloudPresentation.append("الجزء الأول من الرد السحابي", vm: vm, message: current, block: nil)
+        }
+    }
+}
+/// Exercises the production remote-event mapping in the stock native renderer.
+private struct ZeusCloudToolCardsTestEntry: View {
+    @StateObject private var vm = AIChatViewModel()
+    @State private var message: ChatMessage = {
+        let samples: [(String, [String: Any], String)] = [
+            ("shell_execute", ["command": "uname -a", "tool_title": "فحص نظام Linux"], #"{"id":"sample","output":"Linux · UID 10001\nexit 0","exit_code":0}"#),
+            ("file_read", ["path": "project/README.md", "tool_title": "قراءة ملف المشروع"], "# ZEUS project"),
+            ("file_edit", ["path": "project/main.py", "tool_title": "تعديل ملف المشروع"], "File edited"),
+            ("memory_get", ["tool_title": "قراءة الذاكرة"], "Project notes")
+        ]
+        let blocks = samples.enumerated().map { index, sample in
+            let block = AssistantBlock(kind: ZeusToolPresentation.kind(sample.0, input: sample.1), content: ZeusToolPresentation.output(sample.2, name: sample.0), toolStatus: .success, toolUseId: "sample-\(index)")
+            block.toolSummary = sample.1["tool_title"] as? String
+            block.toolInputArgs = String(decoding: try! JSONSerialization.data(withJSONObject: sample.1), as: UTF8.self)
+            return block
+        }
+        return ChatMessage(role: .assistant, content: "", blocks: blocks)
+    }()
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Zeus").font(.title2.bold())
+                ForEach(message.blocks) { block in
+                    AssistantBlockView(block: block, message: message, isActiveMessage: false, highlightedBlockId: .constant(nil), detailBlock: .constant(nil))
+                }
+            }.padding(24).frame(maxWidth: 840)
+        }.frame(maxWidth: .infinity, maxHeight: .infinity).preferredColorScheme(.dark).environmentObject(vm)
+    }
+}
 /// Use the real settings view inside a sheet, as in browser preferences.
 private struct ZeusMountedFoldersTestEntry: View {
     @State private var settings = true
@@ -86,7 +248,10 @@ private struct OriginalPreferencesRoot: View {
             .foregroundStyle(.primary)
             .tint(.blue)
             .preferredColorScheme(appearanceMode == 1 ? .light : appearanceMode == 2 ? .dark : nil)
-            .sheet(isPresented: $showTerminal) { ISHTerminalView(showCloseButton: true) }
+            .sheet(isPresented: $showTerminal) {
+                if NativeCloudAccountAPI.usesCloud { ZeusCloudTerminalView() }
+                else { ISHTerminalView(showCloseButton: true) }
+            }
     }
 }
 
@@ -94,10 +259,28 @@ private struct OriginalPreferencesRoot: View {
 private struct NativeAgentContainer: View {
     let session: NativeBrowserSession
     let presentation: NativeAssistantPresentation
+    @State private var cloudIssue: String?
     var body: some View {
         NativeAgentControllerView()
             .overlay { ZeusAgentControls(presentation: presentation) }
             .onAppear { ZEUSNativeAgentBridge.shared.bind(session) }
+            .task { await refreshCloudIndex() }
+            .safeAreaInset(edge: .top) {
+                if let cloudIssue {
+                    HStack {
+                        Label(cloudIssue, systemImage: "icloud.slash").font(.caption).lineLimit(2)
+                        Spacer()
+                        Button("إعادة الاتصال") { Task { await refreshCloudIndex() } }.font(.caption.bold())
+                    }.padding(10).background(.regularMaterial)
+                }
+            }
+    }
+    @MainActor private func refreshCloudIndex() async {
+        guard NativeCloudAccountAPI.usesCloud else { return }
+        do {
+            try await ZeusCloudRuntime.shared.restoreSessionIndex(); cloudIssue = nil
+            NotificationCenter.default.post(name: .cloudSyncDidFetchChanges, object: nil)
+        } catch { cloudIssue = error.localizedDescription }
     }
 }
 

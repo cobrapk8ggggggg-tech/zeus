@@ -157,6 +157,11 @@ struct AccountSettingsView: View {
                 .disabled(profile.role == .guest && !canAdminister)
                 if model.profile.id == profile.id { Button("تسجيل الخروج الآن") { model.logout(); dismiss() } }
                 if canAdminister && profile.isAdmin {
+                    ThemedSection("حساب ZEUS") {
+                        NavigationLink { CloudAccountSettingsView(model: model) } label: {
+                            Label("الحساب والمزامنة", systemImage: "person.crop.circle.badge.checkmark")
+                        }.accessibilityIdentifier("cloudAccountSettings")
+                    }
                     ThemedSection { Toggle("إظهار صورة الحساب الحالي دائمًا", isOn: $showCurrentUserAvatar) }
                     ThemedSection("حسابات أخرى") {
                         ForEach(model.profiles.profiles.filter { [.guest, .kiosk].contains($0.role) }) { account in Button { editingAccount = account } label: { HStack { AccountAvatar(profile: account, store: model.profiles, size: 50); Text(account.name); Spacer(); Text(account.account?.enabled == true ? "مفعّل" : "متوقف").font(.caption) } } }

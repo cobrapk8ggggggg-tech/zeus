@@ -1,5 +1,6 @@
 import SwiftUI
 import CryptoKit
+import ZEUSBrowser
 
 /// The executing agent remains the original AIChatViewModel and its selected
 /// provider. This runtime adds durable plans, tools and completion gates to it.
@@ -43,7 +44,6 @@ import CryptoKit
     var taskStorageDirectory: URL { root }
     init(root: URL? = nil) {
         self.root = root ?? FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0].appendingPathComponent("ZeusAgentTasks", isDirectory: true)
-        try? FileManager.default.createDirectory(at: self.root, withIntermediateDirectories: true)
     }
     private func file(_ session: String) -> URL {
         let hash = SHA256.hash(data: Data(session.utf8)).map { String(format: "%02x", $0) }.joined()
@@ -57,8 +57,11 @@ import CryptoKit
     }
     func save(_ session: String, _ value: State) throws {
         var value = value; value.updated = Date()
-        let data = try JSONEncoder().encode(value)
-        try data.write(to: file(session), options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        if !NativeCloudAccountAPI.usesCloud {
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            let data = try JSONEncoder().encode(value)
+            try data.write(to: file(session), options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        }
         states[session] = value
         if let raw = value.project?.approvalBlock, let id = UUID(uuidString: raw) {
             NotificationCenter.default.post(name: .zeusApprovalChanged, object: id)
@@ -209,6 +212,13 @@ import CryptoKit
             }
         }
     }
+    func removeDeletedSession(_ session: String) {
+        for job in jobs.values where job.owner == session && job.exitCode == nil { job.task?.cancel() }
+        states.removeValue(forKey: session)
+        results = results.filter { !$0.key.hasPrefix(session + ":") }
+        try? FileManager.default.removeItem(at: file(session))
+        try? FileManager.default.removeItem(at: AIChatViewModel.minisConfigRoot.appendingPathComponent("cloud-run-" + session + ".json"))
+    }
     func cancel(session: String?) {
         guard let session else { return }
         for job in jobs.values where job.owner == session && job.exitCode == nil { job.task?.cancel() }
@@ -244,6 +254,7 @@ import CryptoKit
         return output
     }
     func prepareEnvironment(vm: AIChatViewModel) async throws {
+        if NativeCloudAccountAPI.usesCloud { return }
         if let session = vm.sessionId { try Self.prepareWorkspace(session: session) }
         vm.ensureKernelBooted()
         for _ in 0..<300 {
@@ -255,6 +266,7 @@ import CryptoKit
         throw ZeusPatch.failure("Local execution environment did not finish starting. No command was launched.")
     }
     static func prepareWorkspace(session: String) throws {
+        guard !NativeCloudAccountAPI.usesCloud else { return }
         guard !session.isEmpty, !session.contains("/"), session != ".", session != ".." else { throw ZeusPatch.failure("Invalid conversation storage identifier.") }
         let base = AIChatViewModel.minisPersistentBase.appendingPathComponent(session, isDirectory: true)
         for directory in ["workspace", "attachments", "offloads", "browser"] {
