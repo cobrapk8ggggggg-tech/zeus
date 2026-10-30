@@ -1,7 +1,9 @@
 {
   "session": "zeus-chatgpt-20261030-f",
-  "sequence": 1,
-  "operation": "observe",
-  "label": "Review native ChatGPT onboarding after the observed splash screen",
-  "settle_seconds": 5
+  "sequence": 2,
+  "operation": "tap",
+  "x": 0.5,
+  "y": 0.953125,
+  "label": "Tap Skip as displayed in this fresh onboarding screen",
+  "settle_seconds": 4
 }
