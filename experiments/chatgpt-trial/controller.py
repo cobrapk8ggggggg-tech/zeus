@@ -58,7 +58,13 @@ def control():
 
 async def execute(command):
     operation=command['operation']
-    if operation in {'tap','type','key'}:return await DEVICE.action(operation,command)
+    if operation=='type':
+        import re
+        text=command.get('text','')
+        if isinstance(text,str) and re.fullmatch(r'[A-Za-z0-9 ]{1,200}',text):
+            await DEVICE.command('shell','input','text',text.replace(' ','%s'));return {'typed_with':'system_input_ascii'}
+        return await DEVICE.action(operation,command)
+    if operation in {'tap','swipe','key'}:return await DEVICE.action(operation,command)
     if operation=='launch':return await DEVICE.action('launch',{'package':PACKAGE})
     if operation=='observe':return {'observed':True}
     if operation=='network':
@@ -99,7 +105,14 @@ async def main():
             try:
                 await install_interception_ca(DEVICE,root/'ca/mitmproxy-ca-cert.pem',PROOF/'system-ca-setup.log');RESULT['system_ca_installed']=True
             except Exception as error:RESULT.update(system_ca_installed=False,ca_error=str(error))
-            await DEVICE.connect()
+            await DEVICE.command('shell','wm','dismiss-keyguard')
+            await DEVICE.command('shell','input','keyevent','82')
+            try:await DEVICE.connect()
+            except ValueError as error:
+                if 'Unknown input method' not in str(error):raise
+                # This trial can enter its harmless English prompt using Android's
+                # built-in input; an optional IME registration race must not block it.
+                RESULT['optional_keyboard_error']=str(error)
             # Verify the capture infrastructure independently; never attribute this fixture to ChatGPT.
             if RESULT['system_ca_installed']:
                 try:
@@ -133,7 +146,7 @@ async def main():
                 except Exception as error:
                     print('Control unavailable: '+type(error).__name__,flush=True);continue
                 if command.get('sequence')!=next_sequence:continue
-                since=time.time();record={k:v for k,v in command.items() if k in {'sequence','operation','x','y','text','key','mode','label'}}
+                since=time.time();record={k:v for k,v in command.items() if k in {'sequence','operation','x','y','x2','y2','text','key','mode','label'}}
                 try:record['execution']=await execute(command)
                 except Exception as error:record['error']=str(error)
                 RESULT['agent_actions'].append(record);await asyncio.sleep(min(15,max(1,int(command.get('settle_seconds',4)))))

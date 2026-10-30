@@ -19,7 +19,7 @@ function files(dir){return fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>e
    const artifact=await client.uploadArtifact(`chatgpt-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}-${value.sequence}`,files(root),root,{retentionDays:2,compressionLevel:6});
    console.log(`OBSERVATION_PUBLISHED sequence=${value.sequence} artifact=${artifact.id}`);published.add(name);
   }
-  if(exit!==null)break;
+  if(exit!==null&&fs.readdirSync(proof).filter(n=>/^ready-\d+\.json$/.test(n)).every(n=>published.has(n)))break;
   await new Promise(r=>setTimeout(r,1000));
  }
  if(exit!==0)process.exitCode=exit;
