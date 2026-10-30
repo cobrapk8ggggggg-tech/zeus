@@ -11,7 +11,7 @@ const path=require('node:path');
   const size=await page.locator('video').evaluate(v=>[v.videoWidth,v.videoHeight]);assert(size[0]>0&&size[1]>0);
   await page.waitForFunction(()=>Number(document.getElementById('count').textContent)>=1,{},{timeout:10000});
   await page.locator('[data-tab="network"]').click();
-  await page.locator('#filter').fill('zeus-probe.invalid:8091/probe');
+  await page.locator('#filter').fill('/probe');
   assert.equal(await page.locator('#flows button').count(),1,'Request phases must update one row');
   await page.locator('#flows button').first().click();
   await page.waitForFunction(()=>document.getElementById('flowContent').textContent.includes('مرحبا ZEUS probe'));
