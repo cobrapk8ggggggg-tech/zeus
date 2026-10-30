@@ -28,7 +28,7 @@ async def main():
         proof=Path(os.environ.get('LAB_PROOF_DIR','android-results'));proof.mkdir(exist_ok=True)
         server=uvicorn.Server(uvicorn.Config(app,lifespan='off',host='127.0.0.1',port=8088,log_level='warning',access_log=False))
         serving=asyncio.create_task(server.serve())
-        origin,origin_ca=start_origin(directory)
+        origin,origin_ca=start_origin(directory,hold=True)
         capture_token=secrets.token_urlsafe(40);os.environ['ZEUS_ANDROID_CAPTURE_TOKEN']=capture_token
         capture_log=(proof/'capture.log').open('w')
         ca_directory=Path(directory)/'capture-ca'
@@ -99,6 +99,16 @@ async def main():
                 (proof/'after-send.jpg').write_bytes(await device.screenshot())
             assert found is not None,'Actual Android request did not reach capture addon'
             assert base64.b64decode(found['request_body']['base64']).decode()=='مرحبا ZEUS probe',found
+            assert found['phase']=='request' and not origin.replied.is_set(),'Capture waited for the full response'
+            (proof/'actual-request-before-response.json').write_text(json.dumps(found,ensure_ascii=False,indent=2))
+            origin.release.set();cursor=found['id']
+            for _ in range(50):
+                events=(await call('android_network',{'operation':'read','after':cursor}))['events']
+                if events:
+                    found=events[0];cursor=found['id']
+                    if found.get('phase')=='complete':break
+                await asyncio.sleep(.2)
+            assert found['phase']=='complete',found
             assert found['status']==200,found
             assert found['url'].startswith('https://'),found
             (proof/'actual-android-captured-request.json').write_text(json.dumps(found,ensure_ascii=False,indent=2))

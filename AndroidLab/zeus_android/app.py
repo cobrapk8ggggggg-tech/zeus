@@ -11,7 +11,7 @@ import time
 from uuid import UUID
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from .tokens import decode
 from .device import Device
@@ -36,7 +36,26 @@ def create_app(root=None, key=None, owner=None, device=None, clock=time.time):
     state = State(root or os.environ.get("ZEUS_ANDROID_DATA", "/data"), clock)
     projects = Projects(state.root / "projects")
     device = device or Device(os.environ.get("ZEUS_ANDROID_ADB", "android:5555"))
-    video = Video(device); gate = asyncio.Lock(); lifecycle = Lifecycle()
+    video = Video(device); gate = asyncio.Lock(); lifecycle = Lifecycle(); observers = set()
+
+    def notify():
+        for observer in observers: observer.set()
+
+    def summary(event):
+        return {k:v for k,v in event.items() if k in {'id', 'flow_id', 'sequence', 'phase', 'started', 'observed', 'method', 'url', 'status', 'direction', 'message_type', 'error'}}
+
+    def network(scope, operation, args, role):
+        events = state.events(scope, max(0, int(args.get('after', 0))), 1 if operation == 'read' else 5)
+        if operation == 'list': events = [summary(event) for event in events]
+        elif role == 'agent':
+            # Keep structured model results below the cloud tool output limit.
+            for event in events:
+                for field in ('request_body', 'response_body'):
+                    if field in event and len(event[field].get('base64', '')) > 4096:
+                        event[field] = {**event[field], 'base64':event[field]['base64'][:4096], 'truncated':True}
+                for field in ('request_headers', 'response_headers'):
+                    if field in event: event[field] = dict(list(event[field].items())[:12])
+        return {'events':events}
     initial = state.load()
     if initial and initial["status"] == "running": initial.update(status="interrupted", capture=False); state.save(initial)
 
@@ -49,7 +68,7 @@ def create_app(root=None, key=None, owner=None, device=None, clock=time.time):
         try: await lifecycle.action("stop")
         except ValueError:
             value.update(status="stop_failed", capture=False, reason="تعذر تأكيد إيقاف Android؛ أعد محاولة الإيقاف."); state.save(value); raise
-        value.update(status="stopped", capture=False, reason=reason); state.save(value)
+        value.update(status="stopped", capture=False, reason=reason); state.save(value); notify()
 
     async def sweep():
         while True:
@@ -93,7 +112,8 @@ def create_app(root=None, key=None, owner=None, device=None, clock=time.time):
                 chunks.append(chunk)
             request._body = b"".join(chunks)
         response = await call_next(request)
-        response.headers.update({"Cache-Control":"no-store", "Referrer-Policy":"no-referrer", "X-Content-Type-Options":"nosniff",
+        cache = response.headers.get('Cache-Control', 'no-store')
+        response.headers.update({"Cache-Control":cache, "Referrer-Policy":"no-referrer", "X-Content-Type-Options":"nosniff",
             "Content-Security-Policy":"default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; media-src 'self' blob:; img-src 'self' blob: data:; frame-ancestors 'none'; base-uri 'none'"})
         return response
 
@@ -126,6 +146,30 @@ def create_app(root=None, key=None, owner=None, device=None, clock=time.time):
         if not saved or saved["scope"] != state.scope(value): return {"status":"stopped", "controller":"human", "capture":False}
         return {k:v for k,v in saved.items() if k not in {"scope", "owner"}}
 
+    @app.get('/v1/network/feed')
+    async def network_feed(request: Request, after: int = 0, value=Depends(claims)):
+        if value['role'] != 'viewer': raise HTTPException(403)
+        if len(observers) >= 2: raise HTTPException(429, 'Too many network viewers')
+        observer = asyncio.Event(); observers.add(observer)
+        async def events():
+            cursor = max(0, after); scope = state.scope(value)
+            try:
+                while clock() < value['exp']:
+                    observer.clear()
+                    batch = state.events(scope, cursor)
+                    if batch:
+                        for event in batch:
+                            cursor = event['id']
+                            yield 'id: '+str(cursor)+'\ndata: '+json.dumps(summary(event), ensure_ascii=False)+'\n\n'
+                        continue
+                    saved = state.load()
+                    if not saved or saved['scope'] != scope or saved['status'] != 'running' or not saved['capture']: break
+                    try: await asyncio.wait_for(observer.wait(), min(15, max(.01, value['exp']-clock())))
+                    except asyncio.TimeoutError: yield ': heartbeat\n\n'
+                    if await request.is_disconnected(): break
+            finally: observers.discard(observer)
+        return StreamingResponse(events(), media_type='text/event-stream', headers={'X-Accel-Buffering':'no', 'Cache-Control':'no-store, no-transform'})
+
     @app.post("/v1/tool")
     async def tool(call: Call, value=Depends(claims)):
         async with gate:
@@ -144,6 +188,8 @@ def create_app(root=None, key=None, owner=None, device=None, clock=time.time):
             if call.name == "android_device" and operation == "status": return await session(value)
             if call.name == "android_project" and operation in {"list", "job", "files", "read"}:
                 return await projects.operation(scope, operation, args, device)
+            if call.name == 'android_network' and operation in {'list', 'read'}:
+                return network(scope, operation, args, value['role'])
             if call.name == "android_device" and operation == "start":
                 if value["role"] != "viewer": raise ValueError("Open the laboratory and start Android explicitly before using agent tools")
                 if saved and saved["scope"] != scope and saved["status"] == "running": raise ValueError("Another conversation is using the Android device")
@@ -179,13 +225,8 @@ def create_app(root=None, key=None, owner=None, device=None, clock=time.time):
                 if operation in {"start", "stop"}:
                     proxy = os.environ.get("ZEUS_ANDROID_PROXY", "capture:8080") if operation == "start" else ":0"
                     await device.command("shell", "settings", "put", "global", "http_proxy", proxy)
-                    saved["capture"] = operation == "start"; state.save(saved)
+                    saved["capture"] = operation == "start"; state.save(saved); notify()
                     result = {"capturing":saved["capture"], "https":"Requires a trusted certificate; pinned or non-proxy traffic may be unavailable"}
-                elif operation in {"list", "read"}:
-                    events = state.events(scope, max(0, int(args.get("after", 0))))
-                    if operation == "list":
-                        events = [{k:v for k,v in e.items() if k not in {"request_body", "response_body", "request_headers", "response_headers"}} for e in events]
-                    result = {"events":events}
                 else: raise ValueError("Unknown capture operation")
             else: raise ValueError("Unknown Android tool")
             current = state.load()
@@ -212,6 +253,7 @@ def create_app(root=None, key=None, owner=None, device=None, clock=time.time):
             state.db.execute("DELETE FROM events WHERE scope=?",(scope,))
             state.db.execute("DELETE FROM operations WHERE scope=?",(scope,));state.db.commit()
             state.db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            notify()
         return {"deleted":True}
 
     @app.post("/v1/video")
@@ -241,7 +283,7 @@ def create_app(root=None, key=None, owner=None, device=None, clock=time.time):
             if not saved or saved["status"] != "running" or not saved["capture"]: return {"accepted":False}
             # Exclude flows started before this conversation/session.
             if not isinstance(event.get("started"), (int,float)) or event["started"] < saved["started"]: return {"accepted":False}
-            state.capture(saved["scope"], event)
-        return {"accepted":True}
+            identifier = state.capture(saved["scope"], event); notify()
+        return {"accepted":True, "id":identifier}
 
     return app

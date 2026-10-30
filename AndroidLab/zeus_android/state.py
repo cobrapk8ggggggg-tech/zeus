@@ -40,15 +40,16 @@ class State:
         raw = json.dumps(event, ensure_ascii=False)
         size = len(raw.encode())
         if size > 140000: raise ValueError("Network event too large")
-        self.db.execute("INSERT INTO events(scope,bytes,value) VALUES(?,?,?)", (scope, size, raw))
+        row = self.db.execute("INSERT INTO events(scope,bytes,value) VALUES(?,?,?)", (scope, size, raw))
         # Limits apply globally too; switching conversations cannot evade them.
         self.db.execute("DELETE FROM events WHERE id NOT IN (SELECT id FROM events ORDER BY id DESC LIMIT 1000)")
         while self.db.execute("SELECT COALESCE(SUM(bytes),0) FROM events").fetchone()[0] > 8*1024*1024:
             self.db.execute("DELETE FROM events WHERE id=(SELECT MIN(id) FROM events)")
         self.db.commit()
+        return row.lastrowid
 
-    def events(self, scope, after=0):
-        rows = self.db.execute("SELECT id,value FROM events WHERE scope=? AND id>? ORDER BY id LIMIT 50", (scope, after)).fetchall()
+    def events(self, scope, after=0, limit=50):
+        rows = self.db.execute("SELECT id,value FROM events WHERE scope=? AND id>? ORDER BY id LIMIT ?", (scope, after, max(1, min(50, limit)))).fetchall()
         return [{"id": r[0], **json.loads(r[1])} for r in rows]
 
     def close(self): self.db.execute("PRAGMA wal_checkpoint(TRUNCATE)"); self.db.close()

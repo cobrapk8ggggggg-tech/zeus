@@ -14,7 +14,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID,ExtendedKeyUsageOID
 
 
-def start_origin(directory):
+def start_origin(directory, hold=False):
     root=Path(directory);now=datetime.datetime.now(datetime.timezone.utc)
     ca_key=rsa.generate_private_key(public_exponent=65537,key_size=2048)
     ca_name=x509.Name([x509.NameAttribute(NameOID.COMMON_NAME,'ZEUS CI Origin CA')])
@@ -28,8 +28,12 @@ def start_origin(directory):
         def log_message(self,*args):pass
         def do_POST(self):
             data=self.rfile.read(min(8000,int(self.headers.get('Content-Length','0'))))
+            self.server.received.set()
+            if hold: self.server.release.wait(30)
             self.send_response(200);self.send_header('Content-Type','application/json');self.end_headers();self.wfile.write(json.dumps({'received':data.decode()}).encode())
+            self.server.replied.set()
     server=ThreadingHTTPServer(('127.0.0.1',8091),Origin)
+    server.received=threading.Event();server.release=threading.Event();server.replied=threading.Event()
     context=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);context.load_cert_chain(certificate,private)
     server.socket=context.wrap_socket(server.socket,server_side=True)
     threading.Thread(target=server.serve_forever,daemon=True).start()
