@@ -7,7 +7,7 @@ import subprocess
 import urllib.request
 import zipfile
 
-BUNDLE='https://d.apkpure.com/b/XAPK/com.openai.chatgpt?version=latest'
+BUNDLE=json.loads(Path(__file__).with_name('public-source.json').read_text())['url']
 SHA256='38cd3cbec61a59da3a4c7b2c6d7242dcabaaa2fb04245810d0510369012df892'
 SIGNER='b24f4bfbb3cf293f938703b9d87027c1102cc36dc4fa206910e08927db40473c'
 SOURCE='https://openai.com/.well-known/assetlinks.json'
@@ -41,4 +41,4 @@ def prepare(root):
             signer=next(line.split(': ',1)[1].strip().lower() for line in result.stdout.splitlines() if 'certificate SHA-256 digest:' in line)
             if signer!=SIGNER:raise ValueError('APK signer does not match official OpenAI asset links')
             paths.append(path);signatures[name]={'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'signer':signer}
-    return paths,{'package':manifest['package_name'],'version':manifest['version_name'],'version_code':manifest['version_code'],'min_sdk':manifest['min_sdk_version'],'bundle_sha256':SHA256,'download_source':BUNDLE,'signer_authority':SOURCE,'apks':signatures}
+    return paths,{'package':manifest['package_name'],'version':manifest['version_name'],'version_code':manifest['version_code'],'min_sdk':manifest['min_sdk_version'],'bundle_sha256':SHA256,'download_source':'APKPure public CDN (data.winudf.com)','signer_authority':SOURCE,'apks':signatures}
