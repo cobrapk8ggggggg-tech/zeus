@@ -151,7 +151,10 @@ async def main():
             RESULT['installed']=True
             proxy=bool(RESULT.get('tls_control_passed'));RESULT['proxy_enabled']=proxy
             await DEVICE.command('shell','settings','put','global','http_proxy','10.0.2.2:8089' if proxy else ':0')
-            (PROOF/'capture.jsonl').write_text('');since=time.time()
+            (PROOF/'capture.jsonl').write_text('')
+            (PROOF/'capture.epoch').write_text(SESSION)
+            RESULT['capture_scope']=['openai.com','chatgpt.com','sentry.io']
+            since=time.time()
             await DEVICE.action('launch',{'package':PACKAGE});RESULT['launched']=True;await asyncio.sleep(8)
             await snapshot(0,{'operation':'launch','proxy_enabled':proxy},since)
             deadline=min(deadline,time.monotonic()+600);next_sequence=1
