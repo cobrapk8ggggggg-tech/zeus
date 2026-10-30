@@ -6,6 +6,9 @@ from zeus_android.app import create_app
 from zeus_android.device import Device
 from zeus_android.tokens import encode
 from zeus_android.sealed import seal,seal_file
+from zeus_android.sealed import open_envelope,b64
+from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
+from cryptography.hazmat.primitives import serialization
 
 ROOT=Path(os.environ['LAB_ACTIONS_PROOF']).resolve()
 LAUNCH=json.loads(Path('experiments/actions-lab/launch.json').read_text())
@@ -52,6 +55,10 @@ async def main():
     deadline=time.time()+min(900,max(60,int(LAUNCH['runtime_seconds'])))
     bootstrap={'conversation':LAUNCH['conversation'],'viewer':secrets.token_urlsafe(40),'agent':secrets.token_urlsafe(40),'expires':deadline,'url':''}
     key=secrets.token_urlsafe(48);device=Device('emulator-5554');os.environ.update(ZEUS_ANDROID_EXTERNAL_AVD='1',ZEUS_ANDROID_TUNNEL='1')
+    control_key=X25519PrivateKey.generate()
+    control_private=control_key.private_bytes(serialization.Encoding.Raw,serialization.PrivateFormat.Raw,serialization.NoEncryption())
+    control_public=b64(control_key.public_key().public_bytes(serialization.Encoding.Raw,serialization.PublicFormat.Raw))
+    control_file=ROOT.parent/'zeus-lab-control/incoming.json';control_sequence=0;seen_digest=''
     app=create_app(root=data,key=key,owner=LAUNCH['owner'],device=device,bootstrap=bootstrap)
     server=uvicorn.Server(uvicorn.Config(app,host='127.0.0.1',port=8088,log_level='error',access_log=False,timeout_graceful_shutdown=5,ws_max_size=16384,ws_max_queue=4))
     serving=asyncio.create_task(server.serve());tunnel=None;log_file=None;result={'session':LAUNCH['session'],'fixture_only':True,'credentials_published_plaintext':False,'status':'preparing'};code=0
@@ -84,27 +91,62 @@ async def main():
                 if matches:bootstrap['url']=matches[-1];break
                 await asyncio.sleep(.5)
             if not bootstrap['url']:raise RuntimeError('Temporary tunnel URL was not issued')
-            access={'url':bootstrap['url']+'/lab/','session':LAUNCH['session'],'owner':LAUNCH['owner'],'conversation':LAUNCH['conversation'],'viewer_bootstrap':bootstrap['viewer'],'agent_bootstrap':bootstrap['agent'],'deadline':deadline,'project':project,'transport':'websocket'}
+            access={'url':bootstrap['url']+'/lab/','session':LAUNCH['session'],'owner':LAUNCH['owner'],'conversation':LAUNCH['conversation'],'viewer_bootstrap':bootstrap['viewer'],'agent_bootstrap':bootstrap['agent'],'deadline':deadline,'project':project,'transport':'websocket','control_public_key':control_public,'control_path':'experiments/actions-lab/control.json'}
             encrypted_json(ROOT/'connection','connection',access);publish(0,ROOT/'connection')
             checkpoint(data,ROOT,1,False,private)
             result.update(status='ready',actual_android_api=(await device.command('shell','getprop','ro.build.version.sdk')).decode().strip())
-            env=clean_env({'LAB_LIVE_URL':bootstrap['url']+'/lab/','LAB_LIVE_TOKEN':encode(key,LAUNCH['owner'],LAUNCH['conversation']),'LAB_LIVE_PROJECT':project,'LAB_PROOF_DIR':str(data)})
-            browser=await asyncio.create_subprocess_exec('node','AndroidLab/actions/tunnel_browser.cjs',env=env,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.STDOUT)
-            try:
-                async with asyncio.timeout(80):browser_log,_=await browser.communicate()
-            except asyncio.TimeoutError:browser.kill();await browser.wait();raise ValueError('Tunnel browser acceptance timed out')
-            (data/'browser.log').write_bytes(browser_log)
-            result['browser_passed']=browser.returncode==0
-            if browser.returncode!=0:result['browser_error']='See encrypted browser.log'
+            # Allow ordinary DNS propagation; do not retry a denied destination.
+            healthy=False
+            async with httpx.AsyncClient(timeout=8,follow_redirects=False) as probe:
+                for _ in range(12):
+                    try:
+                        check=await probe.get(bootstrap['url']+'/health')
+                        if check.status_code==200:healthy=True;break
+                        if check.status_code in (401,403):result['tunnel_probe_status']=check.status_code;break
+                    except httpx.HTTPError:pass
+                    await asyncio.sleep(2)
+            result['tunnel_healthy']=healthy
+            if healthy:
+                live_token=encode(key,LAUNCH['owner'],LAUNCH['conversation'])
+                env=clean_env({'LAB_LIVE_URL':bootstrap['url']+'/lab/','LAB_LIVE_TOKEN':live_token,'LAB_LIVE_PROJECT':project,'LAB_PROOF_DIR':str(data)})
+                browser=await asyncio.create_subprocess_exec('node','AndroidLab/actions/tunnel_browser.cjs',env=env,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.STDOUT)
+                try:
+                    async with asyncio.timeout(80):browser_log,_=await browser.communicate()
+                except asyncio.TimeoutError:browser.kill();await browser.wait();browser_log=b'Browser timeout'
+                (data/'browser.log').write_bytes(browser_log.replace(live_token.encode(),b'[redacted]'))
+                result['browser_passed']=browser.returncode==0
+            else:result['browser_passed']=False;result['browser_error']='Temporary relay was not reachable; GitHub artifact control remains available'
             checkpoint(data,ROOT,2,False,private)
             print('LAB_ACCEPTANCE_READY browser_passed='+str(result['browser_passed']),flush=True)
             while time.time()<deadline and not stop.is_set():
+                if control_file.exists():
+                    raw=control_file.read_bytes();digest=hashlib.sha256(raw).hexdigest()
+                    if digest!=seen_digest:
+                        seen_digest=digest
+                        try:
+                            outer=json.loads(raw)
+                            if outer.get('session')!=LAUNCH['session'] or outer.get('sequence')!=control_sequence+1:raise ValueError('Control is out of sequence')
+                            command=json.loads(open_envelope(outer['payload'],control_private))
+                            credential=command.get('credential','');role=next((r for r in ('viewer','agent') if __import__('hmac').compare_digest(credential,bootstrap[r])),None)
+                            if role is None:raise ValueError('Control credential is invalid')
+                            name=command.get('name');arguments=command.get('arguments',{});request_id=str(uuid.UUID(command['request_id']))
+                            client.headers['Authorization']='Bearer '+encode(key,LAUNCH['owner'],LAUNCH['conversation'],role)
+                            response=await client.post('/v1/tool',json={'name':name,'arguments':arguments,'request_id':request_id})
+                            control_sequence=outer['sequence'];observation={'sequence':control_sequence,'request_id':request_id,'http_status':response.status_code,'result':response.json(),'observed_at':time.time(),'session':app.state.lab.load()}
+                            if app.state.lab.load().get('status')=='running':
+                                observation['screenshot']=b64(await device.screenshot());observation['tree']=await device.action('tree',{})
+                            destination=ROOT/f'observation-{control_sequence}';encrypted_json(destination,'observation',observation);publish(100+control_sequence,destination)
+                            (data/f'observation-{control_sequence}.json').write_text(json.dumps(observation))
+                            result['github_control_verified']=True
+                        except Exception as error:
+                            (data/'control-error.json').write_text(json.dumps({'error':type(error).__name__,'detail':str(error)[:1000]}))
                 saved=app.state.lab.load()
                 if saved and saved['status']=='stopped':result['ended']='user_stop';break
                 try:await asyncio.wait_for(stop.wait(),2)
                 except asyncio.TimeoutError:pass
             else:result['ended']='deadline_or_signal'
-            result['status']='completed' if result.get('browser_passed') else 'transport_not_verified'
+            result['status']='completed' if result.get('browser_passed') else 'artifact_control_verified' if result.get('github_control_verified') else 'transport_not_verified'
+            if result['status']=='transport_not_verified':code=1
     except BaseException as error:
         code=1;result.update(status='failed',error=type(error).__name__,detail=str(error)[:3000])
     finally:
