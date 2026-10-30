@@ -4,6 +4,8 @@ This experiment attempts an API29 x86_64 Android boot with **`-accel off`** and 
 
 The SDK is fetched directly from Google's stable emulator/platform-tools metadata and API29 default-image metadata. Pinned official archive lengths and checksums are verified before extraction. No Gradle or model is installed. The image uses normal TLS verification; a local build can mount the managed proxy CA as a BuildKit secret, which is not persisted in layers.
 
+The Dockerfile is a reproducible local preflight image. On Railway the deployed fallback uses a Python image and a bounded inline bootstrap because the current API rejects the deprecated railway.json configuration field. The bootstrap installs only runtime libraries and verified SDK archives within the same900second overall deadline; it passes the remaining budget to the boot trial.
+
 Build from the repository root:
 
 ```sh
