@@ -1,11 +1,11 @@
 {
   "session": "5c9ac790-83b9-4a34-a065-dcf4bc80f16a",
-  "sequence": 4,
+  "sequence": 5,
   "payload": {
     "version": 1,
     "session": "5c9ac790-83b9-4a34-a065-dcf4bc80f16a",
-    "ephemeral_public_key": "OmduTpGZfUclLH621p82m88E89c/6p+TYrrpEJD/ySk=",
-    "nonce": "0CTSS5e8PUAtYm4n",
-    "ciphertext": "9Rn7BeIqod10Cl3nJJi4NZcp0FVGMsONe2vq6FHffmsVUQnhFzCm3yn4Xh9CNvmWysXI0K47dh+IsOUX3lBvHyGRbESNEa0rtZBipNffBsF6BgMndnASHni068dfWl3EO1mOpxWoNq0Jftx6CAaQK+NpGNZrgoF2vowVus2uFSN1xZ781h02eaG4hKGqBCF9kJi5VdSyGzmxsWtb0SAeU8xq9AqU7qzXbJ4rwxx89T9Pt+BkDH6uT8hSKy9e9+Un7XA3GmZSXjeSghLsnuxnhImcHg8+C+sgvQ5DkWWyOKie8bZM/IDoMkaRy7dnEwogD4JPlg3uufLm2a00DomkgDsThihMwWMyUj35HJC+rLwsdsLs45FpywvmE7S93oTTjeV02bBmq52nR0ICluk="
+    "ephemeral_public_key": "tmhvpWcNfg1R7nmEo/mW7o3a9z8/kD0IDjl8VULfT2k=",
+    "nonce": "ty1YODCcfFntivnN",
+    "ciphertext": "7OXKQvy0o5sLHFs8i7COjkt2WkhCyAY0dFK5w5MuSRdWZVAzfEsr/7tgSYVJ74pxQ7EX3e8ojNcThVjEyAZwbka/ocP/0lm5ycXgPZq03h4qSBclS+Z8YARexEGgNe151tdZ6zCzHLgn7L+klaHSwwEA7Dx5g1muqmIw6bqS9ukhcXr2uVT89CuLjvaAkUCR0BIQSvlnzfkxBBVdPrLtsIbsJ8sTfa3/8+C2xOmx1WK8KZuiYWB4hcenSMlLpZSYg0F8I6HuxlJqfD57"
   }
 }
