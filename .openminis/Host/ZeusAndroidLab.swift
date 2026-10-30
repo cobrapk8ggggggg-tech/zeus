@@ -2,6 +2,35 @@ import SwiftUI
 import WebKit
 import ZEUSBrowser
 
+enum ZeusAndroidAPKTransfer {
+    struct Uploaded { let project:String;let sha256:String }
+    @MainActor static func upload(source:URL,conversation:UUID) async throws -> Uploaded {
+        let scoped=source.startAccessingSecurityScopedResource()
+        defer { if scoped { source.stopAccessingSecurityScopedResource() } }
+        let values=try source.resourceValues(forKeys:[.fileSizeKey,.isRegularFileKey])
+        guard values.isRegularFile == true,let size=values.fileSize,size>0,size<=256*1024*1024 else { throw ZeusPatch.failure("اختر ملف APK لا يتجاوز256 MiB") }
+        let data=try await NativeCloudAccountAPI.runtime("v1/android/\(conversation.uuidString.lowercased())/access",method:"POST",body:Data("{}".utf8))
+        let access=try JSONDecoder().decode(ZeusAndroidAccess.self,from:data)
+        guard access.url.scheme=="https",access.url.user==nil,access.url.password==nil,
+              var components=URLComponents(url:access.url,resolvingAgainstBaseURL:false) else { throw ZeusPatch.failure("عنوان المختبر غير صالح") }
+        components.path="/v1/upload";components.query=nil;components.fragment=nil
+        guard let url=components.url else { throw ZeusPatch.failure("عنوان رفع غير صالح") }
+        var request=URLRequest(url:url);request.httpMethod="POST"
+        request.setValue("Bearer "+access.token,forHTTPHeaderField:"Authorization")
+        request.setValue("application/vnd.android.package-archive",forHTTPHeaderField:"Content-Type")
+        request.setValue(source.lastPathComponent.addingPercentEncoding(withAllowedCharacters:.urlPathAllowed),forHTTPHeaderField:"X-Filename")
+        let configuration=URLSessionConfiguration.ephemeral;configuration.urlCache=nil;configuration.httpMaximumConnectionsPerHost=1
+        configuration.timeoutIntervalForRequest=180;configuration.timeoutIntervalForResource=300
+        let session=URLSession(configuration:configuration);defer { session.invalidateAndCancel() }
+        // Upload streams the picked file; no Data(contentsOf:) or persistent copy.
+        let (responseData,response)=try await session.upload(for:request,fromFile:source)
+        guard (response as? HTTPURLResponse)?.statusCode==200 else { throw ZeusPatch.failure("لم يكتمل رفع APK إلى المختبر؛ تحقق من الاتصال والحصة") }
+        guard let value=try JSONSerialization.jsonObject(with:responseData) as? [String:Any],let project=value["id"] as? String,UUID(uuidString:project) != nil,
+              let sha=value["sha256"] as? String,sha.count==64 else { throw ZeusPatch.failure("استجابة رفع APK غير مكتملة") }
+        return Uploaded(project:project,sha256:sha)
+    }
+}
+
 /// This feature has no RootfsManager/ISH dependency and never stages an APK in
 /// the local agent workspace. The remote page uses a nonpersistent WebKit store.
 enum ZeusAndroidTools {

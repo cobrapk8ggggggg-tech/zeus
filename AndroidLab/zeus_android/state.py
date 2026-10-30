@@ -95,4 +95,7 @@ class State:
     def all_events(self, scope):
         return [{'id':r['id'],**json.loads(r['value'])} for r in self.db.execute('SELECT id,value FROM events WHERE scope=? ORDER BY id',(scope,))]
 
+    def all_history(self,scope):
+        return [{'id':r['id'],**json.loads(r['value'])} for r in self.db.execute('SELECT id,value FROM timeline WHERE scope=? ORDER BY id',(scope,))]
+
     def close(self): self.db.execute("PRAGMA wal_checkpoint(TRUNCATE)"); self.db.close()

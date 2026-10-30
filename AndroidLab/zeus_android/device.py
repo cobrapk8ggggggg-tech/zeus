@@ -51,10 +51,16 @@ class Device:
             if attempt == 59: raise ValueError("Android did not finish booting")
             await asyncio.sleep(1)
         await self.command("shell", "input", "keyevent", "224")
+        await self.command('shell','wm','dismiss-keyguard')
         keyboard = os.environ.get("ZEUS_ANDROID_IME_APK", "/opt/zeus/ime.apk")
         if os.path.isfile(keyboard):
             await self.command("install", "-r", keyboard, timeout=60)
-            await self.command("shell", "ime", "enable", "com.zeus.lab.ime/.LabIME")
+            for attempt in range(20):
+                try:
+                    await self.command("shell", "ime", "enable", "com.zeus.lab.ime/.LabIME");break
+                except ValueError as error:
+                    if 'Unknown input method' not in str(error) or attempt==19:raise
+                    await asyncio.sleep(.5)
             await self.command("shell", "ime", "set", "com.zeus.lab.ime/.LabIME")
             await self.command("shell", "settings", "put", "secure", "show_ime_with_hard_keyboard", "1")
 

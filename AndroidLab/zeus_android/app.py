@@ -10,11 +10,12 @@ from pathlib import Path
 import time
 import zlib
 from uuid import UUID
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from urllib.parse import unquote
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
-from .tokens import decode
+from .tokens import decode, encode
 from .device import Device
 from .state import State
 from .projects import Projects
@@ -23,6 +24,7 @@ from .lifecycle import Lifecycle
 from .ice import servers as ice_servers
 from . import audit, reports
 from .diagnostics import Diagnostics
+from .streaming import SocketVideo
 
 
 class Call(BaseModel):
@@ -32,19 +34,24 @@ class Call(BaseModel):
     request_id: str = Field(min_length=1, max_length=180, pattern=r"^[a-zA-Z0-9_.:-]+$")
 
 
-def create_app(root=None, key=None, owner=None, device=None, clock=time.time):
+def create_app(root=None, key=None, owner=None, device=None, clock=time.time, bootstrap=None):
     signing_key = key or os.environ.get("ZEUS_ANDROID_SIGNING_KEY", "")
     allowed_owner = owner or os.environ.get("ZEUS_ANDROID_OWNER_ID", "")
     if len(signing_key) < 32 or not allowed_owner: raise ValueError("Configure an owner and a laboratory signing key")
     state = State(root or os.environ.get("ZEUS_ANDROID_DATA", "/data"), clock)
-    projects = Projects(state.root / "projects")
+    projects = Projects(state.root / "projects",on_event=lambda scope,kind,details:record(scope,kind,details))
     device = device or Device(os.environ.get("ZEUS_ANDROID_ADB", "android:5555"))
     video = Video(device); gate = asyncio.Lock(); lifecycle = Lifecycle(); observers = set()
-    diagnostics=Diagnostics(projects,device,state.record)
     active_agent={}
+    socket_video=SocketVideo(device);sockets=set()
 
     def notify():
         for observer in observers: observer.set()
+
+    def record(scope,kind,details):
+        identifier=state.record(scope,kind,details);notify();return identifier
+
+    diagnostics=Diagnostics(projects,device,record)
 
     def summary(event):
         return {k:v for k,v in event.items() if k in {'id', 'flow_id', 'sequence', 'phase', 'started', 'observed', 'method', 'url', 'status', 'direction', 'message_type', 'error','sni','duration_ms','interpretation','observer_dropped_total','observer_delivery_failures_total'}}
@@ -80,6 +87,7 @@ def create_app(root=None, key=None, owner=None, device=None, clock=time.time):
 
     async def stop(value, reason):
         await diagnostics.stop(value['scope'])
+        await socket_video.close()
         await video.close()
         try:
             await device.command("shell", "settings", "put", "global", "http_proxy", ":0")
@@ -112,7 +120,7 @@ def create_app(root=None, key=None, owner=None, device=None, clock=time.time):
         try: yield
         finally:
             worker.cancel(); await asyncio.gather(worker, return_exceptions=True)
-            await diagnostics.close();await projects.close(); await video.close(); state.close()
+            await diagnostics.close();await projects.close();await socket_video.close(); await video.close(); state.close()
 
     app = FastAPI(title="ZEUS Android Laboratory", lifespan=lifespan, docs_url=None, redoc_url=None)
     app.state.lab, app.state.device = state, device
@@ -141,7 +149,20 @@ def create_app(root=None, key=None, owner=None, device=None, clock=time.time):
         try: value = decode(signing_key, authorization.removeprefix("Bearer "), clock())
         except ValueError: raise HTTPException(401, "انتهت صلاحية المختبر؛ أغلقه وافتحه مجددًا.") from None
         if value["sub"] != allowed_owner: raise HTTPException(403, "Laboratory belongs to another account")
+        if bootstrap and (value['conversation']!=bootstrap['conversation'] or clock()>=bootstrap['expires']):raise HTTPException(401,'Temporary laboratory session ended')
         return value
+
+    @app.post('/v1/access/renew')
+    async def renew(authorization:str=Header(default='')):
+        if not bootstrap or clock()>=bootstrap['expires']:raise HTTPException(401,'Temporary session ended')
+        secret=authorization.removeprefix('Bearer ');role=None
+        if len(secret)<=200:
+            for candidate in ('viewer','agent'):
+                if hmac.compare_digest(secret,bootstrap[candidate]):role=candidate
+        if role is None:raise HTTPException(401,'Invalid temporary session access')
+        lifetime=min(300,int(bootstrap['expires']-clock()))
+        return {'url':bootstrap['url']+'/lab/','token':encode(signing_key,allowed_owner,bootstrap['conversation'],role,ttl=lifetime,now=clock()),
+            'owner':allowed_owner,'conversation':bootstrap['conversation'],'role':role,'expires_in':lifetime,'session_deadline':bootstrap['expires']}
 
     @app.exception_handler(ValueError)
     async def invalid(_, error): return JSONResponse({"detail":str(error)[:1000]}, 400)
@@ -157,7 +178,7 @@ def create_app(root=None, key=None, owner=None, device=None, clock=time.time):
     async def page(): return FileResponse(Path(__file__).parent / "web/index.html")
     @app.get("/lab/{name}")
     async def asset(name: str):
-        if name not in {"lab.js", "lab.css"}: raise HTTPException(404)
+        if name not in {"lab.js", "lab.css", "transports.js"}: raise HTTPException(404)
         return FileResponse(Path(__file__).parent / "web" / name)
 
     @app.get("/v1/session")
@@ -166,10 +187,72 @@ def create_app(root=None, key=None, owner=None, device=None, clock=time.time):
         if not saved or saved["scope"] != state.scope(value): return {"status":"stopped", "controller":"human", "capture":False}
         return {k:v for k,v in saved.items() if k not in {"scope", "owner"}}
 
+    @app.get('/v1/transport')
+    async def transport(value=Depends(claims)):
+        return {'preferred':'websocket' if os.environ.get('ZEUS_ANDROID_TUNNEL')=='1' else 'webrtc',
+            'modes':['fmp4','frames'],'frames_are_video':False,'network_feed':'websocket' if os.environ.get('ZEUS_ANDROID_TUNNEL')=='1' else 'sse'}
+
+    @app.websocket('/v1/stream')
+    async def stream(socket:WebSocket):
+        if len(sockets)>=6:await socket.close(code=1013);return
+        sockets.add(socket);observer=None;watcher=None
+        try:
+            await socket.accept()
+            first=await asyncio.wait_for(socket.receive_text(),5)
+            if len(first)>8000:await socket.close(code=1009);return
+            message=json.loads(first)
+            if not isinstance(message,dict):raise ValueError('Invalid stream authentication')
+            value=await claims('Bearer '+str(message.get('token','')))
+            if value['role']!='viewer':await socket.close(code=1008);return
+            owner_task=asyncio.current_task()
+            async def watch_disconnect():
+                while True:
+                    incoming=await socket.receive()
+                    if incoming['type']=='websocket.disconnect':owner_task.cancel();return
+                    # There are no command frames on this read-only connection.
+                    await socket.close(code=1008);owner_task.cancel();return
+            watcher=asyncio.create_task(watch_disconnect())
+            channel=message.get('channel');scope=state.scope(value)
+            if channel in ('video','frames'):
+                state.owned(value)
+                if channel=='video':
+                    generator=socket_video.fragments()
+                    try:
+                        async for fragment in generator:
+                            if clock()>=value['exp']:break
+                            current=state.load()
+                            if not current or current['scope']!=scope or current['status']!='running':break
+                            if isinstance(fragment,bytes):await asyncio.wait_for(socket.send_bytes(fragment),5)
+                            else:await socket.send_json(fragment)
+                    finally:await generator.aclose()
+                else:
+                    await socket.send_json({'mode':'frames','interval_seconds':1,'notice':'Successive screenshots, not live video'})
+                    while clock()<value['exp']:
+                        state.owned(value);await asyncio.wait_for(socket.send_bytes(await device.screenshot()),5);await asyncio.sleep(1)
+            elif channel in ('network','timeline'):
+                cursor=max(0,int(message.get('after',0)));observer=asyncio.Event();observers.add(observer)
+                while clock()<value['exp']:
+                    observer.clear();batch=state.events(scope,cursor) if channel=='network' else state.history(scope,cursor)
+                    if batch:
+                        for event in batch:
+                            cursor=event['id'];await socket.send_json({'channel':channel,'event':summary(event) if channel=='network' else event})
+                        continue
+                    try:await asyncio.wait_for(observer.wait(),15)
+                    except asyncio.TimeoutError:await socket.send_json({'heartbeat':True})
+            else:await socket.close(code=1008);return
+        except (ValueError,KeyError,TypeError,HTTPException,asyncio.TimeoutError,asyncio.CancelledError,WebSocketDisconnect,RuntimeError):pass
+        finally:
+            if watcher:
+                watcher.cancel();await asyncio.gather(watcher,return_exceptions=True)
+            if observer:observers.discard(observer)
+            sockets.discard(socket)
+            try:await socket.close()
+            except RuntimeError:pass
+
     @app.get('/v1/network/feed')
     async def network_feed(request: Request, after: int = 0, value=Depends(claims)):
         if value['role'] != 'viewer': raise HTTPException(403)
-        if len(observers) >= 2: raise HTTPException(429, 'Too many network viewers')
+        if len(observers) >= 4: raise HTTPException(429, 'Too many laboratory viewers')
         observer = asyncio.Event(); observers.add(observer)
         async def events():
             cursor = max(0, after); scope = state.scope(value)
@@ -253,7 +336,7 @@ def create_app(root=None, key=None, owner=None, device=None, clock=time.time):
                     except BaseException:
                         await lifecycle.action("stop"); raise
                     saved = {"scope":scope, "owner":value["sub"], "status":"running", "controller":"human", "agent_until":0,
-                        "activity":clock(), "started":clock(), "deadline":clock()+1800, "capture":False}
+                        "activity":clock(), "started":clock(), "deadline":min(clock()+1800,bootstrap['expires']) if bootstrap else clock()+1800, "capture":False}
                     # Another conversation cannot inherit an earlier capture.
                     await device.command("shell", "settings", "put", "global", "http_proxy", ":0")
                 elif operation == "stop": await stop(saved, "user")
@@ -326,13 +409,34 @@ def create_app(root=None, key=None, owner=None, device=None, clock=time.time):
     async def timeline(after:int=0,value=Depends(claims)):
         return {'events':state.history(state.scope(value),after),'coverage':state.coverage(state.scope(value))}
 
+    @app.get('/v1/timeline/feed')
+    async def timeline_feed(request:Request,after:int=0,value=Depends(claims)):
+        if value['role']!='viewer':raise HTTPException(403)
+        if len(observers)>=4:raise HTTPException(429,'Too many laboratory viewers')
+        observer=asyncio.Event();observers.add(observer)
+        async def events():
+            cursor=max(0,after)
+            try:
+                while clock()<value['exp']:
+                    observer.clear();batch=state.history(state.scope(value),cursor)
+                    if batch:
+                        for event in batch:
+                            cursor=event['id'];yield 'id: '+str(cursor)+'\ndata: '+json.dumps(event,ensure_ascii=False)+'\n\n'
+                        continue
+                    if await request.is_disconnected():break
+                    try:await asyncio.wait_for(observer.wait(),min(15,max(.01,value['exp']-clock())))
+                    except asyncio.TimeoutError:yield ': heartbeat\n\n'
+            finally:observers.discard(observer)
+        return StreamingResponse(events(),media_type='text/event-stream',headers={'X-Accel-Buffering':'no','Cache-Control':'no-store, no-transform'})
+
     @app.get('/v1/projects/{identifier}/export')
     async def report_export(identifier:str,format:str='json',variant:str='original',value=Depends(claims)):
         if value['role']!='viewer':raise HTTPException(403)
         async with gate:
             scope=state.scope(value);root=projects.project(scope,identifier);report=projects.report(root,variant)
             report['runtime_correlations']=audit.correlate(report,state.all_events(scope))
-            report['timeline']=state.history(scope,limit=200)
+            report['timeline']=state.all_history(scope)
+            report['recordings']=diagnostics.records(scope,identifier)['records']
             report['coverage']['runtime_capture']={'retention':state.coverage(scope),'limits':'Bounded, best effort; no packet-level completeness guarantee.'}
         content,mime=await asyncio.to_thread(reports.export,report,format)
         return Response(content,media_type=mime,headers={'Content-Disposition':f'attachment; filename="zeus-report-{identifier}.{format}"'})
@@ -347,7 +451,9 @@ def create_app(root=None, key=None, owner=None, device=None, clock=time.time):
     async def upload(request: Request, value=Depends(claims)):
         if value["role"] != "viewer": raise HTTPException(403)
         async with gate:
-            return await projects.upload(state.scope(value), request.stream(), request.headers.get("x-filename", "application.apk"))
+            uploaded=await projects.upload(state.scope(value), request.stream(), unquote(request.headers.get("x-filename", "application.apk")))
+            record(state.scope(value),'apk_uploaded',{'actor':'viewer','project':uploaded['id'],'sha256':uploaded['sha256'],'bytes':uploaded['bytes']})
+            return uploaded
 
     @app.delete("/v1/session")
     async def delete_session(value=Depends(claims)):

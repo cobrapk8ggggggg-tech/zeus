@@ -14,9 +14,10 @@ MAX_APK = 256 * 1024 * 1024
 
 
 class Projects:
-    def __init__(self, root):
+    def __init__(self, root, on_event=None):
         self.root = Path(root); self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
         self.tasks = set()
+        self.on_event=on_event
         # A process killed during a build has an unknown/failed result, never a
         # success inferred from the mere presence of an output file.
         for file in self.root.glob("*/*/jobs/*.json"):
@@ -171,7 +172,9 @@ class Projects:
             state.update(status="completed", output="\n".join(logs)[-12000:])
         except asyncio.CancelledError: state.update(status="interrupted"); raise
         except Exception as error: state.update(status="failed", error=str(error)[-2000:])
-        finally: file.write_text(json.dumps(state))
+        finally:
+            file.write_text(json.dumps(state))
+            if self.on_event:self.on_event(root.parent.name,'project_job_finished',{'actor':'worker','project':root.name,'job':state['id'],'operation':state['operation'],'status':state['status'],'error':state.get('error'),'report':state.get('report')})
 
     @staticmethod
     def report(root, variant='original'):
@@ -184,9 +187,14 @@ class Projects:
     async def process(command):
         # No broker/model credentials are inherited by decompilers/build tools.
         uid = int(os.environ["ZEUS_ANDROID_BUILD_UID"]) if os.environ.get("ZEUS_ANDROID_BUILD_UID") else None
+        network_isolated=os.environ.get('ZEUS_ANDROID_TOOL_NETNS')=='1'
+        if network_isolated:
+            if uid is None or os.geteuid()!=0:raise ValueError('Tool network isolation requires a root launcher and configured build UID')
+            command=['unshare','--net','--pid','--fork','--mount-proc','--setuid='+str(uid),'--setgid='+str(uid),'--',
+                'prlimit','--as=4294967296','--nproc=128','--fsize=134217728','--cpu=600','--',*command]
         process = await asyncio.create_subprocess_exec(*command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
-            env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": "/tmp", "JAVA_TOOL_OPTIONS": "-Xmx1536m", "LANG":"C.UTF-8"},
-            start_new_session=True, **({"user":uid,"group":uid,"extra_groups":[]} if uid is not None else {}))
+            env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": "/tmp", "JAVA_TOOL_OPTIONS": "-Xmx1536m -XX:ActiveProcessorCount=2", "LANG":"C.UTF-8"},
+            start_new_session=True, **({"extra_groups":[]} if network_isolated else {"user":uid,"group":uid,"extra_groups":[]} if uid is not None else {}))
         output = bytearray()
         try:
             async with asyncio.timeout(600):

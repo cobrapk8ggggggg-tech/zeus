@@ -9,7 +9,7 @@ def render_html(report):
     sections=[]
     for title,key in [('Application','artifact'),('Manifest and components','inventory'),('Findings — not confirmed exploits','findings'),
                       ('Source evidence and coverage','source_observations'),('Runtime correlations','runtime_correlations'),
-                      ('Timeline','timeline'),('Coverage and limitations','coverage')]:
+                      ('Timeline','timeline'),('Recording references','recordings'),('Coverage and limitations','coverage')]:
         sections.append('<section><h2>'+title+'</h2><pre>'+escape(json.dumps(report.get(key,{}),ensure_ascii=False,indent=2))+'</pre></section>')
     return ('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
         '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'">'

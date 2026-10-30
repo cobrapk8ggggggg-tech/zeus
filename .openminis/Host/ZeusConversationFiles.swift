@@ -9,6 +9,10 @@ extension AIChatViewModel {
     /// and never attach the result to a different/new conversation after a move.
     func zeusAddPickedFiles(_ urls: [URL]) {
         for source in urls {
+            if source.pathExtension.lowercased() == "apk" {
+                zeusUploadAPKDirectly(source)
+                continue
+            }
             let id = UUID(), owner = sessionId
             let directory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("InputAttachments")
             let target = directory.appendingPathComponent(UUID().uuidString + "_" + source.lastPathComponent)
@@ -34,6 +38,32 @@ extension AIChatViewModel {
                     try? FileManager.default.removeItem(at: target)
                     self?.markPlaceholderFailed(id: id)
                 }
+            }
+        }
+    }
+
+    /// An APK belongs to the remote lab, not the local attachment/Linux cache.
+    private func zeusUploadAPKDirectly(_ source:URL) {
+        let id=UUID(),initialSession=sessionId
+        let placeholder=FileManager.default.temporaryDirectory.appendingPathComponent("zeus-upload-\(id.uuidString)")
+        attachments.append(InputAttachment(id:id,fileName:source.lastPathComponent,cacheURL:placeholder,kind:.document,loadState:.loading))
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                guard NativeCloudAccountAPI.ownerID != nil else { throw ZeusPatch.failure("سجّل الدخول لرفع APK إلى المختبر؛ لم يُنسخ الملف إلى البيئة المحلية.") }
+                if self.sessionId == nil { await self.ensureSession() }
+                guard let current=self.sessionId,let conversation=UUID(uuidString:current),
+                      initialSession == nil || initialSession == current,
+                      self.attachments.contains(where:{$0.id==id}) else { return }
+                let uploaded=try await ZeusAndroidAPKTransfer.upload(source:source,conversation:conversation)
+                guard self.sessionId == current,self.attachments.contains(where:{$0.id==id}) else { return }
+                self.attachments.removeAll(where:{$0.id==id})
+                let note="[ZEUS Android Lab: \(source.lastPathComponent) · project=\(uploaded.project) · sha256=\(uploaded.sha256)]"
+                self.inputText += (self.inputText.isEmpty ? "" : "\n") + note
+                self.transientNotice="تم رفع APK إلى المختبر مباشرة؛ أرسل تعليماتك للوكيل."
+            } catch {
+                self.markPlaceholderFailed(id:id)
+                self.errorMessage=error.localizedDescription
             }
         }
     }

@@ -32,3 +32,32 @@ current Railway cloud-agent service. Keep GitHub Actions to bounded repository t
 Evidence: 33 local laboratory tests and 47 cloud tests passed; Chromium iPhone/iPad layout/navigation/upload tests passed. A real signed APK from previously verified CI was verified/decompiled with actual apksigner/Apktool/JADX and exported to real JSON/HTML/PDF under /workspace/outputs/security-lab-actual. These are not yet current-branch Android emulator or native Swift acceptance results.
 
 Still pending: current-branch actual emulator acceptance; native build/test; MobSF adapter and authorized Frida lifecycle; GitHub repository CI orchestration; durable external backup/restore and hard quotas; optional video container/export improvements; production host/TURN/physical iPad remain unavailable.
+
+## Runtime direction changed by user: temporary GitHub Actions sessions
+
+The user selected GitHub Actions as the primary current runtime with no paid host.
+The new transport work targets bounded repository APK tests and temporary free
+Cloudflare relay URLs, not a permanent emulator service. Quick Tunnels do not
+support SSE; WebSocket feeds and H.264/fMP4 MSE video avoid that limitation. The
+original WebRTC node transport remains available. An explicitly labelled successive
+JPEG fallback is implemented for unsupported/failed MSE playback.
+
+Actual local evidence: a real Chromium MSE client decoded genuine fragmented MP4
+frames sent over authenticated WebSocket from a synthetic H.264 process. This is
+codec/transport evidence, not an Android emulator claim. A new actual AVD32 tunnel
+acceptance workflow is being prepared; its success must be observed separately.
+
+The ZEUS repository is public. Connection credentials and checkpoints are sealed
+to a client X25519 public key with HKDF-SHA256/AES-GCM before artifact publication.
+Streaming archive encryption validates complete frames/end markers; corruption,
+wrong keys and truncated restores fail without overwriting an existing target.
+The test workflow uses one standard Linux runner, one session, a 15-minute session
+limit and 28-minute overall job limit, 1-day artifacts and a 50-MiB aggregate test
+artifact budget. These acceptance limits are not a complete account-wide billing
+or durable project retention implementation.
+
+References:
+- https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/
+- https://developers.cloudflare.com/sandbox/sdk/api/tunnels/
+- https://docs.github.com/en/billing/concepts/product-billing/github-actions
+- https://developer.apple.com/documentation/safari-release-notes/safari-17-release-notes
