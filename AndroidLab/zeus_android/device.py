@@ -72,9 +72,20 @@ class Device:
 
     async def action(self, operation, args):
         if operation == "tree":
-            await self.command("shell", "uiautomator", "dump", "/sdcard/zeus-window.xml", timeout=30)
-            raw = await self.command("exec-out", "cat", "/sdcard/zeus-window.xml")
-            tree = ET.fromstring(raw)
+            # External storage can still be mounting immediately after boot.
+            # Never read a stale earlier hierarchy when uiautomator fails.
+            path = "/data/local/tmp/zeus-window.xml"
+            for attempt in range(3):
+                await self.command("shell", "rm", "-f", path)
+                await self.command("shell", "uiautomator", "dump", "--compressed", path, timeout=30)
+                raw = await self.command("exec-out", "cat", path)
+                try:
+                    tree = ET.fromstring(raw)
+                    if tree.tag != "hierarchy": raise ET.ParseError("Not an Android hierarchy")
+                    break
+                except ET.ParseError:
+                    if attempt == 2: raise ValueError("Android has not produced a valid UI hierarchy; retry after the screen settles") from None
+                    await asyncio.sleep(.5)
             nodes = []
             for node in tree.iter("node"):
                 value = {k: v for k, v in node.attrib.items() if k in {"text", "resource-id", "class", "content-desc", "bounds", "clickable", "enabled", "password", "focused", "focusable"}}

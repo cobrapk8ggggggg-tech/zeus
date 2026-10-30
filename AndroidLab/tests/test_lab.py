@@ -127,6 +127,27 @@ class LabTests(unittest.IsolatedAsyncioTestCase):
 
 
 class DeviceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_tree_retries_incomplete_boot_output_without_reusing_old_file(self):
+        device=Device('emulator-5554');calls=[];reads=0
+        async def command(*args,**kw):
+            nonlocal reads
+            calls.append(args)
+            if args[:2]==('exec-out','cat'):
+                reads+=1
+                return b'ERROR: screen changing' if reads==1 else b'<hierarchy><node text="Settings" password="false"/></hierarchy>'
+            return b''
+        device.command=command
+        result=await device.action('tree',{})
+        self.assertEqual(result['nodes'][0]['text'],'Settings')
+        self.assertEqual(sum(c[:3]==('shell','rm','-f') for c in calls),2)
+        self.assertTrue(all('/sdcard/' not in str(c) for c in calls))
+
+    async def test_invalid_ui_tree_is_a_controlled_error(self):
+        device=Device('emulator-5554')
+        async def command(*args,**kw):return b'not xml'
+        device.command=command
+        with self.assertRaisesRegex(ValueError,'valid UI hierarchy'):await device.action('tree',{})
+
     async def test_waits_for_ime_readiness_before_a_single_text_mutation(self):
         device=Device('emulator-5554');calls=[];ready=0
         async def command(*args,**kw):

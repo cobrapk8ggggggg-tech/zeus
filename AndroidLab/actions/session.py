@@ -81,7 +81,8 @@ async def main():
             response.raise_for_status();project=response.json()['id'];result['project']=project
             await call('android_project',{'operation':'install','project':project})
             await call('android_ui',{'operation':'launch','package':'com.zeus.lab.probe'})
-            (data/'actual-initial-ui.json').write_text(json.dumps(await call('android_ui',{'operation':'tree'})))
+            try:(data/'actual-initial-ui.json').write_text(json.dumps(await call('android_ui',{'operation':'tree'})))
+            except ValueError as error:(data/'actual-initial-ui.json').write_text(json.dumps({'unavailable':str(error)}))
             await call('android_device',{'operation':'record_start','project':project,'kind':'logcat'})
             logfile=private/'tunnel.log';log_file=logfile.open('wb')
             tunnel=subprocess.Popen([str(binary),'tunnel','--no-autoupdate','--url','http://127.0.0.1:8088','--protocol','http2'],stdout=log_file,stderr=log_file,env=clean_env(),start_new_session=True)
@@ -95,30 +96,45 @@ async def main():
             encrypted_json(ROOT/'connection','connection',access);publish(0,ROOT/'connection')
             checkpoint(data,ROOT,1,False,private)
             result.update(status='ready',actual_android_api=(await device.command('shell','getprop','ro.build.version.sdk')).decode().strip())
-            # Allow ordinary DNS propagation; do not retry a denied destination.
-            healthy=False
-            async with httpx.AsyncClient(timeout=8,follow_redirects=False) as probe:
-                for _ in range(12):
+            async def test_relay():
+                # Ordinary readiness only: denied destinations are never retried.
+                healthy=False
+                async with httpx.AsyncClient(timeout=8,follow_redirects=False) as probe:
+                    for _ in range(12):
+                        try:
+                            check=await probe.get(bootstrap['url']+'/health')
+                            if check.status_code==200:healthy=True;break
+                            if check.status_code in (401,403):result['tunnel_probe_status']=check.status_code;break
+                        except httpx.HTTPError:pass
+                        await asyncio.sleep(2)
+                result['tunnel_healthy']=healthy
+                if healthy:
+                    live_token=encode(key,LAUNCH['owner'],LAUNCH['conversation'])
+                    env=clean_env({'LAB_LIVE_URL':bootstrap['url']+'/lab/','LAB_LIVE_TOKEN':live_token,'LAB_LIVE_PROJECT':project,'LAB_PROOF_DIR':str(data)})
+                    browser=await asyncio.create_subprocess_exec('node','AndroidLab/actions/tunnel_browser.cjs',env=env,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.STDOUT)
                     try:
-                        check=await probe.get(bootstrap['url']+'/health')
-                        if check.status_code==200:healthy=True;break
-                        if check.status_code in (401,403):result['tunnel_probe_status']=check.status_code;break
-                    except httpx.HTTPError:pass
-                    await asyncio.sleep(2)
-            result['tunnel_healthy']=healthy
-            if healthy:
-                live_token=encode(key,LAUNCH['owner'],LAUNCH['conversation'])
-                env=clean_env({'LAB_LIVE_URL':bootstrap['url']+'/lab/','LAB_LIVE_TOKEN':live_token,'LAB_LIVE_PROJECT':project,'LAB_PROOF_DIR':str(data)})
-                browser=await asyncio.create_subprocess_exec('node','AndroidLab/actions/tunnel_browser.cjs',env=env,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.STDOUT)
-                try:
-                    async with asyncio.timeout(80):browser_log,_=await browser.communicate()
-                except asyncio.TimeoutError:browser.kill();await browser.wait();browser_log=b'Browser timeout'
-                (data/'browser.log').write_bytes(browser_log.replace(live_token.encode(),b'[redacted]'))
-                result['browser_passed']=browser.returncode==0
-            else:result['browser_passed']=False;result['browser_error']='Temporary relay was not reachable; GitHub artifact control remains available'
-            checkpoint(data,ROOT,2,False,private)
-            print('LAB_ACCEPTANCE_READY browser_passed='+str(result['browser_passed']),flush=True)
+                        async with asyncio.timeout(80):browser_log,_=await browser.communicate()
+                    except asyncio.TimeoutError:browser.kill();await browser.wait();browser_log=b'Browser timeout'
+                    (data/'browser.log').write_bytes(browser_log.replace(live_token.encode(),b'[redacted]'))
+                    result['browser_passed']=browser.returncode==0
+                else:result['browser_passed']=False;result['browser_error']='Temporary relay was not reachable; GitHub artifact control remains available'
+                checkpoint(data,ROOT,2,False,private)
+                print('LAB_RELAY_TEST browser_passed='+str(result['browser_passed']),flush=True)
+            relay_test=asyncio.create_task(test_relay())
+            frames=0;frame_bytes=0;next_frame=0;previous_frame=''
+            print('LAB_ACCEPTANCE_READY',flush=True)
             while time.time()<deadline and not stop.is_set():
+                if time.time()>=next_frame and frame_bytes<15*1024*1024:
+                    next_frame=time.time()+8
+                    try:
+                        frame=await device.screenshot();fingerprint=hashlib.sha256(frame).hexdigest()
+                        if fingerprint!=previous_frame:
+                            frames+=1;frame_bytes+=len(frame);previous_frame=fingerprint
+                            destination=ROOT/f'frame-{frames}'
+                            encrypted_json(destination,'frame',{'session':LAUNCH['session'],'frame':frames,'observed_at':time.time(),'screenshot':b64(frame),'kind':'successive_screenshots','live_video':False})
+                            publish(1000+frames,destination)
+                            (data/'latest-frame.json').write_text(json.dumps({'frame':frames,'observed_at':time.time(),'screenshot':b64(frame)}))
+                    except (ValueError,OSError,asyncio.TimeoutError):pass
                 if control_file.exists():
                     raw=control_file.read_bytes();digest=hashlib.sha256(raw).hexdigest()
                     if digest!=seen_digest:
@@ -134,7 +150,9 @@ async def main():
                             response=await client.post('/v1/tool',json={'name':name,'arguments':arguments,'request_id':request_id})
                             control_sequence=outer['sequence'];observation={'sequence':control_sequence,'request_id':request_id,'http_status':response.status_code,'result':response.json(),'observed_at':time.time(),'session':app.state.lab.load()}
                             if app.state.lab.load().get('status')=='running':
-                                observation['screenshot']=b64(await device.screenshot());observation['tree']=await device.action('tree',{})
+                                observation['screenshot']=b64(await device.screenshot())
+                                try:observation['tree']=await device.action('tree',{})
+                                except ValueError as error:observation['tree']={'unavailable':str(error)}
                             destination=ROOT/f'observation-{control_sequence}';encrypted_json(destination,'observation',observation);publish(100+control_sequence,destination)
                             (data/f'observation-{control_sequence}.json').write_text(json.dumps(observation))
                             result['github_control_verified']=True
@@ -145,6 +163,9 @@ async def main():
                 try:await asyncio.wait_for(stop.wait(),2)
                 except asyncio.TimeoutError:pass
             else:result['ended']='deadline_or_signal'
+            if not relay_test.done():relay_test.cancel()
+            await asyncio.gather(relay_test,return_exceptions=True)
+            result.update(successive_frames=frames,frame_bytes=frame_bytes)
             result['status']='completed' if result.get('browser_passed') else 'artifact_control_verified' if result.get('github_control_verified') else 'transport_not_verified'
             if result['status']=='transport_not_verified':code=1
     except BaseException as error:
