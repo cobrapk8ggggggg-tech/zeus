@@ -104,23 +104,38 @@ async def main():
                 await asyncio.sleep(.1)
             try:
                 await install_interception_ca(DEVICE,root/'ca/mitmproxy-ca-cert.pem',PROOF/'system-ca-setup.log');RESULT['system_ca_installed']=True
-            except Exception as error:RESULT.update(system_ca_installed=False,ca_error=str(error))
+            except Exception as error:RESULT.update(system_ca_installed=False,ca_error=type(error).__name__+': '+str(error))
+            # adb reboot can close its transport before the command returns.
+            # Require stable boot/package-manager reads before any UI operation.
+            stable=0
+            for attempt in range(150):
+                try:
+                    boot=(await DEVICE.command('shell','getprop','sys.boot_completed',timeout=3)).strip()==b'1'
+                    package=await DEVICE.command('shell','pm','path','android',timeout=3)
+                    stable=stable+1 if boot and b'package:' in package else 0
+                    if stable>=3:break
+                except (ValueError,asyncio.TimeoutError):stable=0
+                if attempt==149:raise RuntimeError('Android did not return after certificate provisioning')
+                await asyncio.sleep(1)
             await DEVICE.command('shell','wm','dismiss-keyguard')
             await DEVICE.command('shell','input','keyevent','82')
-            try:await DEVICE.connect()
-            except ValueError as error:
-                if 'Unknown input method' not in str(error):raise
-                # This trial can enter its harmless English prompt using Android's
-                # built-in input; an optional IME registration race must not block it.
-                RESULT['optional_keyboard_error']=str(error)
+            digest=subprocess.check_output(['openssl','x509','-in',str(root/'ca/mitmproxy-ca-cert.pem'),'-subject_hash_old','-noout'],text=True).strip()
+            try:
+                await DEVICE.command('shell','ls','/system/etc/security/cacerts/'+digest+'.0');RESULT['system_ca_file_present']=True
+            except ValueError:RESULT['system_ca_file_present']=False
             # Verify the capture infrastructure independently; never attribute this fixture to ChatGPT.
-            if RESULT['system_ca_installed']:
+            if RESULT['system_ca_file_present']:
                 try:
                     await DEVICE.command('install','-r',os.environ['LAB_PROBE_APK'],timeout=90)
                     await DEVICE.command('shell','settings','put','global','http_proxy','10.0.2.2:8089')
-                    await DEVICE.action('launch',{'package':'com.zeus.lab.probe'});await asyncio.sleep(1)
-                    tree=await DEVICE.action('tree',{});width,height=await DEVICE.size()
-                    node=next(n for n in tree['nodes'] if n.get('content-desc')=='probeSend')
+                    await DEVICE.action('launch',{'package':'com.zeus.lab.probe'});await asyncio.sleep(2)
+                    node=None
+                    for _ in range(5):
+                        tree=await DEVICE.action('tree',{});node=next((n for n in tree['nodes'] if n.get('content-desc')=='probeSend'),None)
+                        if node:break
+                        await asyncio.sleep(1)
+                    if not node:raise ValueError('TLS control fixture did not show its send button')
+                    width,height=await DEVICE.size()
                     import re
                     left,top,right,bottom=map(int,re.findall(r'\d+',node['bounds']))
                     await DEVICE.action('tap',{'x':(left+right)/2/width,'y':(top+bottom)/2/height})
