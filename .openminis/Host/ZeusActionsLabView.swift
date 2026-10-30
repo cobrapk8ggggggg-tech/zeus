@@ -59,7 +59,7 @@ struct ZeusActionsLabView: View {
                             }
                             TextField("owner/repository",text:$repository).textInputAutocapitalization(.never).autocorrectionDisabled()
                             TextField("فرع مصدر المختبر",text:$sourceRef).textInputAutocapitalization(.never).autocorrectionDisabled()
-                        }.padding(20).background(Color.white.opacity(.045),in:RoundedRectangle(cornerRadius:20))
+                        }.padding(20).background(Color.white.opacity(0.045),in:RoundedRectangle(cornerRadius:20))
                         Text("تتطلب النسخة الحالية وجود ملفات المختبر في الفرع المختار. الجلسة15 دقيقة بعد الإقلاع وعلى مشغّل Ubuntu قياسي. المستودع العام مطلوب لضبط تكلفة التشغيل؛ البيانات لا تُنشر كنص مكشوف.").font(.caption).foregroundStyle(.secondary)
                         Button { perform { try await lab.start(accountID:accountID,repository:repository,ref:sourceRef) } } label: {
                             HStack { Image(systemName:"play.fill");Text("بدء جلسة Android");Spacer();if working { ProgressView() } }.padding(12)

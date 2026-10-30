@@ -1,3 +1,4 @@
+// Compile gate revision 2
 import Foundation
 import Combine
 struct ZeusPatch { static func failure(_ value:String)->NSError { NSError(domain:"fixture",code:1,userInfo:[NSLocalizedDescriptionKey:value]) } }
