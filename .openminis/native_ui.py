@@ -89,7 +89,9 @@ private enum SkillFilePickResult {''')
     replace(chat, '    @State private var showFileBrowser = false',
             '    @State private var showFileBrowser = false\n    @State private var zeusShowArtifacts = false\n    @State private var zeusShowAndroid = false')
     replace(chat, '        .sheet(isPresented: $showBrowserSheet) {', '''        .fullScreenCover(isPresented: $zeusShowAndroid) {
-            ZeusAndroidLabView(session: vm.sessionId)
+            ZeusAndroidLabView(session: vm.sessionId,
+                chatPanel: AnyView(VStack(spacing: 0) { messagesArea; inputBar }),
+                stopAgent: { vm.cancel() })
         }
         .sheet(isPresented: $zeusShowArtifacts) {
             ZeusConversationFiles(sessionID: vm.sessionId)

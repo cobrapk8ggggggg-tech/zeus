@@ -8,6 +8,7 @@ import re
 import signal
 import uuid
 import zipfile
+from . import audit
 
 MAX_APK = 256 * 1024 * 1024
 
@@ -70,6 +71,27 @@ class Projects:
     async def operation(self, scope, operation, args, device):
         if operation == "list": return {"projects": self.list(scope)}
         root = self.project(scope, args.get("project", ""))
+        variant=args.get('variant','original')
+        if variant not in {'original','rebuilt'}:raise ValueError('Unknown APK variant')
+        if operation=='report':
+            report=self.report(root,variant);section=args.get('section','summary')
+            if section=='summary':return {'artifact':report['artifact'],'inventory':{'package':report['inventory']['package'],'permission_count':len(report['inventory']['permissions']),'component_count':len(report['inventory']['components'])},'coverage':report['coverage'],'finding_count':len(report['findings']),'source_observation_count':len(report['source_observations']['matches'])}
+            if section not in {'inventory','findings','dex','native_libraries','source_observations','coverage'}:raise ValueError('Unknown report section')
+            value=report[section]
+            if isinstance(value,list):value=value[max(0,int(args.get('offset',0))):max(0,int(args.get('offset',0)))+30]
+            if section=='source_observations':value={**value,'matches':value['matches'][:30],'endpoints':value['endpoints'][:30]}
+            return {section:value}
+        if operation=='compare':
+            original=self.report(root,'original');rebuilt=self.report(root,'rebuilt')
+            left,right=original['inventory'],rebuilt['inventory']
+            return {'original_sha256':original['artifact']['sha256'],'rebuilt_sha256':rebuilt['artifact']['sha256'],
+                'original_preserved':hashlib.sha256((root/'original.apk').read_bytes()).hexdigest()==json.loads((root/'project.json').read_text())['sha256'],
+                'inventory_changes':{key:{'original':left.get(key),'rebuilt':right.get(key)} for key in left if left.get(key)!=right.get(key)},
+                'limitation':'Static comparison only; matching runtime behavior requires a separate recorded test.'}
+        if operation=='search':
+            evidence=root/'work/audit'/variant
+            if not evidence.is_dir():evidence=root/'work'
+            return await asyncio.to_thread(audit.source_index,{'sources':evidence/'sources','decoded':evidence/'decoded'},args.get('query'),80)
         if self.tasks and operation != "job": raise ValueError("Wait for the current APK job to finish")
         if operation == "install":
             name = "rebuilt.apk" if args.get("variant") == "rebuilt" else "original.apk"
@@ -99,10 +121,10 @@ class Projects:
             if hashlib.sha256(old).hexdigest() != args.get("expected_sha256"): raise ValueError("File changed; read it again before editing")
             file.parent.mkdir(parents=True, exist_ok=True); file.write_text(content)
             return {"written": args["path"], "sha256": hashlib.sha256(content.encode()).hexdigest()}
-        if operation not in {"analyze", "decode", "build"}: raise ValueError("Unknown project operation")
+        if operation not in {"analyze", "decode", "build", "audit"}: raise ValueError("Unknown project operation")
         if self.tasks: raise ValueError("Wait for the current APK job to finish")
         identifier = str(uuid.uuid4()); (root / "jobs").mkdir(exist_ok=True)
-        state = {"id": identifier, "operation": operation, "status": "running"}
+        state = {"id": identifier, "operation": operation, "variant":variant,"status": "running"}
         file = root / "jobs" / (identifier + ".json"); file.write_text(json.dumps(state))
         task = asyncio.create_task(self.run(root, state, file),name=scope+":"+identifier); self.tasks.add(task); task.add_done_callback(self.tasks.discard)
         return state
@@ -119,6 +141,15 @@ class Projects:
             operation = state["operation"]
             if operation == "analyze": commands = [["jadx", "--no-res", "--threads-count", "1", "-d", str(work / "sources"), str(root / "original.apk")]]
             elif operation == "decode": commands = [["apktool", "d", "-f", "-o", str(work / "decoded"), str(root / "original.apk")]]
+            elif operation == 'audit':
+                variant=state['variant'];target=root/('original.apk' if variant=='original' else 'rebuilt.apk')
+                if not target.is_file():raise ValueError('Requested APK variant is missing')
+                evidence=work/'audit'/variant;evidence.mkdir(parents=True,exist_ok=True)
+                if build_uid is not None:
+                    for folder in (work/'audit',evidence):os.chown(folder,build_uid,build_uid)
+                commands=[['apksigner','verify','--print-certs',str(target)],
+                    ['apktool','d','-f','-o',str(evidence/'decoded'),str(target)],
+                    ['jadx','--no-res','--threads-count','1','-d',str(evidence/'sources'),str(target)]]
             else:
                 commands = [["apktool", "b", str(work / "decoded"), "-o", str(work / "unsigned.apk")],
                     ["zipalign", "-p", "-f", "4", str(work / "unsigned.apk"), str(work / "aligned.apk")],
@@ -127,6 +158,12 @@ class Projects:
             logs = []
             for command in commands:
                 logs.append(await self.process(command))
+            if operation=='audit':
+                metadata=json.loads((root/'project.json').read_text());metadata['variant']=variant
+                report=await asyncio.to_thread(audit.analyze,target,evidence/'decoded',evidence/'sources',metadata,logs[0])
+                reports=root/'reports';reports.mkdir(exist_ok=True)
+                temporary=reports/(variant+'.tmp');temporary.write_text(json.dumps(report,ensure_ascii=False));temporary.replace(reports/(variant+'.json'))
+                state['report']={'variant':variant,'findings':len(report['findings']),'sha256':report['artifact']['sha256']}
             if operation == "build":
                 import shutil
                 source = self.relative(work, "rebuilt.apk")
@@ -135,6 +172,13 @@ class Projects:
         except asyncio.CancelledError: state.update(status="interrupted"); raise
         except Exception as error: state.update(status="failed", error=str(error)[-2000:])
         finally: file.write_text(json.dumps(state))
+
+    @staticmethod
+    def report(root, variant='original'):
+        if variant not in {'original','rebuilt'}:raise ValueError('Unknown APK variant')
+        path=root/'reports'/(variant+'.json')
+        if not path.is_file():raise ValueError('Run an audit for this APK variant first')
+        return json.loads(path.read_text())
 
     @staticmethod
     async def process(command):

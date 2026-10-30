@@ -11,10 +11,10 @@ enum ZeusAndroidTools {
         var fields: [String: Any] = ["tool_title": ["type":"string"], "approval_reason":["type":"string"]]
         let operations: [String]
         switch name {
-        case "android_device": operations = ["status", "stop"]
+        case "android_device": operations = ["status", "stop", "capabilities", "timeline", "logs", "records", "record_start", "record_stop"]
         case "android_ui": operations = ["tree", "tap", "swipe", "type", "key", "launch"]
-        case "android_network": operations = ["start", "stop", "list", "read"]
-        case "android_project": operations = ["list", "install", "analyze", "decode", "build", "job", "files", "read", "write"]
+        case "android_network": operations = ["start", "stop", "list", "read", "coverage"]
+        case "android_project": operations = ["list", "install", "analyze", "decode", "build", "job", "files", "read", "write", "audit", "report", "search", "compare"]
         default: operations = []
         }
         if !operations.isEmpty { fields["operation"] = ["type":"string", "enum":operations] }
@@ -24,9 +24,15 @@ enum ZeusAndroidTools {
             fields["key"] = ["type":"string", "enum":["back", "home", "recent", "enter", "delete"]]
             fields["package"] = ["type":"string", "maxLength":200]
         }
-        if name == "android_network" { fields["after"] = ["type":"integer", "minimum":0] }
+        if name == "android_network" || name == "android_device" { fields["after"] = ["type":"integer", "minimum":0] }
+        if name == "android_device" {
+            fields["project"] = ["type":"string", "maxLength":36]
+            fields["package"] = ["type":"string", "maxLength":200]
+            fields["kind"] = ["type":"string", "enum":["logcat", "pcap", "video"]]
+        }
         if name == "android_project" {
-            for field in ["project", "job", "path", "expected_sha256"] { fields[field] = ["type":"string", "maxLength":500] }
+            for field in ["project", "job", "path", "expected_sha256", "query", "section"] { fields[field] = ["type":"string", "maxLength":500] }
+            fields["offset"] = ["type":"integer", "minimum":0]
             fields["content"] = ["type":"string", "maxLength":100000]
             fields["variant"] = ["type":"string", "enum":["original", "rebuilt"]]
             fields["tree"] = ["type":"string", "enum":["decoded", "sources"]]
@@ -36,11 +42,11 @@ enum ZeusAndroidTools {
     @MainActor static var definitions: [AgentToolDefinition] {
         guard NativeCloudAccountAPI.ownerID != nil else { return [] }
         let descriptions = [
-            "android_device":"Read/stop this conversation's remote Android session. The user must open Android Lab, start the device and explicitly hand control to you. Never install an emulator locally or infer that a device exists. Sessions have a hard time limit.",
+            "android_device":"Remote Android status/capabilities/timeline, logs (optional package), project evidence records, record_start(kind logcat/pcap/video, project), record_stop or stop the device. Recordings are server-side, bounded to 180s/32MiB. PCAP requires tcpdump and does not decrypt TLS. The user must start Android and hand control to you; never infer availability or install an emulator locally. Human takeover interrupts actions and revokes modification consent.",
             "android_ui":"Inspect the remote Android UI or tap/swipe/type/launch. Coordinates are normalized 0...1. Read the UI tree first; screenshot for visual inspection. Human takeover blocks agent mutations. Text uses the laboratory's Unicode IME.",
             "android_screenshot":"Read the current remote Android screenshot using native image input. No screenshot is written to the iPhone or local Linux workspace.",
             "android_network":"Start/stop bounded HTTP(S) capture or read/list events. after is a numeric cursor. HTTPS requires a trusted certificate; pinned/non-proxy traffic may be unavailable. Never claim every request was captured or infer causality from timing alone.",
-            "android_project":"Inspect uploaded APK projects, install original/rebuilt APK, analyze with JADX, decode/edit/build with Apktool. Jobs run on the separate Android node; poll job. read returns SHA256; write requires expected_sha256. Preserve original APK. Re-signing may break integrity/login. No heavy Android builds on Railway."
+            "android_project":"Remote APK projects. audit runs signature verification, Apktool and JADX and creates an evidence-based report; poll job. report returns summary or a section (inventory/findings/dex/native_libraries/source_observations/coverage); offset pages findings. search uses a literal query in decoded/sources files. compare compares audited original/rebuilt variants. Static work does not start Android. decode/edit/build preserve the original; write needs expected_sha256. Heuristics are observations, not confirmed vulnerabilities. Never build on Railway."
         ]
         return names.sorted().map { name in
             let shape = schema(name)!, properties = shape["properties"] as! [String:[String:Any]]
@@ -72,14 +78,34 @@ struct ZeusAndroidLabButton: View {
 
 struct ZeusAndroidLabView: View {
     let session: String?
+    var chatPanel: AnyView? = nil
+    var stopAgent: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var access: ZeusAndroidAccess?
     @State private var issue: String?
     @State private var loading = true
+    @State private var showAgent = UIDevice.current.userInterfaceIdiom == .pad
     var body: some View {
         NavigationStack {
             Group {
-                if let access { ZeusAndroidWebView(access:access, renew:load) }
+                if let access {
+                    GeometryReader { geometry in
+                        HStack(spacing:0) {
+                            if geometry.size.width >= 1000 || !showAgent || chatPanel == nil {
+                                ZeusAndroidWebView(access:access, renew:load, stopAgent:stopAgent)
+                            }
+                            if showAgent, let chatPanel {
+                                if geometry.size.width >= 1000 { Divider() }
+                                VStack(spacing:0) {
+                                    HStack { Label("وكيل المختبر",systemImage:"sparkles"); Spacer()
+                                        if stopAgent != nil { Button("إيقاف واستعادة التحكم",role:.destructive) { stopAgent?(); Task { await takeControl() } } }
+                                    }.font(.subheadline).padding(14)
+                                    chatPanel
+                                }.frame(width:geometry.size.width >= 1000 ? min(420,geometry.size.width * 0.34) : nil)
+                            }
+                        }
+                    }
+                }
                 else {
                     VStack(spacing:22) {
                         Image(systemName:"apps.iphone").font(.system(size:65, weight:.ultraLight)).foregroundStyle(.mint)
@@ -93,7 +119,12 @@ struct ZeusAndroidLabView: View {
                 }
             }
             .navigationTitle("ZEUS · Android").navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement:.confirmationAction) { Button("إغلاق") { dismiss() } } }
+            .toolbar {
+                ToolbarItem(placement:.confirmationAction) { Button("إغلاق") { dismiss() } }
+                ToolbarItem(placement:.primaryAction) {
+                    if chatPanel != nil { Button { showAgent.toggle() } label: { Label(showAgent ? "عرض المختبر" : "عرض الوكيل",systemImage:"sidebar.right") } }
+                }
+            }
             .task { await load() }
         }.preferredColorScheme(.dark)
     }
@@ -109,6 +140,11 @@ struct ZeusAndroidLabView: View {
             access = try JSONDecoder().decode(ZeusAndroidAccess.self,from:data); issue=nil
         } catch { issue=error.localizedDescription }
     }
+    @MainActor private func takeControl() async {
+        guard let session,let identifier=UUID(uuidString:session) else { return }
+        do { _ = try await NativeCloudAccountAPI.runtime("v1/android/\(identifier.uuidString.lowercased())/take",method:"POST",body:Data("{}".utf8)) }
+        catch { issue=error.localizedDescription }
+    }
 }
 
 struct ZeusAndroidAccess: Decodable, Equatable { let url: URL; let token: String }
@@ -116,12 +152,15 @@ struct ZeusAndroidAccess: Decodable, Equatable { let url: URL; let token: String
 private struct ZeusAndroidWebView: UIViewRepresentable {
     let access: ZeusAndroidAccess
     let renew: @MainActor () async -> Void
-    func makeCoordinator() -> Coordinator { Coordinator(renew:renew) }
+    var stopAgent: (() -> Void)? = nil
+    func makeCoordinator() -> Coordinator { Coordinator(renew:renew,stopAgent:stopAgent) }
     func makeUIView(context:Context) -> WKWebView {
         let configuration = WKWebViewConfiguration(); configuration.websiteDataStore = .nonPersistent(); configuration.allowsInlineMediaPlayback=true
         configuration.mediaTypesRequiringUserActionForPlayback = []
         configuration.userContentController.add(context.coordinator,name:"labRenew")
         configuration.userContentController.add(context.coordinator,name:"labFullscreen")
+        configuration.userContentController.add(context.coordinator,name:"labStopAgent")
+        configuration.userContentController.add(context.coordinator,name:"labExport")
         let view = WKWebView(frame:.zero,configuration:configuration)
         view.navigationDelegate=context.coordinator; view.isOpaque=false; view.backgroundColor = .black
         context.coordinator.view=view; context.coordinator.origin=access.url
@@ -144,13 +183,16 @@ private struct ZeusAndroidWebView: UIViewRepresentable {
         view.stopLoading(); view.loadHTMLString("",baseURL:nil)
         view.configuration.userContentController.removeScriptMessageHandler(forName:"labRenew")
         view.configuration.userContentController.removeScriptMessageHandler(forName:"labFullscreen")
+        view.configuration.userContentController.removeScriptMessageHandler(forName:"labStopAgent")
+        view.configuration.userContentController.removeScriptMessageHandler(forName:"labExport")
     }
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         weak var view:WKWebView?
         var origin:URL?
         var loaded:ZeusAndroidAccess?
         let renew:@MainActor () async -> Void
-        init(renew:@escaping @MainActor () async -> Void) { self.renew=renew }
+        let stopAgent:(() -> Void)?
+        init(renew:@escaping @MainActor () async -> Void,stopAgent:(() -> Void)?=nil) { self.renew=renew;self.stopAgent=stopAgent }
         func webView(_ webView:WKWebView,decidePolicyFor action:WKNavigationAction,decisionHandler:@escaping (WKNavigationActionPolicy)->Void) {
             guard let url=action.request.url, url.scheme=="https",url.host==origin?.host,url.port==origin?.port else { decisionHandler(.cancel);return }
             decisionHandler(.allow)
@@ -158,7 +200,57 @@ private struct ZeusAndroidWebView: UIViewRepresentable {
         func userContentController(_ controller:WKUserContentController,didReceive message:WKScriptMessage) {
             guard message.frameInfo.isMainFrame,message.frameInfo.securityOrigin.host==origin?.host else { return }
             if message.name=="labRenew" { Task { @MainActor in await renew() } }
+            if message.name=="labStopAgent" { stopAgent?() }
+            if message.name=="labExport",let value=message.body as? [String:String],let project=value["project"],UUID(uuidString:project) != nil,
+               let format=value["format"],["json","html","pdf"].contains(format),let variant=value["variant"],["original","rebuilt"].contains(variant) {
+                Task { @MainActor in await shareReport(project:project,format:format,variant:variant) }
+            }
+            if message.name=="labExport",let value=message.body as? [String:String],value["kind"]=="evidence",
+               let project=value["project"],UUID(uuidString:project) != nil,let recording=value["record"],UUID(uuidString:recording) != nil,
+               let suffix=value["extension"],["pcap","h264","log"].contains(suffix) {
+                Task { @MainActor in await shareEvidence(project:project,recording:recording,suffix:suffix) }
+            }
             if message.name=="labFullscreen" { view?.evaluateJavaScript("document.getElementById('screen').scrollIntoView({block:'start'})",completionHandler:nil) }
+        }
+        @MainActor private func shareReport(project:String,format:String,variant:String) async {
+            guard let origin else { return }
+            var components=URLComponents(url:origin,resolvingAgainstBaseURL:false)!
+            components.path="/v1/projects/\(project)/export";components.queryItems=[URLQueryItem(name:"format",value:format),URLQueryItem(name:"variant",value:variant)];components.fragment=nil
+            guard let url=components.url else { return }
+            await shareFile(url:url,name:"ZEUS-Security-Report.\(format)",maximum:8*1024*1024)
+        }
+        @MainActor private func shareEvidence(project:String,recording:String,suffix:String) async {
+            guard let origin else { return }
+            var components=URLComponents(url:origin,resolvingAgainstBaseURL:false)!
+            components.path="/v1/projects/\(project)/evidence/\(recording)";components.query=nil;components.fragment=nil
+            guard let url=components.url else { return }
+            await shareFile(url:url,name:"ZEUS-Evidence.\(suffix)",maximum:40*1024*1024)
+        }
+        @MainActor private func shareFile(url:URL,name:String,maximum:Int) async {
+            guard let loaded,let view else { return }
+            var request=URLRequest(url:url);request.setValue("Bearer "+loaded.token,forHTTPHeaderField:"Authorization")
+            let configuration=URLSessionConfiguration.ephemeral;configuration.urlCache=nil
+            let session=URLSession(configuration:configuration);defer { session.invalidateAndCancel() }
+            do {
+                let (temporary,response)=try await session.download(for:request)
+                defer { try? FileManager.default.removeItem(at:temporary) }
+                guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw ZeusPatch.failure("تعذر تصدير التقرير") }
+                let size=(try FileManager.default.attributesOfItem(atPath:temporary.path)[.size] as? NSNumber)?.intValue ?? Int.max
+                guard size<=maximum else { throw ZeusPatch.failure("الملف يتجاوز حد المشاركة") }
+                let directory=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString,isDirectory:true)
+                try FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
+                let file=directory.appendingPathComponent(name);try FileManager.default.moveItem(at:temporary,to:file)
+                let share=UIActivityViewController(activityItems:[file],applicationActivities:nil)
+                share.completionWithItemsHandler={ _,_,_,_ in try? FileManager.default.removeItem(at:directory) }
+                share.popoverPresentationController?.sourceView=view;share.popoverPresentationController?.sourceRect=CGRect(x:view.bounds.midX,y:60,width:1,height:1)
+                var presenter=view.window?.rootViewController
+                while let presented=presenter?.presentedViewController { presenter=presented }
+                presenter?.present(share,animated:true)
+            } catch {
+                if let encoded=try? JSONSerialization.data(withJSONObject:[error.localizedDescription]),let literal=String(data:encoded,encoding:.utf8) {
+                    view.evaluateJavaScript("window.zeusLabIssue(\(literal)[0])",completionHandler:nil)
+                }
+            }
         }
     }
 }

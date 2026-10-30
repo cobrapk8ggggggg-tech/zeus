@@ -35,6 +35,17 @@ class AndroidGateway:
     def access(self, owner, conversation):
         return {"url": self.public_url + "/lab/", "token": self.token(owner, conversation, "viewer"), "expires_in": 300}
 
+    async def take(self,owner,conversation):
+        response=await self.client.post(self.url+'/v1/control/take',headers={'Authorization':'Bearer '+self.token(owner,conversation,'viewer')})
+        if response.status_code!=200:raise ValueError('تعذر تأكيد استعادة التحكم في Android')
+        return response.json()
+
+    async def approve_changes(self,owner,conversation,project):
+        response=await self.client.post(self.url+'/v1/tool',headers={'Authorization':'Bearer '+self.token(owner,conversation,'viewer')},
+            json={'name':'android_project','arguments':{'operation':'approve_changes','project':project},'request_id':'consent-'+str(__import__('uuid').uuid4())})
+        if response.status_code!=200:raise ValueError('تعذر تسجيل موافقة تعديل نسخة الاختبار')
+        return response.json()
+
     async def tool(self, owner, conversation, name, args, request_id):
         if name not in ANDROID_NAMES: raise ValueError("Unknown Android tool")
         token = self.token(owner, conversation, "agent")

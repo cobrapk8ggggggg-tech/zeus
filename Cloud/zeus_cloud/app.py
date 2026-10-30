@@ -237,6 +237,10 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
     async def android_tool(conversation: uuid.UUID, value: AndroidToolInput, account=Depends(auth)):
         return await android.tool(account, str(conversation), value.name, value.arguments, value.request_id)
 
+    @app.post('/v1/android/{conversation}/take')
+    async def android_take(conversation:uuid.UUID,account=Depends(auth)):
+        return await android.take(account,str(conversation))
+
     @app.get("/v1/capabilities")
     async def capabilities(account=Depends(auth)):
         from .resources import limits

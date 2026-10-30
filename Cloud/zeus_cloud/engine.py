@@ -249,8 +249,12 @@ class Engine:
                 await self.store.event(owner, identifier, "device_required", {"id": key, "call": call, "notice": "هذه الأداة تستخدم الجهاز الأصلي. المهمة محفوظة وتنتظر اتصاله؛ لا يعمل متصفح على Railway."})
                 raise WaitingForUser()
 
-            android_mutation = call["name"] in ANDROID_NAMES and call["name"] != "android_screenshot" and call["arguments"].get("operation") not in {"status", "tree", "list", "read", "job", "files"}
-            if approved is None and (run.get("permission_mode") == "ask_all" or (android_mutation or call["name"] in {"exec_command", "shell_execute", "file_write", "file_edit", "apply_patch", "memory_write"}) and run.get("permission_mode") != "unrestricted"):
+            android_mutation = call["name"] in ANDROID_NAMES and call["name"] != "android_screenshot" and call["arguments"].get("operation") not in {"status", "tree", "list", "read", "job", "files", "capabilities", "timeline", "coverage", "report", "search", "compare", "logs", "records"}
+            android_sensitive=call['name']=='android_project' and (call['arguments'].get('operation') in {'write','build'} or call['arguments'].get('operation')=='install' and call['arguments'].get('variant')=='rebuilt')
+            # Runtime UI control is already subject to the user's revocable
+            # device lease. APK changes require explicit consent even in unrestricted mode.
+            if call['name']=='android_ui':android_mutation=False
+            if approved is None and (android_sensitive or run.get("permission_mode") == "ask_all" or (android_mutation or call["name"] in {"exec_command", "shell_execute", "file_write", "file_edit", "apply_patch", "memory_write"}) and run.get("permission_mode") != "unrestricted"):
                 # A live command cannot be suspended into a portable approval.
                 for key in command_ids:
                     if self.terminals.active(owner, key):
@@ -260,6 +264,9 @@ class Engine:
             await self.store.event(owner, identifier, "tool_start", {"id": call["id"], "name": call["name"], "input": call["arguments"]})
             successful = approved is not False
             try:
+                if approved is True and android_sensitive:
+                    if self.android is None:raise ValueError('Android laboratory is not configured')
+                    await self.android.approve_changes(owner,conversation,call['arguments'].get('project',''))
                 output = "User declined this action; it was not executed" if approved is False else await self.tool(run, call, root, command_ids)
                 if successful and call["name"] in {"shell_execute", "exec_command", "write_stdin"}:
                     exit_code = json.loads(output).get("exit_code")
