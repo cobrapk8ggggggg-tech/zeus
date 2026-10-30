@@ -1,9 +1,8 @@
 {
   "session": "zeus-chatgpt-20261030-f",
-  "sequence": 2,
-  "operation": "tap",
-  "x": 0.5,
-  "y": 0.953125,
-  "label": "Tap Skip as displayed in this fresh onboarding screen",
-  "settle_seconds": 4
+  "sequence": 3,
+  "operation": "type",
+  "text": "Hello please reply with one word",
+  "label": "Enter test prompt into the reviewed focused composer",
+  "settle_seconds": 2
 }
