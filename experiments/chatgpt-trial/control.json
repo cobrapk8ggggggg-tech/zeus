@@ -1,9 +1,8 @@
 {
   "session": "zeus-chatgpt-20261030-e",
-  "sequence": 2,
-  "operation": "tap",
-  "x": 0.5,
-  "y": 0.953125,
-  "label": "Continue without logging in, selected from observed onboarding screen",
-  "settle_seconds": 6
+  "sequence": 3,
+  "operation": "type",
+  "text": "Hello please reply with one word",
+  "label": "Enter harmless test message into the observed focused composer",
+  "settle_seconds": 2
 }
