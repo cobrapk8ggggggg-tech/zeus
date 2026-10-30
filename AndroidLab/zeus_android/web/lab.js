@@ -6,6 +6,7 @@
   let status = {status:"stopped",controller:"human",capture:false}, peer, timer, flows=[], last=0, tab="device", edit, feed, reconnectAt=0, detailFlow, replayed=false, selectedProject="", timelineCursor=0, transportSettings, timelineFeed;
   function error(e){ $("error").textContent=e.message || String(e); $("error").hidden=false; }
   async function api(path, body, options={}) {
+    if(window.zeusLabNative)return window.zeusLabNative(path,body);
     const response = await fetch(path,{method:body === undefined ? "GET":"POST",headers:{"Authorization":"Bearer "+token,...(body ? {"Content-Type":"application/json"}:{}),...options.headers},body:body===undefined ? undefined:JSON.stringify(body),cache:"no-store",credentials:"omit",redirect:"error",...options});
     const result=await response.json(); if(!response.ok) throw new Error(result.detail || "تعذر الاتصال بالمختبر"); return result;
   }
@@ -15,7 +16,7 @@
   function closeVideo(){if(peer){peer.close();peer=null;}$("video").srcObject=null;$("video").hidden=false;}
   async function webrtcVideo(){ closeVideo();const ice=await api("/v1/ice");const connection=new RTCPeerConnection({iceServers:ice.iceServers});peer=connection;connection.addTransceiver("video",{direction:"recvonly"});connection.ontrack=e=>{$("video").srcObject=e.streams[0] || new MediaStream([e.track]);$("placeholder").hidden=true;$("video").play().catch(()=>{});};connection.onconnectionstatechange=()=>{if(connection.connectionState==="failed"){closeVideo();error(new Error("تعذر البث المباشر. تحقق من اتصال WebRTC وإعداد TURN على الخادم."));}};await connection.setLocalDescription(await connection.createOffer());await new Promise((resolve,reject)=>{if(connection.iceGatheringState==="complete")return resolve();const timeout=setTimeout(()=>reject(new Error("انتهت مهلة اتصال الفيديو")),10000);connection.addEventListener("icegatheringstatechange",()=>{if(connection.iceGatheringState==="complete"){clearTimeout(timeout);resolve();}});});const answer=await api("/v1/video",{sdp:connection.localDescription.sdp,type:connection.localDescription.type});await connection.setRemoteDescription(answer); }
   async function settings(){if(!transportSettings)transportSettings=await api("/v1/transport");return transportSettings;}
-  async function video(){const selected=await settings();if(selected.preferred!=="websocket")return webrtcVideo();closeVideo();peer=ZeusLabTransport.player({token,video:$("video"),image:$("screenImage"),onState:message=>{$("transportState").textContent=message;$("placeholder").hidden=true;},onError:error});}
+  async function video(){const selected=await settings();if(selected.preferred==="github_frames"){closeVideo();$("video").hidden=true;$("screenImage").hidden=false;$("transportState").textContent="لقطات متتابعة مشفّرة عبر GitHub · ليست فيديو مباشرًا";return;}if(selected.preferred!=="websocket")return webrtcVideo();closeVideo();peer=ZeusLabTransport.player({token,video:$("video"),image:$("screenImage"),onState:message=>{$("transportState").textContent=message;$("placeholder").hidden=true;},onError:error});}
   function bind(id,action){$(id).addEventListener("click",async()=>{const b=$(id);b.disabled=true;$("error").hidden=true;try{await action();}catch(e){error(e);}finally{b.disabled=false;}});}
   bind("start",async()=>{await call("android_device",{operation:"start"});await refresh();await video();});
   bind("stop",async()=>{await call("android_device",{operation:"stop"});closeVideo();await refresh();});
@@ -41,7 +42,8 @@
   $("filter").oninput=renderFlows;$("closeDetail").onclick=()=>{$("flowDetail").close();detailFlow=null;};
   function closeFeed(){if(feed){feed.abort();feed=null;}}
   async function networkFeed(){if(feed||document.hidden||Date.now()<reconnectAt)return;const controller=new AbortController();feed=controller;
-    if((await settings()).network_feed==="websocket"){
+    const selected=await settings();if(selected.network_feed==="github_poll"){feed=null;return;}
+    if(selected.network_feed==="websocket"){
       const connection=ZeusLabTransport.connect({token,channel:"network",after:last,onEvent:value=>{if(value.event)receiveFlow(value.event);},onClose:e=>{if(feed===connection){feed=null;reconnectAt=Date.now()+1000;error(e);}}});feed=connection;return;
     }
     try{const response=await fetch("/v1/network/feed?after="+last,{headers:{Authorization:"Bearer "+token},credentials:"omit",cache:"no-store",redirect:"error",signal:controller.signal});if(!response.ok)throw new Error("تعذر استقبال سجل الشبكة");const reader=response.body.getReader(),decoder=new TextDecoder();let pending="";
@@ -103,6 +105,8 @@
   timer=setInterval(async()=>{if(document.hidden)return;try{if(Date.now()>renewAt){window.webkit?.messageHandlers?.labRenew?.postMessage({});renewAt=Date.now()+240000;}await refresh();if(status.status==="running")await api("/v1/heartbeat",{});}catch(e){error(e);}},3000);
   document.addEventListener("visibilitychange",()=>{if(document.hidden){closeVideo();closeFeed();timelineFeed?.abort();timelineFeed=null;}else{refresh().catch(error);if(status.status==="running")video().catch(error);}});
   window.addEventListener("pagehide",()=>{clearInterval(timer);closeVideo();closeFeed();timelineFeed?.abort();timelineFeed=null;});
+  window.addEventListener("zeusLabFrame",e=>{const value=e.detail;if(value.state?.status){status=value.state;render();}for(const flow of value.network?.events||[])receiveFlow(flow);if(value.screenshot){$("video").hidden=true;$("screenImage").hidden=false;$("screenImage").src="data:image/jpeg;base64,"+value.screenshot;$("placeholder").hidden=true;$("transportState").textContent="لقطات GitHub متتابعة · "+new Date(value.observed_at*1000).toLocaleTimeString("ar");}});
+  if(window.zeusLabNative){$("apk").disabled=true;$("uploadState").textContent="استخدم زر APK في الشريط العلوي للرفع مباشرة من تطبيق الملفات.";document.querySelector("footer").textContent="جلسة مؤقتة على GitHub Actions ·15 دقيقة بعد الإقلاع · الحفظ المؤقت24 ساعة";}
   setTab("device");projects().catch(error);
   refresh().then(()=>{if(status.status==="running")return video();}).catch(error);
 })();

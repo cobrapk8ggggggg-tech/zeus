@@ -74,6 +74,10 @@ Dir.glob((browser + '.openminis/Host/*.swift').to_s).reject { |path| path.end_wi
   app.source_build_phase.add_file_reference(bridge)
 end
 
+lab_ui = project.main_group.new_file((browser + '.openminis/build/ZeusAndroidLab').to_s)
+lab_ui.last_known_file_type = 'folder'
+app.resources_build_phase.add_file_reference(lab_ui)
+
 skills = project.main_group.new_file((browser + '.openminis/ZEUSDefaultSkills').to_s)
 skills.last_known_file_type = 'folder'
 app.resources_build_phase.add_file_reference(skills)

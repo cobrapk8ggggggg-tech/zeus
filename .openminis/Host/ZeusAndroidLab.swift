@@ -5,6 +5,8 @@ import ZEUSBrowser
 enum ZeusAndroidAPKTransfer {
     struct Uploaded { let project:String;let sha256:String }
     @MainActor static func upload(source:URL,conversation:UUID) async throws -> Uploaded {
+        let actions=ZeusActionsLab.shared(conversation)
+        if actions.receipt != nil,!actions.completed { return try await actions.upload(source) }
         let scoped=source.startAccessingSecurityScopedResource()
         defer { if scoped { source.stopAccessingSecurityScopedResource() } }
         let values=try source.resourceValues(forKeys:[.fileSizeKey,.isRegularFileKey])
@@ -88,6 +90,8 @@ enum ZeusAndroidTools {
     }
     @MainActor static func execute(_ name: String, args: [String:Any], session: String?, callID: String) async throws -> [String:Any] {
         guard let session, let identifier = UUID(uuidString:session), names.contains(name) else { throw ZeusPatch.failure("افتح محادثة محفوظة أولًا.") }
+        let actions=ZeusActionsLab.shared(identifier)
+        if actions.receipt != nil,!actions.completed { return try await actions.execute(name,args:args,requestID:callID,agent:true) }
         let body: [String:Any] = ["name":name, "arguments":args, "request_id":callID]
         let data = try await NativeCloudAccountAPI.runtime("v1/android/\(identifier.uuidString.lowercased())/tool", method:"POST", body:JSONSerialization.data(withJSONObject:body))
         guard let value = try JSONSerialization.jsonObject(with:data) as? [String:Any] else { throw ZeusPatch.failure("استجابة مختبر غير صالحة.") }
@@ -106,6 +110,22 @@ struct ZeusAndroidLabButton: View {
 }
 
 struct ZeusAndroidLabView: View {
+    let session:String?
+    var chatPanel:AnyView? = nil
+    var stopAgent:(() -> Void)? = nil
+    @Environment(\.dismiss) private var dismiss
+    var body:some View {
+        NavigationStack {
+            Group {
+                if let session,let conversation=UUID(uuidString:session) { ZeusActionsLabView(conversation:conversation,chatPanel:chatPanel,stopAgent:stopAgent) }
+                else { ContentUnavailableView("افتح محادثة محفوظة",systemImage:"bubble.left",description:Text("ترتبط جلسة المختبر بالمحادثة وحساب ZEUS.")) }
+            }.navigationTitle("ZEUS · Android Lab").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement:.confirmationAction) { Button("إغلاق") { dismiss() } } }
+        }.preferredColorScheme(.dark)
+    }
+}
+
+struct ZeusHostedAndroidLabView: View {
     let session: String?
     var chatPanel: AnyView? = nil
     var stopAgent: (() -> Void)? = nil

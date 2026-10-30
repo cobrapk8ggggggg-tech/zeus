@@ -1,7 +1,7 @@
 name: ZEUS temporary Android tunnel acceptance
 on:
   push:
-    branches: [feature/zeus-security-lab-20261030]
+    branches: [feature/zeus-security-lab-20261030, "zeus-lab/**"]
     paths: [experiments/actions-lab/launch.json, .github/workflows/zeus-lab-tunnel.yml]
   workflow_dispatch:
 permissions:

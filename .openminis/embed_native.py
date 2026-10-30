@@ -76,6 +76,8 @@ def embed(native, browser, report):
     for host in sorted((browser / ".openminis/Host").glob("*.swift")):
         if host.name.endswith("Tests.swift"): continue
         shutil.copyfile(host, source / host.name)
+    lab_resources = browser / ".openminis/build/ZeusAndroidLab"
+    shutil.copytree(browser / "AndroidLab/zeus_android/web", lab_resources, dirs_exist_ok=True)
     # Turn the original informational storage rows into drill-down links.
     storage = source / "Views/Settings/StorageManagementView.swift"
     replace(storage, '        HStack {\n            Image(systemName: icon)', '        NavigationLink { ZeusStorageCategoryView(category: label) } label: {\n        HStack {\n            Image(systemName: icon)')

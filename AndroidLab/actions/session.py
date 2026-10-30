@@ -49,7 +49,10 @@ def checkpoint(data,directory,sequence,final,private):
 async def main():
     os.umask(0o077);ROOT.mkdir(exist_ok=True,mode=0o755)
     for name in ('session','owner','conversation'):uuid.UUID(LAUNCH[name])
-    private=ROOT.parent/'zeus-lab-private';private.mkdir(mode=0o711,exist_ok=True);private.chmod(0o711);data=private/'data';data.mkdir(exist_ok=True,mode=0o700)
+    # RUNNER_TEMP's ancestors are private to the runner UID. Sandboxed APK
+    # parsers need traversal to their own input/work directories, not access
+    # to the runner home, checkout, credentials or control channel.
+    private=Path(tempfile.mkdtemp(prefix='zeus-lab-private-',dir='/tmp'));private.chmod(0o711);data=private/'data';data.mkdir(exist_ok=True,mode=0o700)
     stop=asyncio.Event();loop=asyncio.get_running_loop()
     for signum in (signal.SIGTERM,signal.SIGINT):loop.add_signal_handler(signum,stop.set)
     deadline=time.time()+min(900,max(60,int(LAUNCH['runtime_seconds'])))
@@ -59,9 +62,10 @@ async def main():
     control_private=control_key.private_bytes(serialization.Encoding.Raw,serialization.PrivateFormat.Raw,serialization.NoEncryption())
     control_public=b64(control_key.public_key().public_bytes(serialization.Encoding.Raw,serialization.PublicFormat.Raw))
     control_file=ROOT.parent/'zeus-lab-control/incoming.json';control_sequence=0;seen_digest=''
+    capture_token=secrets.token_urlsafe(40);os.environ['ZEUS_ANDROID_CAPTURE_TOKEN']=capture_token
     app=create_app(root=data,key=key,owner=LAUNCH['owner'],device=device,bootstrap=bootstrap)
     server=uvicorn.Server(uvicorn.Config(app,host='127.0.0.1',port=8088,log_level='error',access_log=False,timeout_graceful_shutdown=5,ws_max_size=16384,ws_max_queue=4))
-    serving=asyncio.create_task(server.serve());tunnel=None;log_file=None;result={'session':LAUNCH['session'],'fixture_only':True,'credentials_published_plaintext':False,'status':'preparing'};code=0
+    audit_test=None;serving=asyncio.create_task(server.serve());tunnel=None;log_file=None;result={'session':LAUNCH['session'],'fixture_only':LAUNCH.get('fixture_only',True),'credentials_published_plaintext':False,'status':'preparing'};code=0
     try:
         while not server.started:await asyncio.sleep(.05)
         binary=private/'cloudflared'
@@ -77,13 +81,27 @@ async def main():
                 if response.status_code!=200:raise ValueError('Fixture operation failed: '+str(response.status_code)+' '+response.text[:1000])
                 return response.json()
             await call('android_device',{'operation':'start'})
-            apk=Path(os.environ['LAB_PROBE_APK']).read_bytes();response=await client.post('/v1/upload',content=apk,headers={'X-Filename':'zeus-ci-probe.apk','Content-Type':'application/vnd.android.package-archive'})
-            response.raise_for_status();project=response.json()['id'];result['project']=project
-            await call('android_project',{'operation':'install','project':project})
-            await call('android_ui',{'operation':'launch','package':'com.zeus.lab.probe'})
-            try:(data/'actual-initial-ui.json').write_text(json.dumps(await call('android_ui',{'operation':'tree'})))
-            except ValueError as error:(data/'actual-initial-ui.json').write_text(json.dumps({'unavailable':str(error)}))
-            await call('android_device',{'operation':'record_start','project':project,'kind':'logcat'})
+            project=None
+            if LAUNCH.get('fixture_only',True):
+                apk=Path(os.environ['LAB_PROBE_APK']).read_bytes();response=await client.post('/v1/upload',content=apk,headers={'X-Filename':'zeus-ci-probe.apk','Content-Type':'application/vnd.android.package-archive'})
+                response.raise_for_status();project=response.json()['id'];result['project']=project
+                await call('android_project',{'operation':'install','project':project})
+                await call('android_ui',{'operation':'launch','package':'com.zeus.lab.probe'})
+                try:(data/'actual-initial-ui.json').write_text(json.dumps(await call('android_ui',{'operation':'tree'})))
+                except ValueError as error:(data/'actual-initial-ui.json').write_text(json.dumps({'unavailable':str(error)}))
+                await call('android_device',{'operation':'record_start','project':project,'kind':'logcat'})
+                if LAUNCH.get('verify_static'):
+                    async def verify_static():
+                        job=await call('android_project',{'operation':'audit','project':project})
+                        for _ in range(150):
+                            state=await call('android_project',{'operation':'job','project':project,'job':job['id']})
+                            if state['status']!='running':break
+                            await asyncio.sleep(2)
+                        if state['status']!='completed':raise ValueError('Actual isolated APK audit failed: '+str(state))
+                        summary=await call('android_project',{'operation':'report','project':project})
+                        if summary['inventory']['package']!='com.zeus.lab.probe':raise ValueError('Wrong actual APK report identity')
+                        result['actual_static_audit']={'passed':True,'summary':summary}
+                    audit_test=asyncio.create_task(verify_static())
             logfile=private/'tunnel.log';log_file=logfile.open('wb')
             tunnel=subprocess.Popen([str(binary),'tunnel','--no-autoupdate','--url','http://127.0.0.1:8088','--protocol','http2'],stdout=log_file,stderr=log_file,env=clean_env(),start_new_session=True)
             for _ in range(100):
@@ -120,7 +138,7 @@ async def main():
                 else:result['browser_passed']=False;result['browser_error']='Temporary relay was not reachable; GitHub artifact control remains available'
                 checkpoint(data,ROOT,2,False,private)
                 print('LAB_RELAY_TEST browser_passed='+str(result['browser_passed']),flush=True)
-            relay_test=asyncio.create_task(test_relay())
+            relay_test=asyncio.create_task(test_relay()) if LAUNCH.get('fixture_only',True) else asyncio.create_task(asyncio.sleep(0))
             frames=0;frame_bytes=0;next_frame=0;previous_frame=''
             print('LAB_ACCEPTANCE_READY',flush=True)
             while time.time()<deadline and not stop.is_set():
@@ -131,7 +149,7 @@ async def main():
                         if fingerprint!=previous_frame:
                             frames+=1;frame_bytes+=len(frame);previous_frame=fingerprint
                             destination=ROOT/f'frame-{frames}'
-                            encrypted_json(destination,'frame',{'session':LAUNCH['session'],'frame':frames,'observed_at':time.time(),'screenshot':b64(frame),'kind':'successive_screenshots','live_video':False})
+                            encrypted_json(destination,'frame',{'session':LAUNCH['session'],'frame':frames,'observed_at':time.time(),'screenshot':b64(frame),'kind':'successive_screenshots','live_video':False,'state':app.state.lab.load(),'network':await call('android_network',{'operation':'list','after':0})})
                             publish(1000+frames,destination)
                             (data/'latest-frame.json').write_text(json.dumps({'frame':frames,'observed_at':time.time(),'screenshot':b64(frame)}))
                     except (ValueError,OSError,asyncio.TimeoutError):pass
@@ -147,7 +165,11 @@ async def main():
                             if role is None:raise ValueError('Control credential is invalid')
                             name=command.get('name');arguments=command.get('arguments',{});request_id=str(uuid.UUID(command['request_id']))
                             client.headers['Authorization']='Bearer '+encode(key,LAUNCH['owner'],LAUNCH['conversation'],role)
-                            response=await client.post('/v1/tool',json={'name':name,'arguments':arguments,'request_id':request_id})
+                            if name=='__take':
+                                if role!='viewer':raise ValueError('Only the viewer can reclaim control')
+                                response=await client.post('/v1/control/take',json={})
+                            elif name=='__heartbeat':response=await client.post('/v1/heartbeat',json={})
+                            else:response=await client.post('/v1/tool',json={'name':name,'arguments':arguments,'request_id':request_id})
                             control_sequence=outer['sequence'];observation={'sequence':control_sequence,'request_id':request_id,'http_status':response.status_code,'result':response.json(),'observed_at':time.time(),'session':app.state.lab.load()}
                             if app.state.lab.load().get('status')=='running':
                                 observation['screenshot']=b64(await device.screenshot())
@@ -158,6 +180,10 @@ async def main():
                             result['github_control_verified']=True
                         except Exception as error:
                             (data/'control-error.json').write_text(json.dumps({'error':type(error).__name__,'detail':str(error)[:1000]}))
+                if LAUNCH.get('acceptance_auto_end') and relay_test.done() and (audit_test is None or audit_test.done()):
+                    await relay_test
+                    if audit_test:await audit_test
+                    await call('android_device',{'operation':'stop'})
                 saved=app.state.lab.load()
                 if saved and saved['status']=='stopped':result['ended']='user_stop';break
                 try:await asyncio.wait_for(stop.wait(),2)
@@ -171,6 +197,7 @@ async def main():
     except BaseException as error:
         code=1;result.update(status='failed',error=type(error).__name__,detail=str(error)[:3000])
     finally:
+        if audit_test and not audit_test.done():audit_test.cancel();await asyncio.gather(audit_test,return_exceptions=True)
         (data/'result.json').write_text(json.dumps(result,indent=2))
         server.should_exit=True
         try:await asyncio.wait_for(serving,10)

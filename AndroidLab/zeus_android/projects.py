@@ -194,7 +194,7 @@ class Projects:
                 'prlimit','--as=4294967296','--nproc=128','--fsize=134217728','--cpu=600','--',*command]
         process = await asyncio.create_subprocess_exec(*command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
             env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": "/tmp", "JAVA_TOOL_OPTIONS": "-Xmx1536m -XX:ActiveProcessorCount=2", "LANG":"C.UTF-8"},
-            start_new_session=True, **({"extra_groups":[]} if network_isolated else {"user":uid,"group":uid,"extra_groups":[]} if uid is not None else {}))
+            cwd="/tmp", start_new_session=True, **({"extra_groups":[]} if network_isolated else {"user":uid,"group":uid,"extra_groups":[]} if uid is not None else {}))
         output = bytearray()
         try:
             async with asyncio.timeout(600):

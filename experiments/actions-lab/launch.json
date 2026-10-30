@@ -1,8 +1,11 @@
 {
-  "session": "5c9ac790-83b9-4a34-a065-dcf4bc80f16a",
+  "session": "9b22d330-8a36-49a8-a268-d6de3578f8fc",
   "owner": "a6335c86-ea20-4115-929f-02953492bb6d",
   "conversation": "15dc304e-19b5-4517-982d-f76543956c52",
   "public_key": "Qud1p8NkHXreYv5EzKCyZLx0WI6U406Q1FFMIKoHFCU=",
   "purpose": "Real Android ADB encrypted control, successive screenshots and temporary HTTPS video acceptance",
-  "runtime_seconds": 900
+  "runtime_seconds": 900,
+  "verify_static": true,
+  "acceptance_auto_end": true,
+  "fixture_only": true
 }
