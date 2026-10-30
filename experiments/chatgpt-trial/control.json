@@ -1,5 +1,7 @@
 {
   "session": "zeus-chatgpt-20261030-e",
-  "sequence": 0,
-  "operation": "observe"
+  "sequence": 1,
+  "operation": "observe",
+  "label": "Wait for ChatGPT startup after first splash screen",
+  "settle_seconds": 12
 }
