@@ -1,8 +1,9 @@
 {
   "session": "zeus-chatgpt-20261030-f",
-  "sequence": 3,
-  "operation": "type",
-  "text": "Hello please reply with one word",
-  "label": "Enter test prompt into the reviewed focused composer",
-  "settle_seconds": 2
+  "sequence": 4,
+  "operation": "tap",
+  "x": 0.88125,
+  "y": 0.5765625,
+  "label": "Send the reviewed test message and observe its network exchange",
+  "settle_seconds": 15
 }
