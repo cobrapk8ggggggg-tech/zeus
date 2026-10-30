@@ -78,7 +78,8 @@ async def main():
             paths,metadata=await asyncio.to_thread(prepare,root/'app');RESULT['application']=metadata;write(PROOF/'application.json',metadata)
             await asyncio.to_thread(subprocess.run,['avdmanager','create','avd','-n','zeus-chatgpt','-k','system-images;android-32;google_apis;x86_64','--force'],input=b'no\n',env=clean_env(),capture_output=True,check=True,timeout=90)
             log=(PROOF/'emulator.log').open('wb');files.append(log)
-            emulator=subprocess.Popen(['emulator','-avd','zeus-chatgpt','-no-window','-noaudio','-no-boot-anim','-no-snapshot','-gpu','swiftshader_indirect','-memory','2048','-cores','2','-writable-system','-port','5554'],env=clean_env(),stdout=log,stderr=log,start_new_session=True);children.append(emulator)
+            executable=str(Path((os.environ.get('ANDROID_HOME') or os.environ['ANDROID_SDK_ROOT']))/'emulator/emulator')
+            emulator=subprocess.Popen([executable,'-avd','zeus-chatgpt','-no-window','-noaudio','-no-boot-anim','-no-snapshot','-gpu','swiftshader_indirect','-memory','2048','-cores','2','-writable-system','-port','5554'],env=clean_env(),stdout=log,stderr=log,start_new_session=True);children.append(emulator)
             for attempt in range(180):
                 if emulator.poll() is not None:raise RuntimeError('Emulator exited: '+str(emulator.returncode))
                 try:

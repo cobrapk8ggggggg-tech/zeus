@@ -30,7 +30,7 @@ jobs:
         run: gradle --no-daemon :app:assembleDebug :probe:assembleDebug
       - name: Prepare the API32 guest and bounded observation tools
         run: |
-          sdkmanager 'platforms;android-32' 'system-images;android-32;google_apis;x86_64'
+          sdkmanager 'emulator' 'platforms;android-32' 'system-images;android-32;google_apis;x86_64'
           pip install -r AndroidLab/requirements.in
           python -m venv /tmp/zeus-chatgpt-capture
           /tmp/zeus-chatgpt-capture/bin/pip install mitmproxy==11.0.2
