@@ -43,5 +43,13 @@ jobs:
           PY
       - name: Typecheck the Actions controller and inspector against the actual iOS SDK
         run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          source=Path('.openminis/Host/ZeusAndroidLab.swift').read_text()
+          prefix=source.split('struct ZeusAndroidLabButton:')[0].replace('import ZEUSBrowser','')
+          access=next(line for line in source.splitlines() if line.startswith('struct ZeusAndroidAccess:'))
+          (Path(os.environ['RUNNER_TEMP'])/'LabActualTools.swift').write_text(prefix+'\n'+access)
+          PY
           SDK=$(xcrun --sdk iphonesimulator --show-sdk-path)
-          xcrun swiftc -typecheck -swift-version 5 -strict-concurrency=minimal -sdk "$SDK" -target arm64-apple-ios18.1-simulator .zeus-ci/android-lab/TypecheckStubs.swift .openminis/Host/ZeusLabEnvelope.swift .openminis/Host/ZeusActionsLab.swift .openminis/Host/ZeusActionsLabView.swift
+          xcrun swiftc -typecheck -swift-version 5 -strict-concurrency=minimal -sdk "$SDK" -target arm64-apple-ios18.1-simulator .zeus-ci/android-lab/TypecheckStubs.swift .openminis/Host/ZeusLabEnvelope.swift .openminis/Host/ZeusActionsLab.swift .openminis/Host/ZeusActionsLabView.swift "$RUNNER_TEMP/LabActualTools.swift"

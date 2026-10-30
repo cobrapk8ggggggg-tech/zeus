@@ -11,8 +11,8 @@ async function pollControl(){
  const branch=encodeURIComponent(process.env.GITHUB_REF_NAME),repository=process.env.GITHUB_REPOSITORY;
  const response=await fetch(`https://api.github.com/repos/${repository}/contents/experiments/actions-lab/control.json?ref=${branch}`,{headers:{Authorization:'Bearer '+process.env.GITHUB_TOKEN,Accept:'application/vnd.github+json',...(etag?{'If-None-Match':etag}:{})},redirect:'error',signal:AbortSignal.timeout(10000)});
  if(response.status===304||response.status===404)return;if(!response.ok)throw Error('GitHub control channel HTTP '+response.status);
- etag=response.headers.get('etag')||'';const value=await response.json();if(value.size>120000)throw Error('Encrypted control exceeds limit');
- const data=Buffer.from(value.content,'base64');if(data.length>120000)throw Error('Encrypted control exceeds limit');
+ etag=response.headers.get('etag')||'';const value=await response.json();if(value.size>256000)throw Error('Encrypted control exceeds limit');
+ const data=Buffer.from(value.content,'base64');if(data.length>256000)throw Error('Encrypted control exceeds limit');
  const temporary=path.join(control,'incoming.tmp');fs.writeFileSync(temporary,data,{mode:0o600});fs.renameSync(temporary,path.join(control,'incoming.json'));
 }
 

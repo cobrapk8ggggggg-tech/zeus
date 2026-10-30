@@ -139,6 +139,8 @@ class Projects:
                 os.chmod(root, 0o755); os.chmod(root / "original.apk", 0o444)
             work = root / "work"; work.mkdir(exist_ok=True)
             if build_uid is not None: os.chown(work, build_uid, build_uid)
+            home=work/'.tool-home';home.mkdir(mode=0o700,exist_ok=True)
+            if build_uid is not None:os.chown(home,build_uid,build_uid)
             operation = state["operation"]
             if operation == "analyze": commands = [["jadx", "--no-res", "--threads-count", "1", "-d", str(work / "sources"), str(root / "original.apk")]]
             elif operation == "decode": commands = [["apktool", "d", "-f", "-o", str(work / "decoded"), str(root / "original.apk")]]
@@ -158,7 +160,7 @@ class Projects:
                     ["apksigner", "verify", str(work / "rebuilt.apk")]]
             logs = []
             for command in commands:
-                logs.append(await self.process(command))
+                logs.append(await self.process(command,home=home))
             if operation=='audit':
                 metadata=json.loads((root/'project.json').read_text());metadata['variant']=variant
                 report=await asyncio.to_thread(audit.analyze,target,evidence/'decoded',evidence/'sources',metadata,logs[0])
@@ -184,7 +186,7 @@ class Projects:
         return json.loads(path.read_text())
 
     @staticmethod
-    async def process(command):
+    async def process(command,home=None):
         # No broker/model credentials are inherited by decompilers/build tools.
         uid = int(os.environ["ZEUS_ANDROID_BUILD_UID"]) if os.environ.get("ZEUS_ANDROID_BUILD_UID") else None
         network_isolated=os.environ.get('ZEUS_ANDROID_TOOL_NETNS')=='1'
@@ -193,7 +195,9 @@ class Projects:
             command=['unshare','--net','--pid','--fork','--mount-proc','--setuid='+str(uid),'--setgid='+str(uid),'--',
                 'prlimit','--as=4294967296','--nproc=128','--fsize=134217728','--cpu=600','--',*command]
         process = await asyncio.create_subprocess_exec(*command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
-            env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": "/tmp", "JAVA_TOOL_OPTIONS": "-Xmx1536m -XX:ActiveProcessorCount=2", "LANG":"C.UTF-8"},
+            env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(home or '/tmp'),
+                 "XDG_CONFIG_HOME":str(Path(home or '/tmp')/'config'),"XDG_CACHE_HOME":str(Path(home or '/tmp')/'cache'),
+                 "JAVA_TOOL_OPTIONS": "-Xmx1536m -XX:ActiveProcessorCount=2 -Duser.home="+str(home or '/tmp'), "LANG":"C.UTF-8"},
             cwd="/tmp", start_new_session=True, **({"extra_groups":[]} if network_isolated else {"user":uid,"group":uid,"extra_groups":[]} if uid is not None else {}))
         output = bytearray()
         try:

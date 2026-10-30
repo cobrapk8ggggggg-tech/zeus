@@ -57,7 +57,7 @@ def create_app(root=None, key=None, owner=None, device=None, clock=time.time, bo
         return {k:v for k,v in event.items() if k in {'id', 'flow_id', 'sequence', 'phase', 'started', 'observed', 'method', 'url', 'status', 'direction', 'message_type', 'error','sni','duration_ms','interpretation','observer_dropped_total','observer_delivery_failures_total'}}
 
     def network(scope, operation, args, role):
-        events = state.events(scope, max(0, int(args.get('after', 0))), 1 if operation == 'read' else 5)
+        events = state.events(scope, max(0, int(args.get('after', 0))), 1 if operation == 'read' else min(50,max(1,int(args.get('limit',5)))))
         if operation == 'list': events = [summary(event) for event in events]
         else:
             for event in events:
@@ -297,7 +297,7 @@ def create_app(root=None, key=None, owner=None, device=None, clock=time.time, bo
                 state.db.execute('INSERT INTO operations VALUES(?,?,?,?)',(scope,call.request_id,digest,json.dumps(result)));state.db.commit()
                 return result
             sensitive=call.name=='android_project' and (operation in {'write','build'} or operation=='install' and args.get('variant')=='rebuilt')
-            if sensitive and value['role']=='agent' and not state.consent(scope,args.get('project',''),'modify'):
+            if sensitive and value['role']=='agent' and not (saved and saved.get('scope')==scope and saved.get('trusted') and saved.get('controller')=='agent') and not state.consent(scope,args.get('project',''),'modify'):
                 raise HTTPException(403,'تحتاج نسخة الاختبار موافقة صريحة لهذا المشروع؛ اطلب موافقة المستخدم أولًا.')
             if call.name=='android_device' and operation=='timeline':return {'events':state.history(scope,int(args.get('after',0))),'coverage':state.coverage(scope)}
             if call.name=='android_device' and operation=='capabilities':
@@ -336,7 +336,8 @@ def create_app(root=None, key=None, owner=None, device=None, clock=time.time, bo
                     except BaseException:
                         await lifecycle.action("stop"); raise
                     saved = {"scope":scope, "owner":value["sub"], "status":"running", "controller":"human", "agent_until":0,
-                        "activity":clock(), "started":clock(), "deadline":min(clock()+1800,bootstrap['expires']) if bootstrap else clock()+1800, "capture":False}
+                        "activity":clock(), "started":clock(), "deadline":min(clock()+1800,bootstrap['expires']) if bootstrap else clock()+1800, "capture":False,"trusted":bool(bootstrap and bootstrap.get("trusted"))}
+                    if saved["trusted"]:saved.update(controller="agent",agent_until=saved["deadline"])
                     # Another conversation cannot inherit an earlier capture.
                     await device.command("shell", "settings", "put", "global", "http_proxy", ":0")
                 elif operation == "stop": await stop(saved, "user")
@@ -349,9 +350,14 @@ def create_app(root=None, key=None, owner=None, device=None, clock=time.time, bo
                     result=await diagnostics.stop(scope)
                     state.db.execute('UPDATE operations SET value=? WHERE scope=? AND id=?',(json.dumps(result),scope,call.request_id));state.db.commit()
                     return result
+                elif operation == 'trust':
+                    if value['role']!='viewer':raise ValueError('Only the user can trust this session')
+                    saved.update(trusted=True,controller='agent',agent_until=saved['deadline'])
+                    state.record(scope,'session_trusted',{'actor':'viewer','expires':saved['deadline']})
                 elif operation in {"take", "release"}:
                     if value["role"] != "viewer": raise ValueError("Only the user can transfer device control")
                     saved.update(controller="human" if operation == "take" else "agent", agent_until=clock()+1800)
+                    if operation=="take":saved["trusted"]=False
                 else: raise ValueError("Unknown session operation")
                 state.save(saved); result = await session(value)
             elif call.name == "android_ui": result = await device.action(operation, args)
@@ -397,7 +403,7 @@ def create_app(root=None, key=None, owner=None, device=None, clock=time.time, bo
     @app.post('/v1/control/take')
     async def take_control(value=Depends(claims)):
         if value['role']!='viewer':raise HTTPException(403)
-        saved=state.owned(value,active=False);saved.update(controller='human',agent_until=0);state.save(saved)
+        saved=state.owned(value,active=False);saved.update(controller='human',agent_until=0,trusted=False);state.save(saved)
         state.db.execute('DELETE FROM consents WHERE scope=?',(state.scope(value),));state.db.commit()
         # Do not wait behind a stalled ADB call holding the ordinary tool gate.
         for task,scope in list(active_agent.items()):

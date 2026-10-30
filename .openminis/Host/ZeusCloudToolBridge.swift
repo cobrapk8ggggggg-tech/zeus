@@ -14,7 +14,10 @@ import ZEUSBrowser
                 properties[key] = schema
             }
             let schema = ZeusAgentSchemas.schema(tool.name) ?? ["type": "object", "properties": properties, "required": tool.required]
-            return ["name": tool.name, "description": tool.description, "parameters": schema]
+            var descriptor:[String:Any] = ["name": tool.name, "description": tool.description, "parameters": schema]
+            let actions = vm.sessionId.flatMap(UUID.init(uuidString:)).map(ZeusActionsLab.shared)
+            if tool.name=="android_lab" || ZeusAndroidTools.names.contains(tool.name) && actions?.receipt != nil && actions?.completed==false { descriptor["zeus_execution"]="actions_via_device" }
+            return descriptor
         }
     }
     private struct Journal: Codable {
@@ -50,7 +53,9 @@ import ZEUSBrowser
             // Cloud execution must never fall back to the device filesystem or
             // shell, even if a stale server dispatches a server-owned tool here.
             let serverTools: Set<String> = ["exec_command", "write_stdin", "shell_execute", "file_read", "file_write", "file_edit", "memory_get", "memory_write", "apply_patch", "file_list", "task_checkpoint", "history_read"]
-            guard !serverTools.contains(name), !name.hasPrefix("android_") else {
+            let actions = vm.sessionId.flatMap(UUID.init(uuidString:)).map(ZeusActionsLab.shared)
+            let permittedAndroid = name=="android_lab" || ZeusAndroidTools.names.contains(name) && actions?.receipt != nil && actions?.completed==false
+            guard !serverTools.contains(name), !name.hasPrefix("android_") || permittedAndroid else {
                 throw issue("هذه الأداة تنفذ على الخادم فقط؛ رُفض تحويلها إلى الجهاز.")
             }
             var args = originalArgs

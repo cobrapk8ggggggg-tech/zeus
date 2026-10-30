@@ -108,6 +108,7 @@ enum ZeusPermissionMode: String, CaseIterable {
 
     func authorize(tool: String, args: [String: Any], sessionID: String?, blockID: UUID) async throws {
         try Task.checkCancellation()
+        if ZeusAndroidTools.names.contains(tool),let sessionID,let identifier=UUID(uuidString:sessionID),ZeusActionsLab.shared(identifier).isTrusted { return }
         var plan: ZeusProjectContract.Proposal?
         if tool == "propose_project_plan" {
             if ZeusAgentHarness.shared.isUtilityTask(session: sessionID) { return }

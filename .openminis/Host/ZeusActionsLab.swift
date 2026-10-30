@@ -46,6 +46,7 @@ import Security
     private var polling: Task<Void,Never>?
     private var pollingNow=false
     private var frameNumber = 0
+    var isTrusted:Bool { lastState?["trusted"] as? Bool == true && lastState?["controller"] as? String == "agent" && !completed }
     var displayState: [String:Any]? { lastState }
     private(set) var networkEvents: [[String:Any]] = []
     private var lastHeartbeat=Date.distantPast
@@ -73,7 +74,7 @@ import Security
         guard SecItemCopyMatching(query as CFDictionary,&result)==errSecSuccess,let data=result as? Data,data.count==32 else { throw ZeusPatch.failure("مفتاح فك تشفير الجلسة غير متاح في Keychain؛ لا تبدأ جلسة بديلة فوق نتائج لم تحفظها") }
         return data
     }
-    func start(accountID:String,repository:String,ref:String) async throws {
+    func start(accountID:String,repository:String,ref:String,trusted:Bool=true) async throws {
         guard !busy,receipt==nil || completed else { throw ZeusPatch.failure("توجد جلسة قائمة؛ أوقفها أو انتظر اكتمالها") }
         guard let owner=NativeCloudAccountAPI.ownerID?.lowercased(),UUID(uuidString:owner) != nil,
               repository.range(of:#"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"#,options:.regularExpression) != nil,
@@ -81,7 +82,7 @@ import Security
         busy=true;defer { busy=false }
         let prefix="/repos/"+repository
         let repo=try await client.object(accountID:accountID,path:prefix)
-        guard repo["private"] as? Bool==false,(repo["permissions"] as? [String:Any])?["push"] as? Bool==true else { throw ZeusPatch.failure("الوضع المجاني الحالي يتطلب مستودعًا عامًا بصلاحية الكتابة؛ ملفات APK والنتائج تُنقل مشفّرة. المستودعات الخاصة تحتاج فحص حصة مستقلًا") }
+        guard (repo["permissions"] as? [String:Any])?["push"] as? Bool==true else { throw ZeusPatch.failure("يلزم حساب GitHub بصلاحية الكتابة إلى هذا المستودع") }
         _ = try await client.readSource(accountID:accountID,repository:repository,branch:ref,path:".github/workflows/zeus-lab-tunnel.yml",maxChars:1000)
         let base=try await client.object(accountID:accountID,path:prefix+"/commits/"+ref)
         guard let sha=base["sha"] as? String,sha.count==40 else { throw ZeusPatch.failure("لم يتأكد مصدر الجلسة") }
@@ -91,7 +92,7 @@ import Security
         guard SecItemAdd(query as CFDictionary,nil)==errSecSuccess else { throw ZeusPatch.failure("تعذر حفظ مفتاح الجلسة") }
         _ = try await client.request(accountID:accountID,method:"POST",path:prefix+"/git/refs",body:["ref":"refs/heads/"+branch,"sha":sha])
         receipt=created;completed=false;connection=nil;screenshot=nil;frameNumber=0;try save()
-        let launch:[String:Any] = ["session":session.uuidString.lowercased(),"owner":owner,"conversation":conversation.uuidString.lowercased(),"public_key":key.publicKey.rawRepresentation.base64EncodedString(),"runtime_seconds":900,"fixture_only":false,"purpose":"User-requested temporary Android security laboratory"]
+        let launch:[String:Any] = ["session":session.uuidString.lowercased(),"owner":owner,"conversation":conversation.uuidString.lowercased(),"public_key":key.publicKey.rawRepresentation.base64EncodedString(),"runtime_seconds":900,"fixture_only":false,"trusted":trusted,"purpose":"User-requested temporary Android security laboratory"]
         let content=String(decoding:try JSONSerialization.data(withJSONObject:launch,options:[.sortedKeys]),as:UTF8.self)+"\n"
         let result=try await client.writeSources(accountID:accountID,repository:repository,branch:branch,message:"Start temporary encrypted ZEUS Android laboratory",files:[["path":"experiments/actions-lab/launch.json","content":content]])
         guard let head=result["commit_sha"] as? String else { throw ZeusPatch.failure("تعذر تأكيد بدء الجلسة؛ افحص الفرع قبل إعادة المحاولة") }

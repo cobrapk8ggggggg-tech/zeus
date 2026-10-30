@@ -84,6 +84,21 @@ class EvidenceApiTests(unittest.IsolatedAsyncioTestCase):
         response=await self.call('android_project',args,role='agent');self.assertEqual(response.status_code,200,response.text);self.assertEqual(file.read_text(),'edited')
         self.now+=601;denied=await self.call('android_project',args,role='agent');self.assertEqual(denied.status_code,403)
 
+    async def test_trusted_session_grants_modifications_once_and_takeover_revokes_them(self):
+        await lab_fixture.LabTests.start(self)
+        scope=self.app.state.lab.scope({'sub':'owner','conversation':self.conversation});project=str(uuid.uuid4())
+        root=self.app.state.lab.root/'projects'/scope/project;(root/'work/decoded').mkdir(parents=True)
+        (root/'project.json').write_text('{}');file=root/'work/decoded/test.txt';file.write_text('original')
+        args={'operation':'write','project':project,'path':'test.txt','content':'edited','expected_sha256':hashlib.sha256(b'original').hexdigest()}
+        self.assertEqual((await self.call('android_device',{'operation':'trust'},role='agent')).status_code,400)
+        self.assertEqual((await self.call('android_device',{'operation':'trust'})).status_code,200)
+        response=await self.call('android_project',args,role='agent');self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual(file.read_text(),'edited')
+        await self.client.post('/v1/control/take',headers=self.auth())
+        args.update(content='again',expected_sha256=hashlib.sha256(b'edited').hexdigest())
+        self.assertEqual((await self.call('android_project',args,role='agent')).status_code,403)
+        self.assertEqual(file.read_text(),'edited')
+
     async def test_takeover_interrupts_a_stalled_agent_action_without_waiting_for_tool_gate(self):
         await lab_fixture.LabTests.start(self);await self.call('android_device',{'operation':'release'})
         entered=asyncio.Event()

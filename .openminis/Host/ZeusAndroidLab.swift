@@ -36,12 +36,13 @@ enum ZeusAndroidAPKTransfer {
 /// This feature has no RootfsManager/ISH dependency and never stages an APK in
 /// the local agent workspace. The remote page uses a nonpersistent WebKit store.
 enum ZeusAndroidTools {
-    static let names: Set<String> = ["android_device", "android_ui", "android_screenshot", "android_network", "android_project"]
+    static let names: Set<String> = ["android_lab", "android_device", "android_ui", "android_screenshot", "android_network", "android_project"]
     static func schema(_ name: String) -> [String: Any]? {
         guard names.contains(name) else { return nil }
         var fields: [String: Any] = ["tool_title": ["type":"string"], "approval_reason":["type":"string"]]
         let operations: [String]
         switch name {
+        case "android_lab": operations = ["start", "status", "stop"]
         case "android_device": operations = ["status", "stop", "capabilities", "timeline", "logs", "records", "record_start", "record_stop"]
         case "android_ui": operations = ["tree", "tap", "swipe", "type", "key", "launch"]
         case "android_network": operations = ["start", "stop", "list", "read", "coverage"]
@@ -49,6 +50,7 @@ enum ZeusAndroidTools {
         default: operations = []
         }
         if !operations.isEmpty { fields["operation"] = ["type":"string", "enum":operations] }
+        if name == "android_lab" { for field in ["account_id","repository","ref"] { fields[field] = ["type":"string", "maxLength":200] } }
         if name == "android_ui" {
             for field in ["x", "y", "x2", "y2"] { fields[field] = ["type":"number", "minimum":0, "maximum":1] }
             fields["text"] = ["type":"string", "maxLength":4000]
@@ -73,6 +75,7 @@ enum ZeusAndroidTools {
     @MainActor static var definitions: [AgentToolDefinition] {
         guard NativeCloudAccountAPI.ownerID != nil else { return [] }
         let descriptions = [
+            "android_lab":"Start/status/stop this conversation's temporary GitHub Actions Android laboratory. For start supply the exact linked GitHub account_id, repository (owner/name), and source ref containing ZEUS Lab workflow. Private repositories are supported and use the account's Actions quota. Standard Ubuntu runner only, no paid hosting. Start returns a launch receipt, not proof Android booted: poll status until connected. Uploaded APKs, analysis and ADB run on Actions, never local Linux. Device can reconnect later; the current cloud-agent GitHub bridge needs ZEUS open while issuing commands. User can trust the session once and revoke it at any moment.",
             "android_device":"Remote Android status/capabilities/timeline, logs (optional package), project evidence records, record_start(kind logcat/pcap/video, project), record_stop or stop the device. Recordings are server-side, bounded to 180s/32MiB. PCAP requires tcpdump and does not decrypt TLS. The user must start Android and hand control to you; never infer availability or install an emulator locally. Human takeover interrupts actions and revokes modification consent.",
             "android_ui":"Inspect the remote Android UI or tap/swipe/type/launch. Coordinates are normalized 0...1. Read the UI tree first; screenshot for visual inspection. Human takeover blocks agent mutations. Text uses the laboratory's Unicode IME.",
             "android_screenshot":"Read the current remote Android screenshot using native image input. No screenshot is written to the iPhone or local Linux workspace.",
@@ -91,6 +94,17 @@ enum ZeusAndroidTools {
     @MainActor static func execute(_ name: String, args: [String:Any], session: String?, callID: String) async throws -> [String:Any] {
         guard let session, let identifier = UUID(uuidString:session), names.contains(name) else { throw ZeusPatch.failure("افتح محادثة محفوظة أولًا.") }
         let actions=ZeusActionsLab.shared(identifier)
+        if name=="android_lab" {
+            switch args["operation"] as? String {
+            case "start":
+                guard let account=args["account_id"] as? String,let repository=args["repository"] as? String,let ref=args["ref"] as? String else { throw ZeusPatch.failure("حدد حساب GitHub والمستودع وفرع مصدر المختبر") }
+                try await actions.start(accountID:account,repository:repository,ref:ref)
+            case "stop":try await actions.stop()
+            case "status":if actions.receipt != nil { try await actions.poll() }
+            default:throw ZeusPatch.failure("أمر جلسة غير صالح")
+            }
+            return ["phase":actions.phase,"connected":actions.connection != nil && !actions.completed,"completed":actions.completed,"run_id":actions.receipt?.runID as Any? ?? NSNull(),"repository":actions.receipt?.repository as Any? ?? NSNull(),"branch":actions.receipt?.branch as Any? ?? NSNull(),"execution":"github_actions","agent_bridge_requires_device":true]
+        }
         if actions.receipt != nil,!actions.completed { return try await actions.execute(name,args:args,requestID:callID,agent:true) }
         let body: [String:Any] = ["name":name, "arguments":args, "request_id":callID]
         let data = try await NativeCloudAccountAPI.runtime("v1/android/\(identifier.uuidString.lowercased())/tool", method:"POST", body:JSONSerialization.data(withJSONObject:body))

@@ -238,7 +238,8 @@ class Engine:
             if run.get("tools") is not None and call["name"] not in {t["name"] for t in self.catalog(run)}: raise ValueError("The tool is disabled or absent from this conversation registry")
             approved = first_approval if index == 0 else None
             device_path = str(call["arguments"].get("path", "")).startswith(("/var/minis/mounts/", "minis://mounts/"))
-            if call["name"] not in SERVER_TOOLS | ANDROID_NAMES or device_path:
+            actions_bridge=any(t.get('name')==call['name'] and t.get('zeus_execution')=='actions_via_device' for t in run.get('tools') or []) and call['name'].startswith('android_')
+            if call["name"] not in SERVER_TOOLS | ANDROID_NAMES or device_path or actions_bridge:
                 if call["name"] not in {t["name"] for t in self.catalog(run)}: raise ValueError("The model requested an unregistered tool")
                 if any(self.terminals.active(owner, key) for key in command_ids): raise ValueError("Finish the active command before waiting for the device")
                 await self.checkpoint(owner, conversation, grant)
@@ -246,7 +247,7 @@ class Engine:
                 await self.store.put(owner, "approval", key, {"type": "device", "run": identifier, "call": call, "status": "pending"})
                 await self.store.update_run(owner, identifier, status="waiting_user", pending_calls=calls[index:], pending_device=key)
                 await self.store.event(owner, identifier, "tool_start", {"id": call["id"], "name": call["name"], "input": call["arguments"]})
-                await self.store.event(owner, identifier, "device_required", {"id": key, "call": call, "notice": "هذه الأداة تستخدم الجهاز الأصلي. المهمة محفوظة وتنتظر اتصاله؛ لا يعمل متصفح على Railway."})
+                await self.store.event(owner, identifier, "device_required", {"id": key, "call": call, "notice": "تنتظر الأداة اتصال ZEUS لتمرير أمر GitHub إلى المحاكي؛ Android يعمل على Actions." if actions_bridge else "هذه الأداة تستخدم الجهاز الأصلي. المهمة محفوظة وتنتظر اتصاله؛ لا يعمل متصفح على Railway."})
                 raise WaitingForUser()
 
             android_mutation = call["name"] in ANDROID_NAMES and call["name"] != "android_screenshot" and call["arguments"].get("operation") not in {"status", "tree", "list", "read", "job", "files", "capabilities", "timeline", "coverage", "report", "search", "compare", "logs", "records"}

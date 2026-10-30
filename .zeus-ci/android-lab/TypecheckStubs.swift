@@ -1,8 +1,8 @@
-// Compile gate revision 2
+// Compile gate revision 3
 import Foundation
 import Combine
 struct ZeusPatch { static func failure(_ value:String)->NSError { NSError(domain:"fixture",code:1,userInfo:[NSLocalizedDescriptionKey:value]) } }
-@MainActor enum NativeCloudAccountAPI { static var ownerID:String? }
+@MainActor enum NativeCloudAccountAPI { static var ownerID:String?;static func runtime(_ path:String,method:String="GET",body:Data?=nil) async throws->Data { Data() } }
 @MainActor final class ZeusGitHubTools {
  static let shared=ZeusGitHubTools()
  func object(accountID:String,path:String,query:[String:String]=[:]) async throws->[String:Any] { [:] }
@@ -18,5 +18,5 @@ enum BackupZipExtractor {
  static func centralDirectory(handle:FileHandle)throws->[Entry] { [] }
 }
 enum BackupPackageReader { static func readEntry(at url:URL,named:String)throws->Data? { nil } }
-enum ZeusAndroidAPKTransfer { struct Uploaded { let project:String;let sha256:String } }
-enum ZeusAndroidTools { static let names:Set<String>=["android_device","android_ui","android_screenshot","android_network","android_project"] }
+struct AgentToolParam { enum Kind { case integer,string };let type:Kind;let description:String }
+struct AgentToolDefinition { let name:String;let description:String;let parameters:[String:AgentToolParam];let required:[String] }

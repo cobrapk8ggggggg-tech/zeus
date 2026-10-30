@@ -56,7 +56,7 @@ async def main():
     stop=asyncio.Event();loop=asyncio.get_running_loop()
     for signum in (signal.SIGTERM,signal.SIGINT):loop.add_signal_handler(signum,stop.set)
     deadline=time.time()+min(900,max(60,int(LAUNCH['runtime_seconds'])))
-    bootstrap={'conversation':LAUNCH['conversation'],'viewer':secrets.token_urlsafe(40),'agent':secrets.token_urlsafe(40),'expires':deadline,'url':''}
+    bootstrap={'conversation':LAUNCH['conversation'],'viewer':secrets.token_urlsafe(40),'agent':secrets.token_urlsafe(40),'expires':deadline,'url':'','trusted':LAUNCH.get('trusted',False)}
     key=secrets.token_urlsafe(48);device=Device('emulator-5554');os.environ.update(ZEUS_ANDROID_EXTERNAL_AVD='1',ZEUS_ANDROID_TUNNEL='1')
     control_key=X25519PrivateKey.generate()
     control_private=control_key.private_bytes(serialization.Encoding.Raw,serialization.PrivateFormat.Raw,serialization.NoEncryption())
@@ -139,17 +139,22 @@ async def main():
                 checkpoint(data,ROOT,2,False,private)
                 print('LAB_RELAY_TEST browser_passed='+str(result['browser_passed']),flush=True)
             relay_test=asyncio.create_task(test_relay()) if LAUNCH.get('fixture_only',True) else asyncio.create_task(asyncio.sleep(0))
-            frames=0;frame_bytes=0;next_frame=0;previous_frame=''
+            frames=0;frame_bytes=0;next_frame=0;previous_frame='';last_published_frame=0;network_cursor=0;network_window=[]
             print('LAB_ACCEPTANCE_READY',flush=True)
             while time.time()<deadline and not stop.is_set():
                 if time.time()>=next_frame and frame_bytes<15*1024*1024:
                     next_frame=time.time()+8
                     try:
-                        frame=await device.screenshot();fingerprint=hashlib.sha256(frame).hexdigest()
-                        if fingerprint!=previous_frame:
-                            frames+=1;frame_bytes+=len(frame);previous_frame=fingerprint
+                        frame=await device.screenshot()
+                        network=await call('android_network',{'operation':'list','after':network_cursor,'limit':50})
+                        network_cursor=max([network_cursor,*[e['id'] for e in network['events']]])
+                        network_window=(network_window+network['events'])[-100:]
+                        snapshot={'state':app.state.lab.load(),'network':{'events':network_window}}
+                        fingerprint=hashlib.sha256(frame+json.dumps(snapshot,sort_keys=True).encode()).hexdigest()
+                        if fingerprint!=previous_frame or time.time()-last_published_frame>=24:
+                            frames+=1;frame_bytes+=len(frame);previous_frame=fingerprint;last_published_frame=time.time()
                             destination=ROOT/f'frame-{frames}'
-                            encrypted_json(destination,'frame',{'session':LAUNCH['session'],'frame':frames,'observed_at':time.time(),'screenshot':b64(frame),'kind':'successive_screenshots','live_video':False,'state':app.state.lab.load(),'network':await call('android_network',{'operation':'list','after':0})})
+                            encrypted_json(destination,'frame',{'session':LAUNCH['session'],'frame':frames,'observed_at':time.time(),'screenshot':b64(frame),'kind':'successive_screenshots','live_video':False,**snapshot})
                             publish(1000+frames,destination)
                             (data/'latest-frame.json').write_text(json.dumps({'frame':frames,'observed_at':time.time(),'screenshot':b64(frame)}))
                     except (ValueError,OSError,asyncio.TimeoutError):pass
@@ -192,7 +197,7 @@ async def main():
             if not relay_test.done():relay_test.cancel()
             await asyncio.gather(relay_test,return_exceptions=True)
             result.update(successive_frames=frames,frame_bytes=frame_bytes)
-            result['status']='completed' if result.get('browser_passed') else 'artifact_control_verified' if result.get('github_control_verified') else 'transport_not_verified'
+            result['status']='completed' if result.get('browser_passed') else 'artifact_control_verified' if result.get('github_control_verified') else 'static_audit_verified' if result.get('actual_static_audit',{}).get('passed') and not LAUNCH.get('require_relay',True) else 'transport_not_verified'
             if result['status']=='transport_not_verified':code=1
     except BaseException as error:
         code=1;result.update(status='failed',error=type(error).__name__,detail=str(error)[:3000])
