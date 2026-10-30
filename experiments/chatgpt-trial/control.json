@@ -1,8 +1,9 @@
 {
   "session": "zeus-chatgpt-20261030-e",
-  "sequence": 3,
-  "operation": "type",
-  "text": "Hello please reply with one word",
-  "label": "Enter harmless test message into the observed focused composer",
-  "settle_seconds": 2
+  "sequence": 4,
+  "operation": "tap",
+  "x": 0.88125,
+  "y": 0.5765625,
+  "label": "Press the observed enabled Send Message button",
+  "settle_seconds": 10
 }
