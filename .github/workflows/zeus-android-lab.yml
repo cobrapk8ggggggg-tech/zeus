@@ -15,7 +15,7 @@ jobs:
       - name: Build the separate Android worker image
         run: docker build -f AndroidLab/Dockerfile -t zeus-android:test .
       - name: Verify packaged tools and keyboard without booting Android
-        run: docker run --rm --entrypoint sh zeus-android:test -c 'test -s /opt/zeus/ime.apk && adb version && apktool --version && jadx --version && apksigner version && python -c "import aiortc, av; print(aiortc.__version__)"'
+        run: docker run --rm --entrypoint sh zeus-android:test -c 'test -s /opt/zeus/ime.apk && adb version && apktool --version && jadx --version && apksigner version && command -v zipalign && python -c "import aiortc, av; print(aiortc.__version__)"'
   contracts:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -62,12 +62,14 @@ jobs:
       - name: Prepare actual APK analysis tools and capture proxy
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y apksigner
+          sudo apt-get install -y apksigner zipalign
           python AndroidLab/tests/prepare_tools.py
           python -m venv /tmp/zeus-capture
           /tmp/zeus-capture/bin/pip install mitmproxy==11.0.2
           echo '/tmp/zeus-android-tools' >> "$GITHUB_PATH"
           echo '/tmp/zeus-android-tools/jadx/bin' >> "$GITHUB_PATH"
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install --prefix "$RUNNER_TEMP/zeus-browser" --no-save playwright@1.56.1
+          echo "NODE_PATH=$RUNNER_TEMP/zeus-browser/node_modules" >> "$GITHUB_ENV"
       - name: Enable KVM on the GitHub test runner
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -82,6 +84,7 @@ jobs:
           ZEUS_ANDROID_IME_APK: ${{ github.workspace }}/AndroidLab/ime/app/build/outputs/apk/debug/app-debug.apk
           LAB_PROBE_APK: ${{ github.workspace }}/AndroidLab/ime/probe/build/outputs/apk/debug/probe-debug.apk
           LAB_CAPTURE_EXE: /tmp/zeus-capture/bin/mitmdump
+          CHROMIUM_PATH: /usr/bin/google-chrome
           LAB_PROOF_DIR: android-results
         with:
           api-level: 29

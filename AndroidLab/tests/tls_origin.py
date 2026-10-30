@@ -60,6 +60,13 @@ async def install_interception_ca(device,certificate,log_path=None):
         await step('root');await step('wait-for-device',timeout=30);await step('remount',timeout=30)
         destination='/system/etc/security/cacerts/'+digest+'.0'
         await step('push',str(certificate),destination,timeout=30);await step('shell','chmod','644',destination)
+        await step('reboot');await step('wait-for-device',timeout=60)
+        for attempt in range(90):
+            try:
+                if (await device.command('shell','getprop','sys.boot_completed',timeout=3)).strip()==b'1':break
+            except (ValueError,asyncio.TimeoutError):pass
+            if attempt==89:raise AssertionError('AVD did not reload the provisioned CA store')
+            await asyncio.sleep(1)
         await step('shell','input','keyevent','224')
     finally:
         if log_path:Path(log_path).write_text('\n'.join(log))

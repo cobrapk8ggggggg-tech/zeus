@@ -121,7 +121,8 @@ class Projects:
             elif operation == "decode": commands = [["apktool", "d", "-f", "-o", str(work / "decoded"), str(root / "original.apk")]]
             else:
                 commands = [["apktool", "b", str(work / "decoded"), "-o", str(work / "unsigned.apk")],
-                    ["apksigner", "sign", "--ks", os.environ.get("ZEUS_ANDROID_KEYSTORE", "/data/lab.keystore"), "--ks-pass", "pass:android", "--out", str(work / "rebuilt.apk"), str(work / "unsigned.apk")],
+                    ["zipalign", "-p", "-f", "4", str(work / "unsigned.apk"), str(work / "aligned.apk")],
+                    ["apksigner", "sign", "--ks", os.environ.get("ZEUS_ANDROID_KEYSTORE", "/data/lab.keystore"), "--ks-pass", "pass:android", "--out", str(work / "rebuilt.apk"), str(work / "aligned.apk")],
                     ["apksigner", "verify", str(work / "rebuilt.apk")]]
             logs = []
             for command in commands:

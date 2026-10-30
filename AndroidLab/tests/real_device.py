@@ -32,7 +32,7 @@ async def main():
         capture_token=secrets.token_urlsafe(40);os.environ['ZEUS_ANDROID_CAPTURE_TOKEN']=capture_token
         capture_log=(proof/'capture.log').open('w')
         ca_directory=Path(directory)/'capture-ca'
-        capture=subprocess.Popen([os.environ['LAB_CAPTURE_EXE'],'--listen-host','0.0.0.0','--listen-port','8089','-q','--set','confdir='+str(ca_directory),'--set','ssl_verify_upstream_trusted_ca='+str(origin_ca),'-s','AndroidLab/tests/route_probe.py','-s','AndroidLab/zeus_android/capture.py'],
+        capture=subprocess.Popen([os.environ['LAB_CAPTURE_EXE'],'--listen-host','0.0.0.0','--listen-port','8089','--set','connection_strategy=lazy','--set','confdir='+str(ca_directory),'--set','ssl_verify_upstream_trusted_ca='+str(origin_ca),'-s','AndroidLab/tests/route_probe.py','-s','AndroidLab/zeus_android/capture.py'],
             env={**os.environ,'ZEUS_ANDROID_CAPTURE_ENDPOINT':'http://127.0.0.1:8088/internal/capture'},stdout=capture_log,stderr=capture_log)
         async with app.router.lifespan_context(app),httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='https://lab.test',headers={'Authorization':'Bearer '+encode(key,owner,conversation)}) as client:
             async def call(name,args):
@@ -94,6 +94,9 @@ async def main():
                 found=next((e for e in events if e['url'].endswith('/probe')),None)
                 if found:break
                 await asyncio.sleep(.2)
+            if found is None:
+                (proof/'after-send-ui.json').write_text(json.dumps(await call('android_ui',{'operation':'tree'}),ensure_ascii=False))
+                (proof/'after-send.jpg').write_bytes(await device.screenshot())
             assert found is not None,'Actual Android request did not reach capture addon'
             assert base64.b64decode(found['request_body']['base64']).decode()=='مرحبا ZEUS probe',found
             assert found['status']==200,found
@@ -117,6 +120,10 @@ async def main():
                 frame=await asyncio.wait_for(frame_ready,25);assert frame.width>0 and frame.height>0
                 frame.to_image().save(proof/'actual-android-video-frame.jpg')
             finally:await peer.close()
+            browser_token=encode(key,owner,conversation)
+            browser=await asyncio.create_subprocess_exec('node','AndroidLab/tests/browser_device.cjs',
+                env={**os.environ,'LAB_TEST_TOKEN':browser_token,'LAB_PROOF_DIR':str(proof.resolve())})
+            assert await browser.wait()==0,'Actual browser video preview failed'
             await job(project,'analyze')
             sources=await call('android_project',{'operation':'files','project':project,'tree':'sources'})
             assert any(p.endswith('/Probe.java') for p in sources['files']),sources

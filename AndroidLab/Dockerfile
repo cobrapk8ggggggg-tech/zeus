@@ -23,7 +23,7 @@ RUN --mount=type=secret,id=proxy_ca --mount=type=secret,id=system_ca \
     gradle --no-daemon :app:assembleDebug; rm -f /tmp/java-trust /tmp/sdk.zip
 
 FROM python:3.12-slim-bookworm
-RUN apt-get update && apt-get install -y --no-install-recommends adb openjdk-17-jre-headless apksigner curl unzip ca-certificates \
+RUN apt-get update && apt-get install -y --no-install-recommends adb openjdk-17-jre-headless apksigner zipalign curl unzip ca-certificates \
     && rm -rf /var/lib/apt/lists/* && useradd --uid 10002 --create-home zeus-apk
 WORKDIR /opt/zeus
 COPY Cloud/requirements.lock /opt/zeus/Cloud/requirements.lock
