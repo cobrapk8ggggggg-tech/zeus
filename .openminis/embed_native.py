@@ -257,6 +257,7 @@ def embed(native, browser, report):
     definitions = source / "Agent/Chat/AIChatViewModel+ToolDefinitions.swift"
     replace(definitions, "        return tools", """        tools.append(contentsOf: ZEUSNativeAgentBridge.definitions)
         tools.append(contentsOf: ZeusAgentHarness.definitions)
+        tools.append(contentsOf: ZeusAndroidTools.definitions)
         return tools.map { tool in
             var parameters = tool.parameters
             parameters["approval_reason"] = AgentToolParam(type: .string, description: "For consequential actions, explain what you intend to change and why in the user language. The app displays this on an inline approval card.")
@@ -294,7 +295,16 @@ def embed(native, browser, report):
             }
 
 '''
-    adapter += '''        case let name where ZeusAgentSchemas.names.contains(name):
+    adapter += '''        case let name where ZeusAndroidTools.names.contains(name):
+            var result = try await ZeusAndroidTools.execute(name, args: toolArgs, session: sessionId,
+                callID: ZeusAgentHarness.scopedCallID(providerID: tu.id, sourceMessageID: zeusSourceMessageID))
+            if let image = result.removeValue(forKey: "image") as? [String: Any], let encoded = image["data"] as? String {
+                toolImageData = Data(base64Encoded: encoded); toolImageMimeType = image["mime"] as? String
+            }
+            toolOutput = String(decoding: try JSONSerialization.data(withJSONObject: result), as: UTF8.self)
+            toolSuccess = true
+
+        case let name where ZeusAgentSchemas.names.contains(name):
             toolOutput = try await ZeusAgentHarness.shared.execute(name, args: toolArgs,
                 callID: ZeusAgentHarness.scopedCallID(providerID: tu.id, sourceMessageID: zeusSourceMessageID), vm: self)
             if let object = try? JSONSerialization.jsonObject(with: Data(toolOutput.utf8)) as? [String: Any], object["isError"] as? Bool == true { toolSuccess = false }

@@ -6,6 +6,7 @@ import CoreFoundation
 enum ZeusAgentSchemas {
     static let names: Set<String> = ["update_plan", "apply_patch", "exec_command", "write_stdin", "task_checkpoint", "task_verify", "task_verify_mcp", "task_complete", "integration_accounts", "integration_tools", "integration_call", "project_environment", "propose_project_plan", "github_request", "task_verify_github", "github_download_artifact", "github_read_file", "github_write_files", "github_project_inspect"]
     static func schema(_ name: String) -> [String: Any]? {
+        if let android = ZeusAndroidTools.schema(name) { return android }
         var fields: [String: Any] = ["tool_title": ["type": "string"], "approval_reason": ["type": "string"]]
         var requiredFields: [String] = []
         switch name {

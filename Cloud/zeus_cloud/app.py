@@ -19,6 +19,7 @@ from .engine import Engine, Vault, TERMINAL
 from .files import FilesGateway, Workspaces, WORKSPACE_LIMIT, GLOBAL_WORKSPACE, WorkspaceConflict
 from .providers import Models, provider_url, normalize_history
 from .terminal import Terminals
+from .android import AndroidGateway
 
 PROJECT = "https://pdfzdcwkkgapcwsnezvn.supabase.co"
 PUBLISHABLE = "sb_publishable_ByPkZ3pyYzYJBY9QZz6aXg_YYqMe1Lu"
@@ -83,6 +84,12 @@ class TerminalWrite(Input):
     rows: int = Field(default=28, ge=10, le=200)
 
 
+class AndroidToolInput(Input):
+    name: str = Field(pattern="^android_(device|ui|screenshot|network|project)$")
+    arguments: dict = Field(default_factory=dict)
+    request_id: str = Field(min_length=1, max_length=180, pattern=r"^[a-zA-Z0-9_.:-]+$")
+
+
 class Authorizer:
     def __init__(self, owner, email=""): self.owner, self.email, self.cache = owner, email.lower(), {}
     async def __call__(self, authorization: str = Header(default="")):
@@ -126,7 +133,7 @@ class BodyLimit:
         await self.app(scope, replay, send)
 
 
-def create_app(store=None, owner=None, key=None, auth=None, work_root=None, models=None, gateway=None, child_uid=10001):
+def create_app(store=None, owner=None, key=None, auth=None, work_root=None, models=None, gateway=None, child_uid=10001, android=None):
     owner = owner or os.environ.get("ZEUS_OWNER_ID", "")
     owner_email = os.environ.get("ZEUS_OWNER_EMAIL", "")
     key = key or os.environ.get("ZEUS_DATA_KEY", "")
@@ -138,6 +145,7 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
     spaces = Workspaces(work_root or os.environ.get("ZEUS_WORK_ROOT", "/tmp/zeus-work"), gateway, store, vault)
     models = models or Models()
     auth = auth or Authorizer(owner, owner_email)
+    android = android or AndroidGateway()
 
     # Wake connected observers after a durable event. No repeated idle DB poll.
     observers = {}
@@ -173,7 +181,7 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
                 if spaces.path(terminal.owner, GLOBAL_WORKSPACE).is_dir(): await spaces.checkpoint(terminal.owner, GLOBAL_WORKSPACE, grant)
             finally: engine.wakeup.set()
     terminals = Terminals(terminal_event)
-    engine = Engine(store, spaces, models, terminals, vault, child_uid) if vault else None
+    engine = Engine(store, spaces, models, terminals, vault, child_uid, android=android) if vault else None
 
     @asynccontextmanager
     async def lifespan(app):
@@ -192,7 +200,7 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
             await stop_collection()
             if engine: await engine.shutdown()
             if worker: worker.cancel(); await asyncio.gather(worker, return_exceptions=True)
-            await store.close(); await gateway.close(); await models.close()
+            await store.close(); await gateway.close(); await models.close(); await android.close()
 
     app = FastAPI(title="ZEUS Cloud", version="4.0.0", lifespan=lifespan, docs_url=None, redoc_url=None)
     app.add_middleware(BodyLimit)
@@ -215,6 +223,19 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
 
     @app.get("/health")
     async def health(): return {"service": "zeus-cloud", "version": "4.0.0", "ready": app.state.ready, "browser": False}
+
+    @app.get("/v1/android/capabilities")
+    async def android_capabilities(account=Depends(auth)):
+        return {"configured":android.configured, "local_install":False, "automatic_start":False,
+                "reason":None if android.configured else "لم يُربط خادم Android بعد. لا يوجد جهاز تجريبي وهمي ولا تنزيل محلي."}
+
+    @app.post("/v1/android/{conversation}/access")
+    async def android_access(conversation: uuid.UUID, account=Depends(auth)):
+        return android.access(account, str(conversation))
+
+    @app.post("/v1/android/{conversation}/tool")
+    async def android_tool(conversation: uuid.UUID, value: AndroidToolInput, account=Depends(auth)):
+        return await android.tool(account, str(conversation), value.name, value.arguments, value.request_id)
 
     @app.get("/v1/capabilities")
     async def capabilities(account=Depends(auth)):
@@ -487,6 +508,7 @@ def create_app(store=None, owner=None, key=None, auth=None, work_root=None, mode
                     engine.running.cancel(); await asyncio.gather(engine.running, return_exceptions=True)
             for terminal in list(terminals.sessions.values()):
                 if terminal.owner == account and terminal.conversation == conversation: await terminals.stop(account, terminal.id)
+            await android.delete(account,conversation)
             result = await store.delete_conversation(account, conversation)
             import shutil
             await asyncio.to_thread(shutil.rmtree, spaces.path(account, conversation), True)

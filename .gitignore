@@ -11,3 +11,9 @@ ZEUSNext/Resources/FILTER-NOTICES.txt
 ZEUS-Cloudflare-connection*.json
 supabase/.temp/
 Cloud/**/__pycache__/
+# Android lab host configuration, credentials and generated applications.
+AndroidLab/.env
+AndroidLab/**/.gradle/
+AndroidLab/**/build/
+AndroidLab/**/__pycache__/
+android-results/
