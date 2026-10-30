@@ -1,7 +1,7 @@
 {
   "session": "zeus-chatgpt-20261030-e",
-  "sequence": 5,
-  "operation": "observe",
-  "label": "Check whether the submitted guest message completes or produces an error",
-  "settle_seconds": 15
+  "sequence": 6,
+  "operation": "stop",
+  "label": "Guest response Hello observed; stop the bounded trial and collect full capture",
+  "settle_seconds": 1
 }
