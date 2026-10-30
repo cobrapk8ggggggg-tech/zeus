@@ -1,0 +1,11 @@
+# Bounded ChatGPT Android compatibility trial
+
+This is a temporary repository integration test, not a persistent emulator hosting backend. The pinned ChatGPT1.2026.293 bundle is obtained from a public mirror, and every APK is cryptographically verified against the signing certificate published by `https://openai.com/.well-known/assetlinks.json`. The downloaded app is not re-signed or patched. APK files are never committed or uploaded as artifacts.
+
+The API32 Google APIs guest is a clean test device. There are no user credentials, subscriptions or API keys. The controller observes screenshots, the accessibility tree and bounded network events, then waits for reviewed UI commands in `control.json`. The assistant chooses those commands based on the observations; there is no unknown model/provider key in the workflow. The command channel allows tap/type/key/observe/relaunch/proxy on-off/stop only and deduplicates sequence IDs scoped to the launch session. Changes to control.json do not launch a new workflow.
+
+The loop allows at most8actions and10minutes after the first observation, with an overall controller deadline and a25minute workflow timeout. Processes are killed and the emulator is discarded afterwards. A custom Node action publishes immutable, short-lived observation artifacts while the runner is awaiting its next command, without exposing a public control server or ADB port.
+
+A separate controlled HTTPS fixture verifies that the proxy CA setup works. Its events are saved separately and cleared before ChatGPT starts; they must never be presented as ChatGPT traffic. The proxy does not disable TLS verification, patch certificate pinning, change remote API responses or bypass account/device integrity checks. Client/server TLS failures are retained as observations. If the app needs login, integrity verification or blocks the proxy, report that observed limitation rather than claiming a message was sent or all traffic was inspected.
+
+GitHub credentials remain on the runner's control plane. ADB, emulator, Java verifier and capture child processes receive scrubbed environments. Collected artifacts have two-day retention; authorization/cookie headers are redacted. Requests are correlated with action timestamps, not asserted to be caused one-to-one by a tap.
