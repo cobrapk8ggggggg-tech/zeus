@@ -91,6 +91,12 @@ class Device:
             import base64
             value = args.get("text", "")
             if not isinstance(value, str) or not 0 < len(value) <= 4000: raise ValueError("Text is empty or too long")
+            selected=(await self.command("shell","settings","get","secure","default_input_method")).decode().strip()
+            if selected!="com.zeus.lab.ime/.LabIME":
+                # Android can restore its system IME after reboot/editor changes.
+                # Selecting the lab IME is preparation; never retry text itself.
+                await self.command("shell","ime","enable","com.zeus.lab.ime/.LabIME")
+                await self.command("shell","ime","set","com.zeus.lab.ime/.LabIME")
             for attempt in range(25):
                 ready=await self.command("shell","am","broadcast","-a","com.zeus.lab.READY","-p","com.zeus.lab.ime")
                 if b"result=1" in ready: break

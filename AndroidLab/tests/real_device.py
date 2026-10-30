@@ -81,7 +81,10 @@ async def main():
             (proof/'before-type-ime.txt').write_bytes(await device.command('shell','dumpsys','input_method'))
             (proof/'before-type-ime-ready.txt').write_bytes(await device.command('shell','am','broadcast','-a','com.zeus.lab.READY','-p','com.zeus.lab.ime'))
             (proof/'before-type-ime-ready-unscoped.txt').write_bytes(await device.command('shell','am','broadcast','-a','com.zeus.lab.READY'))
-            await call('android_ui',{'operation':'type','text':'مرحبا ZEUS probe'})
+            try:await call('android_ui',{'operation':'type','text':'مرحبا ZEUS probe'})
+            finally:
+                (proof/'after-type-ime.txt').write_bytes(await device.command('shell','dumpsys','input_method'))
+                (proof/'ime-runtime-errors.txt').write_bytes(await device.command('logcat','-d','-t','150','AndroidRuntime:E','*:S'))
             # Keyboard appearance can move the button; reread actual bounds.
             tree=await call('android_ui',{'operation':'tree'})
             await call('android_ui',{'operation':'tap',**point('probeSend')})

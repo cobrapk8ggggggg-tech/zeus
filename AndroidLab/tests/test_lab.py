@@ -139,6 +139,7 @@ class DeviceTests(unittest.IsolatedAsyncioTestCase):
         await device.action('type',{'text':'one message'})
         self.assertEqual(ready,3)
         self.assertEqual(sum('com.zeus.lab.INPUT' in c for c in calls),1)
+        self.assertEqual(sum(c[:3]==('shell','ime','set') for c in calls),1)
 
     async def test_arbitrary_package_and_non_normalized_coordinates_never_reach_adb(self):
         device=Device('emulator-5554')
